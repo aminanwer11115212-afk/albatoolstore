@@ -56,6 +56,100 @@ type LogEntry = { kind: LogKind; msg: string; at: string };
 type StepStatus = "pending" | "running" | "done" | "error";
 type Step = { key: string; title: string; status: StepStatus; progress: number; detail?: string };
 
+type PreflightIssue = { row: number; field: string; message: string; severity: "error" | "warn" };
+type PreflightReport = {
+  fileOk: boolean;
+  totalRows: number;
+  validRows: number;
+  emptyRows: number;
+  duplicates: number;
+  headers: string[];
+  missingColumns: string[];
+  issues: PreflightIssue[];
+  error?: string;
+};
+
+const REQUIRED_CUSTOMER_COLS = ["الاسم / الجهة", "رقم الهاتف"];
+const REQUIRED_PRODUCT_COLS = ["اسم المنتج", "مفعل"];
+
+async function preflightFile(
+  url: string,
+  kind: "customers" | "products"
+): Promise<PreflightReport> {
+  const empty: PreflightReport = {
+    fileOk: false, totalRows: 0, validRows: 0, emptyRows: 0,
+    duplicates: 0, headers: [], missingColumns: [], issues: [],
+  };
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return { ...empty, error: `تعذّر تحميل ${url} (HTTP ${res.status})` };
+    const buf = await res.arrayBuffer();
+    const wb = xlsx.read(buf, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+    if (rows.length === 0) return { ...empty, error: "الملف فارغ" };
+
+    const headers = (rows[0] ?? []).map((h: any) => String(h ?? "").trim());
+    const required = kind === "customers" ? REQUIRED_CUSTOMER_COLS : REQUIRED_PRODUCT_COLS;
+    const missingColumns: string[] = [];
+    // فقط نتحقق من وجود العمودين الأولين (الاسم + الحقل الثاني)
+    if (!headers[0]) missingColumns.push(required[0]);
+    if (!headers[1]) missingColumns.push(required[1]);
+
+    const issues: PreflightIssue[] = [];
+    const seen = new Map<string, number>();
+    let validRows = 0, emptyRows = 0, duplicates = 0;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i] ?? [];
+      const name = row[0] ? String(row[0]).trim() : "";
+      if (!name) { emptyRows++; continue; }
+
+      if (kind === "customers") {
+        const phoneRaw = row[1];
+        const phone = phoneRaw == null ? "" : String(phoneRaw).replace(/[^0-9+]/g, "");
+        if (phoneRaw != null && String(phoneRaw).trim() && !phone) {
+          issues.push({ row: i + 1, field: "phone", message: `هاتف غير صالح: "${phoneRaw}"`, severity: "warn" });
+        }
+        if (name.length > 200) {
+          issues.push({ row: i + 1, field: "name", message: "الاسم أطول من 200 حرف", severity: "warn" });
+        }
+      } else {
+        const active = String(row[1] ?? "").toLowerCase();
+        if (row[1] != null && String(row[1]).trim() &&
+            !["x", "✓", "true", "1", "yes", "نعم", ""].some((v) => active === v || active.includes(v))) {
+          // غير حرج
+        }
+        if (name.length > 200) {
+          issues.push({ row: i + 1, field: "name", message: "اسم المنتج أطول من 200 حرف", severity: "warn" });
+        }
+      }
+
+      const key = name.toLowerCase();
+      if (seen.has(key)) {
+        duplicates++;
+        issues.push({
+          row: i + 1, field: "name",
+          message: `مكرر مع الصف ${seen.get(key)}: "${name}"`,
+          severity: "warn",
+        });
+      } else {
+        seen.set(key, i + 1);
+      }
+      validRows++;
+    }
+
+    return {
+      fileOk: true,
+      totalRows: rows.length - 1,
+      validRows, emptyRows, duplicates,
+      headers, missingColumns, issues,
+    };
+  } catch (e: any) {
+    return { ...empty, error: e?.message ?? String(e) };
+  }
+}
+
 const INITIAL_STEPS: Step[] = [
   { key: "wipe", title: "الدفعة 1 — تفريغ كل البيانات", status: "pending", progress: 0 },
   { key: "customers", title: "الدفعة 2 — استيراد العملاء", status: "pending", progress: 0 },
