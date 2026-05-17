@@ -42,6 +42,7 @@ export default function InvoicesPage() {
   const company = companyArr?.[0] || null;
   const currency = company?.currency || "SDG";
   const [showDispatch, setShowDispatch] = useState(false);
+  const qc = useQueryClient();
 
   const handleWhatsApp = (inv: any) => {
     const phone = inv.customers?.phone;
