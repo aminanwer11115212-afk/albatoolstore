@@ -1563,11 +1563,11 @@ export default function CustomersPage() {
                         </td>
                         <td className="tabular-nums" style={{ padding: 0 }}>
                           <EditableCell
-                            value={c.phone || ""}
+                            value={c.whatsapp || ""}
                             disabled={savingRow === c.id}
-                            onSave={(v) => updateRowField(c.id, { phone: v.trim() || null })}
+                            onSave={(v) => updateRowField(c.id, { whatsapp: v.trim() || null })}
                             inputClassName="text-[11px] tabular-nums"
-                            placeholder="الهاتف"
+                            placeholder="واتساب"
                             inputMode="tel"
                             dir="ltr"
                             validate={(v) => {
