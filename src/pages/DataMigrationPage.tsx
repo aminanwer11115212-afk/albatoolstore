@@ -453,6 +453,87 @@ export default function DataMigrationPage() {
             ))}
           </div>
 
+          {/* التحقق المسبق */}
+          <div className="border rounded-lg p-4 bg-card space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-semibold text-sm">التحقق المسبق من ملفات Excel</div>
+              <Button onClick={runPreflight} disabled={preflightBusy || loading} size="sm" variant="secondary">
+                {preflightBusy ? "جارٍ الفحص..." : preflight ? "إعادة الفحص" : "فحص الملفات"}
+              </Button>
+            </div>
+            {!preflight && (
+              <div className="text-xs text-muted-foreground">
+                اضغط "فحص الملفات" لقراءة customers.xlsx و products.xlsx والتحقق من الأعمدة وعدد الصفوف قبل التنفيذ.
+              </div>
+            )}
+            {preflight && (
+              <div className="grid md:grid-cols-2 gap-3">
+                {([
+                  { key: "customers", title: "العملاء", report: preflight.customers },
+                  { key: "products", title: "المنتجات", report: preflight.products },
+                ] as const).map(({ key, title, report }) => {
+                  const blocked = !report.fileOk || report.missingColumns.length > 0;
+                  return (
+                    <div key={key} className={`border rounded-md p-3 ${blocked ? "border-destructive/50" : "border-border"}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        {blocked
+                          ? <XCircle className="w-4 h-4 text-destructive" />
+                          : report.issues.length > 0
+                            ? <Circle className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                            : <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                        <span className="font-medium text-sm">{title}</span>
+                      </div>
+                      {report.error && <div className="text-xs text-destructive mb-2">⚠ {report.error}</div>}
+                      <div className="grid grid-cols-2 gap-1 text-xs">
+                        <span className="text-muted-foreground">إجمالي الصفوف:</span>
+                        <span className="font-mono tabular-nums">{report.totalRows}</span>
+                        <span className="text-muted-foreground">صفوف صالحة:</span>
+                        <span className="font-mono tabular-nums text-green-600">{report.validRows}</span>
+                        <span className="text-muted-foreground">صفوف فارغة:</span>
+                        <span className="font-mono tabular-nums">{report.emptyRows}</span>
+                        <span className="text-muted-foreground">مكررات:</span>
+                        <span className="font-mono tabular-nums">{report.duplicates}</span>
+                      </div>
+                      {report.headers.length > 0 && (
+                        <div className="mt-2 text-xs">
+                          <span className="text-muted-foreground">الأعمدة المكتشفة: </span>
+                          <span className="font-mono">{report.headers.slice(0, 4).join(" | ") || "—"}</span>
+                        </div>
+                      )}
+                      {report.missingColumns.length > 0 && (
+                        <div className="mt-2 text-xs text-destructive">
+                          أعمدة مفقودة: {report.missingColumns.join("، ")}
+                        </div>
+                      )}
+                      {report.issues.length > 0 && (
+                        <details className="mt-2">
+                          <summary className="text-xs cursor-pointer text-yellow-600">
+                            {report.issues.length} تنبيه — اعرض التفاصيل
+                          </summary>
+                          <div className="mt-1 max-h-40 overflow-y-auto text-xs space-y-0.5 bg-muted/30 p-2 rounded">
+                            {report.issues.slice(0, 100).map((iss, idx) => (
+                              <div key={idx} className={iss.severity === "error" ? "text-destructive" : "text-yellow-700 dark:text-yellow-400"}>
+                                صف {iss.row} ({iss.field}): {iss.message}
+                              </div>
+                            ))}
+                            {report.issues.length > 100 && (
+                              <div className="text-muted-foreground">... و {report.issues.length - 100} تنبيه آخر</div>
+                            )}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {preflightBlocked && (
+              <div className="text-xs text-destructive font-medium">
+                ⛔ لا يمكن تنفيذ الاستيراد حتى يتم إصلاح المشاكل الحرجة في الملفات.
+              </div>
+            )}
+          </div>
+
           {/* التأكيد والأزرار */}
           <div className="space-y-2">
             <label className="text-sm font-medium">
@@ -461,7 +542,7 @@ export default function DataMigrationPage() {
             <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} disabled={loading} placeholder={CONFIRM_PHRASE} />
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={runAll} disabled={loading} variant="destructive">
+            <Button onClick={runAll} disabled={loading || preflightBlocked} variant="destructive">
               {loading ? "جارٍ التنفيذ..." : "تنفيذ كل الدفعات"}
             </Button>
             <Button onClick={runWipeOnly} disabled={loading} variant="outline">
