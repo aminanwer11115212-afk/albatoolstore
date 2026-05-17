@@ -83,9 +83,6 @@ export default function InvoicesPage() {
       toast.error(e?.message || "تعذّر حذف الفاتورة");
     }
   };
-
-  const qc = useQueryClient();
-
   const handleWorkflowChange = async (inv: any, newStatus: WorkflowStatus) => {
     if (newStatus === inv.workflow_status) return;
     const before = (inv.workflow_status || "new") as WorkflowStatus;
