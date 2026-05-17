@@ -1,88 +1,102 @@
-## الهدف
-عند حذف أي فاتورة من أي شاشة (قائمة الفواتير، شاشة عرض الفاتورة، شاشة تعديل الفاتورة) يتم:
-1. إرجاع كميات بنود الفاتورة بالكامل إلى مخزون المنتجات.
-2. حذف الفاتورة وكل توابعها (بنود، مرفقات، تغليف، نقل) فعلياً من قاعدة البيانات.
-3. ضمان أن المخزون الذي يظهر في شاشات الإدخال الأربع (فاتورة، عرض سعر، شراء، مرتجع) هو المخزون الفعلي الحالي بعد التحديث.
+
+# خطة إعادة تهيئة النظام بالبيانات الحقيقية
+
+سيتم تنفيذها على **5 دفعات متسلسلة**، كل دفعة قابلة للتحقق قبل الانتقال للتالية.
+
+## 📁 رفع الملفات إلى المشروع
+- نسخ `دليل_الاسماء_👥.xlsx` → `public/import/customers.xlsx` (305 صف: اسم + هاتف)
+- نسخ `المنتجات🛒📦_عطبرة_1.xlsx` → `public/import/products.xlsx` (638 صف: اسم الصنف + علامة تنشيط)
 
 ---
 
-## الوضع الحالي (ما يعمل وما لا يعمل)
+## الدفعة 1 — تفريغ كامل لكل البيانات التشغيلية
 
-| الشاشة | الحذف يعمل؟ | يُرجع المخزون؟ | المشكلة |
-|---|---|---|---|
-| `InvoicesPage` (القائمة) | ✅ | ⚠️ جزئياً | يُرجع دائماً حتى لو الفاتورة لم تُخصم أصلاً (حالة "جديدة") → تضخّم مخزون وهمي |
-| `InvoiceCreatePage` (زر حذف داخل التعديل) | ✅ | ⚠️ جزئياً | نفس المشكلة أعلاه + يبتلع أخطاء إرجاع المخزون بصمت (`console.warn`) ويكمل الحذف |
-| `InvoiceViewPage` (شاشة عرض الفاتورة) | ❌ | ❌ | يضع `status='cancelled'` فقط — لا يحذف ولا يُرجع مخزون |
-| عرض المخزون في 4 شاشات الإدخال | ✅ | — | يقرأ من `products.stock_quantity` مباشرة عبر `fetchAllProducts` — سليم |
+أداة جديدة في `/migration` (إعادة كتابة `DataMigrationPage.tsx`) تحذف بالترتيب الصحيح (children → parents) لتفادي قيود FK:
 
-السياسة الموجودة في `stockDeduction.ts` واضحة:
-- خصم المخزون يحدث **مرة واحدة فقط** عند نقل الفاتورة من حالة "جديدة" إلى أي حالة تجهيز، ويُسجَّل بـ `invoices.stock_deduction_id` كحارس (guard) idempotent.
-- إذن: إرجاع المخزون عند الحذف يجب أن يكون **مشروطاً بوجود `stock_deduction_id`** فقط.
+**جداول الفواتير:**
+`invoice_packaging_items` → `invoice_packaging` → `invoice_transports_items` → `invoice_transports` → `invoice_attachments` → `invoice_revisions` → `deleted_invoice_items` → `invoice_items` → `invoices`
 
----
+**جداول عروض الأسعار:**
+`quotes_packaging_items` → `quotes_packaging` → `quote_transports` → `deleted_quote_items` → `quote_items` → `quotes`
 
-## الخطوات
+**جداول المشتريات والمرتجعات والتحويلات:**
+`purchase_items` → `purchase_orders` → `stock_return_items` → `stock_returns` → `stock_transfer_items` → `stock_transfers`
 
-### 1) دالة موحّدة `deleteInvoiceWithStockRestore`
-ملف جديد `src/utils/deleteInvoice.ts` يحتوي على دالة واحدة تُستدعى من كل شاشات الحذف:
+**روابط ومنتجات وعملاء:**
+`product_category_links` → `product_brand_links` → `customer_destinations` → `customer_preferred_transporter` → `customer_transporters` → `products` → `customers`
 
-```text
-deleteInvoiceWithStockRestore(invoiceId)
-  ├─ يقرأ الفاتورة: stock_deduction_id, invoice_number
-  ├─ يقرأ بنود invoice_items
-  ├─ إذا (stock_deduction_id موجود وبنود > 0):
-  │     يُرجع الكميات عبر applyStockDeltaForLines(oldItems, [])
-  │     إن فشل → يوقف العملية ويُلقي خطأ (لا يحذف)
-  ├─ يحذف توابع الفاتورة بالترتيب الآمن:
-  │     invoices_packaging_items → invoice_packaging
-  │     invoices_transports_items → invoice_transports
-  │     invoice_items, invoice_attachments
-  ├─ يحذف الفاتورة نفسها من invoices
-  ├─ يطلق window event "products:changed" لتحديث الكاشات
-  └─ يُرجع { restoredStock: boolean, invoiceNumber }
-```
+كل خطوة تطبع عدد الصفوف المحذوفة في سجل مرئي، مع زر تأكيد مزدوج باللون الأحمر.
 
-هذا يضمن سلوكاً موحّداً في كل مكان ويمنع تكرار المنطق.
-
-### 2) تحديث مواقع الحذف الثلاثة لتستدعي الدالة الجديدة
-
-**أ. `src/pages/InvoicesPage.tsx`** (دالة `handleDelete` السطر 65-94):
-- إزالة الكود اليدوي لإرجاع المخزون والاستبدال باستدعاء `deleteInvoiceWithStockRestore`.
-- رسالة النجاح تتغير بحسب `restoredStock` (إن لم تكن مُخصومة: "تم الحذف" فقط؛ وإلا: "تم الحذف وإرجاع الكميات").
-
-**ب. `src/pages/InvoiceCreatePage.tsx`** (مربع تأكيد المسح/الحذف، السطر 2386-2470):
-- استبدال الـ 5 خطوات اليدوية باستدعاء `deleteInvoiceWithStockRestore`.
-- في حال فشل إرجاع المخزون → عرض الخطأ في toast وإيقاف العملية (بدل ابتلاع الخطأ بـ `console.warn`).
-- الإبقاء على تنظيف كاش React Query والانتقال إلى `/invoices/create`.
-
-**ج. `src/pages/InvoiceViewPage.tsx`** (دالة `handleDelete` السطر 252-259):
-- استبدال `update({status:'cancelled'})` بحذف فعلي عبر `deleteInvoiceWithStockRestore`.
-- تغيير نص التأكيد إلى: "هل أنت متأكد من حذف هذه الفاتورة؟ سيتم إرجاع الكميات إلى المخزون."
-- بعد النجاح: `navigate("/invoices", { replace: true })`.
-
-### 3) التحقق من شاشات الإدخال (لا تغيير، فقط فحص)
-الشاشات الأربع التالية تقرأ المخزون عبر `fetchAllProducts` الذي يستعلم مباشرة من جدول `products` (مع pagination صحيح):
-
-- `InvoiceCreatePage` ← `products.stock_quantity`
-- `QuoteCreatePage` ← `products.stock_quantity`
-- `StockReturnCreatePage` ← `products.stock_quantity`
-- `PurchaseCreatePage` ← `products.stock_quantity`
-
-كل شاشة منها مُشتركة في حدث `products:changed` (يُطلق تلقائياً من `applyDeltas` داخل `stockDeduction.ts` وأيضاً سنُطلقه من دالة الحذف الجديدة). أيضاً `ProductsCacheSync` يستمع لهذا الحدث ويُبطل الكاش.
-
-سأتحقق أثناء التنفيذ من أن كل شاشة من الأربع تستمع للحدث وتُعيد الجلب — وأُصلح أي شاشة لا تفعل.
+✅ **نتيجة الدفعة:** صفر فواتير، صفر عروض، صفر مشتريات، صفر مرتجعات، صفر منتجات، صفر عملاء. شاشات "آخر 50 فاتورة/عرض" تظهر فارغة.
 
 ---
 
-## ملاحظات تقنية
+## الدفعة 2 — استيراد العملاء (305 عميل)
 
-- **Idempotency محفوظ**: حقل `stock_deduction_id` هو الحارس الوحيد لقرار "هل أُرجع المخزون أم لا" — لا توجد حالة double-restore.
-- **عدم التراجع عند الفشل**: إذا فشل إرجاع المخزون لأي سبب (مثلاً منتج محذوف)، لا تُحذف الفاتورة، ويظهر للمستخدم خطأ واضح بدل خسارة صامتة.
-- **الفواتير الملغاة (`status='cancelled'`) القديمة**: لن تتأثر بهذا التغيير — السلوك الجديد يطبق فقط على عمليات حذف جديدة.
-- **عروض الأسعار والمرتجعات**: خارج نطاق هذا الطلب (المستخدم طلب الفواتير تحديداً). عروض الأسعار لا تخصم مخزوناً أصلاً وفق `stockDeduction.ts`.
+- قراءة `public/import/customers.xlsx` عبر مكتبة `xlsx` الموجودة فعلاً
+- لكل صف:
+  - `name` ← العمود 1 (تنظيف المسافات)
+  - `whatsapp` ← العمود 2 (إزالة `\u200e`، الرموز غير الرقمية ما عدا `+`)
+  - `phone`, `email`, `address`, `city`, `company`, `notes`, `balance` ← **NULL** (يتركها المستخدم ليعدّلها لاحقاً)
+- إدراج على دفعات 50 صف لتفادي مهلة الطلب
+- عدّاد حيّ + إعادة محاولة للصفوف الفاشلة
 
-## الملفات المتأثرة
-- جديد: `src/utils/deleteInvoice.ts`
-- تعديل: `src/pages/InvoicesPage.tsx`
-- تعديل: `src/pages/InvoiceCreatePage.tsx`
-- تعديل: `src/pages/InvoiceViewPage.tsx`
+✅ **نتيجة الدفعة:** ظهور 305 عميل في `/customers` بالاسم والواتساب فقط.
+
+---
+
+## الدفعة 3 — استيراد المنتجات (638 منتج)
+
+- قراءة `public/import/products.xlsx`
+- لكل صف:
+  - `name` ← العمود 1 (اسم الصنف، يقبل الإيموجي والنص الطويل)
+  - `is_active` ← `true` إذا العمود 2 يحتوي `[x]`، وإلا `false`
+  - `stock_quantity` = 0, `sale_price` = 0, `purchase_price` = 0, `min_stock` = 0
+  - باقي الحقول (sku, unit, category_id, warehouse_id, supplier_id, ...) ← **NULL**
+- إدراج على دفعات 50
+
+✅ **نتيجة الدفعة:** ظهور 638 منتج في `/products` وفي اقتراحات شاشات الفواتير/العروض/المشتريات/المرتجعات.
+
+---
+
+## الدفعة 4 — إعادة بناء صفحة التصدير `/export`
+
+استبدال `ExportPage.tsx` بصفحة تدعم النظام الحالي بالكامل:
+
+**صادرات بصيغة XLSX (وليس CSV فقط) لكل جدول حقيقي:**
+- المنتجات (كل الأعمدة الفعلية + الفئات والماركات)
+- العملاء (مع الأرصدة والوجهات)
+- الموردون
+- الفواتير + بنودها (ملف بورقتين)
+- عروض الأسعار + بنودها
+- المشتريات + بنودها
+- المرتجعات + بنودها
+- التحويلات المخزنية
+- الحسابات والمعاملات
+- نسخة احتياطية كاملة (ملف XLSX واحد فيه كل الجداول كأوراق)
+
+**استيرادات مماثلة في `/import`:**
+- إعادة كتابة `ImportProductsPage` لتقرأ XLSX/CSV فعلياً وتدرج في `products`
+- إضافة استيراد عملاء وموردين بنفس النمط
+- التحقق من الأعمدة المطلوبة + تقرير أخطاء بالصف
+
+✅ **نتيجة الدفعة:** تصدير/استيراد يعمل فعلياً بدل الواجهة الوهمية.
+
+---
+
+## الدفعة 5 — التحقق النهائي
+
+- تشغيل `/migration` → تنفيذ الدفعات 1+2+3 بزر واحد متسلسل
+- فتح `/invoices`, `/quotes`, `/purchases`, `/stock-returns` → التأكد من خلوّها
+- فتح `/customers` → 305
+- فتح `/products` → 638
+- فتح شاشة إنشاء فاتورة → التأكد أن البحث عن منتج يُظهر الـ638
+- فتح شاشة إنشاء فاتورة → التأكد أن البحث عن عميل يُظهر الـ305
+
+---
+
+## ⚠️ تنبيهات تقنية
+- العملية **غير قابلة للتراجع**. سيُطلب تأكيد نصي (`نعم احذف`) قبل التنفيذ.
+- لا تغييرات على المخطط (schema) — فقط `DELETE` + `INSERT`.
+- لا حاجة لـ migrations لأن العملية بيانات فقط.
+- مكتبة `xlsx` موجودة فعلاً في `package.json` ولا حاجة لتثبيت أي شيء.
