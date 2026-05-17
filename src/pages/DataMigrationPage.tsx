@@ -71,6 +71,11 @@ export default function DataMigrationPage() {
   const [stats, setStats] = useState({ success: 0, errors: 0, warnings: 0 });
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [preflight, setPreflight] = useState<null | {
+    customers: PreflightReport;
+    products: PreflightReport;
+  }>(null);
+  const [preflightBusy, setPreflightBusy] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   // مؤقّت الوقت المنقضي
