@@ -317,6 +317,32 @@ export default function DataMigrationPage() {
     setElapsed(0);
   };
 
+  const runPreflight = async () => {
+    setPreflightBusy(true);
+    try {
+      const [customers, products] = await Promise.all([
+        preflightFile("/import/customers.xlsx", "customers"),
+        preflightFile("/import/products.xlsx", "products"),
+      ]);
+      setPreflight({ customers, products });
+      const totalIssues = customers.issues.length + products.issues.length;
+      const blocked =
+        !customers.fileOk || !products.fileOk ||
+        customers.missingColumns.length > 0 || products.missingColumns.length > 0;
+      if (blocked) toast.error("توجد مشاكل تمنع التنفيذ");
+      else if (totalIssues > 0) toast.warning(`اكتمل التحقق مع ${totalIssues} تنبيه`);
+      else toast.success("الملفات صالحة للاستيراد");
+    } finally {
+      setPreflightBusy(false);
+    }
+  };
+
+  const preflightBlocked = !!preflight && (
+    !preflight.customers.fileOk || !preflight.products.fileOk ||
+    preflight.customers.missingColumns.length > 0 ||
+    preflight.products.missingColumns.length > 0
+  );
+
   const runAll = async () => {
     if (confirm !== CONFIRM_PHRASE) {
       toast.error(`اكتب "${CONFIRM_PHRASE}" للتأكيد`);
