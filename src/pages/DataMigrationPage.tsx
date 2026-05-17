@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { CheckCircle2, XCircle, Loader2, Circle } from "lucide-react";
 import * as xlsx from "xlsx";
 
 // ترتيب الحذف: من children إلى parents لتفادي قيود FK
 const DELETE_ORDER: string[] = [
-  // Invoice tree
   "invoices_packaging_items",
   "invoice_packaging_items",
   "invoice_packaging",
@@ -19,33 +20,28 @@ const DELETE_ORDER: string[] = [
   "deleted_invoice_items",
   "invoice_items",
   "invoices",
-  // Quote tree
   "quotes_packaging_items",
   "quotes_packaging",
   "quote_transports",
   "deleted_quote_items",
   "quote_items",
   "quotes",
-  // Purchases / returns / transfers
   "purchase_items",
   "purchase_orders",
   "stock_return_items",
   "stock_returns",
   "stock_transfer_items",
   "stock_transfers",
-  // Product/customer relations
   "product_category_links",
   "product_brand_links",
   "customer_destinations",
   "customer_preferred_transporter",
   "customer_transporters",
-  // Core entities
   "products",
   "customers",
 ];
 
 const CONFIRM_PHRASE = "نعم احذف";
-
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const cleanPhone = (raw: any): string | null => {
@@ -55,86 +51,139 @@ const cleanPhone = (raw: any): string | null => {
   return cleaned || null;
 };
 
+type LogKind = "info" | "success" | "error" | "warn";
+type LogEntry = { kind: LogKind; msg: string; at: string };
+type StepStatus = "pending" | "running" | "done" | "error";
+type Step = { key: string; title: string; status: StepStatus; progress: number; detail?: string };
+
+const INITIAL_STEPS: Step[] = [
+  { key: "wipe", title: "الدفعة 1 — تفريغ كل البيانات", status: "pending", progress: 0 },
+  { key: "customers", title: "الدفعة 2 — استيراد العملاء", status: "pending", progress: 0 },
+  { key: "products", title: "الدفعة 3 — استيراد المنتجات", status: "pending", progress: 0 },
+];
+
 export default function DataMigrationPage() {
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState("");
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [steps, setSteps] = useState<Step[]>(INITIAL_STEPS);
+  const [overall, setOverall] = useState(0);
+  const [stats, setStats] = useState({ success: 0, errors: 0, warnings: 0 });
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const logRef = useRef<HTMLDivElement>(null);
 
-  const addLog = (msg: string) => {
-    setLogs((prev) => [...prev, msg]);
+  // مؤقّت الوقت المنقضي
+  useEffect(() => {
+    if (!startedAt || !loading) return;
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [startedAt, loading]);
+
+  // تمرير تلقائي للسجل
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [logs]);
+
+  const addLog = (kind: LogKind, msg: string) => {
+    const at = new Date().toLocaleTimeString("ar-EG", { hour12: false });
+    setLogs((p) => [...p, { kind, msg, at }]);
+    setStats((s) => ({
+      success: s.success + (kind === "success" ? 1 : 0),
+      errors: s.errors + (kind === "error" ? 1 : 0),
+      warnings: s.warnings + (kind === "warn" ? 1 : 0),
+    }));
     // eslint-disable-next-line no-console
-    console.log(msg);
+    console.log(`[${kind}]`, msg);
   };
 
-  // ───────────── الدفعة 1: حذف الكل ─────────────
+  const updateStep = (key: string, patch: Partial<Step>) =>
+    setSteps((prev) => prev.map((s) => (s.key === key ? { ...s, ...patch } : s)));
+
+  const recomputeOverall = (curSteps: Step[]) => {
+    const total = curSteps.reduce((sum, s) => sum + s.progress, 0) / curSteps.length;
+    setOverall(Math.round(total));
+  };
+
+  const setStepProgress = (key: string, progress: number, detail?: string) => {
+    setSteps((prev) => {
+      const next = prev.map((s) => (s.key === key ? { ...s, progress, detail: detail ?? s.detail } : s));
+      recomputeOverall(next);
+      return next;
+    });
+  };
+
+  // ───────── الدفعة 1 ─────────
   const wipeAll = async () => {
-    addLog("════ الدفعة 1: تفريغ كل البيانات ════");
-    for (const table of DELETE_ORDER) {
-      addLog(`جاري تفريغ ${table}...`);
-      const { error, count } = await (supabase as any)
-        .from(table)
-        .delete({ count: "exact" })
-        .neq("id", "00000000-0000-0000-0000-000000000000");
-      if (error) {
-        addLog(`⚠️ تخطّي ${table}: ${error.message}`);
-      } else {
-        addLog(`  ✓ حُذف ${count ?? "?"} صف من ${table}`);
+    updateStep("wipe", { status: "running", progress: 0, detail: "بدء التفريغ..." });
+    addLog("info", "════ الدفعة 1: تفريغ كل البيانات ════");
+    const total = DELETE_ORDER.length;
+    for (let i = 0; i < total; i++) {
+      const table = DELETE_ORDER[i];
+      try {
+        const { error, count } = await (supabase as any)
+          .from(table)
+          .delete({ count: "exact" })
+          .neq("id", "00000000-0000-0000-0000-000000000000");
+        if (error) {
+          addLog("warn", `تخطّي ${table}: ${error.message}`);
+        } else {
+          addLog("success", `حُذف ${count ?? "?"} صف من ${table}`);
+        }
+      } catch (e: any) {
+        addLog("error", `فشل ${table}: ${e?.message ?? e}`);
       }
-      await delay(50);
+      setStepProgress("wipe", Math.round(((i + 1) / total) * 100), `${i + 1}/${total} — ${table}`);
+      await delay(40);
     }
-    addLog("✅ اكتمل التفريغ.");
+    updateStep("wipe", { status: "done", progress: 100, detail: "اكتمل التفريغ" });
+    addLog("success", "✅ اكتمل التفريغ.");
   };
 
-  // ───────────── الدفعة 2: استيراد العملاء ─────────────
+  // ───────── الدفعة 2 ─────────
   const importCustomers = async () => {
-    addLog("════ الدفعة 2: استيراد العملاء ════");
+    updateStep("customers", { status: "running", progress: 0, detail: "قراءة الملف..." });
+    addLog("info", "════ الدفعة 2: استيراد العملاء ════");
     const res = await fetch("/import/customers.xlsx");
-    if (!res.ok) throw new Error("تعذّر تحميل ملف العملاء من /import/customers.xlsx");
+    if (!res.ok) throw new Error("تعذّر تحميل /import/customers.xlsx");
     const buf = await res.arrayBuffer();
     const wb = xlsx.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
-
     const toInsert: any[] = [];
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       const name = row?.[0] ? String(row[0]).trim() : "";
       if (!name) continue;
-      toInsert.push({
-        name,
-        whatsapp: cleanPhone(row?.[1]),
-        phone: null,
-        email: null,
-        address: null,
-        city: null,
-        company: null,
-        notes: null,
-      });
+      toInsert.push({ name, whatsapp: cleanPhone(row?.[1]), phone: null, email: null, address: null, city: null, company: null, notes: null });
     }
-
-    addLog(`عدد العملاء للإدراج: ${toInsert.length}`);
+    addLog("info", `سيتم إدراج ${toInsert.length} عميل`);
     let inserted = 0;
     for (let i = 0; i < toInsert.length; i += 50) {
       const batch = toInsert.slice(i, i + 50);
       const { error } = await supabase.from("customers").insert(batch);
-      if (error) throw new Error(`خطأ إدراج العملاء عند الصف ${i}: ${error.message}`);
+      if (error) {
+        addLog("error", `خطأ عند الصف ${i}: ${error.message}`);
+        throw new Error(error.message);
+      }
       inserted += batch.length;
-      addLog(`  ... تم إدراج ${inserted}/${toInsert.length}`);
-      await delay(80);
+      setStepProgress("customers", Math.round((inserted / toInsert.length) * 100), `${inserted}/${toInsert.length}`);
+      addLog("success", `أُدرج ${inserted}/${toInsert.length} عميل`);
+      await delay(60);
     }
-    addLog(`✅ تم إدراج ${inserted} عميل.`);
+    updateStep("customers", { status: "done", progress: 100, detail: `${inserted} عميل` });
   };
 
-  // ───────────── الدفعة 3: استيراد المنتجات ─────────────
+  // ───────── الدفعة 3 ─────────
   const importProducts = async () => {
-    addLog("════ الدفعة 3: استيراد المنتجات ════");
+    updateStep("products", { status: "running", progress: 0, detail: "قراءة الملف..." });
+    addLog("info", "════ الدفعة 3: استيراد المنتجات ════");
     const res = await fetch("/import/products.xlsx");
-    if (!res.ok) throw new Error("تعذّر تحميل ملف المنتجات من /import/products.xlsx");
+    if (!res.ok) throw new Error("تعذّر تحميل /import/products.xlsx");
     const buf = await res.arrayBuffer();
     const wb = xlsx.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
-
     const toInsert: any[] = [];
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -142,47 +191,53 @@ export default function DataMigrationPage() {
       if (!name) continue;
       const activeCell = String(row?.[1] ?? "").toLowerCase();
       const isActive = activeCell.includes("x") || activeCell.includes("✓") || activeCell === "true";
-      toInsert.push({
-        name,
-        is_active: isActive,
-        stock_quantity: 0,
-        sale_price: 0,
-        purchase_price: 0,
-        min_stock: 0,
-      });
+      toInsert.push({ name, is_active: isActive, stock_quantity: 0, sale_price: 0, purchase_price: 0, min_stock: 0 });
     }
-
-    addLog(`عدد المنتجات للإدراج: ${toInsert.length}`);
+    addLog("info", `سيتم إدراج ${toInsert.length} منتج`);
     let inserted = 0;
     for (let i = 0; i < toInsert.length; i += 50) {
       const batch = toInsert.slice(i, i + 50);
       const { error } = await supabase.from("products").insert(batch);
-      if (error) throw new Error(`خطأ إدراج المنتجات عند الصف ${i}: ${error.message}`);
+      if (error) {
+        addLog("error", `خطأ عند الصف ${i}: ${error.message}`);
+        throw new Error(error.message);
+      }
       inserted += batch.length;
-      addLog(`  ... تم إدراج ${inserted}/${toInsert.length}`);
-      await delay(80);
+      setStepProgress("products", Math.round((inserted / toInsert.length) * 100), `${inserted}/${toInsert.length}`);
+      addLog("success", `أُدرج ${inserted}/${toInsert.length} منتج`);
+      await delay(60);
     }
-    addLog(`✅ تم إدراج ${inserted} منتج.`);
+    updateStep("products", { status: "done", progress: 100, detail: `${inserted} منتج` });
+  };
+
+  const reset = () => {
+    setLogs([]);
+    setSteps(INITIAL_STEPS.map((s) => ({ ...s })));
+    setOverall(0);
+    setStats({ success: 0, errors: 0, warnings: 0 });
+    setElapsed(0);
   };
 
   const runAll = async () => {
     if (confirm !== CONFIRM_PHRASE) {
-      toast.error(`اكتب "${CONFIRM_PHRASE}" في الحقل للتأكيد`);
+      toast.error(`اكتب "${CONFIRM_PHRASE}" للتأكيد`);
       return;
     }
+    reset();
     setLoading(true);
-    setLogs([]);
+    setStartedAt(Date.now());
     try {
       await wipeAll();
       await importCustomers();
       await importProducts();
-      addLog("🎉 اكتملت كل الدفعات بنجاح! النظام جاهز.");
+      addLog("success", "🎉 اكتملت كل الدفعات بنجاح!");
       toast.success("اكتمل ترحيل البيانات");
-      // إعلام الكاش بالتحديث
       window.dispatchEvent(new Event("products:changed"));
       window.dispatchEvent(new Event("invoices:changed"));
     } catch (e: any) {
-      addLog(`❌ خطأ: ${e.message}`);
+      addLog("error", `❌ توقّف التنفيذ: ${e.message}`);
+      // ضع الخطوة الحالية في حالة خطأ
+      setSteps((prev) => prev.map((s) => (s.status === "running" ? { ...s, status: "error" } : s)));
       toast.error(e.message);
     } finally {
       setLoading(false);
@@ -191,65 +246,118 @@ export default function DataMigrationPage() {
 
   const runWipeOnly = async () => {
     if (confirm !== CONFIRM_PHRASE) {
-      toast.error(`اكتب "${CONFIRM_PHRASE}" في الحقل للتأكيد`);
+      toast.error(`اكتب "${CONFIRM_PHRASE}" للتأكيد`);
       return;
     }
+    reset();
     setLoading(true);
-    setLogs([]);
+    setStartedAt(Date.now());
     try {
       await wipeAll();
+      // اعتبر باقي الخطوات متجاهلة
+      updateStep("customers", { status: "done", progress: 100, detail: "تم التخطي" });
+      updateStep("products", { status: "done", progress: 100, detail: "تم التخطي" });
       toast.success("تم تفريغ النظام");
     } catch (e: any) {
-      addLog(`❌ خطأ: ${e.message}`);
+      addLog("error", `❌ ${e.message}`);
       toast.error(e.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${r.toString().padStart(2, "0")}`;
+  };
+
+  const StepIcon = ({ status }: { status: StepStatus }) => {
+    if (status === "done") return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+    if (status === "error") return <XCircle className="w-5 h-5 text-destructive" />;
+    if (status === "running") return <Loader2 className="w-5 h-5 text-primary animate-spin" />;
+    return <Circle className="w-5 h-5 text-muted-foreground" />;
+  };
+
+  const logColor = (k: LogKind) =>
+    k === "success" ? "text-green-400"
+    : k === "error" ? "text-red-400"
+    : k === "warn" ? "text-yellow-400"
+    : "text-slate-300";
+
   return (
     <div className="p-6" dir="rtl">
-      <Card className="max-w-3xl mx-auto">
+      <Card className="max-w-4xl mx-auto">
         <CardHeader>
-          <CardTitle>ترحيل بيانات النظام — تفريغ شامل واستيراد حقيقي</CardTitle>
+          <CardTitle>ترحيل بيانات النظام — تتبع التقدم خطوة بخطوة</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-sm text-muted-foreground space-y-1">
-            <p>سيتم تنفيذ ٣ دفعات متسلسلة:</p>
-            <ol className="list-decimal pr-6 space-y-1">
-              <li>حذف كل الفواتير، عروض الأسعار، المشتريات، المرتجعات، التحويلات، المنتجات، والعملاء.</li>
-              <li>استيراد ٣٠٥ عميل (الاسم + الواتساب فقط) من <code>دليل_الاسماء</code>.</li>
-              <li>استيراد ٦٣٨ منتج (الاسم + التفعيل) من <code>المنتجات_عطبرة</code>.</li>
-            </ol>
-            <p className="text-destructive font-semibold mt-2">⚠️ العملية غير قابلة للتراجع.</p>
+        <CardContent className="space-y-5">
+          {/* شريط التقدم الإجمالي */}
+          <div className="space-y-2 p-4 rounded-lg border bg-card">
+            <div className="flex justify-between items-center text-sm">
+              <span className="font-semibold">التقدم الإجمالي</span>
+              <span className="font-mono tabular-nums">{overall}%</span>
+            </div>
+            <Progress value={overall} className="h-3" />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>الوقت المنقضي: {fmtTime(elapsed)}</span>
+              <span>
+                <span className="text-green-600">✓ {stats.success}</span>
+                {" · "}
+                <span className="text-yellow-600">⚠ {stats.warnings}</span>
+                {" · "}
+                <span className="text-destructive">✕ {stats.errors}</span>
+              </span>
+            </div>
           </div>
 
+          {/* الخطوات */}
+          <div className="space-y-3">
+            {steps.map((s) => (
+              <div key={s.key} className="border rounded-lg p-3 bg-card">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2">
+                    <StepIcon status={s.status} />
+                    <span className="font-medium text-sm">{s.title}</span>
+                  </div>
+                  <span className="text-xs font-mono tabular-nums text-muted-foreground">{s.progress}%</span>
+                </div>
+                <Progress value={s.progress} className="h-2" />
+                {s.detail && <div className="text-xs text-muted-foreground mt-1.5">{s.detail}</div>}
+              </div>
+            ))}
+          </div>
+
+          {/* التأكيد والأزرار */}
           <div className="space-y-2">
             <label className="text-sm font-medium">
               اكتب <code className="bg-muted px-1 rounded">{CONFIRM_PHRASE}</code> للتأكيد:
             </label>
-            <Input
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              disabled={loading}
-              placeholder={CONFIRM_PHRASE}
-            />
+            <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} disabled={loading} placeholder={CONFIRM_PHRASE} />
           </div>
-
           <div className="flex gap-2 flex-wrap">
             <Button onClick={runAll} disabled={loading} variant="destructive">
-              {loading ? "جارٍ التنفيذ..." : "تنفيذ كل الدفعات (حذف + استيراد)"}
+              {loading ? "جارٍ التنفيذ..." : "تنفيذ كل الدفعات"}
             </Button>
             <Button onClick={runWipeOnly} disabled={loading} variant="outline">
-              تفريغ فقط (بدون استيراد)
+              تفريغ فقط
+            </Button>
+            <Button onClick={reset} disabled={loading} variant="ghost">
+              إعادة تعيين
             </Button>
           </div>
 
-          <div className="bg-slate-900 text-green-400 p-4 rounded-md h-96 overflow-y-auto font-mono text-xs">
-            {logs.map((log, i) => (
-              <div key={i}>{log}</div>
-            ))}
-            {logs.length === 0 && <div className="text-slate-500">سجل العملية سيظهر هنا...</div>}
+          {/* السجل */}
+          <div>
+            <div className="text-sm font-medium mb-2">سجل التنفيذ ({logs.length})</div>
+            <div ref={logRef} className="bg-slate-900 p-4 rounded-md h-80 overflow-y-auto font-mono text-xs space-y-0.5">
+              {logs.map((l, i) => (
+                <div key={i} className={logColor(l.kind)}>
+                  <span className="text-slate-500">[{l.at}]</span> {l.msg}
+                </div>
+              ))}
+              {logs.length === 0 && <div className="text-slate-500">سجل العملية سيظهر هنا...</div>}
+            </div>
           </div>
         </CardContent>
       </Card>
