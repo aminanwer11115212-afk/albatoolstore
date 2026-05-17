@@ -1699,7 +1699,7 @@ export default function CustomersPage() {
                   <MobileDocCard
                     key={c.id}
                     index={(page - 1) * perPage + idx + 1}
-                    number={c.phone || "—"}
+                    number={c.whatsapp || c.phone || "—"}
                     party={c.name}
                     date={[regionName, stateName].filter(Boolean).join(" • ")}
                     amount={
