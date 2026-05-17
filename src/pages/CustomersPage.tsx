@@ -214,7 +214,7 @@ export default function CustomersPage() {
     if (filterState && c.state_id !== filterState) return false;
     if (filterLocality && c.locality_id !== filterLocality) return false;
     if (filterName && !(c.name || "").toLowerCase().includes(filterName.toLowerCase())) return false;
-    if (filterPhone && !normalizePhone(c.phone || "").includes(normalizePhone(filterPhone))) return false;
+    if (filterPhone && !normalizePhone(c.whatsapp || c.phone || "").includes(normalizePhone(filterPhone))) return false;
     if (filterAddress && !(c.address || "").toLowerCase().includes(filterAddress.toLowerCase())) return false;
     if (filterGroup && c.group_id !== filterGroup) return false;
     if (filterTransporter && customerTransporter[c.id] !== filterTransporter) return false;
