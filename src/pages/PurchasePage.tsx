@@ -1,0 +1,403 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSuppliers, useCompanySettings, usePurchaseOrders } from "@/hooks/useData";
+import { toast } from "sonner";
+import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
+import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
+import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+
+const statusMap: Record<string, { label: string; cls: string }> = {
+  pending:   { label: "معلق",  cls: "st-pending" },
+  completed: { label: "مكتمل", cls: "st-paid" },
+  cancelled: { label: "ملغي",  cls: "st-canceled" },
+};
+
+function usePurchaseOrdersFullList() {
+  return useQuery({
+    queryKey: ["purchase-orders-full"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export default function PurchasePage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+  const [minAmount, setMinAmount] = useState<string>("");
+  const [perPage, setPerPage] = useState(10);
+  const [page, setPage] = useState(1);
+
+  const { data: orders, isLoading } = usePurchaseOrdersFullList();
+  const { remove } = usePurchaseOrders();
+  const { data: suppliers } = useSuppliers();
+  const { data: companyArr } = useCompanySettings();
+  const company = companyArr?.[0] || null;
+  const currency = company?.currency || "SDG";
+
+  const supplierMap = new Map<string, any>();
+  (suppliers || []).forEach((s: any) => supplierMap.set(s.id, s));
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا الأمر؟")) return;
+    try { await remove.mutateAsync(id); toast.success("تم الحذف"); }
+    catch (e: any) { toast.error(e.message); }
+  };
+
+  const handleConvertToInvoice = async (o: any) => {
+    if (!confirm(`تحويل أمر الشراء ${o.order_number} إلى فاتورة مشتريات (استلام البضاعة وتحديث المخزون)؟`)) return;
+    try {
+      const { data: items } = await supabase.from("purchase_order_items").select("*").eq("purchase_order_id", o.id);
+
+      // Increment stock for each item (purchase = +stock)
+      if (items && items.length > 0) {
+        for (const it of items as any[]) {
+          if (!it.product_id) continue;
+          const { data: prod } = await supabase.from("products").select("stock_quantity, purchase_price").eq("id", it.product_id).maybeSingle();
+          if (prod) {
+            await supabase.from("products").update({
+              stock_quantity: Number(prod.stock_quantity || 0) + Number(it.quantity || 0),
+              purchase_price: Number(it.unit_price || prod.purchase_price || 0),
+            }).eq("id", it.product_id);
+          }
+        }
+      }
+
+      await supabase.from("purchase_orders").update({ status: "completed" }).eq("id", o.id);
+      toast.success(`تم استلام البضاعة وتحديث المخزون`);
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders-full"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      window.dispatchEvent(new Event("products:changed"));
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const handlePrint = async (o: any, variant: PrintVariant = "full", noHeader: boolean = false) => {
+    const { data: items } = await supabase.from("purchase_order_items").select("*").eq("purchase_order_id", o.id);
+    const supplier = supplierMap.get(o.supplier_id);
+    openPrintWindow(generatePrintHTML({
+      type: "purchase",
+      number: o.order_number,
+      date: o.date,
+      customer: supplier ? { name: supplier.name, phone: supplier.phone, address: supplier.address } : null,
+      items: (items || []).map((it: any) => ({
+        product_name: it.product_name, quantity: it.quantity, unit_price: it.unit_price,
+        discount: it.discount || 0, total: it.total, tax_amount: it.tax_amount || 0,
+      })),
+      subtotal: Number(o.subtotal || 0),
+      taxTotal: Number(o.tax_amount || 0),
+      discountTotal: Number(o.discount || 0),
+      grandTotal: Number(o.total || 0),
+      notes: o.notes,
+      company: company as any,
+      variant, noHeader,
+    }));
+  };
+
+  const filtered = (orders || []).filter((o: any) => {
+    if (statusFilter !== "all" && (o.status || "pending") !== statusFilter) return false;
+    if (supplierSearch.trim()) {
+      const sName = supplierMap.get(o.supplier_id)?.name || "";
+      if (!sName.toLowerCase().startsWith(supplierSearch.trim().toLowerCase())) return false;
+    }
+    if (dateFrom && (o.date || "") < dateFrom) return false;
+    if (dateTo && (o.date || "") > dateTo) return false;
+    if (minAmount.trim()) {
+      const min = Number(minAmount) || 0;
+      if (Number(o.total || 0) < min) return false;
+    }
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (
+      o.order_number?.toLowerCase().includes(s) ||
+      (supplierMap.get(o.supplier_id)?.name || "").toLowerCase().includes(s)
+    );
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const start = (page - 1) * perPage;
+  const paginated = filtered.slice(start, start + perPage);
+
+  const fmtDate = (d?: string) => {
+    if (!d) return "-";
+    const parts = d.split("-");
+    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    return d;
+  };
+  const fmtMoney = (n: any) => Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return (
+    <article className="content purchases-compact">
+      <style>{`
+        .purchases-compact { font-size: 11px; }
+        .purchases-compact .legacy-card { padding: 6px; }
+        .purchases-compact h5 { font-size: 13px; margin: 4px 0; }
+        .purchases-compact hr { margin: 4px 0; }
+        .purchases-compact .legacy-dt-toolbar { font-size: 11px; gap: 8px; padding: 4px 0; }
+        .purchases-compact .legacy-dt-toolbar input,
+        .purchases-compact .legacy-dt-toolbar select { height: 24px; font-size: 11px; padding: 2px 6px; }
+        .purchases-compact .legacy-table { font-size: 11px; }
+        .purchases-compact .legacy-table th { padding: 5px 6px; font-size: 11px; }
+        .purchases-compact .legacy-table td { padding: 3px 6px; }
+        .purchases-compact .btn-xs { padding: 2px 6px; font-size: 10px; height: 22px; line-height: 18px; }
+        .purchases-compact .legacy-actions { gap: 3px; }
+        .purchases-compact .legacy-pagination .page-link { padding: 2px 8px; font-size: 11px; }
+        .purchases-compact .legacy-dt-info { font-size: 11px; padding: 4px 0; }
+        .purchases-compact .st-pending, .purchases-compact .st-paid, .purchases-compact .st-canceled { padding: 1px 6px; font-size: 10px; }
+        ${mobileDocListCSS}
+      `}</style>
+      <div className="legacy-card">
+        <div className="grid_3 grid_4 table-responsive">
+          <h5>أوامر الشراء</h5>
+          <hr />
+
+          {/* Mobile toolbar */}
+          <div className="mobile-toolbar">
+            <input
+              type="search"
+              placeholder="بحث في أوامر الشراء أو المورد..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+            />
+            <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(1); }}>
+              <option value={10}>10 لكل صفحة</option>
+              <option value={25}>25 لكل صفحة</option>
+              <option value={50}>50 لكل صفحة</option>
+            </select>
+            <button
+              type="button"
+              className="legacy-btn legacy-btn-success"
+              onClick={() => navigate("/purchase/create")}
+            >
+              + أمر شراء جديد
+            </button>
+          </div>
+
+          <div className="legacy-dt-toolbar desktop-toolbar">
+            <label>
+              عرض
+              <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(1); }}>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              سجل
+            </label>
+            <button
+              type="button"
+              className="legacy-btn legacy-btn-success"
+              onClick={() => navigate("/purchase/create")}
+            >
+              + أمر شراء جديد
+            </button>
+            <label>
+              المورد:
+              <input
+                type="search"
+                placeholder="ابحث باسم المورد..."
+                value={supplierSearch}
+                onChange={e => { setSupplierSearch(e.target.value); setPage(1); }}
+              />
+            </label>
+            <label>
+              الحالة:
+              <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
+                <option value="all">الكل</option>
+                <option value="pending">معلق</option>
+                <option value="completed">مكتمل</option>
+                <option value="cancelled">ملغي</option>
+              </select>
+            </label>
+            <label>
+              من:
+              <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} />
+            </label>
+            <label>
+              إلى:
+              <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} />
+            </label>
+            <label>
+              مبلغ ≥:
+              <input type="number" placeholder="0" value={minAmount}
+                onChange={e => { setMinAmount(e.target.value); setPage(1); }}
+                style={{ width: 90 }} />
+            </label>
+            <label>
+              بحث:
+              <input type="search" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+            </label>
+          </div>
+
+          <div className="desktop-table-wrap" style={{ maxHeight: "calc(100vh - 260px)", overflowY: "auto", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>
+          <table className="legacy-table" cellSpacing={0} width="100%">
+            <thead style={{ position: "sticky", top: 0, zIndex: 5, background: "hsl(var(--card))" }}>
+              <tr>
+                <th style={{ width: 40 }}>رقم</th>
+                <th style={{ width: 100 }}># الأمر</th>
+                <th>المورد</th>
+                <th style={{ width: 110 }}>التاريخ</th>
+                <th style={{ width: 110 }}>استلام متوقع</th>
+                <th style={{ width: 140 }}>المبلغ</th>
+                <th style={{ width: 80 }}>الحالة</th>
+                <th style={{ width: 110 }}>المستخدم</th>
+                <th style={{ width: 260 }}>إعدادات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={9} style={{ textAlign: "center", padding: 30 }}>Processing...</td></tr>
+              ) : paginated.length === 0 ? (
+                <tr><td colSpan={9} style={{ textAlign: "center", padding: 30 }}>لا توجد أوامر شراء</td></tr>
+              ) : paginated.map((o: any, idx: number) => {
+                const st = statusMap[o.status || "pending"] || statusMap.pending;
+                const rowCls = (start + idx) % 2 === 0 ? "odd" : "even";
+                const note = (o.user_note || o.internal_note || "").trim();
+                const supplier = supplierMap.get(o.supplier_id);
+                return (
+                  <tr key={o.id} className={rowCls}>
+                    <td>{start + idx + 1}</td>
+                    <td>{o.order_number}</td>
+                    <td>{supplier?.name || "-"}</td>
+                    <td>{fmtDate(o.date)}</td>
+                    <td>{fmtDate(o.expected_delivery_date)}</td>
+                    <td>{fmtMoney(o.total)} {o.currency_code || currency}</td>
+                    <td><span className={st.cls}>{st.label}</span></td>
+                    <td>{o.created_by || ""}</td>
+                    <td>
+                      <span className="legacy-actions">
+                        <button
+                          type="button"
+                          className="btn-xs btn-warning"
+                          title={note ? "تعديل مذكرة" : "اضف ملاحظة"}
+                          onClick={() => {
+                            const v = prompt("ملاحظة:", note);
+                            if (v === null) return;
+                            supabase.from("purchase_orders").update({ user_note: v } as any).eq("id", o.id)
+                              .then(({ error }) => {
+                                if (error) toast.error(error.message);
+                                else { toast.success("تم الحفظ"); queryClient.invalidateQueries({ queryKey: ["purchase-orders-full"] }); }
+                              });
+                          }}
+                        >
+                          {note ? "✎" : "+"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-xs btn-success"
+                          onClick={() => navigate(`/purchase/edit/${o.id}`)}
+                          title="تعديل"
+                        >
+                          📄 تعديل
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-xs btn-info"
+                          title="طباعة"
+                          onClick={() => navigate(`/preview/purchase/${o.id}`)}
+                        >
+                          🖨 طباعة
+                        </button>
+                        {o.status !== "completed" && (
+                          <button
+                            type="button"
+                            className="btn-xs btn-primary"
+                            onClick={() => handleConvertToInvoice(o)}
+                            title="استلام البضاعة وتحديث المخزون"
+                          >
+                            → استلام
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn-xs btn-danger"
+                          onClick={() => handleDelete(o.id)}
+                          title="حذف"
+                        >
+                          🗑
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          </div>
+
+          {/* Mobile cards list */}
+          <div className="mobile-doc-list">
+            {isLoading ? (
+              <div style={{ textAlign: "center", padding: 30 }}>Processing...</div>
+            ) : paginated.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا توجد أوامر شراء</div>
+            ) : paginated.map((o: any, idx: number) => {
+              const st = statusMap[o.status || "pending"] || statusMap.pending;
+              const supplier = supplierMap.get(o.supplier_id);
+              return (
+                <MobileDocCard
+                  key={o.id}
+                  index={start + idx + 1}
+                  number={o.order_number}
+                  party={supplier?.name || "-"}
+                  date={fmtDate(o.date)}
+                  amount={`${fmtMoney(o.total)} ${o.currency_code || currency}`}
+                  status={<span className={st.cls}>{st.label}</span>}
+                  onOpen={() => navigate(`/purchase/edit/${o.id}`)}
+                  actions={
+                    <>
+                      <button className="btn-xs btn-info" onClick={() => navigate(`/preview/purchase/${o.id}`)} title="طباعة">🖨 طباعة</button>
+                      {o.status !== "completed" && (
+                        <button className="btn-xs btn-primary" onClick={() => handleConvertToInvoice(o)}>→ استلام</button>
+                      )}
+                      <button className="btn-xs btn-danger" onClick={() => handleDelete(o.id)}>🗑 حذف</button>
+                    </>
+                  }
+                />
+              );
+            })}
+          </div>
+
+          {!isLoading && filtered.length > 0 && (
+            <>
+              <div className="legacy-dt-info">
+                إظهار {start + 1} إلى {Math.min(start + perPage, filtered.length)} من إجمالي {filtered.length} مدخل
+              </div>
+              <ul className="legacy-pagination">
+                <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
+                  <button className="page-link" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>السابق</button>
+                </li>
+                {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                  let p: number;
+                  if (totalPages <= 7) p = i + 1;
+                  else if (page <= 4) p = i + 1;
+                  else if (page >= totalPages - 3) p = totalPages - 6 + i;
+                  else p = page - 3 + i;
+                  return (
+                    <li key={p} className={`page-item ${page === p ? "active" : ""}`}>
+                      <button className="page-link" onClick={() => setPage(p)}>{p}</button>
+                    </li>
+                  );
+                })}
+                <li className={`page-item ${page === totalPages ? "disabled" : ""}`}>
+                  <button className="page-link" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>التالي</button>
+                </li>
+              </ul>
+            </>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}

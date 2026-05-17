@@ -1,0 +1,2013 @@
+/* خط Cairo يُحمَّل مباشرةً من index.html عبر <link rel="preload"+stylesheet>
+   لتسريع FCP — لا حاجة لـ @import هنا (كان يؤخّر التحميل لأن CSS تُكتشف
+   بعد parse). */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Bold default text everywhere for readability (per user request) */
+@layer base {
+  body, input, select, textarea, button, table, th, td {
+    font-weight: 600;
+  }
+}
+
+/* منع تداخل/التفاف/تراكب النصوص على شاشات الهاتف (≤640px) — يطبَّق على كل صفحات التطبيق */
+@media (max-width: 640px) {
+  /* التسميات لا تكسر الكلمات حرفاً حرفاً (تجنّب ظاهرة "سج\nل") */
+  label, .label, dt, th, caption, legend, summary, button {
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+  /* العناوين والنصوص الطويلة لا تتراكب — سطر مستقل بارتفاع مريح */
+  h1, h2, h3, h4, h5, h6,
+  p, span, div, a, td, li {
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.4; }
+
+  /* أحجام خط وتباعد العناوين/التسميات على الموبايل — مقروءة بدون قص */
+  body { line-height: 1.6; font-size: 15px; }
+  p, li, td, span, div, a { line-height: 1.6; }
+  label, .label { line-height: 1.5; font-size: 0.9375rem; padding-block: 2px; }
+
+  h1 { font-size: 1.375rem; margin-block: 0.6rem; }
+  h2 { font-size: 1.25rem;  margin-block: 0.55rem; }
+  h3 { font-size: 1.125rem; margin-block: 0.5rem; }
+  h4 { font-size: 1rem;     margin-block: 0.4rem; }
+  h5, h6 { font-size: 0.9375rem; margin-block: 0.35rem; }
+
+  /* الأزرار والمدخلات: ارتفاع مريح للمس + تباعد رأسي يمنع القص */
+  button, .btn, input, select, textarea {
+    line-height: 1.5;
+    min-height: 40px;
+  }
+
+  /* فتح لوحة المفاتيح فوراً عند لمس أي حقل قابل للكتابة على الهاتف:
+     - font-size ≥ 16px يمنع iOS من عمل zoom ويُحافظ على التركيز الفوري
+     - touch-action: manipulation يلغي تأخير 300ms ويسمح بـ focus داخل نفس إيماءة اللمس
+     - user-select: text يضمن قابلية الكتابة
+  */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  textarea,
+  select,
+  [contenteditable="true"],
+  [role="textbox"],
+  [role="combobox"],
+  [role="searchbox"] {
+    font-size: 16px !important;
+    touch-action: manipulation;
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* البطاقات: حشوة داخلية معتدلة + تباعد بين العناصر يمنع التراكب */
+  .card, [class*="card"] { padding-block: 0.75rem; }
+  .card > * + *, [class*="card"] > * + * { margin-top: 0.5rem; }
+
+  /* عناصر الإدخال داخل flex لا تتقلص أقل من 0 (يمنع كسر التسمية بجانبها) */
+  input, select, textarea, button { min-width: 0; }
+
+  /* أي عنصر مرن (flex item) يُسمح له بالتقلّص لأقل من محتواه */
+  .flex > *, [class*="flex"] > * { min-width: 0; }
+
+  /* الأرقام/المبالغ الطويلة لا تطفح خارج البطاقات */
+  [class*="text-"] { overflow-wrap: anywhere; }
+
+  /* البطاقات والحاويات: لا تجبر العرض الأدنى على المحتوى */
+  .card, [class*="card"], section, article { min-width: 0; }
+}
+
+/* ============================================================
+   نقاط توقف responsive عامة لتخطيط الفلاتر والبطاقات
+   تُطبَّق تلقائياً على أي حاوية تحمل class "responsive-filters"
+   أو "responsive-cards" بدون لمس صفحة معيّنة.
+   ============================================================ */
+
+/* الافتراضي: شاشات صغيرة جداً (<480px) — عمود واحد */
+.responsive-filters { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+.responsive-cards   { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+.responsive-filters > *, .responsive-cards > * { min-width: 0; }
+
+/* ≥480px (هاتف عريض) — عمودان */
+@media (min-width: 480px) {
+  .responsive-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .responsive-cards   { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* ≥768px (تابلت) — 3 أعمدة */
+@media (min-width: 768px) {
+  .responsive-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .responsive-cards   { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* ≥1024px (لابتوب) — 4 أعمدة للفلاتر، 4 للبطاقات */
+@media (min-width: 1024px) {
+  .responsive-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .responsive-cards   { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* ≥1280px (شاشة كبيرة) — flex مرن للفلاتر، 5 أعمدة للبطاقات */
+@media (min-width: 1280px) {
+  .responsive-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .responsive-filters > * { flex: 0 1 auto; }
+  .responsive-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+/* مساعد: عنصر فلتر مع تسمية بجانبه — يحافظ على عدم التداخل */
+.responsive-filters .filter-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.responsive-filters .filter-item > label,
+.responsive-filters .filter-item > .label {
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+.responsive-filters .filter-item > input,
+.responsive-filters .filter-item > select,
+.responsive-filters .filter-item > .input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Appearance toggles (driven by useAppearance hook) */
+body.hide-sidebar aside,
+body.hide-sidebar .sidebar-overlay { display: none !important; }
+body.hide-sidebar main { margin-right: 0 !important; margin-left: 0 !important; }
+body.hide-floating-tools .floating-side-tools,
+body.hide-floating-tools [data-floating-tools] { display: none !important; }
+
+/* Items table zoom (Quote/Invoice/Purchase/StockReturn create pages) */
+:root { --items-zoom: 1; }
+
+/* Column resize handle (used in items tables) */
+.col-resize-handle {
+  background: hsl(var(--border));
+  border-inline-end: 2px solid transparent;
+  opacity: 0.6;
+  transition: background .15s, border-color .15s, opacity .15s, width .15s;
+  cursor: col-resize !important;
+}
+.col-resize-handle:hover {
+  background: hsl(var(--primary) / 0.55);
+  border-inline-end-color: hsl(var(--primary));
+  opacity: 1;
+}
+.col-resize-handle:active {
+  background: hsl(var(--primary) / 0.85);
+  border-inline-end-color: hsl(var(--primary));
+  opacity: 1;
+}
+/* Show resize cursor near the trailing edge of resizable header cells */
+.neo-quote-scope .excel-table thead th,
+.neo-purchase-scope .excel-table thead th {
+  position: relative;
+}
+.neo-quote-scope .excel-table thead th:hover .col-resize-handle,
+.neo-purchase-scope .excel-table thead th:hover .col-resize-handle {
+  background: hsl(var(--primary) / 0.45);
+  opacity: 1;
+}
+
+/* Allow drag-to-resize from ANY row (Excel-like). Cells get a thin
+   trailing-edge affordance on hover so users discover the feature. */
+.neo-quote-scope .excel-table tbody td,
+.neo-invoice-scope .excel-table tbody td,
+.neo-purchase-scope .excel-table tbody td {
+  position: relative;
+}
+.neo-quote-scope .excel-table tbody td::after,
+.neo-invoice-scope .excel-table tbody td::after,
+.neo-purchase-scope .excel-table tbody td::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-end: -3px;
+  width: 8px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background .12s ease;
+  z-index: 4;
+  pointer-events: auto;
+}
+.neo-quote-scope .excel-table tbody td:hover::after,
+.neo-invoice-scope .excel-table tbody td:hover::after,
+.neo-purchase-scope .excel-table tbody td:hover::after {
+  background: hsl(var(--primary) / 0.45);
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.6);
+}
+
+/* Column-resize overlay: highlight the active column while dragging.
+   Uses a body-level [data-resizing-col="N"] attribute set by the hook. */
+body[data-resizing-col] { cursor: col-resize !important; }
+body[data-resizing-col] .excel-table tbody td::after {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body[data-resizing-col="1"] .excel-table tr > *:nth-child(1),
+body[data-resizing-col="2"] .excel-table tr > *:nth-child(2),
+body[data-resizing-col="3"] .excel-table tr > *:nth-child(3),
+body[data-resizing-col="4"] .excel-table tr > *:nth-child(4),
+body[data-resizing-col="5"] .excel-table tr > *:nth-child(5),
+body[data-resizing-col="6"] .excel-table tr > *:nth-child(6),
+body[data-resizing-col="7"] .excel-table tr > *:nth-child(7),
+body[data-resizing-col="8"] .excel-table tr > *:nth-child(8) {
+  background-color: hsl(var(--primary) / 0.16) !important;
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.55);
+}
+
+/* Suggestions popup resize handle */
+.suggestions-resize-handle { background: transparent; transition: background .15s; }
+.suggestions-resize-handle:hover,
+.suggestions-resize-handle:active { background: hsl(var(--primary) / 0.45); }
+.items-zoom-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  padding: 2px 4px;
+  background: hsl(var(--card));
+  font-size: 11px;
+}
+.items-zoom-ctrl button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+}
+.items-zoom-ctrl button:hover { background: hsl(var(--muted)); }
+.items-zoom-ctrl span {
+  min-width: 38px;
+  text-align: center;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+@layer base {
+  :root {
+    --background: 30 20% 97%;
+    --foreground: 20 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 10% 10%;
+    --primary: 25 95% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 30% 95%;
+    --secondary-foreground: 20 10% 10%;
+    --muted: 30 20% 94%;
+    --muted-foreground: 20 10% 45%;
+    --accent: 25 90% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 20% 88%;
+    --input: 30 20% 88%;
+    --ring: 25 95% 53%;
+    --radius: 0.5rem;
+
+    /* Sidebar */
+    --sidebar-bg: 0 0% 12%;
+    --sidebar-bg-dark: 0 0% 8%;
+    --sidebar-text: 30 10% 65%;
+    --sidebar-text-active: 0 0% 100%;
+    --sidebar-hover: 25 30% 18%;
+    --sidebar-accent: 25 95% 53%;
+    --sidebar-header-bg: 0 0% 6%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-section-text: 25 60% 55%;
+
+    /* Navbar */
+    --navbar-bg: 0 0% 8%;
+    --navbar-text: 30 10% 80%;
+
+    /* Status colors */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 25 95% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 25 90% 48%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 25 95% 53%;
+  }
+
+  .dark {
+    --background: 220 15% 10%;
+    --foreground: 30 10% 90%;
+    --card: 220 15% 13%;
+    --card-foreground: 30 10% 90%;
+    --popover: 220 15% 13%;
+    --popover-foreground: 30 10% 90%;
+    --primary: 25 95% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 30 10% 90%;
+    --muted: 220 15% 18%;
+    --muted-foreground: 30 10% 55%;
+    --accent: 25 90% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 25 95% 53%;
+
+    /* Sidebar dark */
+    --sidebar-bg: 220 15% 8%;
+    --sidebar-bg-dark: 220 15% 5%;
+    --sidebar-text: 30 10% 55%;
+    --sidebar-text-active: 0 0% 100%;
+    --sidebar-hover: 25 30% 15%;
+    --sidebar-accent: 25 95% 53%;
+    --sidebar-header-bg: 220 15% 5%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-section-text: 25 60% 55%;
+
+    /* Navbar dark */
+    --navbar-bg: 220 15% 6%;
+    --navbar-text: 30 10% 75%;
+
+    /* Status */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    --sidebar-background: 220 15% 8%;
+    --sidebar-foreground: 30 10% 70%;
+    --sidebar-primary: 25 95% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 25 90% 48%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 25 95% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    direction: rtl;
+    overflow-x: hidden;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Cairo', sans-serif;
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  #root {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+}
+
+/* Prevent horizontal overflow on mobile */
+@media (max-width: 768px) {
+  main {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  /* Wrap wide tables so they scroll inside their container, not the page */
+  table.legacy-table,
+  table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Prevent images and media from breaking layout */
+  img, video, iframe, canvas, svg {
+    max-width: 100%;
+    height: auto;
+  }
+  /* Long words / URLs shouldn't widen the layout */
+  p, span, div, td, th, a, h1, h2, h3, h4, h5, h6 {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Mobile sidebar overlay */
+.sidebar-overlay {
+  @apply fixed inset-0 bg-black/50 z-30;
+}
+
+/* Sidebar custom scrollbar */
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--sidebar-dark-border));
+  border-radius: 2px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--sidebar-dark-text) / 0.3);
+}
+
+/* Slide in animation */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.2s ease-out;
+}
+
+/* ===== Splash Screen Animations ===== */
+
+@keyframes logo-grow {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.splash-logo-grow {
+  width: 180px;
+  height: 180px;
+  animation: logo-grow 1.2s ease-out forwards;
+}
+
+@keyframes subtitle-fade {
+  0%, 50% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.splash-subtitle-fade {
+  animation: subtitle-fade 1.8s ease-out forwards;
+}
+
+/* ============================================================
+   LEGACY SYSTEM STYLES (Bootstrap 4 RTL look)
+   Mirrors the original billing system: card-block, h5+hr,
+   DataTables wrapper, status pills (.st-*) and btn-xs colors.
+   ============================================================ */
+
+.legacy-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.04);
+}
+.legacy-card h5 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin: 0 0 0.75rem 0;
+}
+.legacy-card hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 0 0 1rem 0;
+}
+
+/* DataTables wrapper toolbar */
+.legacy-dt-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+}
+.legacy-dt-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-weight: 400;
+}
+.legacy-dt-toolbar select,
+.legacy-dt-toolbar input[type="search"],
+.legacy-dt-toolbar input[type="date"] {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 0.8125rem;
+  color: hsl(var(--foreground));
+  font-family: inherit;
+  outline: none;
+}
+.legacy-dt-toolbar input[type="search"]:focus,
+.legacy-dt-toolbar select:focus,
+.legacy-dt-toolbar input[type="date"]:focus {
+  border-color: hsl(var(--primary));
+}
+
+/* Legacy table */
+table.legacy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+table.legacy-table thead th {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  text-align: right;
+  padding: 10px 8px;
+  border-bottom: 2px solid hsl(var(--border));
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+table.legacy-table tbody td {
+  padding: 8px;
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  vertical-align: middle;
+}
+table.legacy-table tbody tr.odd { background: hsl(var(--card)); }
+table.legacy-table tbody tr.even { background: hsl(var(--muted) / 0.4); }
+table.legacy-table tbody tr:hover { background: hsl(var(--primary) / 0.06); }
+
+/* Status pills - exact colors from old custom.css */
+.st-paid, .st-due, .st-partial, .st-canceled,
+.st-rejected, .st-pending, .st-accepted,
+.st-Recurring, .st-Stopped, .st-draft, .st-sent {
+  text-transform: capitalize;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 11px;
+  font-size: 10px;
+  display: inline-block;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.st-paid, .st-accepted { background-color: #5ed45e; }
+.st-due, .st-Stopped, .st-overdue { background-color: #ff6262; }
+.st-partial, .st-pending, .st-Recurring, .st-sent { background-color: #5da6fb; }
+.st-canceled, .st-rejected { background-color: #848030; }
+.st-draft { background-color: #7c3aed; }
+
+/* Legacy btn-xs - matches Bootstrap 4 colors used in old system */
+.btn-xs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 400;
+  text-decoration: none;
+  transition: filter 0.12s ease;
+  white-space: nowrap;
+}
+.btn-xs:hover { filter: brightness(0.92); text-decoration: none; }
+.btn-xs:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-success { background-color: #5cb85c; border-color: #4cae4c; color: #fff; }
+.btn-info    { background-color: #5bc0de; border-color: #46b8da; color: #fff; }
+.btn-warning { background-color: #f0ad4e; border-color: #eea236; color: #fff; }
+.btn-danger  { background-color: #d9534f; border-color: #d43f3a; color: #fff; }
+.btn-primary { background-color: #428bca; border-color: #357ebd; color: #fff; }
+.btn-secondary { background-color: #6c757d; border-color: #6c757d; color: #fff; }
+
+/* Legacy alert */
+.legacy-alert {
+  padding: 12px 16px;
+  border-radius: 3px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+.legacy-alert-success { background: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; }
+.legacy-alert-danger  { background: #f2dede; color: #a94442; border: 1px solid #ebccd1; }
+
+/* Legacy pagination */
+.legacy-pagination {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0 0;
+  justify-content: flex-end;
+  gap: 0;
+}
+.legacy-pagination .page-item {
+  border: 1px solid hsl(var(--border));
+  margin-right: -1px;
+}
+.legacy-pagination .page-link {
+  display: block;
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  color: hsl(var(--primary));
+  background: hsl(var(--card));
+  cursor: pointer;
+  border: none;
+}
+.legacy-pagination .page-item.active .page-link {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+.legacy-pagination .page-item.disabled .page-link {
+  color: hsl(var(--muted-foreground));
+  cursor: not-allowed;
+}
+
+/* Legacy info text under DataTable */
+.legacy-dt-info {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  padding-top: 0.5rem;
+}
+
+/* Action button gap (mimics &#160; spacing) */
+.legacy-actions { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* ============================================================
+   LEGACY FORM (Bootstrap 4 form-horizontal grid_3 grid_4)
+   Mirrors: <form class="form-horizontal"><div class="grid_3 grid_4">
+            <h5>Title</h5><hr/>
+            <div class="form-group row">
+              <label class="col-sm-2 col-form-label">Label</label>
+              <div class="col-sm-6"><input class="form-control"/></div>
+            </div>
+   ============================================================ */
+
+article.content {
+  display: block;
+  width: 100%;
+}
+
+.legacy-card.card-block {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.04);
+}
+
+.legacy-form-horizontal .legacy-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 0.5rem 1rem;
+}
+.legacy-form-horizontal .legacy-form-label {
+  flex: 0 0 16.6667%;
+  max-width: 16.6667%;
+  text-align: right;
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+  padding-top: 0.4rem;
+  font-weight: 400;
+}
+.legacy-form-horizontal .legacy-form-control-wrap {
+  flex: 0 0 50%;
+  max-width: 50%;
+}
+@media (max-width: 768px) {
+  .legacy-form-horizontal .legacy-form-label,
+  .legacy-form-horizontal .legacy-form-control-wrap {
+    flex: 0 0 100%;
+    max-width: 100%;
+    text-align: right;
+  }
+}
+
+.legacy-control,
+input.legacy-control,
+select.legacy-control,
+textarea.legacy-control {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 3px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+.legacy-control:focus {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15);
+}
+
+.legacy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 400;
+  text-decoration: none;
+  transition: filter 0.12s ease;
+  white-space: nowrap;
+}
+.legacy-btn:hover { filter: brightness(0.92); text-decoration: none; }
+.legacy-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.legacy-btn-success { background-color: #5cb85c; border-color: #4cae4c; color: #fff; }
+.legacy-btn-info    { background-color: #5bc0de; border-color: #46b8da; color: #fff; }
+.legacy-btn-warning { background-color: #f0ad4e; border-color: #eea236; color: #fff; }
+.legacy-btn-danger  { background-color: #d9534f; border-color: #d43f3a; color: #fff; }
+.legacy-btn-primary { background-color: #428bca; border-color: #357ebd; color: #fff; }
+.legacy-btn-default { background-color: hsl(var(--muted)); border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
+.legacy-btn.btn-sm { padding: 4px 10px; font-size: 0.75rem; border-radius: 3px; }
+.legacy-btn.btn-xs { padding: 2px 7px; font-size: 0.7rem; border-radius: 2px; line-height: 1.4; }
+.legacy-btn .lucide { width: 14px; height: 14px; }
+.legacy-btn.btn-sm .lucide, .legacy-btn.btn-xs .lucide { width: 12px; height: 12px; }
+
+/* Legacy section heading + divider (h5 + hr from old grid_3 grid_4) */
+.legacy-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin: 0 0 0.5rem 0;
+}
+.legacy-divider {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 0 0 1rem 0;
+}
+
+/* Legacy invoice document look (for view pages) */
+.legacy-invoice-doc {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  padding: 2rem;
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.04);
+}
+.legacy-invoice-doc table.legacy-table thead th {
+  background: hsl(var(--muted));
+  text-align: center;
+}
+.legacy-invoice-doc table.legacy-table tbody td {
+  text-align: center;
+}
+.legacy-invoice-doc table.legacy-table tbody td:nth-child(2) {
+  text-align: right;
+}
+
+/* =====================================================================
+   MOBILE-ONLY OVERRIDES (< 768px)
+   Desktop/laptop layout (>= 768px) is intentionally left untouched.
+   ===================================================================== */
+@media (max-width: 767px) {
+  /* 1) Quote/Invoice create pages: release the locked viewport height
+        so the form scrolls naturally on phones. */
+  .neo-quote-scope,
+  .neo-invoice-scope {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+  .neo-quote-scope *,
+  .neo-invoice-scope * {
+    /* Allow inner panels marked with overflow:hidden to scroll */
+    scrollbar-width: thin;
+  }
+
+  /* 2) Wide legacy tables become horizontally scrollable inside any
+        .table-responsive / .legacy-card wrapper. */
+  .table-responsive,
+  .legacy-card {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .legacy-table {
+    min-width: 720px;
+  }
+
+  /* 3) Toolbars / filter rows stack vertically. */
+  .legacy-dt-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+  .legacy-dt-toolbar label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    white-space: nowrap;
+  }
+  .legacy-dt-toolbar label > * {
+    white-space: normal;
+  }
+  .legacy-dt-toolbar input,
+  .legacy-dt-toolbar select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* 4) Action button rows wrap. */
+  .legacy-actions {
+    flex-wrap: wrap !important;
+  }
+
+  /* 5) Pagination wraps. */
+  .legacy-pagination {
+    flex-wrap: wrap !important;
+    justify-content: center;
+  }
+
+  /* 6) Legacy invoice document (view pages) gets less padding +
+        horizontal scroll on its inner table. */
+  .legacy-invoice-doc {
+    padding: 0.75rem !important;
+    overflow-x: auto;
+  }
+  .legacy-invoice-doc table.legacy-table {
+    min-width: 600px;
+  }
+
+  /* 7) Generic table fallback inside any page content. */
+  .content table:not(.no-mobile-scroll) {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* 8) Dialogs: widen on phones + scroll instead of clip. */
+  [role="dialog"] {
+    max-width: 96vw !important;
+    width: 96vw !important;
+    max-height: 92vh !important;
+    overflow-y: auto !important;
+    padding: 12px !important;
+  }
+  [role="dialog"] .grid {
+    grid-template-columns: 1fr !important;
+  }
+  [role="dialog"] input,
+  [role="dialog"] select,
+  [role="dialog"] textarea {
+    font-size: 14px !important;
+    min-height: 38px;
+  }
+
+  /* 8b) Generic fix: ANY table on mobile gets horizontal scroll wrapper
+         and never breaks Arabic words letter-by-letter. */
+  table {
+    white-space: nowrap;
+  }
+  table th,
+  table td {
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+  }
+  /* Wrap any direct table not already inside a scroll container */
+  .overflow-x-auto > table,
+  .table-responsive > table {
+    min-width: 700px;
+  }
+
+  /* 9) Hide sidebar-style panels that aren't useful on small screens. */
+  .recent-items-sidebar,
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* 10) Reduce default page padding on mobile. */
+  main > div {
+    padding: 6px !important;
+  }
+
+  /* 11) Header bar stays a single row on phones — fields shrink, no wrap, no scroll */
+  .neo-quote-scope .header-bar,
+  .neo-invoice-scope .header-bar,
+  .neo-purchase-scope .header-bar {
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+  }
+  .neo-quote-scope .header-bar .field:not([style*="width"]):not([style*="flex"]),
+  .neo-invoice-scope .header-bar .field:not([style*="width"]):not([style*="flex"]),
+  .neo-purchase-scope .header-bar .field:not([style*="width"]):not([style*="flex"]) {
+    width: auto !important;
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+  }
+  .neo-quote-scope .header-bar .field input,
+  .neo-invoice-scope .header-bar .field input,
+  .neo-purchase-scope .header-bar .field input,
+  .neo-quote-scope .header-bar .field select,
+  .neo-invoice-scope .header-bar .field select,
+  .neo-purchase-scope .header-bar .field select,
+  .neo-quote-scope .header-bar .field button,
+  .neo-invoice-scope .header-bar .field button,
+  .neo-purchase-scope .header-bar .field button {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 11px !important;
+    padding: 2px 4px !important;
+  }
+  .neo-quote-scope .header-bar .customer-pill,
+  .neo-invoice-scope .header-bar .customer-pill,
+  .neo-purchase-scope .header-bar .supplier-pill {
+    display: inline-flex !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px !important;
+  }
+
+  /* 12) Quote/Invoice quick-add: 2-col grid; search + add button full width */
+  .neo-quote-scope .quick-add-row,
+  .neo-invoice-scope .quick-add-row {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+  .neo-quote-scope .quick-add-row > *:first-child,
+  .neo-invoice-scope .quick-add-row > *:first-child,
+  .neo-quote-scope .quick-add-row > *:last-child,
+  .neo-invoice-scope .quick-add-row > *:last-child {
+    grid-column: 1 / -1;
+  }
+
+  /* 13) Quote/Invoice/Purchase layout: stack columns; release fixed heights */
+  .neo-quote-scope .quote-layout,
+  .neo-invoice-scope .quote-layout,
+  .neo-purchase-scope .purchase-layout {
+    grid-template-columns: 1fr !important;
+    grid-auto-flow: row !important;
+    height: auto !important;
+  }
+  .neo-quote-scope .form-column,
+  .neo-invoice-scope .form-column,
+  .neo-purchase-scope .form-column {
+    min-width: 0;
+    height: auto !important;
+  }
+
+  /* 14) Items area: enable real horizontal scroll inside form column */
+  .neo-quote-scope .items-scroll,
+  .neo-invoice-scope .items-scroll,
+  .neo-purchase-scope .items-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .neo-quote-scope table,
+  .neo-invoice-scope table,
+  .neo-purchase-scope table {
+    min-width: 680px;
+  }
+
+  /* 15) Hide RecentItemsSidebar (aside / last column) on phones */
+  .neo-quote-scope .quote-layout > aside,
+  .neo-invoice-scope .quote-layout > aside,
+  .neo-purchase-scope .purchase-layout > aside,
+  .neo-quote-scope .quote-layout > div:last-child:not(:first-child),
+  .neo-invoice-scope .quote-layout > div:last-child:not(:first-child),
+  .neo-purchase-scope .purchase-layout > div:last-child:not(:first-child) {
+    display: none !important;
+  }
+
+}
+
+/* Global: customer/supplier pill expands into available header space */
+.neo-quote-scope .header-bar .customer-pill,
+.neo-invoice-scope .header-bar .customer-pill,
+.neo-purchase-scope .header-bar .supplier-pill {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  /* 16) Bottom padding so action buttons clear the floating Lovable bar */
+  .neo-quote-scope,
+  .neo-invoice-scope {
+    padding-bottom: 80px !important;
+  }
+
+  /* ============================================================
+     17) NATIVE-APP MOBILE LAYOUT for Invoice/Quote Create pages
+     - Header bar uses system primary color (sticky)
+     - Customer row: 3 fields side-by-side with primary borders
+     - Quick-add: product full-width, then qty/price/add row
+     - Items table: 5 cols only, no horizontal scroll, fixed layout
+     - Sticky bottom action bar with prominent save button
+     ============================================================ */
+
+  /* Page padding minimal on phone */
+  .neo-quote-scope > .quote-layout,
+  .neo-invoice-scope > .quote-layout {
+    padding: 4px !important;
+  }
+
+  /* (1) Header bar — sticky, primary color, white text */
+  .neo-quote-scope .header-bar,
+  .neo-invoice-scope .header-bar {
+    position: sticky !important;
+    top: 0;
+    z-index: 20;
+    background: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 6px !important;
+    margin-bottom: 6px !important;
+    grid-template-columns: 1.4fr 0.9fr 1fr !important;
+    gap: 4px !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,.15) !important;
+  }
+  .neo-quote-scope .header-bar .field,
+  .neo-invoice-scope .header-bar .field {
+    width: auto;
+  }
+  .neo-quote-scope .header-bar .field label,
+  .neo-invoice-scope .header-bar .field label {
+    color: hsl(var(--primary-foreground)) !important;
+    opacity: 0.9;
+    font-size: 9px !important;
+    margin-bottom: 1px !important;
+  }
+  .neo-quote-scope .header-bar .field .form-control,
+  .neo-invoice-scope .header-bar .field .form-control,
+  .neo-quote-scope .header-bar .field input,
+  .neo-invoice-scope .header-bar .field input,
+  .neo-quote-scope .header-bar .field select,
+  .neo-invoice-scope .header-bar .field select {
+    height: 28px !important;
+    font-size: 11px !important;
+    padding: 2px 5px !important;
+    border: 1.5px solid hsl(var(--primary-foreground) / 0.4) !important;
+    border-radius: 4px !important;
+    background: hsl(var(--primary-foreground)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+  /* Hide secondary header-bar children beyond first 3 (extras like buttons) */
+  .neo-quote-scope .header-bar > *:nth-child(n+4),
+  .neo-invoice-scope .header-bar > *:nth-child(n+4) {
+    display: none !important;
+  }
+
+  /* (3) Quick-add row — product full width, then qty/price/add */
+  .neo-quote-scope .quick-add-row,
+  .neo-invoice-scope .quick-add-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 80px !important;
+    gap: 4px !important;
+    padding: 6px !important;
+    margin-bottom: 6px !important;
+  }
+  .neo-quote-scope .quick-add-row > .product-search-container,
+  .neo-invoice-scope .quick-add-row > .product-search-container,
+  .neo-quote-scope .quick-add-row > *:first-child,
+  .neo-invoice-scope .quick-add-row > *:first-child {
+    grid-column: 1 / -1 !important;
+  }
+  /* Hide quick-add columns beyond qty(2nd), price(3rd), add(last) */
+  .neo-quote-scope .quick-add-row > *:nth-child(n+3):not(:last-child),
+  .neo-invoice-scope .quick-add-row > *:nth-child(n+3):not(:last-child) {
+    display: none !important;
+  }
+
+  /* (4) Items table — 5 cols, fixed layout, no horizontal scroll */
+  .neo-quote-scope .items-scroll,
+  .neo-invoice-scope .items-scroll {
+    overflow-x: hidden !important;
+  }
+  .neo-quote-scope table.excel-table,
+  .neo-invoice-scope table.excel-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+    font-size: 11px !important;
+  }
+  .neo-quote-scope table.excel-table th,
+  .neo-invoice-scope table.excel-table th,
+  .neo-quote-scope table.excel-table td,
+  .neo-invoice-scope table.excel-table td {
+    padding: 4px 3px !important;
+    font-size: 11px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .neo-quote-scope table.excel-table thead th,
+  .neo-invoice-scope table.excel-table thead th {
+    background: #e5e7eb !important;
+    color: #374151 !important;
+    font-weight: 600 !important;
+  }
+  .neo-quote-scope table.excel-table tbody tr:nth-child(even),
+  .neo-invoice-scope table.excel-table tbody tr:nth-child(even) {
+    background: #f9fafb !important;
+  }
+  .neo-quote-scope table.excel-table input,
+  .neo-invoice-scope table.excel-table input {
+    font-size: 11px !important;
+    padding: 2px 3px !important;
+    height: 24px !important;
+  }
+
+  /* (Packaging dialog rules moved out of media query — see end of file) */
+
+
+  /* InvoiceCreatePage table: 6 cols (Product, Qty, Foreign$, UnitPrice, Total, Delete)
+     Hide col 3 (Foreign$) and col 6 (Delete) → show: Product, Qty, UnitPrice, Total */
+  .neo-invoice-scope table.excel-table th:nth-child(3),
+  .neo-invoice-scope table.excel-table td:nth-child(3),
+  .neo-invoice-scope table.excel-table th:nth-child(6),
+  .neo-invoice-scope table.excel-table td:nth-child(6) {
+    display: none !important;
+  }
+  /* Re-balance widths: Product 50%, Qty 18%, UnitPrice 16%, Total 16% */
+  .neo-invoice-scope table.excel-table th:nth-child(1),
+  .neo-invoice-scope table.excel-table td:nth-child(1) { width: 50% !important; }
+  .neo-invoice-scope table.excel-table th:nth-child(2),
+  .neo-invoice-scope table.excel-table td:nth-child(2) { width: 18% !important; }
+  .neo-invoice-scope table.excel-table th:nth-child(4),
+  .neo-invoice-scope table.excel-table td:nth-child(4) { width: 16% !important; }
+  .neo-invoice-scope table.excel-table th:nth-child(5),
+  .neo-invoice-scope table.excel-table td:nth-child(5) { width: 16% !important; }
+
+  /* QuoteCreatePage table: 8 cols (Check, Product, Qty, Foreign$, Price, Total, _, _)
+     Hide col 1 (checkbox), 4 (Foreign$), 7, 8 → show: Product, Qty, Price, Total */
+  .neo-quote-scope table.excel-table th:nth-child(1),
+  .neo-quote-scope table.excel-table td:nth-child(1),
+  .neo-quote-scope table.excel-table th:nth-child(4),
+  .neo-quote-scope table.excel-table td:nth-child(4),
+  .neo-quote-scope table.excel-table th:nth-child(7),
+  .neo-quote-scope table.excel-table td:nth-child(7),
+  .neo-quote-scope table.excel-table th:nth-child(8),
+  .neo-quote-scope table.excel-table td:nth-child(8) {
+    display: none !important;
+  }
+  .neo-quote-scope table.excel-table th:nth-child(2),
+  .neo-quote-scope table.excel-table td:nth-child(2) { width: 50% !important; }
+  .neo-quote-scope table.excel-table th:nth-child(3),
+  .neo-quote-scope table.excel-table td:nth-child(3) { width: 18% !important; }
+  .neo-quote-scope table.excel-table th:nth-child(5),
+  .neo-quote-scope table.excel-table td:nth-child(5) { width: 16% !important; }
+  .neo-quote-scope table.excel-table th:nth-child(6),
+  .neo-quote-scope table.excel-table td:nth-child(6) { width: 16% !important; }
+
+  /* (5) Totals bar — gray with bold numbers */
+  .neo-quote-scope .totals-bar,
+  .neo-invoke-scope .totals-bar,
+  .neo-invoice-scope .totals-bar {
+    background: #e9ecef !important;
+    border-radius: 6px !important;
+    padding: 8px !important;
+    margin: 6px 0 !important;
+    font-weight: 600 !important;
+    color: #1f2937 !important;
+  }
+
+  /* (6) Sticky bottom action bar */
+  .neo-quote-scope .actions-grid,
+  .neo-invoice-scope .actions-grid {
+    position: sticky !important;
+    bottom: 0;
+    z-index: 15;
+    background: hsl(var(--card)) !important;
+    border-top: 1px solid hsl(var(--border));
+    padding: 6px !important;
+    margin: 6px -4px -4px -4px !important;
+    display: flex !important;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    overflow-x: auto;
+  }
+  .neo-quote-scope .actions-grid > button:first-child,
+  .neo-invoice-scope .actions-grid > button:first-child {
+    flex: 1 1 40% !important;
+    background: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    padding: 8px 10px !important;
+    border-radius: 6px !important;
+    min-width: 110px;
+  }
+  .neo-quote-scope .actions-grid > button:not(:first-child),
+  .neo-invoice-scope .actions-grid > button:not(:first-child) {
+    flex: 0 0 auto !important;
+    padding: 6px 8px !important;
+    font-size: 11px !important;
+    min-width: 36px;
+  }
+
+  /* Re-enable scroll on form column for native feel */
+  .neo-quote-scope .form-column,
+  .neo-invoice-scope .form-column {
+    overflow: visible !important;
+  }
+  .neo-quote-scope .items-scroll,
+  .neo-invoice-scope .items-scroll {
+    max-height: none !important;
+    overflow-y: visible !important;
+  }
+}
+
+/* =====================================================================
+   Lock RecentItemsSidebar beside the form on desktop/tablet (>= 768px).
+   Prevents the "Recent Quotes/Invoices/Purchases" panel from dropping
+   below the form when the AppSidebar opens or the viewport shrinks.
+   ===================================================================== */
+@media (min-width: 768px) {
+  .neo-quote-scope .quote-layout,
+  .neo-invoice-scope .quote-layout,
+  .neo-purchase-scope .purchase-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 14px minmax(180px, var(--sidebar-width, 260px)) !important;
+    grid-auto-flow: column !important;
+    grid-auto-rows: 1fr !important;
+    align-items: stretch !important;
+  }
+  .neo-quote-scope .quote-layout > *,
+  .neo-invoice-scope .quote-layout > *,
+  .neo-purchase-scope .purchase-layout > * {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    grid-row: 1 !important;
+  }
+  .neo-quote-scope .quote-layout > aside,
+  .neo-invoice-scope .quote-layout > aside,
+  .neo-purchase-scope .purchase-layout > aside {
+    grid-column: 3 !important;
+    align-self: stretch !important;
+  }
+}
+
+/* =====================================================================
+   Global: prevent horizontal scroll on Create pages (Quote/Invoice/
+   Purchase/StockReturn) at any viewport size — including the customer/
+   supplier header bar. Tables keep their own internal scroll only.
+   ===================================================================== */
+.neo-quote-scope,
+.neo-invoice-scope,
+.neo-purchase-scope {
+  overflow-x: hidden !important;
+  max-width: 100%;
+}
+.neo-quote-scope .header-bar,
+.neo-invoice-scope .header-bar,
+.neo-purchase-scope .header-bar {
+  flex-wrap: wrap !important;
+  overflow: visible !important;
+  max-width: 100%;
+}
+.neo-quote-scope .header-bar > *,
+.neo-invoice-scope .header-bar > *,
+.neo-purchase-scope .header-bar > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.neo-quote-scope .header-bar input,
+.neo-invoice-scope .header-bar input,
+.neo-purchase-scope .header-bar input,
+.neo-quote-scope .header-bar select,
+.neo-invoice-scope .header-bar select,
+.neo-purchase-scope .header-bar select {
+  max-width: 100%;
+}
+.neo-quote-scope .form-column,
+.neo-invoice-scope .form-column,
+.neo-purchase-scope .form-column {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* =====================================================================
+   Header bar = single row at ALL viewport sizes. Fields shrink evenly
+   instead of wrapping or causing horizontal scroll. Customer/Date/
+   Warehouse all visible side-by-side; ellipsis trims long values.
+   ===================================================================== */
+.neo-quote-scope .header-bar,
+.neo-invoice-scope .header-bar,
+.neo-purchase-scope .header-bar {
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+}
+.neo-quote-scope .header-bar > *,
+.neo-invoice-scope .header-bar > *,
+.neo-purchase-scope .header-bar > * {
+  min-width: 0;
+  flex-shrink: 1;
+}
+/* Fields that DON'T set their own inline width/flex get the equal-share fallback.
+   Fields with inline `style="width:..."` or `style="flex:..."` keep their size,
+   so the per-field expand handles work at every viewport. */
+.neo-quote-scope .header-bar .field:not([style*="width"]):not([style*="flex"]),
+.neo-invoice-scope .header-bar .field:not([style*="width"]):not([style*="flex"]),
+.neo-purchase-scope .header-bar .field:not([style*="width"]):not([style*="flex"]) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.neo-quote-scope .header-bar .field input,
+.neo-invoice-scope .header-bar .field input,
+.neo-purchase-scope .header-bar .field input,
+.neo-quote-scope .header-bar .field select,
+.neo-invoice-scope .header-bar .field select,
+.neo-purchase-scope .header-bar .field select {
+  width: 100% !important;
+  min-width: 0 !important;
+  text-overflow: ellipsis;
+}
+
+/* =====================================================================
+   Item table: bigger, bolder rows + sticky empty input row + smaller quick-add
+   Applies to Quote / Invoice (.neo-quote-scope) and Purchase (.neo-purchase-scope) and Stock-return (.neo-quote-scope)
+   ===================================================================== */
+.neo-quote-scope .item_header th,
+.neo-purchase-scope .item_header th {
+  padding: calc(5px * var(--items-zoom, 1)) calc(4px * var(--items-zoom, 1)) !important;
+  font-size: calc(11px * var(--items-zoom, 1)) !important;
+  font-weight: 600 !important;
+  text-align: center !important;
+  background: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  white-space: nowrap;
+}
+.neo-quote-scope .excel-row td,
+.neo-purchase-scope .excel-row td {
+  padding: calc(3px * var(--items-zoom, 1)) calc(4px * var(--items-zoom, 1)) !important;
+  font-size: calc(13px * var(--items-zoom, 1)) !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+.neo-quote-scope .excel-row,
+.neo-purchase-scope .excel-row {
+  height: calc(32px * var(--items-zoom, 1)) !important;
+}
+.neo-quote-scope .excel-row .form-control,
+.neo-purchase-scope .excel-row .form-control,
+.neo-quote-scope .empty-input-row .form-control,
+.neo-purchase-scope .empty-input-row .form-control {
+  height: calc(28px * var(--items-zoom, 1)) !important;
+  font-size: calc(13px * var(--items-zoom, 1)) !important;
+  font-weight: 700 !important;
+  padding: calc(3px * var(--items-zoom, 1)) calc(6px * var(--items-zoom, 1)) !important;
+}
+
+/* =====================================================================
+   Excel-clean grid look for items table (Invoice / Quote / Purchase / Stock-return)
+   Thin gray cell borders, white background, no zebra, borderless inputs.
+   ===================================================================== */
+.neo-quote-scope table,
+.neo-purchase-scope table {
+  border-collapse: collapse !important;
+  background: #ffffff !important;
+}
+.neo-quote-scope .excel-row > td,
+.neo-purchase-scope .excel-row > td,
+.neo-quote-scope .empty-input-row > td,
+.neo-purchase-scope .empty-input-row > td {
+  border: 1px solid #d0d7de !important;
+  background: #ffffff !important;
+}
+.neo-quote-scope .item_header th,
+.neo-purchase-scope .item_header th {
+  border: 1px solid hsl(var(--primary)) !important;
+}
+.neo-quote-scope .excel-row:hover > td,
+.neo-purchase-scope .excel-row:hover > td {
+  background: rgba(124, 58, 237, 0.04) !important;
+}
+.neo-quote-scope .excel-row .form-control,
+.neo-purchase-scope .excel-row .form-control,
+.neo-quote-scope .empty-input-row .form-control,
+.neo-purchase-scope .empty-input-row .form-control {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  width: 100% !important;
+}
+.neo-quote-scope .excel-row .form-control:focus,
+.neo-purchase-scope .excel-row .form-control:focus,
+.neo-quote-scope .empty-input-row .form-control:focus,
+.neo-purchase-scope .empty-input-row .form-control:focus {
+  outline: 2px solid hsl(var(--primary)) !important;
+  outline-offset: -2px !important;
+  background: #ffffff !important;
+}
+
+/* Row + cell highlight while navigating items table (all 4 screens) */
+.neo-quote-scope tr.excel-row:focus-within > td,
+.neo-purchase-scope tr.excel-row:focus-within > td {
+  background: hsl(var(--accent) / 0.45) !important;
+  transition: background 0.12s ease-out;
+}
+.neo-quote-scope [data-nav-table]:focus,
+.neo-purchase-scope [data-nav-table]:focus,
+.neo-quote-scope td:focus-within[data-nav-col],
+.neo-purchase-scope td:focus-within[data-nav-col] {
+  background: hsl(var(--ring) / 0.18) !important;
+  outline: 2px solid hsl(var(--ring)) !important;
+  outline-offset: -2px !important;
+}
+/* Read-only total cell focus (it's the <td> itself) */
+.neo-quote-scope td[data-nav-col="total"]:focus,
+.neo-purchase-scope td[data-nav-col="total"]:focus {
+  background: hsl(var(--ring) / 0.22) !important;
+}
+
+/* Sticky empty input row at bottom of items table */
+.neo-quote-scope .empty-input-row td,
+.neo-purchase-scope .empty-input-row td {
+  position: sticky;
+  bottom: 0;
+  background: hsl(var(--card)) !important;
+  box-shadow: 0 -2px 4px rgba(0,0,0,.06);
+  z-index: 4;
+}
+
+/* Compact quick-add row above the items table */
+.neo-quote-scope .quick-add-row .form-control,
+.neo-purchase-scope .quick-add-row .form-control {
+  height: 26px !important;
+  font-size: 11px !important;
+  padding: 2px 6px !important;
+}
+/* grid-template-columns is now driven inline from JS (useQuickRowWidths) */
+
+/* === منع تداخل/قصّ الأعمدة عند ضيق الشاشة ===
+   كل خلية في صف الإضافة السريعة قابلة للانكماش (min-width:0)،
+   والمحتوى الداخلي يقَصّ بإيليبسس بدلاً من دفع الجار.
+*/
+.quick-add-row {
+  min-width: 0;
+}
+.quick-add-row > * {
+  min-width: 0;
+  overflow: hidden;
+}
+.quick-add-row .form-control,
+.quick-add-row input,
+.quick-add-row select {
+  min-width: 0;
+  width: 100%;
+  text-overflow: ellipsis;
+}
+.quick-add-row .product-search-container,
+.quick-add-row .quick-add-field {
+  min-width: 0;
+}
+
+/* جدول البنود: اسمح بالانكماش بدلاً من فيضان أفقي خفيّ */
+.neo-quote-scope .items-scroll,
+.neo-invoice-scope .items-scroll,
+.neo-purchase-scope .items-scroll {
+  min-width: 0;
+}
+/* احترم أعرض الأعمدة الديناميكية من <colgroup> ومقابض السحب — لا نفرض table-layout أو overflow */
+.neo-quote-scope .items-scroll th,
+.neo-invoice-scope .items-scroll th,
+.neo-purchase-scope .items-scroll th,
+.neo-quote-scope .items-scroll td,
+.neo-invoice-scope .items-scroll td,
+.neo-purchase-scope .items-scroll td {
+  position: relative;
+}
+
+
+/* عند تمرير الماوس فوق خلية بنص مقطوع: أظهر النص كاملاً عبر طبقة عائمة (tooltip) */
+.neo-quote-scope .items-scroll th:hover,
+.neo-invoke-scope .items-scroll th:hover,
+.neo-purchase-scope .items-scroll th:hover,
+.neo-quote-scope .items-scroll td:hover,
+.neo-invoice-scope .items-scroll td:hover,
+.neo-purchase-scope .items-scroll td:hover {
+  overflow: visible;
+  z-index: 5;
+}
+.neo-quote-scope .items-scroll td:hover > *,
+.neo-invoice-scope .items-scroll td:hover > *,
+.neo-purchase-scope .items-scroll td:hover > *,
+.neo-quote-scope .items-scroll th:hover > *,
+.neo-invoice-scope .items-scroll th:hover > *,
+.neo-purchase-scope .items-scroll th:hover > * {
+  position: relative;
+  z-index: 6;
+}
+/* tooltip CSS-only للنصوص المقطوعة باستخدام data-full أو title */
+.neo-quote-scope .items-scroll [data-full]:hover::after,
+.neo-invoice-scope .items-scroll [data-full]:hover::after,
+.neo-purchase-scope .items-scroll [data-full]:hover::after,
+.neo-quote-scope .items-scroll [title]:hover::after,
+.neo-invoice-scope .items-scroll [title]:hover::after,
+.neo-purchase-scope .items-scroll [title]:hover::after {
+  content: attr(data-full) attr(title);
+  position: absolute;
+  top: 100%;
+  inset-inline-start: 0;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: normal;
+  max-width: 320px;
+  z-index: 50;
+  box-shadow: 0 4px 12px hsl(var(--foreground) / 0.15);
+  pointer-events: none;
+}
+
+/* === وضع استجابة: تبديل الأعمدة إلى تخطيط عمودي عند ضيق الشاشة ===
+   عند العرض < 900px تتكدّس حقول صف الإضافة السريعة وحقول الترويسة
+   فوق بعضها ضمن عمود واحد بدلاً من الانضغاط الذي يكسر الواجهة.
+*/
+@media (max-width: 900px) {
+  .quick-add-row {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+  }
+  .quick-add-row > * {
+    grid-column: 1 / -1 !important;
+    width: 100%;
+  }
+
+  .neo-quote-scope .header-bar,
+  .neo-invoice-scope .header-bar,
+  .neo-purchase-scope .header-bar {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .neo-quote-scope .header-bar,
+  .neo-invoice-scope .header-bar,
+  .neo-purchase-scope .header-bar {
+    grid-template-columns: 1fr !important;
+  }
+  .neo-quote-scope .header-bar > *,
+  .neo-invoice-scope .header-bar > *,
+  .neo-purchase-scope .header-bar > * {
+    width: 100%;
+  }
+}
+
+/* Per-field expand button (↔) sits in the inline-end top corner of a field */
+.quick-add-field {
+  position: relative;
+}
+.field-expand-btn {
+  position: absolute;
+  top: 1px;
+  inset-inline-end: 1px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: hsl(var(--muted-foreground));
+  opacity: 0;
+  pointer-events: none;
+  cursor: ew-resize;
+  border-radius: 3px;
+  z-index: 3;
+  transition: opacity .15s, background-color .15s;
+}
+/* Reveal & enable the handle only when the field is hovered/focused.
+   This prevents the absolutely-positioned button from intercepting
+   clicks on the native <select> dropdown arrow underneath. */
+.field:hover > .field-expand-btn,
+.field:focus-within > .field-expand-btn,
+.quick-add-field:hover > .field-expand-btn,
+.quick-add-field:focus-within > .field-expand-btn,
+.field-expand-btn:hover,
+.field-expand-btn:focus {
+  opacity: 0.6;
+  pointer-events: auto;
+}
+.field-expand-btn:hover {
+  opacity: 1;
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+/* For fields containing a native <select>, push the handle further
+   from the dropdown caret area so it never overlaps the click target. */
+.header-bar .field:has(select) > .field-expand-btn,
+.quick-add-row .field:has(select) > .field-expand-btn,
+.quick-add-field:has(select) > .field-expand-btn {
+  inset-inline-end: 20px;
+}
+
+/* Hide number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* === Custom checkbox in items table: large + visible ✓ === */
+.neo-quote-scope .excel-table input[type="checkbox"],
+.neo-purchase-scope .excel-table input[type="checkbox"],
+.neo-invoice-scope .excel-table input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid hsl(220 13% 60%);
+  border-radius: 4px;
+  background: #ffffff;
+  cursor: pointer;
+  position: relative;
+  vertical-align: middle;
+  transition: background 120ms, border-color 120ms;
+}
+.neo-quote-scope .excel-table input[type="checkbox"]:hover,
+.neo-purchase-scope .excel-table input[type="checkbox"]:hover,
+.neo-invoice-scope .excel-table input[type="checkbox"]:hover {
+  border-color: hsl(var(--destructive));
+}
+.neo-quote-scope .excel-table input[type="checkbox"]:checked,
+.neo-purchase-scope .excel-table input[type="checkbox"]:checked,
+.neo-invoice-scope .excel-table input[type="checkbox"]:checked {
+  background: hsl(var(--destructive));
+  border-color: hsl(var(--destructive));
+}
+.neo-quote-scope .excel-table input[type="checkbox"]:checked::after,
+.neo-purchase-scope .excel-table input[type="checkbox"]:checked::after,
+.neo-invoice-scope .excel-table input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 0px;
+  width: 6px;
+  height: 12px;
+  border: solid #ffffff;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+/* Strong red highlight for checkbox-selected rows (pre-delete cue) */
+.neo-quote-scope tr.row-selected-danger > td,
+.neo-purchase-scope tr.row-selected-danger > td,
+.neo-invoice-scope tr.row-selected-danger > td {
+  background: hsl(0 84% 60% / 0.55) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 -1px 0 hsl(0 84% 40% / 0.9);
+}
+.neo-quote-scope tr.row-selected-danger > td:first-child,
+.neo-purchase-scope tr.row-selected-danger > td:first-child,
+.neo-invoice-scope tr.row-selected-danger > td:first-child {
+  border-right: 5px solid hsl(0 84% 40%) !important;
+}
+.neo-quote-scope tr.row-selected-danger > td:last-child,
+.neo-purchase-scope tr.row-selected-danger > td:last-child,
+.neo-invoice-scope tr.row-selected-danger > td:last-child {
+  border-left: 5px solid hsl(0 84% 40%) !important;
+}
+/* Hover stays neutral/light to differentiate from selected */
+.neo-quote-scope tr.excel-row:not(.row-selected-danger):not(.row-pending-delete):hover > td,
+.neo-purchase-scope tr.excel-row:not(.row-selected-danger):not(.row-pending-delete):hover > td,
+.neo-invoice-scope tr.excel-row:not(.row-selected-danger):not(.row-pending-delete):hover > td {
+  background: hsl(220 14% 96%) !important;
+}
+.neo-quote-scope tr.row-selected-danger:hover > td,
+.neo-purchase-scope tr.row-selected-danger:hover > td,
+.neo-invoice-scope tr.row-selected-danger:hover > td,
+.neo-quote-scope tr.row-selected-danger:focus-within > td,
+.neo-purchase-scope tr.row-selected-danger:focus-within > td,
+.neo-invoice-scope tr.row-selected-danger:focus-within > td {
+  background: hsl(0 84% 50% / 0.65) !important;
+}
+/* Make every input/cell inside a selected row clearly red — overrides input white bg */
+.neo-quote-scope tr.row-selected-danger .form-control,
+.neo-purchase-scope tr.row-selected-danger .form-control,
+.neo-invoice-scope tr.row-selected-danger .form-control,
+.neo-quote-scope tr.row-selected-danger input,
+.neo-purchase-scope tr.row-selected-danger input,
+.neo-invoice-scope tr.row-selected-danger input,
+.neo-quote-scope tr.row-selected-danger select,
+.neo-purchase-scope tr.row-selected-danger select,
+.neo-invoice-scope tr.row-selected-danger select {
+  background: hsl(0 84% 60% / 0.0) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-color: hsl(0 84% 40% / 0.6) !important;
+}
+.neo-quote-scope tr.row-selected-danger ::placeholder,
+.neo-purchase-scope tr.row-selected-danger ::placeholder,
+.neo-invoice-scope tr.row-selected-danger ::placeholder {
+  color: #ffe5e5 !important;
+  opacity: 0.85;
+}
+.neo-quote-scope tr.row-selected-danger ::selection,
+.neo-purchase-scope tr.row-selected-danger ::selection,
+.neo-invoice-scope tr.row-selected-danger ::selection {
+  background: #ffffff;
+  color: hsl(var(--destructive));
+}
+
+/* Space-to-delete: highlight rows pending deletion (multi-select) */
+.neo-quote-scope tr.row-pending-delete > td,
+.neo-purchase-scope tr.row-pending-delete > td,
+.neo-invoice-scope tr.row-pending-delete > td {
+  background: hsl(0 84% 55% / 0.22) !important;
+  box-shadow: inset 0 -2px 0 0 hsl(0 84% 45% / 0.95), inset 0 2px 0 0 hsl(0 84% 45% / 0.95);
+  color: hsl(0 0% 10%) !important;
+  font-weight: 600;
+  animation: pending-delete-pulse 0.9s ease-in-out infinite alternate;
+}
+.neo-quote-scope tr.row-pending-delete > td:first-child,
+.neo-purchase-scope tr.row-pending-delete > td:first-child,
+.neo-invoice-scope tr.row-pending-delete > td:first-child {
+  position: relative;
+  box-shadow:
+    inset 0 -2px 0 0 hsl(0 84% 45% / 0.95),
+    inset 0 2px 0 0 hsl(0 84% 45% / 0.95),
+    inset 4px 0 0 0 hsl(0 84% 45% / 0.95);
+}
+.neo-quote-scope tr.row-pending-delete > td:last-child,
+.neo-purchase-scope tr.row-pending-delete > td:last-child,
+.neo-invoice-scope tr.row-pending-delete > td:last-child {
+  box-shadow:
+    inset 0 -2px 0 0 hsl(0 84% 45% / 0.95),
+    inset 0 2px 0 0 hsl(0 84% 45% / 0.95),
+    inset -4px 0 0 0 hsl(0 84% 45% / 0.95);
+}
+.neo-quote-scope tr.row-pending-delete > td:first-child::before,
+.neo-purchase-scope tr.row-pending-delete > td:first-child::before {
+  content: "🗑";
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 1px 2px hsl(0 0% 0% / 0.3));
+}
+@keyframes pending-delete-pulse {
+  from { background-color: hsl(0 84% 55% / 0.18) !important; }
+  to   { background-color: hsl(0 84% 55% / 0.32) !important; }
+}
+
+
+/* =====================================================================
+   MOBILE FIT — ضبط الخطوط/الهوامش/التباعد ومنع تجاوز المحتوى للارتفاع
+   يُطبَّق فقط على الشاشات < 768px ولا يمسّ سطح المكتب.
+   ===================================================================== */
+@media (max-width: 767px) {
+  html, body { font-size: 13px; }
+  body { overflow-x: hidden; }
+
+  /* عناوين الصفحات أصغر */
+  h1 { font-size: 18px !important; line-height: 1.25 !important; margin: 4px 0 !important; }
+  h2 { font-size: 16px !important; line-height: 1.25 !important; margin: 4px 0 !important; }
+  h3 { font-size: 14px !important; line-height: 1.25 !important; margin: 2px 0 !important; }
+
+  /* تقليص حشوة الكروت/البانلات الافتراضية */
+  .card, .legacy-card, [class*="rounded-lg"][class*="border"] {
+    padding: 8px !important;
+  }
+  .card-header, .card-content, .card-footer { padding: 6px 8px !important; }
+
+  /* تقليص الأزرار في القوائم/شريط الأدوات */
+  .legacy-actions .btn,
+  .legacy-actions button {
+    font-size: 11px !important;
+    padding: 3px 6px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* بطاقة المستند للموبايل: تباعد أصغر */
+  .mobile-doc-card { padding: 8px !important; margin-bottom: 6px !important; gap: 4px !important; }
+  .mobile-doc-list { padding: 0 !important; }
+
+  /* الـ pagination في الأسفل: صغّر النص واجعله متعدد الأسطر بهدوء */
+  .legacy-pagination .page-link {
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    min-width: 0 !important;
+  }
+  .legacy-dt-info, .legacy-dt-length { font-size: 11px !important; }
+
+  /* امنع أي عنصر من تجاوز عرض الشاشة */
+  img, video, table, pre { max-width: 100% !important; }
+
+  /* main: اسمح للسكرول العمودي الطبيعي بدلاً من ارتفاع ثابت */
+  main, main > div {
+    min-height: 0 !important;
+    overflow-y: visible !important;
+  }
+
+  /* منع الكلمات/الأرقام/الإيميلات الطويلة من تكسير التخطيط على الهاتف */
+  body, p, span, div, td, th, a, li,
+  h1, h2, h3, h4, h5, h6,
+  label, button, .badge, .btn,
+  .card-title, .card-header, .card-body,
+  input, textarea, select,
+  .form-label, .form-control,
+  .nav-link, .dropdown-item,
+  .breadcrumb-item, .list-group-item {
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    word-wrap: break-word !important;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+    min-width: 0;
+  }
+
+  /* اسمح للأزرار والشارات بالالتفاف بدلاً من القص */
+  .btn, button, .badge {
+    white-space: normal !important;
+    max-width: 100%;
+  }
+
+  /* خلايا الجداول: لا تجبر سطر واحد */
+  table, td, th {
+    white-space: normal !important;
+  }
+
+  /* الحاويات لا تتجاوز عرض الشاشة */
+  .container, .container-fluid, .row, [class*="col-"], main, section, article, aside, header, footer {
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ============================================
+   انتقال سلس عند تبديل تخطيط الأعمدة
+   ============================================ */
+@media (prefers-reduced-motion: no-preference) {
+  .neo-quote-scope .quick-add-row,
+  .neo-invoice-scope .quick-add-row,
+  .neo-purchase-scope .quick-add-row,
+  .neo-quote-scope .header-bar,
+  .neo-invoice-scope .header-bar,
+  .neo-purchase-scope .header-bar {
+    transition: grid-template-columns 280ms ease, gap 280ms ease, padding 280ms ease;
+  }
+
+  .neo-quote-scope .quick-add-row > *,
+  .neo-invoice-scope .quick-add-row > *,
+  .neo-purchase-scope .quick-add-row > *,
+  .neo-quote-scope .header-bar > *,
+  .neo-invoice-scope .header-bar > *,
+  .neo-purchase-scope .header-bar > * {
+    transition: width 280ms ease, max-width 280ms ease, transform 280ms ease, opacity 220ms ease, grid-column 280ms ease;
+  }
+
+  .items-scroll th,
+  .items-scroll td {
+    transition: width 250ms ease, padding 250ms ease;
+  }
+}
+
+/* تلاشي خفيف عند الدخول لوضع العمود */
+@media (max-width: 900px) and (prefers-reduced-motion: no-preference) {
+  .neo-quote-scope .quick-add-row > *,
+  .neo-invoice-scope .quick-add-row > *,
+  .neo-purchase-scope .quick-add-row > *,
+  .neo-quote-scope .header-bar > *,
+  .neo-invoice-scope .header-bar > *,
+  .neo-purchase-scope .header-bar > * {
+    animation: fade-in 220ms ease-out;
+  }
+}
+
+
+/* =====================================================================
+   Packaging dialog table — apply at ALL viewport sizes (not just mobile)
+   Goal: مطابق لجدول البنود — مضغوط، بدون سكرول أفقي، خط 11px.
+   ===================================================================== */
+.neo-pkg-scope,
+.neo-pkg-scope .pkg-scroll {
+  overflow-x: hidden !important;
+}
+.neo-pkg-scope table.excel-table {
+  min-width: 0 !important;
+  width: 100% !important;
+  table-layout: fixed !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  border-collapse: collapse !important;
+}
+.neo-pkg-scope table.excel-table th,
+.neo-pkg-scope table.excel-table td {
+  padding: 3px 4px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  vertical-align: middle !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+}
+.neo-pkg-scope table.excel-table input,
+.neo-pkg-scope table.excel-table select,
+.neo-pkg-scope table.excel-table textarea {
+  font-weight: 700 !important;
+}
+.neo-pkg-scope table.excel-table thead th,
+.neo-pkg-scope table.excel-table .item_header th {
+  background: hsl(142 71% 35%) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  padding: 5px 4px !important;
+  text-align: center !important;
+}
+.neo-pkg-scope table.excel-table tbody tr:nth-child(even) td {
+  background: hsl(var(--muted) / 0.4) !important;
+}
+.neo-pkg-scope table.excel-table .legacy-btn {
+  font-size: 11px !important;
+  padding: 2px 6px !important;
+  height: 22px !important;
+  line-height: 1 !important;
+}
+.neo-pkg-scope table.excel-table .legacy-btn svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+.neo-pkg-scope table.excel-table input[type="checkbox"] {
+  width: 13px !important;
+  height: 13px !important;
+}

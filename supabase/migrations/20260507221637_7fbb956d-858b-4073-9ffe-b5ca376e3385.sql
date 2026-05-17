@@ -1,0 +1,1 @@
+ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS side_quote_prefix text DEFAULT 'QTS-';
