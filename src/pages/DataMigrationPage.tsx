@@ -56,6 +56,100 @@ type LogEntry = { kind: LogKind; msg: string; at: string };
 type StepStatus = "pending" | "running" | "done" | "error";
 type Step = { key: string; title: string; status: StepStatus; progress: number; detail?: string };
 
+type PreflightIssue = { row: number; field: string; message: string; severity: "error" | "warn" };
+type PreflightReport = {
+  fileOk: boolean;
+  totalRows: number;
+  validRows: number;
+  emptyRows: number;
+  duplicates: number;
+  headers: string[];
+  missingColumns: string[];
+  issues: PreflightIssue[];
+  error?: string;
+};
+
+const REQUIRED_CUSTOMER_COLS = ["الاسم / الجهة", "رقم الهاتف"];
+const REQUIRED_PRODUCT_COLS = ["اسم المنتج", "مفعل"];
+
+async function preflightFile(
+  url: string,
+  kind: "customers" | "products"
+): Promise<PreflightReport> {
+  const empty: PreflightReport = {
+    fileOk: false, totalRows: 0, validRows: 0, emptyRows: 0,
+    duplicates: 0, headers: [], missingColumns: [], issues: [],
+  };
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return { ...empty, error: `تعذّر تحميل ${url} (HTTP ${res.status})` };
+    const buf = await res.arrayBuffer();
+    const wb = xlsx.read(buf, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+    if (rows.length === 0) return { ...empty, error: "الملف فارغ" };
+
+    const headers = (rows[0] ?? []).map((h: any) => String(h ?? "").trim());
+    const required = kind === "customers" ? REQUIRED_CUSTOMER_COLS : REQUIRED_PRODUCT_COLS;
+    const missingColumns: string[] = [];
+    // فقط نتحقق من وجود العمودين الأولين (الاسم + الحقل الثاني)
+    if (!headers[0]) missingColumns.push(required[0]);
+    if (!headers[1]) missingColumns.push(required[1]);
+
+    const issues: PreflightIssue[] = [];
+    const seen = new Map<string, number>();
+    let validRows = 0, emptyRows = 0, duplicates = 0;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i] ?? [];
+      const name = row[0] ? String(row[0]).trim() : "";
+      if (!name) { emptyRows++; continue; }
+
+      if (kind === "customers") {
+        const phoneRaw = row[1];
+        const phone = phoneRaw == null ? "" : String(phoneRaw).replace(/[^0-9+]/g, "");
+        if (phoneRaw != null && String(phoneRaw).trim() && !phone) {
+          issues.push({ row: i + 1, field: "phone", message: `هاتف غير صالح: "${phoneRaw}"`, severity: "warn" });
+        }
+        if (name.length > 200) {
+          issues.push({ row: i + 1, field: "name", message: "الاسم أطول من 200 حرف", severity: "warn" });
+        }
+      } else {
+        const active = String(row[1] ?? "").toLowerCase();
+        if (row[1] != null && String(row[1]).trim() &&
+            !["x", "✓", "true", "1", "yes", "نعم", ""].some((v) => active === v || active.includes(v))) {
+          // غير حرج
+        }
+        if (name.length > 200) {
+          issues.push({ row: i + 1, field: "name", message: "اسم المنتج أطول من 200 حرف", severity: "warn" });
+        }
+      }
+
+      const key = name.toLowerCase();
+      if (seen.has(key)) {
+        duplicates++;
+        issues.push({
+          row: i + 1, field: "name",
+          message: `مكرر مع الصف ${seen.get(key)}: "${name}"`,
+          severity: "warn",
+        });
+      } else {
+        seen.set(key, i + 1);
+      }
+      validRows++;
+    }
+
+    return {
+      fileOk: true,
+      totalRows: rows.length - 1,
+      validRows, emptyRows, duplicates,
+      headers, missingColumns, issues,
+    };
+  } catch (e: any) {
+    return { ...empty, error: e?.message ?? String(e) };
+  }
+}
+
 const INITIAL_STEPS: Step[] = [
   { key: "wipe", title: "الدفعة 1 — تفريغ كل البيانات", status: "pending", progress: 0 },
   { key: "customers", title: "الدفعة 2 — استيراد العملاء", status: "pending", progress: 0 },
@@ -71,6 +165,11 @@ export default function DataMigrationPage() {
   const [stats, setStats] = useState({ success: 0, errors: 0, warnings: 0 });
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [preflight, setPreflight] = useState<null | {
+    customers: PreflightReport;
+    products: PreflightReport;
+  }>(null);
+  const [preflightBusy, setPreflightBusy] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   // مؤقّت الوقت المنقضي
@@ -218,6 +317,32 @@ export default function DataMigrationPage() {
     setElapsed(0);
   };
 
+  const runPreflight = async () => {
+    setPreflightBusy(true);
+    try {
+      const [customers, products] = await Promise.all([
+        preflightFile("/import/customers.xlsx", "customers"),
+        preflightFile("/import/products.xlsx", "products"),
+      ]);
+      setPreflight({ customers, products });
+      const totalIssues = customers.issues.length + products.issues.length;
+      const blocked =
+        !customers.fileOk || !products.fileOk ||
+        customers.missingColumns.length > 0 || products.missingColumns.length > 0;
+      if (blocked) toast.error("توجد مشاكل تمنع التنفيذ");
+      else if (totalIssues > 0) toast.warning(`اكتمل التحقق مع ${totalIssues} تنبيه`);
+      else toast.success("الملفات صالحة للاستيراد");
+    } finally {
+      setPreflightBusy(false);
+    }
+  };
+
+  const preflightBlocked = !!preflight && (
+    !preflight.customers.fileOk || !preflight.products.fileOk ||
+    preflight.customers.missingColumns.length > 0 ||
+    preflight.products.missingColumns.length > 0
+  );
+
   const runAll = async () => {
     if (confirm !== CONFIRM_PHRASE) {
       toast.error(`اكتب "${CONFIRM_PHRASE}" للتأكيد`);
@@ -328,6 +453,87 @@ export default function DataMigrationPage() {
             ))}
           </div>
 
+          {/* التحقق المسبق */}
+          <div className="border rounded-lg p-4 bg-card space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-semibold text-sm">التحقق المسبق من ملفات Excel</div>
+              <Button onClick={runPreflight} disabled={preflightBusy || loading} size="sm" variant="secondary">
+                {preflightBusy ? "جارٍ الفحص..." : preflight ? "إعادة الفحص" : "فحص الملفات"}
+              </Button>
+            </div>
+            {!preflight && (
+              <div className="text-xs text-muted-foreground">
+                اضغط "فحص الملفات" لقراءة customers.xlsx و products.xlsx والتحقق من الأعمدة وعدد الصفوف قبل التنفيذ.
+              </div>
+            )}
+            {preflight && (
+              <div className="grid md:grid-cols-2 gap-3">
+                {([
+                  { key: "customers", title: "العملاء", report: preflight.customers },
+                  { key: "products", title: "المنتجات", report: preflight.products },
+                ] as const).map(({ key, title, report }) => {
+                  const blocked = !report.fileOk || report.missingColumns.length > 0;
+                  return (
+                    <div key={key} className={`border rounded-md p-3 ${blocked ? "border-destructive/50" : "border-border"}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        {blocked
+                          ? <XCircle className="w-4 h-4 text-destructive" />
+                          : report.issues.length > 0
+                            ? <Circle className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                            : <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                        <span className="font-medium text-sm">{title}</span>
+                      </div>
+                      {report.error && <div className="text-xs text-destructive mb-2">⚠ {report.error}</div>}
+                      <div className="grid grid-cols-2 gap-1 text-xs">
+                        <span className="text-muted-foreground">إجمالي الصفوف:</span>
+                        <span className="font-mono tabular-nums">{report.totalRows}</span>
+                        <span className="text-muted-foreground">صفوف صالحة:</span>
+                        <span className="font-mono tabular-nums text-green-600">{report.validRows}</span>
+                        <span className="text-muted-foreground">صفوف فارغة:</span>
+                        <span className="font-mono tabular-nums">{report.emptyRows}</span>
+                        <span className="text-muted-foreground">مكررات:</span>
+                        <span className="font-mono tabular-nums">{report.duplicates}</span>
+                      </div>
+                      {report.headers.length > 0 && (
+                        <div className="mt-2 text-xs">
+                          <span className="text-muted-foreground">الأعمدة المكتشفة: </span>
+                          <span className="font-mono">{report.headers.slice(0, 4).join(" | ") || "—"}</span>
+                        </div>
+                      )}
+                      {report.missingColumns.length > 0 && (
+                        <div className="mt-2 text-xs text-destructive">
+                          أعمدة مفقودة: {report.missingColumns.join("، ")}
+                        </div>
+                      )}
+                      {report.issues.length > 0 && (
+                        <details className="mt-2">
+                          <summary className="text-xs cursor-pointer text-yellow-600">
+                            {report.issues.length} تنبيه — اعرض التفاصيل
+                          </summary>
+                          <div className="mt-1 max-h-40 overflow-y-auto text-xs space-y-0.5 bg-muted/30 p-2 rounded">
+                            {report.issues.slice(0, 100).map((iss, idx) => (
+                              <div key={idx} className={iss.severity === "error" ? "text-destructive" : "text-yellow-700 dark:text-yellow-400"}>
+                                صف {iss.row} ({iss.field}): {iss.message}
+                              </div>
+                            ))}
+                            {report.issues.length > 100 && (
+                              <div className="text-muted-foreground">... و {report.issues.length - 100} تنبيه آخر</div>
+                            )}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {preflightBlocked && (
+              <div className="text-xs text-destructive font-medium">
+                ⛔ لا يمكن تنفيذ الاستيراد حتى يتم إصلاح المشاكل الحرجة في الملفات.
+              </div>
+            )}
+          </div>
+
           {/* التأكيد والأزرار */}
           <div className="space-y-2">
             <label className="text-sm font-medium">
@@ -336,7 +542,7 @@ export default function DataMigrationPage() {
             <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} disabled={loading} placeholder={CONFIRM_PHRASE} />
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={runAll} disabled={loading} variant="destructive">
+            <Button onClick={runAll} disabled={loading || preflightBlocked} variant="destructive">
               {loading ? "جارٍ التنفيذ..." : "تنفيذ كل الدفعات"}
             </Button>
             <Button onClick={runWipeOnly} disabled={loading} variant="outline">
