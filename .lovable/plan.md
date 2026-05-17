@@ -1,61 +1,88 @@
-
 ## الهدف
-عند حذف صنف من فاتورة/عرض سعر، يُحفظ في سجل مرتبط بالمستند، ويظهر للمستخدم قسم "الأصناف غير المتوفرة" مع 3 طرق إرسال للعميل: واتساب (نص جاهز)، رابط مشاركة، وطباعة/PDF.
+عند حذف أي فاتورة من أي شاشة (قائمة الفواتير، شاشة عرض الفاتورة، شاشة تعديل الفاتورة) يتم:
+1. إرجاع كميات بنود الفاتورة بالكامل إلى مخزون المنتجات.
+2. حذف الفاتورة وكل توابعها (بنود، مرفقات، تغليف، نقل) فعلياً من قاعدة البيانات.
+3. ضمان أن المخزون الذي يظهر في شاشات الإدخال الأربع (فاتورة، عرض سعر، شراء، مرتجع) هو المخزون الفعلي الحالي بعد التحديث.
 
-ملاحظة: الجداول `deleted_invoice_items` و `deleted_quote_items` موجودة بالفعل بسياسات RLS صحيحة (SELECT/INSERT للمستخدم المصادق عليه). المفقود فقط: حذف صفوف الاستعادة + ربط الكتابة بفورم الإنشاء.
+---
+
+## الوضع الحالي (ما يعمل وما لا يعمل)
+
+| الشاشة | الحذف يعمل؟ | يُرجع المخزون؟ | المشكلة |
+|---|---|---|---|
+| `InvoicesPage` (القائمة) | ✅ | ⚠️ جزئياً | يُرجع دائماً حتى لو الفاتورة لم تُخصم أصلاً (حالة "جديدة") → تضخّم مخزون وهمي |
+| `InvoiceCreatePage` (زر حذف داخل التعديل) | ✅ | ⚠️ جزئياً | نفس المشكلة أعلاه + يبتلع أخطاء إرجاع المخزون بصمت (`console.warn`) ويكمل الحذف |
+| `InvoiceViewPage` (شاشة عرض الفاتورة) | ❌ | ❌ | يضع `status='cancelled'` فقط — لا يحذف ولا يُرجع مخزون |
+| عرض المخزون في 4 شاشات الإدخال | ✅ | — | يقرأ من `products.stock_quantity` مباشرة عبر `fetchAllProducts` — سليم |
+
+السياسة الموجودة في `stockDeduction.ts` واضحة:
+- خصم المخزون يحدث **مرة واحدة فقط** عند نقل الفاتورة من حالة "جديدة" إلى أي حالة تجهيز، ويُسجَّل بـ `invoices.stock_deduction_id` كحارس (guard) idempotent.
+- إذن: إرجاع المخزون عند الحذف يجب أن يكون **مشروطاً بوجود `stock_deduction_id`** فقط.
+
+---
 
 ## الخطوات
 
-### 1) ربط الحذف بالـ DB
-في `InvoiceCreatePage` و `QuoteCreatePage`:
-- عند حذف بند جديد (لم يحفظ بعد): يبقى في السلة المحلية فقط.
-- عند الحفظ: كل صف في سلة `useDeletedRowsTrash` يُكتب صفّاً في الجدول المناسب مع `invoice_id`/`quote_id`، `original_id` (إن وُجد)، `full_data` snapshot، و `deleted_by`.
-- عند تعديل فاتورة قائمة وحذف بند موجود في DB: نسجّل في `deleted_invoice_items` قبل DELETE من `invoice_items`.
+### 1) دالة موحّدة `deleteInvoiceWithStockRestore`
+ملف جديد `src/utils/deleteInvoice.ts` يحتوي على دالة واحدة تُستدعى من كل شاشات الحذف:
 
-### 2) Migration بسيطة
-- إضافة سياسة `DELETE` على `deleted_invoice_items` و `deleted_quote_items` للسماح بالحذف النهائي من السجل (admin أو صاحب الفاتورة).
-- (اختياري) إضافة عمود `reason text` افتراضي `'unavailable'` للتمييز مستقبلاً.
-
-### 3) قسم "الأصناف غير المتوفرة" داخل المستند
-في `InvoiceCreatePage` (وضع تعديل) و `InvoiceViewPage` و `QuoteCreatePage` (وضع تعديل) و `QuoteViewPage`:
-- قسم قابل للطي يظهر فقط إذا كان فيه صفوف.
-- يعرض: المنتج، الكمية، السعر، تاريخ الحذف، من حذف.
-- أزرار لكل صف: استرجاع / حذف نهائي.
-- أعلى القسم: زر **"إرسال للعميل"** يفتح قائمة بثلاث خيارات: واتساب / رابط مشاركة / طباعة-PDF.
-
-### 4) طرق الإرسال الثلاث
-أ. **واتساب**: استخدام `utils/whatsapp.ts` مع نص:
+```text
+deleteInvoiceWithStockRestore(invoiceId)
+  ├─ يقرأ الفاتورة: stock_deduction_id, invoice_number
+  ├─ يقرأ بنود invoice_items
+  ├─ إذا (stock_deduction_id موجود وبنود > 0):
+  │     يُرجع الكميات عبر applyStockDeltaForLines(oldItems, [])
+  │     إن فشل → يوقف العملية ويُلقي خطأ (لا يحذف)
+  ├─ يحذف توابع الفاتورة بالترتيب الآمن:
+  │     invoices_packaging_items → invoice_packaging
+  │     invoices_transports_items → invoice_transports
+  │     invoice_items, invoice_attachments
+  ├─ يحذف الفاتورة نفسها من invoices
+  ├─ يطلق window event "products:changed" لتحديث الكاشات
+  └─ يُرجع { restoredStock: boolean, invoiceNumber }
 ```
-السلام عليكم {اسم العميل}،
-بخصوص الفاتورة رقم {رقم}، الأصناف التالية غير متوفرة حالياً:
-- {الصنف} × {الكمية}
-- ...
-يرجى إفادتنا بالبدائل أو حذفها من الطلب.
-{اسم الشركة}
-```
-بدون رقم هاتف العميل في النص (احتراماً للذاكرة).
 
-ب. **رابط مشاركة**: نوع جديد في `document_share_tokens` بقيمة `doc_type='unavailable_items'` مع `doc_id={invoice_id|quote_id}`. صفحة عامة جديدة `/u/:token` (أو إعادة استخدام `PublicDocumentSharePage` بفرع جديد) تعرض القائمة فقط بدون تفاصيل الفاتورة المالية. زر "نسخ الرابط".
+هذا يضمن سلوكاً موحّداً في كل مكان ويمنع تكرار المنطق.
 
-ج. **طباعة/PDF**: قالب طباعة مبسّط مبني على `printTemplate.ts` يحتوي:
-- ترويسة الشركة (لوغو + اسم + هاتف الشركة).
-- اسم العميل ورقم المستند والتاريخ.
-- جدول: الصنف / الكمية / ملاحظة.
-- نص ختامي: "بانتظار إفادتكم بالبدائل".
+### 2) تحديث مواقع الحذف الثلاثة لتستدعي الدالة الجديدة
 
-### 5) صفحة `DeletedItemsPage` الحالية
-- إضافة فلتر بسيط: بحث باسم المنتج + فلتر تاريخ.
-- إضافة زر **"إرسال للعميل"** أمام كل مجموعة منتجات تخص نفس `invoice_id`/`quote_id` (يجمعها تلقائياً)، بنفس قائمة الإرسال الثلاثية من الخطوة 4.
+**أ. `src/pages/InvoicesPage.tsx`** (دالة `handleDelete` السطر 65-94):
+- إزالة الكود اليدوي لإرجاع المخزون والاستبدال باستدعاء `deleteInvoiceWithStockRestore`.
+- رسالة النجاح تتغير بحسب `restoredStock` (إن لم تكن مُخصومة: "تم الحذف" فقط؛ وإلا: "تم الحذف وإرجاع الكميات").
+
+**ب. `src/pages/InvoiceCreatePage.tsx`** (مربع تأكيد المسح/الحذف، السطر 2386-2470):
+- استبدال الـ 5 خطوات اليدوية باستدعاء `deleteInvoiceWithStockRestore`.
+- في حال فشل إرجاع المخزون → عرض الخطأ في toast وإيقاف العملية (بدل ابتلاع الخطأ بـ `console.warn`).
+- الإبقاء على تنظيف كاش React Query والانتقال إلى `/invoices/create`.
+
+**ج. `src/pages/InvoiceViewPage.tsx`** (دالة `handleDelete` السطر 252-259):
+- استبدال `update({status:'cancelled'})` بحذف فعلي عبر `deleteInvoiceWithStockRestore`.
+- تغيير نص التأكيد إلى: "هل أنت متأكد من حذف هذه الفاتورة؟ سيتم إرجاع الكميات إلى المخزون."
+- بعد النجاح: `navigate("/invoices", { replace: true })`.
+
+### 3) التحقق من شاشات الإدخال (لا تغيير، فقط فحص)
+الشاشات الأربع التالية تقرأ المخزون عبر `fetchAllProducts` الذي يستعلم مباشرة من جدول `products` (مع pagination صحيح):
+
+- `InvoiceCreatePage` ← `products.stock_quantity`
+- `QuoteCreatePage` ← `products.stock_quantity`
+- `StockReturnCreatePage` ← `products.stock_quantity`
+- `PurchaseCreatePage` ← `products.stock_quantity`
+
+كل شاشة منها مُشتركة في حدث `products:changed` (يُطلق تلقائياً من `applyDeltas` داخل `stockDeduction.ts` وأيضاً سنُطلقه من دالة الحذف الجديدة). أيضاً `ProductsCacheSync` يستمع لهذا الحدث ويُبطل الكاش.
+
+سأتحقق أثناء التنفيذ من أن كل شاشة من الأربع تستمع للحدث وتُعيد الجلب — وأُصلح أي شاشة لا تفعل.
+
+---
+
+## ملاحظات تقنية
+
+- **Idempotency محفوظ**: حقل `stock_deduction_id` هو الحارس الوحيد لقرار "هل أُرجع المخزون أم لا" — لا توجد حالة double-restore.
+- **عدم التراجع عند الفشل**: إذا فشل إرجاع المخزون لأي سبب (مثلاً منتج محذوف)، لا تُحذف الفاتورة، ويظهر للمستخدم خطأ واضح بدل خسارة صامتة.
+- **الفواتير الملغاة (`status='cancelled'`) القديمة**: لن تتأثر بهذا التغيير — السلوك الجديد يطبق فقط على عمليات حذف جديدة.
+- **عروض الأسعار والمرتجعات**: خارج نطاق هذا الطلب (المستخدم طلب الفواتير تحديداً). عروض الأسعار لا تخصم مخزوناً أصلاً وفق `stockDeduction.ts`.
 
 ## الملفات المتأثرة
-- migration واحد (سياسات DELETE + عمود reason اختياري).
-- `src/pages/InvoiceCreatePage.tsx`, `src/pages/QuoteCreatePage.tsx` — كتابة عند الحفظ + قسم العرض.
-- `src/pages/InvoiceViewPage.tsx`, `src/pages/QuoteViewPage.tsx` — قسم العرض فقط.
-- `src/pages/DeletedItemsPage.tsx` — فلاتر + زر الإرسال.
-- جديد: `src/components/invoice/UnavailableItemsPanel.tsx` (UI القسم + قائمة الإرسال).
-- جديد: `src/utils/unavailableItemsShare.ts` (نص الواتساب + قالب الطباعة + إنشاء توكن المشاركة).
-- جديد: فرع داخل `PublicDocumentSharePage` لعرض `unavailable_items`.
-
-## ملاحظة أمان
-- لا يظهر رقم هاتف العميل في أي مخرج (واتساب/طباعة/صفحة المشاركة).
-- صفحة المشاركة العامة لا تعرض أسعاراً ولا أرصدة، فقط الأسماء والكميات.
+- جديد: `src/utils/deleteInvoice.ts`
+- تعديل: `src/pages/InvoicesPage.tsx`
+- تعديل: `src/pages/InvoiceCreatePage.tsx`
+- تعديل: `src/pages/InvoiceViewPage.tsx`
