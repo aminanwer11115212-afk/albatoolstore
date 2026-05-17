@@ -1,0 +1,1 @@
+UPDATE company_settings SET logo_url = 'https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png' WHERE id = '6f9371bf-a183-4641-91f4-ed9c579ba3fb';

@@ -1,0 +1,1 @@
+ALTER TABLE public.quotes ADD COLUMN warehouse_id uuid REFERENCES public.warehouses(id) ON DELETE SET NULL;
