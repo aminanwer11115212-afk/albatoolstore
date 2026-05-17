@@ -42,6 +42,7 @@ export default function InvoicesPage() {
   const company = companyArr?.[0] || null;
   const currency = company?.currency || "SDG";
   const [showDispatch, setShowDispatch] = useState(false);
+  const qc = useQueryClient();
 
   const handleWhatsApp = (inv: any) => {
     const phone = inv.customers?.phone;
@@ -65,36 +66,23 @@ export default function InvoicesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("هل أنت متأكد من حذف هذه الفاتورة؟ سيتم إرجاع الكميات إلى المخزون.")) return;
     try {
-      // 1) إرجاع المخزون أولاً — إن فشل، نوقف العملية ولا نحذف الفاتورة
-      const { data: oldItems, error: readErr } = await supabase
-        .from("invoice_items")
-        .select("product_id, quantity")
-        .eq("invoice_id", id);
-      if (readErr) {
-        toast.error(`تعذّر قراءة بنود الفاتورة، تم إيقاف الحذف: ${readErr.message}`);
-        return;
-      }
-      if (oldItems && oldItems.length) {
-        try {
-          const { applyStockDeltaForLines } = await import("@/utils/stockDeduction");
-          await applyStockDeltaForLines(oldItems as any[], []);
-        } catch (stockErr: any) {
-          console.error("[InvoicesPage] stock reversal failed:", stockErr);
-          toast.error(
-            `لم يكتمل إرجاع الكميات إلى المخزون، تم إيقاف حذف الفاتورة. ${stockErr?.message || ""}`,
-            { duration: 6000 },
-          );
-          return;
-        }
-      }
-      // 2) حذف الفاتورة (الـ triggers تؤرشف البنود تلقائياً)
-      await remove.mutateAsync(id);
-      toast.success("تم حذف الفاتورة وإرجاع الكميات إلى المخزون");
-    } catch (e: any) { toast.error(e.message); }
+      const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
+      const { restoredStock } = await deleteInvoiceWithStockRestore(id);
+      // إزالة الفاتورة من كاش React Query محلياً
+      qc.setQueriesData<any>(
+        { predicate: (q) => {
+          const key = q.queryKey[0];
+          return key === "invoices-with-customers" || key === "invoices";
+        }},
+        (old: any) => Array.isArray(old) ? old.filter((row: any) => row.id !== id) : old,
+      );
+      qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success(restoredStock ? "تم حذف الفاتورة وإرجاع الكميات إلى المخزون" : "تم حذف الفاتورة");
+    } catch (e: any) {
+      toast.error(e?.message || "تعذّر حذف الفاتورة");
+    }
   };
-
-  const qc = useQueryClient();
-
   const handleWorkflowChange = async (inv: any, newStatus: WorkflowStatus) => {
     if (newStatus === inv.workflow_status) return;
     const before = (inv.workflow_status || "new") as WorkflowStatus;

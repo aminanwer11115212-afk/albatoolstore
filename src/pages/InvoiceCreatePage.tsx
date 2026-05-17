@@ -2389,63 +2389,30 @@ export default function InvoiceCreatePage() {
                 try {
                   const targetId = editId || savedInvoiceId;
                   if (targetId) {
-                    // 1) Reverse stock deduction (return quantities to stock)
+                    // حذف موحّد عبر deleteInvoiceWithStockRestore:
+                    // يُرجع المخزون فقط إن كانت الفاتورة مُخصومة (stock_deduction_id موجود)،
+                    // ثم يحذف كل التوابع والفاتورة. أي فشل يوقف العملية.
+                    let restoredStock = false;
                     try {
-                      const { data: oldItems } = await supabase
-                        .from("invoice_items")
-                        .select("product_id, quantity")
-                        .eq("invoice_id", targetId);
-                      if (oldItems && oldItems.length) {
-                        await applyStockDeltaForLines(oldItems as any[], []);
-                      }
-                    } catch (stockErr) {
-                      console.warn("Stock reversal failed:", stockErr);
-                    }
-
-                    // 2) Delete packaging children
-                    const { data: pkgs } = await supabase
-                      .from("invoice_packaging")
-                      .select("id")
-                      .eq("invoice_id", targetId);
-                    const pkgIds = (pkgs || []).map((p: any) => p.id);
-                    if (pkgIds.length) {
-                      await supabase.from("invoices_packaging_items").delete().in("invoice_packaging_id", pkgIds);
-                    }
-
-                    // 3) Delete transports children (items then headers)
-                    const { data: trs } = await supabase
-                      .from("invoice_transports")
-                      .select("id")
-                      .eq("invoice_id", targetId);
-                    const trIds = (trs || []).map((t: any) => t.id);
-                    if (trIds.length) {
-                      await supabase.from("invoices_transports_items").delete().in("invoice_transport_id", trIds);
-                    }
-
-                    // 4) Delete other children
-                    await supabase.from("invoice_items").delete().eq("invoice_id", targetId);
-                    await supabase.from("invoice_packaging").delete().eq("invoice_id", targetId);
-                    await supabase.from("invoice_transports").delete().eq("invoice_id", targetId);
-                    await supabase.from("invoice_attachments").delete().eq("invoice_id", targetId);
-
-                    // 5) Finally delete the invoice itself
-                    const { error } = await supabase.from("invoices").delete().eq("id", targetId);
-                    if (error) {
-                      console.error("[InvoiceCreatePage] clear/delete failed", error);
-                      toast.error(`فشل الحذف: ${error.message}`, { duration: 8000 });
+                      const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
+                      const res = await deleteInvoiceWithStockRestore(targetId);
+                      restoredStock = res.restoredStock;
+                    } catch (delErr: any) {
+                      console.error("[InvoiceCreatePage] delete failed", delErr);
+                      toast.error(`فشل الحذف: ${delErr?.message || "خطأ غير معروف"}`, { duration: 8000 });
                       setClearing(false);
                       return;
                     }
 
                     toast.success(
-                      invoiceNumber
-                        ? `تم حذف الفاتورة «${invoiceNumber}» بالكامل — جارٍ فتح فاتورة جديدة`
-                        : "تم حذف الفاتورة بالكامل — جارٍ فتح فاتورة جديدة",
+                      (invoiceNumber
+                        ? `تم حذف الفاتورة «${invoiceNumber}» بالكامل`
+                        : "تم حذف الفاتورة بالكامل")
+                        + (restoredStock ? " وإرجاع الكميات إلى المخزون" : "")
+                        + " — جارٍ فتح فاتورة جديدة",
                       { duration: 5000 }
                     );
 
-                    // حذف الفاتورة فوراً من كل كاشات React Query
-                    // لمنع ظهورها في الشريط الجانبي بعد الحذف
                     queryClient.setQueriesData<any>(
                       { predicate: (q) => {
                         const key = q.queryKey[0];
@@ -2456,14 +2423,11 @@ export default function InvoiceCreatePage() {
                         return old.filter((row: any) => row.id !== targetId);
                       }
                     );
-                    // إبطال الكاشات ليُعاد جلبها من الخادم في الخلفية
                     queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
                     queryClient.invalidateQueries({ queryKey: ["invoices"] });
 
-                    // دائماً بعد الحذف: ننتقل إلى صفحة إنشاء فاتورة جديدة نظيفة
                     setClearConfirmOpen(false);
                     setClearing(false);
-                    window.dispatchEvent(new Event("products:changed"));
                     navigate("/invoices/create", { replace: true });
                     return;
                   }

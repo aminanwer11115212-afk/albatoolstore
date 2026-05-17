@@ -250,12 +250,16 @@ export default function InvoiceViewPage() {
   };
 
   const handleDelete = async () => {
-    if (!invoice || !confirm("هل أنت متأكد من إلغاء هذه الفاتورة؟")) return;
+    if (!invoice) return;
+    if (!confirm("هل أنت متأكد من حذف هذه الفاتورة؟ سيتم إرجاع الكميات إلى المخزون.")) return;
     try {
-      await supabase.from("invoices").update({ status: "cancelled" }).eq("id", invoice.id);
-      toast.success("تم إلغاء الفاتورة");
-      loadInvoice();
-    } catch (e: any) { toast.error(e.message); }
+      const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
+      const { restoredStock } = await deleteInvoiceWithStockRestore(invoice.id);
+      toast.success(restoredStock ? "تم حذف الفاتورة وإرجاع الكميات إلى المخزون" : "تم حذف الفاتورة");
+      navigate("/invoices", { replace: true });
+    } catch (e: any) {
+      toast.error(e?.message || "تعذّر حذف الفاتورة");
+    }
   };
 
   const handleCopyInvoice = async () => {

@@ -37,7 +37,7 @@ export default function DataMigrationPage() {
 
       for (const table of tablesToDelete) {
         addLog(`جاري تفريغ ${table}...`);
-        const { error } = await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        const { error } = await (supabase as any).from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
         if (error) {
           addLog(`⚠️ تحذير: خطأ في تفريغ ${table}: ${error.message}`);
         }
@@ -47,7 +47,7 @@ export default function DataMigrationPage() {
       const coreTables = ["customers"]; // Products removed per user request
       for (const table of coreTables) {
         addLog(`جاري تفريغ ${table}...`);
-        const { error } = await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        const { error } = await (supabase as any).from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
         if (error) {
           addLog(`⚠️ تحذير: خطأ في تفريغ ${table}: ${error.message}`);
         }
