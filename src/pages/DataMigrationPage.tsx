@@ -290,7 +290,7 @@ export default function DataMigrationPage() {
       if (!name) continue;
       const activeCell = String(row?.[1] ?? "").toLowerCase();
       const isActive = activeCell.includes("x") || activeCell.includes("✓") || activeCell === "true";
-      toInsert.push({ name, is_active: isActive, stock_quantity: 0, sale_price: 0, purchase_price: 0, min_stock: 0 });
+      toInsert.push({ name, is_frozen: !isActive, stock_quantity: 0, sale_price: 0, purchase_price: 0, min_stock: 0 });
     }
     addLog("info", `سيتم إدراج ${toInsert.length} منتج`);
     let inserted = 0;
