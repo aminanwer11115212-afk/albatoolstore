@@ -216,6 +216,19 @@ export default function DataMigrationPage() {
   const wipeAll = async () => {
     updateStep("wipe", { status: "running", progress: 0, detail: "بدء التفريغ..." });
     addLog("info", "════ الدفعة 1: تفريغ كل البيانات ════");
+
+    // إرجاع كل الفواتير إلى وضع "preparing" + total=0 لتجاوز الـ guards قبل حذف البنود
+    try {
+      const { error: prepErr } = await (supabase as any)
+        .from("invoices")
+        .update({ workflow_status: "preparing", total: 0 })
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+      if (prepErr) addLog("warn", `تعذّر إرجاع الفواتير لوضع التحضير: ${prepErr.message}`);
+      else addLog("success", "أُعيدت كل الفواتير إلى وضع التحضير");
+    } catch (e: any) {
+      addLog("warn", `تخطّي إعداد الفواتير: ${e?.message ?? e}`);
+    }
+
     const total = DELETE_ORDER.length;
     for (let i = 0; i < total; i++) {
       const table = DELETE_ORDER[i];
