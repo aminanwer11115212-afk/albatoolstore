@@ -214,7 +214,7 @@ export default function CustomersPage() {
     if (filterState && c.state_id !== filterState) return false;
     if (filterLocality && c.locality_id !== filterLocality) return false;
     if (filterName && !(c.name || "").toLowerCase().includes(filterName.toLowerCase())) return false;
-    if (filterPhone && !normalizePhone(c.phone || "").includes(normalizePhone(filterPhone))) return false;
+    if (filterPhone && !normalizePhone(c.whatsapp || c.phone || "").includes(normalizePhone(filterPhone))) return false;
     if (filterAddress && !(c.address || "").toLowerCase().includes(filterAddress.toLowerCase())) return false;
     if (filterGroup && c.group_id !== filterGroup) return false;
     if (filterTransporter && customerTransporter[c.id] !== filterTransporter) return false;
@@ -1263,7 +1263,7 @@ export default function CustomersPage() {
                       const headers: { i: number; key: string; label: string; filter?: { kind: "text" | "select"; value: string; setValue: (v: string) => void; options?: { value: string; label: string }[]; placeholder?: string } }[] = [
                         { i: 1, key: "name", label: "اسم العميل", filter: { kind: "text", value: filterName, setValue: setFilterName, placeholder: "ابحث بالاسم..." } },
                         { i: 2, key: "address", label: "عنوان", filter: { kind: "text", value: filterAddress, setValue: setFilterAddress, placeholder: "ابحث بالعنوان..." } },
-                        { i: 3, key: "phone", label: "هاتف", filter: { kind: "text", value: filterPhone, setValue: setFilterPhone, placeholder: "ابحث بالهاتف..." } },
+                        { i: 3, key: "phone", label: "واتساب", filter: { kind: "text", value: filterPhone, setValue: setFilterPhone, placeholder: "ابحث بالواتساب..." } },
                         { i: 4, key: "region", label: "الاتجاه", filter: { kind: "select", value: filterRegion, setValue: (v) => { setFilterRegion(v); setFilterState(""); setFilterCity(""); setFilterLocality(""); }, options: regions.map(r => ({ value: r.id, label: r.name })) } },
                         { i: 5, key: "state", label: "الولاية", filter: { kind: "select", value: filterState, setValue: (v) => { setFilterState(v); setFilterCity(""); setFilterLocality(""); }, options: filteredStates.map(s => ({ value: s.id, label: s.name })) } },
                         { i: 6, key: "city", label: "المدينة", filter: { kind: "select", value: filterCity, setValue: (v) => { setFilterCity(v); setFilterLocality(""); }, options: filteredCities.map(c => ({ value: c.id, label: c.name })) } },
@@ -1563,11 +1563,11 @@ export default function CustomersPage() {
                         </td>
                         <td className="tabular-nums" style={{ padding: 0 }}>
                           <EditableCell
-                            value={c.phone || ""}
+                            value={c.whatsapp || ""}
                             disabled={savingRow === c.id}
-                            onSave={(v) => updateRowField(c.id, { phone: v.trim() || null })}
+                            onSave={(v) => updateRowField(c.id, { whatsapp: v.trim() || null })}
                             inputClassName="text-[11px] tabular-nums"
-                            placeholder="الهاتف"
+                            placeholder="واتساب"
                             inputMode="tel"
                             dir="ltr"
                             validate={(v) => {
@@ -1699,7 +1699,7 @@ export default function CustomersPage() {
                   <MobileDocCard
                     key={c.id}
                     index={(page - 1) * perPage + idx + 1}
-                    number={c.phone || "—"}
+                    number={c.whatsapp || c.phone || "—"}
                     party={c.name}
                     date={[regionName, stateName].filter(Boolean).join(" • ")}
                     amount={
