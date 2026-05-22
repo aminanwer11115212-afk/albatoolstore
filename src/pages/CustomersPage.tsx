@@ -1244,15 +1244,14 @@ export default function CustomersPage() {
                     if (anyExplicit) {
                       return colWidths.map((w, i) => {
                         const px = typeof w === "number" ? w : (colMinWidths[i] ?? 100);
-                        return <col key={i} style={{ width: `${px}px`, minWidth: colMinWidths[i] ?? undefined }} />;
+                        return <col key={i} style={{ width: `${px}px`, minWidth: 24 }} />;
                       });
                     }
                     const effective = colWidths.map((w, i) => (w != null ? w : (colMinWidths[i] ?? 100)));
                     const total = effective.reduce((s, v) => s + v, 0) || 1;
                     return colWidths.map((_, i) => {
                       const pct = (effective[i] / total) * 100;
-                      const minW = colMinWidths[i] ?? undefined;
-                      return <col key={i} style={{ width: `${pct}%`, minWidth: minW }} />;
+                      return <col key={i} style={{ width: `${pct}%`, minWidth: 24 }} />;
                     });
                   })()}
                 </colgroup>
