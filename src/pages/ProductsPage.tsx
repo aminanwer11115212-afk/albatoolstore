@@ -1383,9 +1383,9 @@ export default function ProductsPage() {
               <colgroup>
                 {(() => {
                   return colWidths.map((w, i) => {
-                    const minW = colMinWidths[i] ?? undefined;
-                    const px = w != null ? w : (minW ?? 100);
-                    return <col key={i} style={{ width: `${px}px`, minWidth: minW }} />;
+                    const defW = colMinWidths[i] ?? undefined;
+                    const px = w != null ? w : (defW ?? 100);
+                    return <col key={i} style={{ width: `${px}px`, minWidth: 24 }} />;
                   });
                 })()}
               </colgroup>
