@@ -546,7 +546,19 @@ export default function PurchaseCreatePage() {
         status: alsoReceive ? "completed" : status,
       };
 
+      // Snapshot existing state BEFORE mutating, so we can compute stock deltas correctly.
+      let prevStatusInDb: string | null = null;
+      let prevItems: Array<{ product_id: string | null; quantity: number }> = [];
       if (isEdit && orderId) {
+        prevStatusInDb = await getPurchaseStatus(orderId);
+        const { data: prevItemsRows } = await supabase
+          .from("purchase_order_items")
+          .select("product_id, quantity")
+          .eq("purchase_order_id", orderId);
+        prevItems = (prevItemsRows || []).map((r: any) => ({
+          product_id: r.product_id, quantity: Number(r.quantity || 0),
+        }));
+
         const { error } = await (supabase as any).from("purchase_orders").update(payload).eq("id", orderId);
         if (error) throw error;
         await supabase.from("purchase_order_items").delete().eq("purchase_order_id", orderId);
@@ -606,19 +618,33 @@ export default function PurchaseCreatePage() {
       const { error: itemsErr } = await (supabase as any).from("purchase_order_items").insert(itemsPayload);
       if (itemsErr) throw itemsErr;
 
-      if (alsoReceive) {
+      // ── Stock sync ───────────────────────────────────────────────────────
+      // Three cases:
+      //  A) was NOT completed and now becoming completed → add all new lines (once).
+      //  B) was already completed and still completed (edit) → apply delta old vs new.
+      //  C) creating brand new with alsoReceive → add all lines (no prior state).
+      // Update purchase_price on the products as a side-effect of receiving.
+      const newStatus = alsoReceive ? "completed" : status;
+      const wasCompleted = prevStatusInDb === "completed";
+      const isNowCompleted = newStatus === "completed";
+
+      if (isNowCompleted && !wasCompleted) {
+        // Case A or C — first time receiving
+        await addStockForLines(valid);
         for (const it of valid) {
           if (!it.product_id) continue;
-          const { data: prod } = await supabase.from("products").select("stock_quantity").eq("id", it.product_id).maybeSingle();
-          if (prod) {
-            await supabase.from("products").update({
-              stock_quantity: Number(prod.stock_quantity || 0) + Number(it.quantity || 0),
-              purchase_price: it.unit_price,
-            }).eq("id", it.product_id);
-          }
+          await supabase.from("products").update({ purchase_price: it.unit_price }).eq("id", it.product_id);
         }
-        setStatus("completed");
+        if (alsoReceive) setStatus("completed");
         toast.success("تم استلام البضاعة وتحديث المخزون");
+      } else if (isNowCompleted && wasCompleted) {
+        // Case B — edit of received order: apply delta
+        await applyStockDeltaForPurchaseLines(prevItems, valid);
+        for (const it of valid) {
+          if (!it.product_id) continue;
+          await supabase.from("products").update({ purchase_price: it.unit_price }).eq("id", it.product_id);
+        }
+        toast.success(isEdit ? "تم تحديث أمر الشراء والمخزون" : "تم الحفظ");
       } else {
         toast.success(isEdit ? "تم تحديث أمر الشراء" : "تم إنشاء أمر الشراء");
       }
