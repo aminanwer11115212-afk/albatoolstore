@@ -471,7 +471,7 @@ export default function ProductsPage() {
     const primaryBrandId = selectedBrandIds[0] || null;
     const payload: any = {
       name: form.name, sku: form.sku || null,
-      category_id: null,
+      category_id: selectedCategoryIds[0] || null,
       warehouse_id: form.warehouse_id || null, company_id: primaryBrandId,
       supplier_id: form.supplier_id || null,
       purchase_price: parseFloat(form.purchase_price) || 0, sale_price: parseFloat(form.sale_price) || 0,
