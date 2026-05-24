@@ -1769,7 +1769,7 @@ export default function ProductsPage() {
                                     queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
                                   } catch (err: any) { toast.error(err.message || "فشل"); }
                                 }}
-                                onDelete={(opt) => deleteProductBrand(p.id, opt.value)}
+                                onDelete={(opt) => deleteBrandFromSystem(opt.value)}
                                 showDeleteButton
                                 placeholder="—"
                               />
