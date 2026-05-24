@@ -1480,6 +1480,8 @@ export default function CustomersPage() {
                         options={groups.map(g => ({ value: g.id, label: g.name }))}
                         onChange={(v) => setQuickAdd({ ...quickAdd, group_id: v })}
                         onAdd={async (name) => await createGroup(name)}
+                        onDelete={async (o) => await deleteGroup(o.value)}
+                        showDeleteButton
                         placeholder="— المجموعة —"
                         addLabel="إضافة مجموعة"
                         disabled={quickSaving}
@@ -1491,6 +1493,8 @@ export default function CustomersPage() {
                         options={transporters.map(t => ({ value: t.id, label: t.name }))}
                         onChange={(v) => setQuickAdd({ ...quickAdd, transporter_id: v })}
                         onAdd={async (name) => await createTransporter(name)}
+                        onDelete={async (o) => await deleteTransporter(o.value)}
+                        showDeleteButton
                         placeholder="— ترحيلات —"
                         addLabel="إضافة ناقل"
                         disabled={quickSaving}
@@ -1502,6 +1506,8 @@ export default function CustomersPage() {
                         options={destinations.map(d => ({ value: d.id, label: d.name }))}
                         onChange={(v) => setQuickAdd({ ...quickAdd, destination_id: v })}
                         onAdd={async (name) => await createDestination(name)}
+                        onDelete={async (o) => await deleteDestination(o.value)}
+                        showDeleteButton
                         placeholder="— الوجهة —"
                         addLabel="إضافة وجهة"
                         disabled={quickSaving}
