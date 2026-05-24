@@ -410,6 +410,17 @@ export default function ProductsPage() {
     } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
   };
 
+  // إزالة المورد من المنتج (لا يحذف المورد من النظام)
+  const deleteProductSupplier = async (productId: string) => {
+    try {
+      updateField(productId, "supplier_id", null);
+      await update.mutateAsync({ id: productId, supplier_id: null });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      return true;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+
   // أسماء المنتجات المستخدمة لمعرف معين (للرسائل)
   const formatUsageList = (names: string[]) => {
     const shown = names.slice(0, 5).join("، ");
@@ -471,7 +482,7 @@ export default function ProductsPage() {
     const primaryBrandId = selectedBrandIds[0] || null;
     const payload: any = {
       name: form.name, sku: form.sku || null,
-      category_id: null,
+      category_id: selectedCategoryIds[0] || null,
       warehouse_id: form.warehouse_id || null, company_id: primaryBrandId,
       supplier_id: form.supplier_id || null,
       purchase_price: parseFloat(form.purchase_price) || 0, sale_price: parseFloat(form.sale_price) || 0,
@@ -1601,13 +1612,14 @@ export default function ProductsPage() {
                   </td>
                 </tr>
               )}
-              {isLoading ? (
-                <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">جاري تحميل المنتجات...</td></tr>
-              ) : error ? (
-                <tr><td colSpan={10} className="text-center py-8 text-destructive">تعذر تحميل المنتجات</td></tr>
-              ) : paginated.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">{emptyMessage}</td></tr>
-              ) : paginated.map((p: any, idx: number) => {
+              {(() => {
+                const totalCols = isPriceReport ? 3 : (isInStockPage || isOutOfStockPage) ? 6 : isReportPage ? 8 : 11;
+                if (isLoading) return <tr><td colSpan={totalCols} className="text-center py-8 text-muted-foreground">جاري تحميل المنتجات...</td></tr>;
+                if (error) return <tr><td colSpan={totalCols} className="text-center py-8 text-destructive">تعذر تحميل المنتجات</td></tr>;
+                if (paginated.length === 0) return <tr><td colSpan={totalCols} className="text-center py-8 text-muted-foreground">{emptyMessage}</td></tr>;
+                return null;
+              })()}
+              {!isLoading && !error && paginated.length > 0 && paginated.map((p: any, idx: number) => {
                 const rowH = getRowH(p.id);
                 return (
                 <tr
@@ -1729,32 +1741,45 @@ export default function ProductsPage() {
                           const cats: any[] = (p.categories && p.categories.length > 0)
                             ? p.categories
                             : (p.product_categories ? [p.product_categories] : []);
-                           const allNames = cats.map((c: any) => c.name).filter(Boolean).join("، ");
-                           return (
-                             <div className="flex flex-col" style={{ padding: "2px 4px" }}>
-<InlineSearchSelect
-                                  value={(p.categories?.[0]?.id) || p.category_id || ""}
-                                  options={(categories || []).map((c: any) => ({ value: c.id, label: c.name }))}
-                                  onChange={async (v) => {
-                                    try {
-                                      updateField(p.id, "category_id", v || null);
-                                      await syncProductCategoryLinks(p.id, v ? [v] : []);
-                                      await update.mutateAsync({ id: p.id, category_id: v || null });
-                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
-                                      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"] });
-                                    } catch (err: any) { toast.error(err.message || "فشل"); }
-                                  }}
-                                  onAdd={createCategoryInline}
-                                  onDelete={(opt) => deleteCategoryFromSystem(opt.value)}
-                                  showDeleteButton
-                                  placeholder={allNames ? "تغيير الفئة الأساسية" : "—"} addLabel="إضافة فئة"
-                                />
+                          const currentCatId = (p.categories?.[0]?.id) || p.category_id || "";
+                          const allNames = cats.map((c: any) => c.name).filter(Boolean).join("، ");
+                          return (
+                            <div className="flex flex-col" style={{ padding: "2px 4px" }}>
+                              <InlineSearchSelect
+                                value={currentCatId}
+                                options={(categories || []).map((c: any) => ({ value: c.id, label: c.name }))}
+                                onChange={async (v) => {
+                                  try {
+                                    // استبدل الفئة الأساسية فقط، احتفظ بالباقي
+                                    const existing = cats.map((c: any) => c.id).filter(Boolean);
+                                    const replaced = existing.map((id: string) => id === currentCatId ? v : id);
+                                    const next = Array.from(new Set(replaced.filter(Boolean)));
+                                    if (v && !next.includes(v)) next.unshift(v);
+                                    if (!v) {
+                                      // إذا أُلغيت القيمة، أزل القديم فقط
+                                      const idx = next.indexOf(currentCatId);
+                                      if (idx >= 0) next.splice(idx, 1);
+                                    }
+                                    updateField(p.id, "category_id", v || null);
+                                    await syncProductCategoryLinks(p.id, next);
+                                    await update.mutateAsync({ id: p.id, category_id: v || null });
+                                    queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+                                    queryClient.invalidateQueries({ queryKey: ["product_category_links_all"] });
+                                  } catch (err: any) { toast.error(err.message || "فشل"); }
+                                }}
+                                onAdd={createCategoryInline}
+                                onDelete={(opt) => deleteProductCategory(p.id, opt.value)}
+                                placeholder={allNames ? "تغيير الفئة الأساسية" : "—"} addLabel="إضافة فئة"
+                              />
                             </div>
                           );
                         })()}
                       </td>
                       <td style={{ padding: 0 }}>
                         {(() => {
+                          const brs: any[] = (p.brands && p.brands.length > 0)
+                            ? p.brands
+                            : (p.product_companies ? [p.product_companies] : []);
                           const currentBrandId = (p.brands?.[0]?.id) || p.company_id || "";
                           return (
                             <div className="flex flex-row items-center gap-2" style={{ padding: "2px 4px" }}>
@@ -1763,14 +1788,21 @@ export default function ProductsPage() {
                                 options={(companies || []).map((c: any) => ({ value: c.id, label: c.name }))}
                                 onChange={async (v) => {
                                   try {
+                                    const existing = brs.map((b: any) => b.id).filter(Boolean);
+                                    const replaced = existing.map((id: string) => id === currentBrandId ? v : id);
+                                    const next = Array.from(new Set(replaced.filter(Boolean)));
+                                    if (v && !next.includes(v)) next.unshift(v);
+                                    if (!v) {
+                                      const idx = next.indexOf(currentBrandId);
+                                      if (idx >= 0) next.splice(idx, 1);
+                                    }
                                     updateField(p.id, "company_id", v || null);
-                                    await syncProductBrandLinks(p.id, v ? [v] : []);
+                                    await syncProductBrandLinks(p.id, next);
                                     await update.mutateAsync({ id: p.id, company_id: v || null });
                                     queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
                                   } catch (err: any) { toast.error(err.message || "فشل"); }
                                 }}
-                                onDelete={(opt) => deleteBrandFromSystem(opt.value)}
-                                showDeleteButton
+                                onDelete={(opt) => deleteProductBrand(p.id, opt.value)}
                                 placeholder="—"
                               />
                             </div>
@@ -1784,7 +1816,6 @@ export default function ProductsPage() {
                           onChange={(v) => updateField(p.id, "warehouse_id", v || null)}
                           onAdd={createWarehouseInline}
                           onDelete={() => deleteProductWarehouse(p.id)}
-                          showDeleteButton
                           placeholder="—" addLabel="إضافة مستودع"
                         />
                       </td>
@@ -1836,14 +1867,13 @@ export default function ProductsPage() {
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();
-                                fileInputRef.current?.click();
+                                (e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement | null)?.click();
                               }
                             }}
                             tabIndex={0}
                           >
                             {p.image_url ? "تغيير" : "ارفع"}
                             <input
-                              ref={(el) => { (fileInputRef as any).current = el; }}
                               type="file"
                               accept="image/*"
                               className="hidden"
@@ -1859,6 +1889,7 @@ export default function ProductsPage() {
                                   await updateField(p.id, "image_url", data.publicUrl);
                                   toast.success("تم رفع الصورة");
                                 } catch (err: any) { toast.error(err.message || "فشل الرفع"); }
+                                finally { e.target.value = ""; }
                               }}
                             />
                           </label>
@@ -1870,6 +1901,7 @@ export default function ProductsPage() {
                           options={(suppliers || []).map((s: any) => ({ value: s.id, label: s.name }))}
                           onChange={(v) => updateField(p.id, "supplier_id", v || null)}
                           onAdd={createSupplierInline}
+                          onDelete={() => deleteProductSupplier(p.id)}
                           placeholder="—" addLabel="إضافة مورد"
                         />
                       </td>
