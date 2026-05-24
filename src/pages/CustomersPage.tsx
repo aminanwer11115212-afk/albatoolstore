@@ -1667,6 +1667,8 @@ export default function CustomersPage() {
                             options={groups.map(g => ({ value: g.id, label: g.name }))}
                             onChange={(v) => updateRowField(c.id, { group_id: v || null })}
                             onAdd={async (name) => await createGroup(name)}
+                            onDelete={async (o) => await deleteGroup(o.value)}
+                            showDeleteButton
                             placeholder="—"
                             addLabel="إضافة مجموعة"
                             disabled={savingRow === c.id}
@@ -1679,6 +1681,8 @@ export default function CustomersPage() {
                             options={transporters.map(t => ({ value: t.id, label: t.name }))}
                             onChange={(v) => updateCustomerTransporter(c.id, v)}
                             onAdd={async (name) => await createTransporter(name)}
+                            onDelete={async (o) => await deleteTransporter(o.value)}
+                            showDeleteButton
                             placeholder="—"
                             addLabel="إضافة ناقل"
                             disabled={savingRow === c.id}
@@ -1691,6 +1695,8 @@ export default function CustomersPage() {
                             options={destinations.map(d => ({ value: d.id, label: d.name }))}
                             onChange={(v) => updateCustomerDestination(c.id, v)}
                             onAdd={async (name) => await createDestination(name)}
+                            onDelete={async (o) => await deleteDestination(o.value)}
+                            showDeleteButton
                             placeholder="—"
                             addLabel="إضافة وجهة"
                             disabled={savingRow === c.id}
