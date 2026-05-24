@@ -2,12 +2,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Stock receive policy for Purchase Orders:
- * - Stock is INCREASED only when a Purchase Order is "received" (status = completed
- *   or the user clicks "Save & Receive").
- * - Guarded by `purchase_orders.stock_added_id` to prevent double-adding on
- *   retries, status flips, or edits.
- * - When editing an already-received purchase, only the delta between old
- *   and new lines is applied.
+ * - Stock is INCREASED only when a Purchase Order transitions into "completed".
+ * - Idempotency: we read the CURRENT persisted status from DB before adding.
+ *   If it is already "completed", we skip (prevents double-add on retries,
+ *   refresh, or repeated status changes).
+ * - When editing items of an already-completed purchase, only the delta
+ *   between old and new lines is applied.
  */
 
 export type StockLine = { product_id: string | null | undefined; quantity: number | null | undefined };
@@ -66,35 +66,28 @@ export async function addStockForLines(lines: StockLine[]): Promise<void> {
   await applyDeltas(deltas);
 }
 
+/** Read currently persisted status of a purchase order. */
+export async function getPurchaseStatus(purchaseId: string): Promise<string | null> {
+  const { data } = await (supabase as any)
+    .from("purchase_orders")
+    .select("status")
+    .eq("id", purchaseId)
+    .maybeSingle();
+  return (data?.status as string) || null;
+}
+
 /**
- * Idempotent stock add for a purchase order.
- * Uses `purchase_orders.stock_added_id` as guard.
+ * Idempotent stock add for a purchase order, guarded by current persisted status.
+ * Only adds if the DB currently shows status !== "completed".
  */
 export async function receiveStockForPurchaseOnce(
   purchaseId: string,
   lines: StockLine[],
 ): Promise<{ added: boolean; reason?: string }> {
   if (!purchaseId) return { added: false, reason: "missing_purchase_id" };
-
-  const { data: po, error: readErr } = await (supabase as any)
-    .from("purchase_orders")
-    .select("stock_added_id")
-    .eq("id", purchaseId)
-    .maybeSingle();
-  if (readErr) return { added: false, reason: "read_failed" };
-  if (po?.stock_added_id) return { added: false, reason: "already_added" };
-
+  const currentStatus = await getPurchaseStatus(purchaseId);
+  if (currentStatus === "completed") return { added: false, reason: "already_completed" };
   await addStockForLines(lines);
-
-  const addedId =
-    (typeof crypto !== "undefined" && "randomUUID" in crypto)
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const { error: upErr } = await (supabase as any)
-    .from("purchase_orders")
-    .update({ stock_added_id: addedId, stock_added_at: new Date().toISOString() })
-    .eq("id", purchaseId);
-  if (upErr) return { added: true, reason: "mark_failed" };
   return { added: true };
 }
 
