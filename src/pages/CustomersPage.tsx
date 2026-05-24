@@ -537,6 +537,34 @@ export default function CustomersPage() {
     return data.id;
   };
 
+  const deleteGroup = async (groupId: string): Promise<boolean> => {
+    const used = (customers || []).some((c: any) => c.group_id === groupId);
+    if (used) { toast.error("لا يمكن حذف المجموعة — مستخدمة من قبل عملاء"); return false; }
+    const { error } = await (supabase as any).from("customer_groups").delete().eq("id", groupId);
+    if (error) { toast.error(error.message); return false; }
+    setGroups(prev => prev.filter(g => g.id !== groupId));
+    toast.success("تم حذف المجموعة");
+    return true;
+  };
+  const deleteTransporter = async (id: string): Promise<boolean> => {
+    const used = Object.values(customerTransporter || {}).some((v) => v === id);
+    if (used) { toast.error("لا يمكن حذف الترحيلات — مستخدمة من قبل عملاء"); return false; }
+    const { error } = await (supabase as any).from("transporters").delete().eq("id", id);
+    if (error) { toast.error(error.message); return false; }
+    setTransporters(prev => prev.filter(t => t.id !== id));
+    toast.success("تم حذف الترحيلات");
+    return true;
+  };
+  const deleteDestination = async (id: string): Promise<boolean> => {
+    const used = Object.values(customerDestination || {}).some((v) => v === id);
+    if (used) { toast.error("لا يمكن حذف الوجهة — مستخدمة من قبل عملاء"); return false; }
+    const { error } = await (supabase as any).from("destinations").delete().eq("id", id);
+    if (error) { toast.error(error.message); return false; }
+    setDestinations(prev => prev.filter(d => d.id !== id));
+    toast.success("تم حذف الوجهة");
+    return true;
+  };
+
   const updateCustomerTransporter = async (customerId: string, transporterId: string) => {
     setSavingRow(customerId);
     try {
@@ -1452,6 +1480,8 @@ export default function CustomersPage() {
                         options={groups.map(g => ({ value: g.id, label: g.name }))}
                         onChange={(v) => setQuickAdd({ ...quickAdd, group_id: v })}
                         onAdd={async (name) => await createGroup(name)}
+                        onDelete={async (o) => await deleteGroup(o.value)}
+                        showDeleteButton
                         placeholder="— المجموعة —"
                         addLabel="إضافة مجموعة"
                         disabled={quickSaving}
@@ -1463,6 +1493,8 @@ export default function CustomersPage() {
                         options={transporters.map(t => ({ value: t.id, label: t.name }))}
                         onChange={(v) => setQuickAdd({ ...quickAdd, transporter_id: v })}
                         onAdd={async (name) => await createTransporter(name)}
+                        onDelete={async (o) => await deleteTransporter(o.value)}
+                        showDeleteButton
                         placeholder="— ترحيلات —"
                         addLabel="إضافة ناقل"
                         disabled={quickSaving}
@@ -1474,6 +1506,8 @@ export default function CustomersPage() {
                         options={destinations.map(d => ({ value: d.id, label: d.name }))}
                         onChange={(v) => setQuickAdd({ ...quickAdd, destination_id: v })}
                         onAdd={async (name) => await createDestination(name)}
+                        onDelete={async (o) => await deleteDestination(o.value)}
+                        showDeleteButton
                         placeholder="— الوجهة —"
                         addLabel="إضافة وجهة"
                         disabled={quickSaving}
@@ -1633,6 +1667,8 @@ export default function CustomersPage() {
                             options={groups.map(g => ({ value: g.id, label: g.name }))}
                             onChange={(v) => updateRowField(c.id, { group_id: v || null })}
                             onAdd={async (name) => await createGroup(name)}
+                            onDelete={async (o) => await deleteGroup(o.value)}
+                            showDeleteButton
                             placeholder="—"
                             addLabel="إضافة مجموعة"
                             disabled={savingRow === c.id}
@@ -1645,6 +1681,8 @@ export default function CustomersPage() {
                             options={transporters.map(t => ({ value: t.id, label: t.name }))}
                             onChange={(v) => updateCustomerTransporter(c.id, v)}
                             onAdd={async (name) => await createTransporter(name)}
+                            onDelete={async (o) => await deleteTransporter(o.value)}
+                            showDeleteButton
                             placeholder="—"
                             addLabel="إضافة ناقل"
                             disabled={savingRow === c.id}
@@ -1657,6 +1695,8 @@ export default function CustomersPage() {
                             options={destinations.map(d => ({ value: d.id, label: d.name }))}
                             onChange={(v) => updateCustomerDestination(c.id, v)}
                             onAdd={async (name) => await createDestination(name)}
+                            onDelete={async (o) => await deleteDestination(o.value)}
+                            showDeleteButton
                             placeholder="—"
                             addLabel="إضافة وجهة"
                             disabled={savingRow === c.id}
