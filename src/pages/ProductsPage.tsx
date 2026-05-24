@@ -1601,13 +1601,14 @@ export default function ProductsPage() {
                   </td>
                 </tr>
               )}
-              {isLoading ? (
-                <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">جاري تحميل المنتجات...</td></tr>
-              ) : error ? (
-                <tr><td colSpan={10} className="text-center py-8 text-destructive">تعذر تحميل المنتجات</td></tr>
-              ) : paginated.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">{emptyMessage}</td></tr>
-              ) : paginated.map((p: any, idx: number) => {
+              {(() => {
+                const totalCols = isPriceReport ? 3 : (isInStockPage || isOutOfStockPage) ? 6 : isReportPage ? 8 : 11;
+                if (isLoading) return <tr><td colSpan={totalCols} className="text-center py-8 text-muted-foreground">جاري تحميل المنتجات...</td></tr>;
+                if (error) return <tr><td colSpan={totalCols} className="text-center py-8 text-destructive">تعذر تحميل المنتجات</td></tr>;
+                if (paginated.length === 0) return <tr><td colSpan={totalCols} className="text-center py-8 text-muted-foreground">{emptyMessage}</td></tr>;
+                return null;
+              })()}
+              {!isLoading && !error && paginated.length > 0 && paginated.map((p: any, idx: number) => {
                 const rowH = getRowH(p.id);
                 return (
                 <tr
