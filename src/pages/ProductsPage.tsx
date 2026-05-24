@@ -1714,21 +1714,9 @@ export default function ProductsPage() {
                                     queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
                                   } catch (err: any) { toast.error(err.message || "فشل"); }
                                 }}
-                                onAdd={async (name) => {
-                                  const id = await createCompanyInline(name);
-                                  if (id) {
-                                    try {
-                                      updateField(p.id, "company_id", id);
-                                      await syncProductBrandLinks(p.id, [id]);
-                                      await update.mutateAsync({ id: p.id, company_id: id });
-                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
-                                    } catch (err: any) { toast.error(err.message || "فشل"); }
-                                  }
-                                  return id;
-                                }}
                                 onDelete={(opt) => deleteProductBrand(p.id, opt.value)}
                                 showDeleteButton
-                                placeholder="—" addLabel="إضافة ماركة جديدة"
+                                placeholder="—"
                               />
                             </div>
                           );
