@@ -1700,34 +1700,17 @@ export default function ProductsPage() {
                       </td>
                       <td style={{ padding: 0 }}>
                         {(() => {
-                          const brs: any[] = (p.brands && p.brands.length > 0)
-                            ? p.brands
-                            : (p.product_companies ? [p.product_companies] : []);
-                          const allBrandNames = brs.map((b: any) => b.name).filter(Boolean).join("، ");
-                          const showBrandsLine = brs.length > 1;
+                          const currentBrandId = (p.brands?.[0]?.id) || p.company_id || "";
                           return (
                             <div className="flex flex-row items-center gap-2" style={{ padding: "2px 4px" }}>
-                              {showBrandsLine && (
-                                <div className="text-[11px] text-foreground truncate flex-shrink-0 max-w-[50%]" title={allBrandNames}>{allBrandNames}</div>
-                              )}
                               <InlineSearchSelect
-                                value={(p.brands?.[0]?.id) || p.company_id || ""}
-                                options={(companies || [])
-                                  .filter((c: any) => !brs.some((b: any) => b.id === c.id))
-                                  .map((c: any) => ({ value: c.id, label: c.name }))}
+                                value={currentBrandId}
+                                options={(companies || []).map((c: any) => ({ value: c.id, label: c.name }))}
                                 onChange={async (v) => {
-                                  if (!v) return;
                                   try {
-                                    updateField(p.id, "company_id", v);
-                                    if (!brs.some((b: any) => b.id === v)) {
-                                      const { error: insErr } = await (supabase as any)
-                                        .from("product_brand_links")
-                                        .upsert({ product_id: p.id, brand_id: v }, { onConflict: "product_id,brand_id", ignoreDuplicates: true });
-                                      if (insErr) throw insErr;
-                                    }
-                                    if (!p.company_id) {
-                                      await update.mutateAsync({ id: p.id, company_id: v });
-                                    }
+                                    updateField(p.id, "company_id", v || null);
+                                    await syncProductBrandLinks(p.id, v ? [v] : []);
+                                    await update.mutateAsync({ id: p.id, company_id: v || null });
                                     queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
                                   } catch (err: any) { toast.error(err.message || "فشل"); }
                                 }}
@@ -1736,12 +1719,8 @@ export default function ProductsPage() {
                                   if (id) {
                                     try {
                                       updateField(p.id, "company_id", id);
-                                      await (supabase as any)
-                                        .from("product_brand_links")
-                                        .upsert({ product_id: p.id, brand_id: id }, { onConflict: "product_id,brand_id", ignoreDuplicates: true });
-                                      if (!p.company_id) {
-                                        await update.mutateAsync({ id: p.id, company_id: id });
-                                      }
+                                      await syncProductBrandLinks(p.id, [id]);
+                                      await update.mutateAsync({ id: p.id, company_id: id });
                                       queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
                                     } catch (err: any) { toast.error(err.message || "فشل"); }
                                   }
@@ -1749,7 +1728,7 @@ export default function ProductsPage() {
                                 }}
                                 onDelete={(opt) => deleteProductBrand(p.id, opt.value)}
                                 showDeleteButton
-                                placeholder={allBrandNames ? "+ إضافة ماركة" : "—"} addLabel="إضافة ماركة"
+                                placeholder="—" addLabel="إضافة ماركة جديدة"
                               />
                             </div>
                           );
