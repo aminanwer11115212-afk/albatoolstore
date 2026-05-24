@@ -410,6 +410,61 @@ export default function ProductsPage() {
     } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
   };
 
+  // أسماء المنتجات المستخدمة لمعرف معين (للرسائل)
+  const formatUsageList = (names: string[]) => {
+    const shown = names.slice(0, 5).join("، ");
+    const extra = names.length > 5 ? ` و${names.length - 5} آخرون` : "";
+    return shown + extra;
+  };
+
+  // حذف فئة من النظام كلياً إن لم تكن مستخدمة في أي منتج
+  const deleteCategoryFromSystem = async (categoryId: string): Promise<boolean> => {
+    try {
+      const { data: links, error: lerr } = await (supabase as any)
+        .from("product_category_links").select("product_id").eq("category_id", categoryId);
+      if (lerr) throw lerr;
+      const { data: legacy, error: perr } = await (supabase as any)
+        .from("products").select("id").eq("category_id", categoryId);
+      if (perr) throw perr;
+      const ids = new Set<string>([...(links || []).map((x: any) => x.product_id), ...(legacy || []).map((x: any) => x.id)]);
+      if (ids.size > 0) {
+        const names = (products || []).filter((p: any) => ids.has(p.id)).map((p: any) => p.name);
+        toast.error(`لا يمكن حذف الفئة، مستخدمة في: ${formatUsageList(names)}`);
+        return false;
+      }
+      const { error: derr } = await (supabase as any).from("product_categories").delete().eq("id", categoryId);
+      if (derr) throw derr;
+      queryClient.invalidateQueries({ queryKey: ["product_categories"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      toast.success("تم حذف الفئة");
+      return true;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+  // حذف ماركة من النظام كلياً إن لم تكن مستخدمة في أي منتج
+  const deleteBrandFromSystem = async (brandId: string): Promise<boolean> => {
+    try {
+      const { data: links, error: lerr } = await (supabase as any)
+        .from("product_brand_links").select("product_id").eq("brand_id", brandId);
+      if (lerr) throw lerr;
+      const { data: legacy, error: perr } = await (supabase as any)
+        .from("products").select("id").eq("company_id", brandId);
+      if (perr) throw perr;
+      const ids = new Set<string>([...(links || []).map((x: any) => x.product_id), ...(legacy || []).map((x: any) => x.id)]);
+      if (ids.size > 0) {
+        const names = (products || []).filter((p: any) => ids.has(p.id)).map((p: any) => p.name);
+        toast.error(`لا يمكن حذف الماركة، مستخدمة في: ${formatUsageList(names)}`);
+        return false;
+      }
+      const { error: derr } = await (supabase as any).from("product_companies").delete().eq("id", brandId);
+      if (derr) throw derr;
+      queryClient.invalidateQueries({ queryKey: ["product_companies"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      toast.success("تم حذف الماركة");
+      return true;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
   const handleSubmit = async () => {
     if (!form.name) { toast.error("اسم المنتج مطلوب"); return; }
     // أول ماركة محفوظة كـ company_id للحفاظ على التكامل الخلفي مع باقي النظام
