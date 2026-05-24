@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import QuickAddProductDialog from "@/components/product/QuickAddProductDialog";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
+import { receiveStockForPurchaseOnce, applyStockDeltaForPurchaseLines, getPurchaseStatus, addStockForLines } from "@/utils/stockReceive";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLocked, screenColWidthsKey, migrateScreenColKeys, COLS_TOAST_SAVED, COLS_TOAST_SAVE_FAILED, COLS_TOAST_EDIT_MODE, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE } from "@/hooks/useColumnWidths";
