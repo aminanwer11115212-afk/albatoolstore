@@ -133,7 +133,7 @@ export const WORKFLOW_STATUS_OPTIONS: StatusOption[] = [
 
 export const PURCHASE_STATUS_OPTIONS: StatusOption[] = [
   { value: "pending", label: "قيد الانتظار", color: "#eab308" },
-  { value: "completed", label: "مكتمل", color: "#16a34a" },
+  { value: "received", label: "مكتمل", color: "#16a34a" },
   { value: "cancelled", label: "ملغى", color: "#ef4444" },
 ];
 

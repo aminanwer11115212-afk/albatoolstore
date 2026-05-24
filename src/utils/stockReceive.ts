@@ -2,9 +2,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Stock receive policy for Purchase Orders:
- * - Stock is INCREASED only when a Purchase Order transitions into "completed".
+ * - Stock is INCREASED only when a Purchase Order transitions into "received".
  * - Idempotency: we read the CURRENT persisted status from DB before adding.
- *   If it is already "completed", we skip (prevents double-add on retries,
+ *   If it is already "received", we skip (prevents double-add on retries,
  *   refresh, or repeated status changes).
  * - When editing items of an already-completed purchase, only the delta
  *   between old and new lines is applied.
@@ -78,7 +78,7 @@ export async function getPurchaseStatus(purchaseId: string): Promise<string | nu
 
 /**
  * Idempotent stock add for a purchase order, guarded by current persisted status.
- * Only adds if the DB currently shows status !== "completed".
+ * Only adds if the DB currently shows status !== "received".
  */
 export async function receiveStockForPurchaseOnce(
   purchaseId: string,
@@ -86,7 +86,7 @@ export async function receiveStockForPurchaseOnce(
 ): Promise<{ added: boolean; reason?: string }> {
   if (!purchaseId) return { added: false, reason: "missing_purchase_id" };
   const currentStatus = await getPurchaseStatus(purchaseId);
-  if (currentStatus === "completed") return { added: false, reason: "already_completed" };
+  if (currentStatus === "received") return { added: false, reason: "already_completed" };
   await addStockForLines(lines);
   return { added: true };
 }

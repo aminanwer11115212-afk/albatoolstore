@@ -543,7 +543,7 @@ export default function PurchaseCreatePage() {
         total: totals.grandTotal,
         notes,
         user_note: userNote,
-        status: alsoReceive ? "completed" : status,
+        status: alsoReceive ? "received" : status,
       };
 
       // Snapshot existing state BEFORE mutating, so we can compute stock deltas correctly.
@@ -624,9 +624,9 @@ export default function PurchaseCreatePage() {
       //  B) was already completed and still completed (edit) → apply delta old vs new.
       //  C) creating brand new with alsoReceive → add all lines (no prior state).
       // Update purchase_price on the products as a side-effect of receiving.
-      const newStatus = alsoReceive ? "completed" : status;
-      const wasCompleted = prevStatusInDb === "completed";
-      const isNowCompleted = newStatus === "completed";
+      const newStatus = alsoReceive ? "received" : status;
+      const wasCompleted = prevStatusInDb === "received";
+      const isNowCompleted = newStatus === "received";
 
       if (isNowCompleted && !wasCompleted) {
         // Case A or C — first time receiving
@@ -635,7 +635,7 @@ export default function PurchaseCreatePage() {
           if (!it.product_id) continue;
           await supabase.from("products").update({ purchase_price: it.unit_price }).eq("id", it.product_id);
         }
-        if (alsoReceive) setStatus("completed");
+        if (alsoReceive) setStatus("received");
         toast.success("تم استلام البضاعة وتحديث المخزون");
       } else if (isNowCompleted && wasCompleted) {
         // Case B — edit of received order: apply delta
@@ -1152,7 +1152,7 @@ export default function PurchaseCreatePage() {
                     </button>
                   ),
                 },
-                ...(status !== "completed" ? [{
+                ...(status !== "received" ? [{
                   id: "save-and-receive",
                   group: "1-primary",
                   node: (
@@ -1216,9 +1216,9 @@ export default function PurchaseCreatePage() {
                         if (!editId) return;
                         const prev = status;
                         setStatus(v);
-                        // If transitioning INTO "completed" and DB still shows a non-completed status,
+                        // If transitioning INTO "received" and DB still shows a non-completed status,
                         // read items from DB and add to stock (guarded by receiveStockForPurchaseOnce).
-                        if (v === "completed" && prev !== "completed") {
+                        if (v === "received" && prev !== "received") {
                           try {
                             const { data: itemRows } = await supabase
                               .from("purchase_order_items")
@@ -1243,8 +1243,8 @@ export default function PurchaseCreatePage() {
                         }
                         const { error } = await supabase.from("purchase_orders").update({ status: v }).eq("id", editId);
                         if (error) { setStatus(prev); toast.error(error.message); }
-                        else if (v === "completed" && prev !== "completed") toast.success("تم تحديث الحالة وزيادة المخزون");
-                        else if (prev === "completed" && v !== "completed") toast.message("تم تغيير الحالة. ملاحظة: لم يُعَد خصم المخزون تلقائياً.");
+                        else if (v === "received" && prev !== "received") toast.success("تم تحديث الحالة وزيادة المخزون");
+                        else if (prev === "received" && v !== "received") toast.message("تم تغيير الحالة. ملاحظة: لم يُعَد خصم المخزون تلقائياً.");
                         else toast.success("تم تحديث الحالة");
                       }}
                     />
