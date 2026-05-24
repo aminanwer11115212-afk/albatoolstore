@@ -1216,8 +1216,35 @@ export default function PurchaseCreatePage() {
                         if (!editId) return;
                         const prev = status;
                         setStatus(v);
+                        // If transitioning INTO "completed" and DB still shows a non-completed status,
+                        // read items from DB and add to stock (guarded by receiveStockForPurchaseOnce).
+                        if (v === "completed" && prev !== "completed") {
+                          try {
+                            const { data: itemRows } = await supabase
+                              .from("purchase_order_items")
+                              .select("product_id, quantity, unit_price")
+                              .eq("purchase_order_id", editId);
+                            const lines = (itemRows || []).map((r: any) => ({
+                              product_id: r.product_id, quantity: Number(r.quantity || 0),
+                            }));
+                            const res = await receiveStockForPurchaseOnce(editId, lines);
+                            // also refresh purchase_price on receive
+                            if (res.added) {
+                              for (const r of (itemRows || [])) {
+                                if (!r.product_id) continue;
+                                await supabase.from("products").update({ purchase_price: r.unit_price }).eq("id", r.product_id);
+                              }
+                            }
+                          } catch (err: any) {
+                            setStatus(prev);
+                            toast.error(`فشل تحديث المخزون: ${err.message || err}`);
+                            return;
+                          }
+                        }
                         const { error } = await supabase.from("purchase_orders").update({ status: v }).eq("id", editId);
                         if (error) { setStatus(prev); toast.error(error.message); }
+                        else if (v === "completed" && prev !== "completed") toast.success("تم تحديث الحالة وزيادة المخزون");
+                        else if (prev === "completed" && v !== "completed") toast.message("تم تغيير الحالة. ملاحظة: لم يُعَد خصم المخزون تلقائياً.");
                         else toast.success("تم تحديث الحالة");
                       }}
                     />
