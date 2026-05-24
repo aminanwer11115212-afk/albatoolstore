@@ -1867,14 +1867,13 @@ export default function ProductsPage() {
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();
-                                fileInputRef.current?.click();
+                                (e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement | null)?.click();
                               }
                             }}
                             tabIndex={0}
                           >
                             {p.image_url ? "تغيير" : "ارفع"}
                             <input
-                              ref={(el) => { (fileInputRef as any).current = el; }}
                               type="file"
                               accept="image/*"
                               className="hidden"
@@ -1890,6 +1889,7 @@ export default function ProductsPage() {
                                   await updateField(p.id, "image_url", data.publicUrl);
                                   toast.success("تم رفع الصورة");
                                 } catch (err: any) { toast.error(err.message || "فشل الرفع"); }
+                                finally { e.target.value = ""; }
                               }}
                             />
                           </label>
