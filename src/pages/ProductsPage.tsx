@@ -410,6 +410,17 @@ export default function ProductsPage() {
     } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
   };
 
+  // إزالة المورد من المنتج (لا يحذف المورد من النظام)
+  const deleteProductSupplier = async (productId: string) => {
+    try {
+      updateField(productId, "supplier_id", null);
+      await update.mutateAsync({ id: productId, supplier_id: null });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      return true;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+
   // أسماء المنتجات المستخدمة لمعرف معين (للرسائل)
   const formatUsageList = (names: string[]) => {
     const shown = names.slice(0, 5).join("، ");
