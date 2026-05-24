@@ -75,7 +75,7 @@ export default function PurchasePage() {
         }
       }
 
-      await supabase.from("purchase_orders").update({ status: "completed" }).eq("id", o.id);
+      await supabase.from("purchase_orders").update({ status: "received" }).eq("id", o.id);
       toast.success(`تم استلام البضاعة وتحديث المخزون`);
       queryClient.invalidateQueries({ queryKey: ["purchase-orders-full"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -216,7 +216,7 @@ export default function PurchasePage() {
               <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
                 <option value="all">الكل</option>
                 <option value="pending">معلق</option>
-                <option value="completed">مكتمل</option>
+                <option value="received">مستلَم</option>
                 <option value="cancelled">ملغي</option>
               </select>
             </label>
@@ -309,7 +309,7 @@ export default function PurchasePage() {
                         >
                           🖨 طباعة
                         </button>
-                        {o.status !== "completed" && (
+                        {o.status !== "received" && (
                           <button
                             type="button"
                             className="btn-xs btn-primary"
@@ -358,7 +358,7 @@ export default function PurchasePage() {
                   actions={
                     <>
                       <button className="btn-xs btn-info" onClick={() => navigate(`/preview/purchase/${o.id}`)} title="طباعة">🖨 طباعة</button>
-                      {o.status !== "completed" && (
+                      {o.status !== "received" && (
                         <button className="btn-xs btn-primary" onClick={() => handleConvertToInvoice(o)}>→ استلام</button>
                       )}
                       <button className="btn-xs btn-danger" onClick={() => handleDelete(o.id)}>🗑 حذف</button>
