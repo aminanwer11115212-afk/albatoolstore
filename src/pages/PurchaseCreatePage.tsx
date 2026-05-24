@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import QuickAddProductDialog from "@/components/product/QuickAddProductDialog";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
+import { receiveStockForPurchaseOnce, applyStockDeltaForPurchaseLines, getPurchaseStatus, addStockForLines } from "@/utils/stockReceive";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLocked, screenColWidthsKey, migrateScreenColKeys, COLS_TOAST_SAVED, COLS_TOAST_SAVE_FAILED, COLS_TOAST_EDIT_MODE, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE } from "@/hooks/useColumnWidths";
@@ -545,7 +546,19 @@ export default function PurchaseCreatePage() {
         status: alsoReceive ? "completed" : status,
       };
 
+      // Snapshot existing state BEFORE mutating, so we can compute stock deltas correctly.
+      let prevStatusInDb: string | null = null;
+      let prevItems: Array<{ product_id: string | null; quantity: number }> = [];
       if (isEdit && orderId) {
+        prevStatusInDb = await getPurchaseStatus(orderId);
+        const { data: prevItemsRows } = await supabase
+          .from("purchase_order_items")
+          .select("product_id, quantity")
+          .eq("purchase_order_id", orderId);
+        prevItems = (prevItemsRows || []).map((r: any) => ({
+          product_id: r.product_id, quantity: Number(r.quantity || 0),
+        }));
+
         const { error } = await (supabase as any).from("purchase_orders").update(payload).eq("id", orderId);
         if (error) throw error;
         await supabase.from("purchase_order_items").delete().eq("purchase_order_id", orderId);
@@ -605,19 +618,33 @@ export default function PurchaseCreatePage() {
       const { error: itemsErr } = await (supabase as any).from("purchase_order_items").insert(itemsPayload);
       if (itemsErr) throw itemsErr;
 
-      if (alsoReceive) {
+      // ── Stock sync ───────────────────────────────────────────────────────
+      // Three cases:
+      //  A) was NOT completed and now becoming completed → add all new lines (once).
+      //  B) was already completed and still completed (edit) → apply delta old vs new.
+      //  C) creating brand new with alsoReceive → add all lines (no prior state).
+      // Update purchase_price on the products as a side-effect of receiving.
+      const newStatus = alsoReceive ? "completed" : status;
+      const wasCompleted = prevStatusInDb === "completed";
+      const isNowCompleted = newStatus === "completed";
+
+      if (isNowCompleted && !wasCompleted) {
+        // Case A or C — first time receiving
+        await addStockForLines(valid);
         for (const it of valid) {
           if (!it.product_id) continue;
-          const { data: prod } = await supabase.from("products").select("stock_quantity").eq("id", it.product_id).maybeSingle();
-          if (prod) {
-            await supabase.from("products").update({
-              stock_quantity: Number(prod.stock_quantity || 0) + Number(it.quantity || 0),
-              purchase_price: it.unit_price,
-            }).eq("id", it.product_id);
-          }
+          await supabase.from("products").update({ purchase_price: it.unit_price }).eq("id", it.product_id);
         }
-        setStatus("completed");
+        if (alsoReceive) setStatus("completed");
         toast.success("تم استلام البضاعة وتحديث المخزون");
+      } else if (isNowCompleted && wasCompleted) {
+        // Case B — edit of received order: apply delta
+        await applyStockDeltaForPurchaseLines(prevItems, valid);
+        for (const it of valid) {
+          if (!it.product_id) continue;
+          await supabase.from("products").update({ purchase_price: it.unit_price }).eq("id", it.product_id);
+        }
+        toast.success(isEdit ? "تم تحديث أمر الشراء والمخزون" : "تم الحفظ");
       } else {
         toast.success(isEdit ? "تم تحديث أمر الشراء" : "تم إنشاء أمر الشراء");
       }
@@ -1189,8 +1216,35 @@ export default function PurchaseCreatePage() {
                         if (!editId) return;
                         const prev = status;
                         setStatus(v);
+                        // If transitioning INTO "completed" and DB still shows a non-completed status,
+                        // read items from DB and add to stock (guarded by receiveStockForPurchaseOnce).
+                        if (v === "completed" && prev !== "completed") {
+                          try {
+                            const { data: itemRows } = await supabase
+                              .from("purchase_order_items")
+                              .select("product_id, quantity, unit_price")
+                              .eq("purchase_order_id", editId);
+                            const lines = (itemRows || []).map((r: any) => ({
+                              product_id: r.product_id, quantity: Number(r.quantity || 0),
+                            }));
+                            const res = await receiveStockForPurchaseOnce(editId, lines);
+                            // also refresh purchase_price on receive
+                            if (res.added) {
+                              for (const r of (itemRows || [])) {
+                                if (!r.product_id) continue;
+                                await supabase.from("products").update({ purchase_price: r.unit_price }).eq("id", r.product_id);
+                              }
+                            }
+                          } catch (err: any) {
+                            setStatus(prev);
+                            toast.error(`فشل تحديث المخزون: ${err.message || err}`);
+                            return;
+                          }
+                        }
                         const { error } = await supabase.from("purchase_orders").update({ status: v }).eq("id", editId);
                         if (error) { setStatus(prev); toast.error(error.message); }
+                        else if (v === "completed" && prev !== "completed") toast.success("تم تحديث الحالة وزيادة المخزون");
+                        else if (prev === "completed" && v !== "completed") toast.message("تم تغيير الحالة. ملاحظة: لم يُعَد خصم المخزون تلقائياً.");
                         else toast.success("تم تحديث الحالة");
                       }}
                     />
