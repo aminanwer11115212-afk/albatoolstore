@@ -10,7 +10,7 @@ import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocLi
 
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },
-  completed: { label: "مكتمل", cls: "st-paid" },
+  received:  { label: "مستلَم", cls: "st-paid" },
   cancelled: { label: "ملغي",  cls: "st-canceled" },
 };
 
