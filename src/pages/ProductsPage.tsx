@@ -1901,6 +1901,7 @@ export default function ProductsPage() {
                           options={(suppliers || []).map((s: any) => ({ value: s.id, label: s.name }))}
                           onChange={(v) => updateField(p.id, "supplier_id", v || null)}
                           onAdd={createSupplierInline}
+                          onDelete={() => deleteProductSupplier(p.id)}
                           placeholder="—" addLabel="إضافة مورد"
                         />
                       </td>
