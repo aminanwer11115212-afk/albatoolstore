@@ -149,32 +149,56 @@ body.hide-floating-tools [data-floating-tools] { display: none !important; }
 /* Items table zoom (Quote/Invoice/Purchase/StockReturn create pages) */
 :root { --items-zoom: 1; }
 
-/* Column resize handle (used in items tables) */
+/* Column resize handle (used in items tables) — wide invisible touch area
+   with a thin visible bar centered inside it. */
 .col-resize-handle {
-  background: hsl(var(--border));
-  border-inline-end: 2px solid transparent;
-  opacity: 0.6;
-  transition: background .15s, border-color .15s, opacity .15s, width .15s;
+  background: transparent;
   cursor: col-resize !important;
+  touch-action: none;
 }
-.col-resize-handle:hover {
-  background: hsl(var(--primary) / 0.55);
-  border-inline-end-color: hsl(var(--primary));
+.col-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: hsl(var(--border));
+  opacity: 0.6;
+  transition: background .15s, width .15s, opacity .15s;
+  pointer-events: none;
+}
+.col-resize-handle:hover::after {
+  background: hsl(var(--primary));
+  width: 3px;
   opacity: 1;
 }
-.col-resize-handle:active {
-  background: hsl(var(--primary) / 0.85);
-  border-inline-end-color: hsl(var(--primary));
+.col-resize-handle:active::after,
+[data-resizing-col] .col-resize-handle::after {
+  background: hsl(var(--primary));
+  width: 4px;
   opacity: 1;
+}
+/* On touch / coarse pointers, enlarge the grab zone further. */
+@media (hover: none) and (pointer: coarse) {
+  .col-resize-handle {
+    width: 28px !important;
+    inset-inline-end: -14px !important;
+  }
+  .col-resize-handle::after {
+    width: 3px;
+    opacity: 0.85;
+  }
 }
 /* Show resize cursor near the trailing edge of resizable header cells */
 .neo-quote-scope .excel-table thead th,
 .neo-purchase-scope .excel-table thead th {
   position: relative;
 }
-.neo-quote-scope .excel-table thead th:hover .col-resize-handle,
-.neo-purchase-scope .excel-table thead th:hover .col-resize-handle {
-  background: hsl(var(--primary) / 0.45);
+.neo-quote-scope .excel-table thead th:hover .col-resize-handle::after,
+.neo-purchase-scope .excel-table thead th:hover .col-resize-handle::after {
+  background: hsl(var(--primary));
   opacity: 1;
 }
 

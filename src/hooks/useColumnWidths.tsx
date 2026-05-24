@@ -147,16 +147,21 @@ export function useColumnWidths(
   // sum of column widths after a drag (preventing CSS auto-redistribution).
   const tableElRef = useRef<HTMLTableElement | null>(null);
 
-  const startDrag = useCallback((index: number, e: React.MouseEvent | MouseEvent) => {
+  const startDrag = useCallback((index: number, e: React.MouseEvent | MouseEvent | React.PointerEvent | PointerEvent) => {
     if (lockedRef.current) return;
     e.preventDefault();
     if ("stopPropagation" in e) e.stopPropagation();
-    const startX = (e as MouseEvent).clientX;
+    const startX = (e as PointerEvent).clientX;
+    const pointerId = (e as PointerEvent).pointerId;
+    const handleEl = (e as PointerEvent).target as HTMLElement | null;
+    // Capture pointer so we keep getting events even if finger drifts off the handle.
+    try {
+      if (handleEl && typeof pointerId === "number" && (handleEl as any).setPointerCapture) {
+        (handleEl as any).setPointerCapture(pointerId);
+      }
+    } catch { /* noop */ }
 
-    // Excel/Access-style: ONLY the dragged column changes. Freeze every
-    // other flex (null-width) column to its current rendered px width so
-    // it cannot absorb/redistribute the delta. Read widths from DOM.
-    const handleEl = (e as MouseEvent).target as HTMLElement | null;
+    // Excel/Access-style: ONLY the dragged column changes.
     const tableEl = (handleEl?.closest?.("table") as HTMLTableElement | null) ?? null;
     const headerCells = tableEl
       ? (Array.from(tableEl.querySelectorAll("thead th")) as HTMLTableCellElement[])
@@ -178,16 +183,11 @@ export function useColumnWidths(
 
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
+    // Block touch scroll/zoom while dragging on touch devices.
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.touchAction = "none";
     document.body.setAttribute("data-resizing-col", String(index + 1));
 
-    // Helper: pin <table> width to the SUM of the given column widths.
-    // We do NOT pin during the drag itself — we only pin AFTER mouseup,
-    // so the user sees a clean transition and the layout doesn't fight
-    // mid-drag. While dragging, CSS `tableLayout: fixed` will momentarily
-    // try to redistribute, but because every column now has an explicit
-    // numeric width (we froze flex columns below), the redistribution
-    // effect on other columns is zero — the dragged column simply grows
-    // or shrinks the overall table width.
     const pinTableWidth = (cols: (number | null)[]) => {
       if (!tableEl) return;
       let sum = 0;
@@ -205,14 +205,12 @@ export function useColumnWidths(
 
     const floor = minFor(index);
 
-    // Snapshot of widths BEFORE we mutate (after measuring flex cols).
     const beforeSnapshot: (number | null)[] = widthsRef.current.map((v, i) => {
       if (typeof v === "number") return v;
       const m = measured[i];
       return typeof m === "number" ? m : null;
     });
 
-    // Freeze flex columns immediately so layout doesn't jump on first move.
     setWidths((prev) => {
       const arr = prev.slice();
       for (let i = 0; i < arr.length; i++) {
@@ -224,8 +222,6 @@ export function useColumnWidths(
       return arr;
     });
 
-    // Snapshot the table-pin state BEFORE drag — so we can prove later
-    // that pinning didn't happen mid-drag.
     const snapshotTablePin = () => {
       if (!tableEl) return { pinned: false, width: "", inlineWidth: "" };
       return {
@@ -236,21 +232,23 @@ export function useColumnWidths(
     };
     const initialPin = snapshotTablePin();
 
-    // Debug: emit "start" event.
     try {
       window.dispatchEvent(new CustomEvent("colwidths-debug-start", {
         detail: { storageKey, index, startW, before: beforeSnapshot, initialPin },
       }));
     } catch { /* noop */ }
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX;
       const isRtl = document.documentElement.dir === "rtl" || document.body.dir === "rtl";
-      const next = Math.max(floor, Math.round(startW + (isRtl ? -dx : dx)));
+      // On coarse pointers, apply a small dead-zone to prevent jitter, and a
+      // sub-pixel snap so dragging feels smoother on touch.
+      const isCoarse = (ev as any).pointerType === "touch" || (ev as any).pointerType === "pen";
+      const raw = startW + (isRtl ? -dx : dx);
+      const next = Math.max(floor, Math.round(isCoarse ? raw : raw));
       setWidths((prev) => {
         const arr = prev.slice();
         arr[index] = next;
-        // Debug: emit "move" event with current widths + live table pin state.
         try {
           const pin = snapshotTablePin();
           window.dispatchEvent(new CustomEvent("colwidths-debug-move", {
@@ -258,7 +256,6 @@ export function useColumnWidths(
               storageKey, index, dx, widths: arr.slice(),
               tablePinned: pin.pinned,
               tableWidth: pin.width,
-              // Compare to initial — should be identical mid-drag.
               pinChangedDuringDrag:
                 pin.pinned !== initialPin.pinned || pin.width !== initialPin.width,
             },
@@ -270,30 +267,29 @@ export function useColumnWidths(
     const onUp = () => {
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      document.body.style.touchAction = prevTouchAction;
       document.body.removeAttribute("data-resizing-col");
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      try {
+        if (handleEl && typeof pointerId === "number" && (handleEl as any).releasePointerCapture) {
+          (handleEl as any).releasePointerCapture(pointerId);
+        }
+      } catch { /* noop */ }
 
-      // Capture pin state BEFORE we pin (proves pinning hadn't happened yet
-      // for an initially-unpinned table).
       const beforePinUp = snapshotTablePin();
-
-      // Mark this storage key as "user-resized" and pin the table width
-      // to the final sum of column widths — only AFTER drag ends.
       try {
         localStorage.setItem(storageKey + ":userResized", "1");
       } catch { /* noop */ }
       pinTableWidth(widthsRef.current);
-
       const afterPinUp = snapshotTablePin();
-      // Compute expected sum.
       let expectedSum = 0;
       for (let i = 0; i < widthsRef.current.length; i++) {
         const v = widthsRef.current[i];
         const m = measured[i];
         expectedSum += typeof v === "number" ? v : (typeof m === "number" ? m : (defaults[i] as number) || 100);
       }
-
       try {
         window.dispatchEvent(new CustomEvent("colwidths-debug-end", {
           detail: {
@@ -306,8 +302,9 @@ export function useColumnWidths(
         }));
       } catch { /* noop */ }
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   }, [defaults, minFor, storageKey]);
 
   const reset = useCallback(() => {
@@ -675,7 +672,7 @@ export function ColumnResizeHandle({
   title,
   hidden,
 }: {
-  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseDown: (e: React.MouseEvent | React.PointerEvent) => void;
   title?: string;
   hidden?: boolean;
 }) {
@@ -684,20 +681,23 @@ export function ColumnResizeHandle({
     <span
       role="separator"
       aria-orientation="vertical"
-      onMouseDown={onMouseDown}
+      onPointerDown={onMouseDown}
       onDoubleClick={(e) => e.stopPropagation()}
       title={title ?? "اسحب للتكبير"}
+      className="col-resize-handle"
       style={{
         position: "absolute",
         top: 0,
         bottom: 0,
-        insetInlineEnd: -4,
-        width: 8,
+        // Wider invisible touch area, with a visible thin bar centered.
+        insetInlineEnd: -10,
+        width: 20,
         cursor: "col-resize",
         zIndex: 6,
         userSelect: "none",
+        touchAction: "none",
+        WebkitTapHighlightColor: "transparent",
       }}
-      className="col-resize-handle"
     />
   );
 }
