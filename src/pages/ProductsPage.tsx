@@ -1745,7 +1745,7 @@ export default function ProductsPage() {
                                     } catch (err: any) { toast.error(err.message || "فشل"); }
                                   }}
                                   onAdd={createCategoryInline}
-                                  onDelete={(opt) => deleteProductCategory(p.id, opt.value)}
+                                  onDelete={(opt) => deleteCategoryFromSystem(opt.value)}
                                   showDeleteButton
                                   placeholder={allNames ? "تغيير الفئة الأساسية" : "—"} addLabel="إضافة فئة"
                                 />
