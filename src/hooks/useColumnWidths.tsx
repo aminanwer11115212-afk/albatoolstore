@@ -672,7 +672,7 @@ export function ColumnResizeHandle({
   title,
   hidden,
 }: {
-  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseDown: (e: React.MouseEvent | React.PointerEvent) => void;
   title?: string;
   hidden?: boolean;
 }) {
@@ -681,20 +681,23 @@ export function ColumnResizeHandle({
     <span
       role="separator"
       aria-orientation="vertical"
-      onMouseDown={onMouseDown}
+      onPointerDown={onMouseDown}
       onDoubleClick={(e) => e.stopPropagation()}
       title={title ?? "اسحب للتكبير"}
+      className="col-resize-handle"
       style={{
         position: "absolute",
         top: 0,
         bottom: 0,
-        insetInlineEnd: -4,
-        width: 8,
+        // Wider invisible touch area, with a visible thin bar centered.
+        insetInlineEnd: -10,
+        width: 20,
         cursor: "col-resize",
         zIndex: 6,
         userSelect: "none",
+        touchAction: "none",
+        WebkitTapHighlightColor: "transparent",
       }}
-      className="col-resize-handle"
     />
   );
 }
