@@ -1825,15 +1825,14 @@ export default function ProductsPage() {
                                     categories: newCats,
                                     product_categories: newCats[0] || null,
                                   });
-                                  // حفظ بالخلفية — لا await
+                                  // حفظ بالخلفية — لا await، ولا invalidate يدوي
+                                  // (ProductsCacheSync يستمع لـ products:changed ويُبطل الكاش بفارق 150ms)
                                   (async () => {
                                     try {
                                       await Promise.all([
                                         update.mutateAsync({ id: p.id, category_id: v || null }),
                                         syncProductCategoryLinks(p.id, next),
                                       ]);
-                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
-                                      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"], refetchType: "active" });
                                       window.dispatchEvent(new Event("products:changed"));
                                     } catch (err: any) {
                                       rollback();
