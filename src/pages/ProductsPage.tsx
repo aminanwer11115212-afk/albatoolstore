@@ -409,8 +409,7 @@ export default function ProductsPage() {
       const p = (next || []).find((x: any) => x.id === productId);
       const primary = p?.category_id ?? null;
       await update.mutateAsync({ id: productId, category_id: primary });
-      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
-      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"], refetchType: "active" });
+      window.dispatchEvent(new Event("products:changed"));
       return true;
     } catch (err: any) {
       queryClient.setQueryData(["products"], prevProducts);
@@ -438,7 +437,7 @@ export default function ProductsPage() {
       const p = (next || []).find((x: any) => x.id === productId);
       const primary = p?.company_id ?? null;
       await update.mutateAsync({ id: productId, company_id: primary });
-      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
+      window.dispatchEvent(new Event("products:changed"));
       return true;
     } catch (err: any) {
       queryClient.setQueryData(["products"], prevProducts);
@@ -1825,15 +1824,14 @@ export default function ProductsPage() {
                                     categories: newCats,
                                     product_categories: newCats[0] || null,
                                   });
-                                  // حفظ بالخلفية — لا await
+                                  // حفظ بالخلفية — لا await، ولا invalidate يدوي
+                                  // (ProductsCacheSync يستمع لـ products:changed ويُبطل الكاش بفارق 150ms)
                                   (async () => {
                                     try {
                                       await Promise.all([
                                         update.mutateAsync({ id: p.id, category_id: v || null }),
                                         syncProductCategoryLinks(p.id, next),
                                       ]);
-                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
-                                      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"], refetchType: "active" });
                                       window.dispatchEvent(new Event("products:changed"));
                                     } catch (err: any) {
                                       rollback();
@@ -1882,7 +1880,6 @@ export default function ProductsPage() {
                                         update.mutateAsync({ id: p.id, company_id: v || null }),
                                         syncProductBrandLinks(p.id, next),
                                       ]);
-                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
                                       window.dispatchEvent(new Event("products:changed"));
                                     } catch (err: any) {
                                       rollback();

@@ -65,7 +65,9 @@ function useTable<T extends keyof Tables<any>>(table: string) {
     onError: (_err, _vars, context: any) => {
       if (context?.previous) queryClient.setQueryData([table], context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: [table] }),
+    // Optimistic update يضمن دقة الكاش — لا داعي لـ refetch فوري بعد كل تعديل.
+    // نُعلِّم الاستعلام كـ stale فقط ليُحدَّث عند إعادة التركيب أو focus.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: [table], refetchType: "none" }),
   });
 
   // ── REMOVE ── يُزال الصف فوراً ──
