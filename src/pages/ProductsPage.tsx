@@ -591,12 +591,10 @@ export default function ProductsPage() {
   const availableBrands = (companies || []).filter((b: any) => !selectedBrandIds.includes(b.id));
   const selectedBrandObjects = (companies || []).filter((b: any) => selectedBrandIds.includes(b.id));
 
-  // تحرير مباشر للحقول من داخل الجدول — مع Optimistic UI فوري
+  // تحرير مباشر للحقول من داخل الجدول — Optimistic UI فوري + حفظ بالخلفية
   const updateField = async (id: string, field: string, value: any) => {
-    // 1. حفظ نسخة سابقة من الكاش للرجوع إليها عند الفشل
     const prevProducts = queryClient.getQueryData<any[]>(["products"]);
     const prevDetails = queryClient.getQueryData<any[]>(["products-with-details"]);
-    // 2. تطبيق التعديل فوراً على الكاشين
     const patch = (old: any[] | undefined) =>
       (old || []).map((p: any) => p.id === id ? { ...p, [field]: value } : p);
     queryClient.setQueryData(["products"], patch);
@@ -605,11 +603,24 @@ export default function ProductsPage() {
       await update.mutateAsync({ id, [field]: value });
       window.dispatchEvent(new Event("products:changed"));
     } catch (e: any) {
-      // Rollback عند الفشل
       queryClient.setQueryData(["products"], prevProducts);
       queryClient.setQueryData(["products-with-details"], prevDetails);
       toast.error(e.message || "فشل التحديث — تم التراجع");
     }
+  };
+
+  // Patch متعدد الحقول للمنتج (يشمل علاقات مثل categories/brands) — يرجع snapshot للـ rollback
+  const patchProductCaches = (id: string, partial: Record<string, any>) => {
+    const prevProducts = queryClient.getQueryData<any[]>(["products"]);
+    const prevDetails = queryClient.getQueryData<any[]>(["products-with-details"]);
+    const apply = (old: any[] | undefined) =>
+      (old || []).map((p: any) => p.id === id ? { ...p, ...partial } : p);
+    queryClient.setQueryData(["products"], apply);
+    queryClient.setQueryData(["products-with-details"], apply);
+    return () => {
+      queryClient.setQueryData(["products"], prevProducts);
+      queryClient.setQueryData(["products-with-details"], prevDetails);
+    };
   };
 
   // تحديث متفائل لحقل التجميد (يظهر فوراً قبل رد الخادم)
