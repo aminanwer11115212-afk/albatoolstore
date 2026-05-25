@@ -1760,24 +1760,39 @@ export default function ProductsPage() {
                               <InlineSearchSelect
                                 value={currentCatId}
                                 options={(categories || []).map((c: any) => ({ value: c.id, label: c.name }))}
-                                onChange={async (v) => {
-                                  try {
-                                    // استبدل الفئة الأساسية فقط، احتفظ بالباقي
-                                    const existing = cats.map((c: any) => c.id).filter(Boolean);
-                                    const replaced = existing.map((id: string) => id === currentCatId ? v : id);
-                                    const next = Array.from(new Set(replaced.filter(Boolean)));
-                                    if (v && !next.includes(v)) next.unshift(v);
-                                    if (!v) {
-                                      // إذا أُلغيت القيمة، أزل القديم فقط
-                                      const idx = next.indexOf(currentCatId);
-                                      if (idx >= 0) next.splice(idx, 1);
+                                onChange={(v) => {
+                                  // Optimistic: استبدل الفئة الأساسية محلياً واحتفظ بالباقي
+                                  const existing = cats.map((c: any) => c.id).filter(Boolean);
+                                  const replaced = existing.map((id: string) => id === currentCatId ? v : id);
+                                  const next = Array.from(new Set(replaced.filter(Boolean)));
+                                  if (v && !next.includes(v)) next.unshift(v);
+                                  if (!v) {
+                                    const idx = next.indexOf(currentCatId);
+                                    if (idx >= 0) next.splice(idx, 1);
+                                  }
+                                  // ابني قائمة كائنات الفئات الجديدة من الـ options
+                                  const catMap = new Map<string, any>((categories || []).map((c: any) => [c.id, c]));
+                                  const newCats = next.map(id => catMap.get(id) || { id, name: "" }).filter(Boolean);
+                                  const rollback = patchProductCaches(p.id, {
+                                    category_id: v || null,
+                                    categories: newCats,
+                                    product_categories: newCats[0] || null,
+                                  });
+                                  // حفظ بالخلفية — لا await
+                                  (async () => {
+                                    try {
+                                      await Promise.all([
+                                        update.mutateAsync({ id: p.id, category_id: v || null }),
+                                        syncProductCategoryLinks(p.id, next),
+                                      ]);
+                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
+                                      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"], refetchType: "active" });
+                                      window.dispatchEvent(new Event("products:changed"));
+                                    } catch (err: any) {
+                                      rollback();
+                                      toast.error(err.message || "فشل — تم التراجع");
                                     }
-                                    updateField(p.id, "category_id", v || null);
-                                    await syncProductCategoryLinks(p.id, next);
-                                    await update.mutateAsync({ id: p.id, category_id: v || null });
-                                    queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
-                                    queryClient.invalidateQueries({ queryKey: ["product_category_links_all"] });
-                                  } catch (err: any) { toast.error(err.message || "فشل"); }
+                                  })();
                                 }}
                                 onAdd={createCategoryInline}
                                 onDelete={(opt) => deleteProductCategory(p.id, opt.value)}
