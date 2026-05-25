@@ -163,7 +163,18 @@ export default function ProductsPage() {
   const { data: companies } = useProductCompanies();
   const { data: suppliers } = useSuppliers();
 
-  const allProducts = products || [];
+  // ترتيب ثابت: الأحدث إضافةً أولاً + كسر تعادل بـ id حتى لا تقفز الصفوف
+  // عند تساوي created_at أو بعد عمليات التعديل/إعادة الجلب.
+  const allProducts = useMemo(() => {
+    const arr = [...(products || [])];
+    arr.sort((a: any, b: any) => {
+      const ta = a?.created_at ? Date.parse(a.created_at) : 0;
+      const tb = b?.created_at ? Date.parse(b.created_at) : 0;
+      if (tb !== ta) return tb - ta;
+      return String(b?.id || "").localeCompare(String(a?.id || ""));
+    });
+    return arr;
+  }, [products]);
   const isOutOfStockPage = location.pathname === "/products/out-of-stock";
   const isInStockPage = location.pathname === "/products/in-stock";
   const isReportPage = location.pathname === "/products/report";
