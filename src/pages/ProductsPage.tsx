@@ -409,8 +409,7 @@ export default function ProductsPage() {
       const p = (next || []).find((x: any) => x.id === productId);
       const primary = p?.category_id ?? null;
       await update.mutateAsync({ id: productId, category_id: primary });
-      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
-      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"], refetchType: "active" });
+      window.dispatchEvent(new Event("products:changed"));
       return true;
     } catch (err: any) {
       queryClient.setQueryData(["products"], prevProducts);
