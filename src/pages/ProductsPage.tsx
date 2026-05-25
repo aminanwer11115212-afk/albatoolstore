@@ -282,35 +282,36 @@ export default function ProductsPage() {
     } finally { setQuickSaving(false); }
   };
 
-  // Quick add suppliers/categories/companies/warehouses inline
-  const createCategoryInline = async (name: string): Promise<string | null> => {
-    try { const created: any = await insertCategory.mutateAsync({ name }); return created?.id || null; }
-    catch (e: any) { toast.error(e.message || "فشل"); return null; }
-  };
-  const createCompanyInline = async (name: string): Promise<string | null> => {
+  // Quick add suppliers/categories/companies/warehouses inline — optimistic
+  // نُدخل عنصراً مؤقتاً في الكاش فوراً ثم نستبدله بالـ id الحقيقي عند الرد
+  const optimisticCreateInline = async (
+    key: string,
+    table: string,
+    name: string
+  ): Promise<string | null> => {
+    const tempId = `__tmp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const prev = queryClient.getQueryData<any[]>([key]);
+    queryClient.setQueryData<any[]>([key], (old) => ([...(old || []), { id: tempId, name }]));
     try {
-      const { data, error } = await (supabase as any).from("product_companies").insert({ name }).select().single();
+      const { data, error } = await (supabase as any).from(table).insert({ name }).select().single();
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ["product_companies"] });
+      // استبدال العنصر المؤقت بالنهائي
+      queryClient.setQueryData<any[]>([key], (old) =>
+        (old || []).map((x: any) => (x.id === tempId ? data : x))
+      );
+      // إبطال للحصول على ترتيب/حقول إضافية من DB
+      queryClient.invalidateQueries({ queryKey: [key], refetchType: "active" });
       return data?.id || null;
-    } catch (e: any) { toast.error(e.message || "فشل"); return null; }
+    } catch (e: any) {
+      if (prev) queryClient.setQueryData([key], prev);
+      toast.error(e.message || "فشل الإضافة");
+      return null;
+    }
   };
-  const createWarehouseInline = async (name: string): Promise<string | null> => {
-    try {
-      const { data, error } = await (supabase as any).from("warehouses").insert({ name }).select().single();
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ["warehouses"] });
-      return data?.id || null;
-    } catch (e: any) { toast.error(e.message || "فشل"); return null; }
-  };
-  const createSupplierInline = async (name: string): Promise<string | null> => {
-    try {
-      const { data, error } = await (supabase as any).from("suppliers").insert({ name }).select().single();
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      return data?.id || null;
-    } catch (e: any) { toast.error(e.message || "فشل"); return null; }
-  };
+  const createCategoryInline = (name: string) => optimisticCreateInline("product_categories", "product_categories", name);
+  const createCompanyInline = (name: string) => optimisticCreateInline("product_companies", "product_companies", name);
+  const createWarehouseInline = (name: string) => optimisticCreateInline("warehouses", "warehouses", name);
+  const createSupplierInline = (name: string) => optimisticCreateInline("suppliers", "suppliers", name);
 
   const resetForm = () => {
     setForm({
