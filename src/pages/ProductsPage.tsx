@@ -282,35 +282,36 @@ export default function ProductsPage() {
     } finally { setQuickSaving(false); }
   };
 
-  // Quick add suppliers/categories/companies/warehouses inline
-  const createCategoryInline = async (name: string): Promise<string | null> => {
-    try { const created: any = await insertCategory.mutateAsync({ name }); return created?.id || null; }
-    catch (e: any) { toast.error(e.message || "فشل"); return null; }
-  };
-  const createCompanyInline = async (name: string): Promise<string | null> => {
+  // Quick add suppliers/categories/companies/warehouses inline — optimistic
+  // نُدخل عنصراً مؤقتاً في الكاش فوراً ثم نستبدله بالـ id الحقيقي عند الرد
+  const optimisticCreateInline = async (
+    key: string,
+    table: string,
+    name: string
+  ): Promise<string | null> => {
+    const tempId = `__tmp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const prev = queryClient.getQueryData<any[]>([key]);
+    queryClient.setQueryData<any[]>([key], (old) => ([...(old || []), { id: tempId, name }]));
     try {
-      const { data, error } = await (supabase as any).from("product_companies").insert({ name }).select().single();
+      const { data, error } = await (supabase as any).from(table).insert({ name }).select().single();
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ["product_companies"] });
+      // استبدال العنصر المؤقت بالنهائي
+      queryClient.setQueryData<any[]>([key], (old) =>
+        (old || []).map((x: any) => (x.id === tempId ? data : x))
+      );
+      // إبطال للحصول على ترتيب/حقول إضافية من DB
+      queryClient.invalidateQueries({ queryKey: [key], refetchType: "active" });
       return data?.id || null;
-    } catch (e: any) { toast.error(e.message || "فشل"); return null; }
+    } catch (e: any) {
+      if (prev) queryClient.setQueryData([key], prev);
+      toast.error(e.message || "فشل الإضافة");
+      return null;
+    }
   };
-  const createWarehouseInline = async (name: string): Promise<string | null> => {
-    try {
-      const { data, error } = await (supabase as any).from("warehouses").insert({ name }).select().single();
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ["warehouses"] });
-      return data?.id || null;
-    } catch (e: any) { toast.error(e.message || "فشل"); return null; }
-  };
-  const createSupplierInline = async (name: string): Promise<string | null> => {
-    try {
-      const { data, error } = await (supabase as any).from("suppliers").insert({ name }).select().single();
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      return data?.id || null;
-    } catch (e: any) { toast.error(e.message || "فشل"); return null; }
-  };
+  const createCategoryInline = (name: string) => optimisticCreateInline("product_categories", "product_categories", name);
+  const createCompanyInline = (name: string) => optimisticCreateInline("product_companies", "product_companies", name);
+  const createWarehouseInline = (name: string) => optimisticCreateInline("warehouses", "warehouses", name);
+  const createSupplierInline = (name: string) => optimisticCreateInline("suppliers", "suppliers", name);
 
   const resetForm = () => {
     setForm({
@@ -379,25 +380,61 @@ export default function ProductsPage() {
     }
   };
 
-  // حذف فئة من المنتج
+  // حذف فئة من المنتج — optimistic
   const deleteProductCategory = async (productId: string, categoryId: string) => {
+    const prevProducts = queryClient.getQueryData<any[]>(["products"]);
+    const prevDetails = queryClient.getQueryData<any[]>(["products-with-details"]);
+    const apply = (old: any[] | undefined) => (old || []).map((p: any) => {
+      if (p.id !== productId) return p;
+      const cats = (p.categories || []).filter((c: any) => c.id !== categoryId);
+      const newPrimary = p.category_id === categoryId ? (cats[0]?.id || null) : p.category_id;
+      return { ...p, categories: cats, category_id: newPrimary, product_categories: cats[0] || null };
+    });
+    queryClient.setQueryData(["products"], apply);
+    queryClient.setQueryData(["products-with-details"], apply);
     try {
       await (supabase as any).from("product_category_links").delete().eq("product_id", productId).eq("category_id", categoryId);
-      await update.mutateAsync({ id: productId, category_id: null });
-      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
-      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"] });
+      const next = queryClient.getQueryData<any[]>(["products-with-details"]);
+      const p = (next || []).find((x: any) => x.id === productId);
+      const primary = p?.category_id ?? null;
+      await update.mutateAsync({ id: productId, category_id: primary });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
+      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"], refetchType: "active" });
       return true;
-    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+    } catch (err: any) {
+      queryClient.setQueryData(["products"], prevProducts);
+      queryClient.setQueryData(["products-with-details"], prevDetails);
+      toast.error(err.message || "فشل الحذف");
+      return false;
+    }
   };
 
-  // حذف ماركة من المنتج
+  // حذف ماركة من المنتج — optimistic
   const deleteProductBrand = async (productId: string, brandId: string) => {
+    const prevProducts = queryClient.getQueryData<any[]>(["products"]);
+    const prevDetails = queryClient.getQueryData<any[]>(["products-with-details"]);
+    const apply = (old: any[] | undefined) => (old || []).map((p: any) => {
+      if (p.id !== productId) return p;
+      const brs = (p.brands || []).filter((b: any) => b.id !== brandId);
+      const newPrimary = p.company_id === brandId ? (brs[0]?.id || null) : p.company_id;
+      return { ...p, brands: brs, company_id: newPrimary, product_companies: brs[0] || null };
+    });
+    queryClient.setQueryData(["products"], apply);
+    queryClient.setQueryData(["products-with-details"], apply);
     try {
       await (supabase as any).from("product_brand_links").delete().eq("product_id", productId).eq("brand_id", brandId);
-      await update.mutateAsync({ id: productId, company_id: null });
-      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      const next = queryClient.getQueryData<any[]>(["products-with-details"]);
+      const p = (next || []).find((x: any) => x.id === productId);
+      const primary = p?.company_id ?? null;
+      await update.mutateAsync({ id: productId, company_id: primary });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
       return true;
-    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+    } catch (err: any) {
+      queryClient.setQueryData(["products"], prevProducts);
+      queryClient.setQueryData(["products-with-details"], prevDetails);
+      toast.error(err.message || "فشل الحذف");
+      return false;
+    }
   };
 
   // حذف مستودع من المنتج
@@ -590,12 +627,10 @@ export default function ProductsPage() {
   const availableBrands = (companies || []).filter((b: any) => !selectedBrandIds.includes(b.id));
   const selectedBrandObjects = (companies || []).filter((b: any) => selectedBrandIds.includes(b.id));
 
-  // تحرير مباشر للحقول من داخل الجدول — مع Optimistic UI فوري
+  // تحرير مباشر للحقول من داخل الجدول — Optimistic UI فوري + حفظ بالخلفية
   const updateField = async (id: string, field: string, value: any) => {
-    // 1. حفظ نسخة سابقة من الكاش للرجوع إليها عند الفشل
     const prevProducts = queryClient.getQueryData<any[]>(["products"]);
     const prevDetails = queryClient.getQueryData<any[]>(["products-with-details"]);
-    // 2. تطبيق التعديل فوراً على الكاشين
     const patch = (old: any[] | undefined) =>
       (old || []).map((p: any) => p.id === id ? { ...p, [field]: value } : p);
     queryClient.setQueryData(["products"], patch);
@@ -604,11 +639,24 @@ export default function ProductsPage() {
       await update.mutateAsync({ id, [field]: value });
       window.dispatchEvent(new Event("products:changed"));
     } catch (e: any) {
-      // Rollback عند الفشل
       queryClient.setQueryData(["products"], prevProducts);
       queryClient.setQueryData(["products-with-details"], prevDetails);
       toast.error(e.message || "فشل التحديث — تم التراجع");
     }
+  };
+
+  // Patch متعدد الحقول للمنتج (يشمل علاقات مثل categories/brands) — يرجع snapshot للـ rollback
+  const patchProductCaches = (id: string, partial: Record<string, any>) => {
+    const prevProducts = queryClient.getQueryData<any[]>(["products"]);
+    const prevDetails = queryClient.getQueryData<any[]>(["products-with-details"]);
+    const apply = (old: any[] | undefined) =>
+      (old || []).map((p: any) => p.id === id ? { ...p, ...partial } : p);
+    queryClient.setQueryData(["products"], apply);
+    queryClient.setQueryData(["products-with-details"], apply);
+    return () => {
+      queryClient.setQueryData(["products"], prevProducts);
+      queryClient.setQueryData(["products-with-details"], prevDetails);
+    };
   };
 
   // تحديث متفائل لحقل التجميد (يظهر فوراً قبل رد الخادم)
@@ -1748,24 +1796,39 @@ export default function ProductsPage() {
                               <InlineSearchSelect
                                 value={currentCatId}
                                 options={(categories || []).map((c: any) => ({ value: c.id, label: c.name }))}
-                                onChange={async (v) => {
-                                  try {
-                                    // استبدل الفئة الأساسية فقط، احتفظ بالباقي
-                                    const existing = cats.map((c: any) => c.id).filter(Boolean);
-                                    const replaced = existing.map((id: string) => id === currentCatId ? v : id);
-                                    const next = Array.from(new Set(replaced.filter(Boolean)));
-                                    if (v && !next.includes(v)) next.unshift(v);
-                                    if (!v) {
-                                      // إذا أُلغيت القيمة، أزل القديم فقط
-                                      const idx = next.indexOf(currentCatId);
-                                      if (idx >= 0) next.splice(idx, 1);
+                                onChange={(v) => {
+                                  // Optimistic: استبدل الفئة الأساسية محلياً واحتفظ بالباقي
+                                  const existing = cats.map((c: any) => c.id).filter(Boolean);
+                                  const replaced = existing.map((id: string) => id === currentCatId ? v : id);
+                                  const next = Array.from(new Set(replaced.filter(Boolean)));
+                                  if (v && !next.includes(v)) next.unshift(v);
+                                  if (!v) {
+                                    const idx = next.indexOf(currentCatId);
+                                    if (idx >= 0) next.splice(idx, 1);
+                                  }
+                                  // ابني قائمة كائنات الفئات الجديدة من الـ options
+                                  const catMap = new Map<string, any>((categories || []).map((c: any) => [c.id, c]));
+                                  const newCats = next.map(id => catMap.get(id) || { id, name: "" }).filter(Boolean);
+                                  const rollback = patchProductCaches(p.id, {
+                                    category_id: v || null,
+                                    categories: newCats,
+                                    product_categories: newCats[0] || null,
+                                  });
+                                  // حفظ بالخلفية — لا await
+                                  (async () => {
+                                    try {
+                                      await Promise.all([
+                                        update.mutateAsync({ id: p.id, category_id: v || null }),
+                                        syncProductCategoryLinks(p.id, next),
+                                      ]);
+                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
+                                      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"], refetchType: "active" });
+                                      window.dispatchEvent(new Event("products:changed"));
+                                    } catch (err: any) {
+                                      rollback();
+                                      toast.error(err.message || "فشل — تم التراجع");
                                     }
-                                    updateField(p.id, "category_id", v || null);
-                                    await syncProductCategoryLinks(p.id, next);
-                                    await update.mutateAsync({ id: p.id, category_id: v || null });
-                                    queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
-                                    queryClient.invalidateQueries({ queryKey: ["product_category_links_all"] });
-                                  } catch (err: any) { toast.error(err.message || "فشل"); }
+                                  })();
                                 }}
                                 onAdd={createCategoryInline}
                                 onDelete={(opt) => deleteProductCategory(p.id, opt.value)}
@@ -1786,21 +1849,35 @@ export default function ProductsPage() {
                               <InlineSearchSelect
                                 value={currentBrandId}
                                 options={(companies || []).map((c: any) => ({ value: c.id, label: c.name }))}
-                                onChange={async (v) => {
-                                  try {
-                                    const existing = brs.map((b: any) => b.id).filter(Boolean);
-                                    const replaced = existing.map((id: string) => id === currentBrandId ? v : id);
-                                    const next = Array.from(new Set(replaced.filter(Boolean)));
-                                    if (v && !next.includes(v)) next.unshift(v);
-                                    if (!v) {
-                                      const idx = next.indexOf(currentBrandId);
-                                      if (idx >= 0) next.splice(idx, 1);
+                                onChange={(v) => {
+                                  const existing = brs.map((b: any) => b.id).filter(Boolean);
+                                  const replaced = existing.map((id: string) => id === currentBrandId ? v : id);
+                                  const next = Array.from(new Set(replaced.filter(Boolean)));
+                                  if (v && !next.includes(v)) next.unshift(v);
+                                  if (!v) {
+                                    const idx = next.indexOf(currentBrandId);
+                                    if (idx >= 0) next.splice(idx, 1);
+                                  }
+                                  const brandMap = new Map<string, any>((companies || []).map((c: any) => [c.id, c]));
+                                  const newBrands = next.map(id => brandMap.get(id) || { id, name: "" }).filter(Boolean);
+                                  const rollback = patchProductCaches(p.id, {
+                                    company_id: v || null,
+                                    brands: newBrands,
+                                    product_companies: newBrands[0] || null,
+                                  });
+                                  (async () => {
+                                    try {
+                                      await Promise.all([
+                                        update.mutateAsync({ id: p.id, company_id: v || null }),
+                                        syncProductBrandLinks(p.id, next),
+                                      ]);
+                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
+                                      window.dispatchEvent(new Event("products:changed"));
+                                    } catch (err: any) {
+                                      rollback();
+                                      toast.error(err.message || "فشل — تم التراجع");
                                     }
-                                    updateField(p.id, "company_id", v || null);
-                                    await syncProductBrandLinks(p.id, next);
-                                    await update.mutateAsync({ id: p.id, company_id: v || null });
-                                    queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
-                                  } catch (err: any) { toast.error(err.message || "فشل"); }
+                                  })();
                                 }}
                                 onDelete={(opt) => deleteProductBrand(p.id, opt.value)}
                                 placeholder="—"
@@ -1877,19 +1954,32 @@ export default function ProductsPage() {
                               type="file"
                               accept="image/*"
                               className="hidden"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0]; if (!file) return;
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = "";
+                                if (!file) return;
                                 if (file.size > 5 * 1024 * 1024) { toast.error("الحجم > 5MB"); return; }
-                                try {
-                                  const ext = file.name.split(".").pop() || "jpg";
-                                  const filename = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                                  const { error: ue } = await supabase.storage.from("company-assets").upload(filename, file);
-                                  if (ue) throw ue;
-                                  const { data } = supabase.storage.from("company-assets").getPublicUrl(filename);
-                                  await updateField(p.id, "image_url", data.publicUrl);
-                                  toast.success("تم رفع الصورة");
-                                } catch (err: any) { toast.error(err.message || "فشل الرفع"); }
-                                finally { e.target.value = ""; }
+                                // اعرض الصورة محلياً فوراً (blob URL) ثم ارفعها بالخلفية
+                                const localUrl = URL.createObjectURL(file);
+                                const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                                (async () => {
+                                  try {
+                                    const ext = file.name.split(".").pop() || "jpg";
+                                    const filename = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                                    const { error: ue } = await supabase.storage.from("company-assets").upload(filename, file);
+                                    if (ue) throw ue;
+                                    const { data } = supabase.storage.from("company-assets").getPublicUrl(filename);
+                                    // استبدل الـ blob بالـ URL الحقيقي + احفظ في DB
+                                    patchProductCaches(p.id, { image_url: data.publicUrl });
+                                    await update.mutateAsync({ id: p.id, image_url: data.publicUrl });
+                                    window.dispatchEvent(new Event("products:changed"));
+                                    setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                                  } catch (err: any) {
+                                    rollback();
+                                    URL.revokeObjectURL(localUrl);
+                                    toast.error(err.message || "فشل الرفع");
+                                  }
+                                })();
                               }}
                             />
                           </label>

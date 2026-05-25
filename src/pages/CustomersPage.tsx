@@ -443,24 +443,25 @@ export default function CustomersPage() {
     }).slice(0, 50);
   }, [customers, lastActivity, recentDebtorsSearch]);
 
-  const updateRowField = async (id: string, patch: Record<string, any>) => {
-    // تطبيق التعديل فوراً على الواجهة
+  const updateRowField = (id: string, patch: Record<string, any>) => {
+    // Optimistic فوري — التطبيق على الواجهة قبل أي انتظار للخادم
     const prev = queryClient.getQueryData<any[]>(["customers"]);
     queryClient.setQueryData<any[]>(["customers"], (old) =>
       (old || []).map((c: any) => c.id === id ? { ...c, ...patch } : c)
     );
-    try {
-      const { error } = await (supabase as any).from("customers").update(patch).eq("id", id);
-      if (error) throw error;
-      // تحديث نهائي من DB (اختياري — يضمن التطابق الكامل)
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
-    } catch (e: any) {
-      // Rollback فوري عند الفشل
-      if (prev) queryClient.setQueryData(["customers"], prev);
-      toast.error(e.message || "فشل التحديث — تم التراجع");
-    } finally {
-      setSavingRow(null);
-    }
+    // الحفظ في الخلفية بدون أي await — لا يمنع المستخدم من المتابعة
+    (async () => {
+      try {
+        const { error } = await (supabase as any).from("customers").update(patch).eq("id", id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ["customers"], refetchType: "active" });
+      } catch (e: any) {
+        if (prev) queryClient.setQueryData(["customers"], prev);
+        toast.error(e.message || "فشل التحديث — تم التراجع");
+      } finally {
+        setSavingRow(null);
+      }
+    })();
   };
 
   // إضافة سريعة لكيانات مرتبطة (تُستخدم من القائمة المنسدلة بضغطة +)
