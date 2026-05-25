@@ -1881,7 +1881,6 @@ export default function ProductsPage() {
                                         update.mutateAsync({ id: p.id, company_id: v || null }),
                                         syncProductBrandLinks(p.id, next),
                                       ]);
-                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
                                       window.dispatchEvent(new Event("products:changed"));
                                     } catch (err: any) {
                                       rollback();
