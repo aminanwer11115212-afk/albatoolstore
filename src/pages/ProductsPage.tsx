@@ -1954,19 +1954,32 @@ export default function ProductsPage() {
                               type="file"
                               accept="image/*"
                               className="hidden"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0]; if (!file) return;
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = "";
+                                if (!file) return;
                                 if (file.size > 5 * 1024 * 1024) { toast.error("الحجم > 5MB"); return; }
-                                try {
-                                  const ext = file.name.split(".").pop() || "jpg";
-                                  const filename = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                                  const { error: ue } = await supabase.storage.from("company-assets").upload(filename, file);
-                                  if (ue) throw ue;
-                                  const { data } = supabase.storage.from("company-assets").getPublicUrl(filename);
-                                  await updateField(p.id, "image_url", data.publicUrl);
-                                  toast.success("تم رفع الصورة");
-                                } catch (err: any) { toast.error(err.message || "فشل الرفع"); }
-                                finally { e.target.value = ""; }
+                                // اعرض الصورة محلياً فوراً (blob URL) ثم ارفعها بالخلفية
+                                const localUrl = URL.createObjectURL(file);
+                                const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                                (async () => {
+                                  try {
+                                    const ext = file.name.split(".").pop() || "jpg";
+                                    const filename = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                                    const { error: ue } = await supabase.storage.from("company-assets").upload(filename, file);
+                                    if (ue) throw ue;
+                                    const { data } = supabase.storage.from("company-assets").getPublicUrl(filename);
+                                    // استبدل الـ blob بالـ URL الحقيقي + احفظ في DB
+                                    patchProductCaches(p.id, { image_url: data.publicUrl });
+                                    await update.mutateAsync({ id: p.id, image_url: data.publicUrl });
+                                    window.dispatchEvent(new Event("products:changed"));
+                                    setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                                  } catch (err: any) {
+                                    rollback();
+                                    URL.revokeObjectURL(localUrl);
+                                    toast.error(err.message || "فشل الرفع");
+                                  }
+                                })();
                               }}
                             />
                           </label>
