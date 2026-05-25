@@ -380,25 +380,61 @@ export default function ProductsPage() {
     }
   };
 
-  // حذف فئة من المنتج
+  // حذف فئة من المنتج — optimistic
   const deleteProductCategory = async (productId: string, categoryId: string) => {
+    const prevProducts = queryClient.getQueryData<any[]>(["products"]);
+    const prevDetails = queryClient.getQueryData<any[]>(["products-with-details"]);
+    const apply = (old: any[] | undefined) => (old || []).map((p: any) => {
+      if (p.id !== productId) return p;
+      const cats = (p.categories || []).filter((c: any) => c.id !== categoryId);
+      const newPrimary = p.category_id === categoryId ? (cats[0]?.id || null) : p.category_id;
+      return { ...p, categories: cats, category_id: newPrimary, product_categories: cats[0] || null };
+    });
+    queryClient.setQueryData(["products"], apply);
+    queryClient.setQueryData(["products-with-details"], apply);
     try {
       await (supabase as any).from("product_category_links").delete().eq("product_id", productId).eq("category_id", categoryId);
-      await update.mutateAsync({ id: productId, category_id: null });
-      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
-      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"] });
+      const next = queryClient.getQueryData<any[]>(["products-with-details"]);
+      const p = (next || []).find((x: any) => x.id === productId);
+      const primary = p?.category_id ?? null;
+      await update.mutateAsync({ id: productId, category_id: primary });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
+      queryClient.invalidateQueries({ queryKey: ["product_category_links_all"], refetchType: "active" });
       return true;
-    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+    } catch (err: any) {
+      queryClient.setQueryData(["products"], prevProducts);
+      queryClient.setQueryData(["products-with-details"], prevDetails);
+      toast.error(err.message || "فشل الحذف");
+      return false;
+    }
   };
 
-  // حذف ماركة من المنتج
+  // حذف ماركة من المنتج — optimistic
   const deleteProductBrand = async (productId: string, brandId: string) => {
+    const prevProducts = queryClient.getQueryData<any[]>(["products"]);
+    const prevDetails = queryClient.getQueryData<any[]>(["products-with-details"]);
+    const apply = (old: any[] | undefined) => (old || []).map((p: any) => {
+      if (p.id !== productId) return p;
+      const brs = (p.brands || []).filter((b: any) => b.id !== brandId);
+      const newPrimary = p.company_id === brandId ? (brs[0]?.id || null) : p.company_id;
+      return { ...p, brands: brs, company_id: newPrimary, product_companies: brs[0] || null };
+    });
+    queryClient.setQueryData(["products"], apply);
+    queryClient.setQueryData(["products-with-details"], apply);
     try {
       await (supabase as any).from("product_brand_links").delete().eq("product_id", productId).eq("brand_id", brandId);
-      await update.mutateAsync({ id: productId, company_id: null });
-      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      const next = queryClient.getQueryData<any[]>(["products-with-details"]);
+      const p = (next || []).find((x: any) => x.id === productId);
+      const primary = p?.company_id ?? null;
+      await update.mutateAsync({ id: productId, company_id: primary });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
       return true;
-    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+    } catch (err: any) {
+      queryClient.setQueryData(["products"], prevProducts);
+      queryClient.setQueryData(["products-with-details"], prevDetails);
+      toast.error(err.message || "فشل الحذف");
+      return false;
+    }
   };
 
   // حذف مستودع من المنتج
