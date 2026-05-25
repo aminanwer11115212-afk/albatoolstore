@@ -1813,21 +1813,35 @@ export default function ProductsPage() {
                               <InlineSearchSelect
                                 value={currentBrandId}
                                 options={(companies || []).map((c: any) => ({ value: c.id, label: c.name }))}
-                                onChange={async (v) => {
-                                  try {
-                                    const existing = brs.map((b: any) => b.id).filter(Boolean);
-                                    const replaced = existing.map((id: string) => id === currentBrandId ? v : id);
-                                    const next = Array.from(new Set(replaced.filter(Boolean)));
-                                    if (v && !next.includes(v)) next.unshift(v);
-                                    if (!v) {
-                                      const idx = next.indexOf(currentBrandId);
-                                      if (idx >= 0) next.splice(idx, 1);
+                                onChange={(v) => {
+                                  const existing = brs.map((b: any) => b.id).filter(Boolean);
+                                  const replaced = existing.map((id: string) => id === currentBrandId ? v : id);
+                                  const next = Array.from(new Set(replaced.filter(Boolean)));
+                                  if (v && !next.includes(v)) next.unshift(v);
+                                  if (!v) {
+                                    const idx = next.indexOf(currentBrandId);
+                                    if (idx >= 0) next.splice(idx, 1);
+                                  }
+                                  const brandMap = new Map<string, any>((companies || []).map((c: any) => [c.id, c]));
+                                  const newBrands = next.map(id => brandMap.get(id) || { id, name: "" }).filter(Boolean);
+                                  const rollback = patchProductCaches(p.id, {
+                                    company_id: v || null,
+                                    brands: newBrands,
+                                    product_companies: newBrands[0] || null,
+                                  });
+                                  (async () => {
+                                    try {
+                                      await Promise.all([
+                                        update.mutateAsync({ id: p.id, company_id: v || null }),
+                                        syncProductBrandLinks(p.id, next),
+                                      ]);
+                                      queryClient.invalidateQueries({ queryKey: ["products-with-details"], refetchType: "active" });
+                                      window.dispatchEvent(new Event("products:changed"));
+                                    } catch (err: any) {
+                                      rollback();
+                                      toast.error(err.message || "فشل — تم التراجع");
                                     }
-                                    updateField(p.id, "company_id", v || null);
-                                    await syncProductBrandLinks(p.id, next);
-                                    await update.mutateAsync({ id: p.id, company_id: v || null });
-                                    queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
-                                  } catch (err: any) { toast.error(err.message || "فشل"); }
+                                  })();
                                 }}
                                 onDelete={(opt) => deleteProductBrand(p.id, opt.value)}
                                 placeholder="—"
