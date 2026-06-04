@@ -144,6 +144,7 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
       toast.success("تمت الإضافة");
       setTransporterId(""); setDestinationId(""); setVehicleNumber(""); setDriverName(""); setCost(""); setNotes("");
       load();
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -152,6 +153,7 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
     await (supabase as any).from(table).delete().eq("id", tId);
     toast.success("تم الحذف");
     load();
+    try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
   };
 
   // === الوضع الشامل: جميع الفواتير الجاهزة للرفع ===
@@ -322,6 +324,7 @@ ${packagingHTML ? `
       toast.success(`✅ تم طباعة ${ids.length} فاتورة وتحويلها إلى "في الطريق للترحيلات"`);
       setInvoiceRows({});
       await loadAllInvoices();
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       setPrinting(false);
     } catch (e: any) { toast.error(e.message); setPrinting(false); }
   };

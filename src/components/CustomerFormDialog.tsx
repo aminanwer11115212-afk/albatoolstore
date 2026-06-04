@@ -2,8 +2,20 @@ import { useEffect, useRef, useState, KeyboardEvent } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
 import { useDialogSize } from "@/hooks/useDialogSize";
+
+const sanitizePhone = (val: string) => {
+  if (!val) return "";
+  const arabicMap: Record<string, string> = {
+    '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+    '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
+  };
+  let cleaned = val.replace(/[٠-٩۰-۹]/g, d => arabicMap[d] || d);
+  cleaned = cleaned.replace(/[\s\-\(\)]/g, ''); // strip spaces, dashes, parens
+  return cleaned;
+};
 
 type Focusable = { focus: () => void } | null;
 
@@ -48,6 +60,17 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   const [transporters, setTransporters] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
+
+  const queryClient = useQueryClient();
+  const localCustomers = queryClient.getQueryData<any[]>(["customers"]) || [];
+
+  const duplicateName = form.name.trim() 
+    ? localCustomers.find(c => c.id !== form.id && c.name?.trim() === form.name.trim())
+    : null;
+
+  const duplicatePhone = form.phone.trim()
+    ? localCustomers.find(c => c.id !== form.id && sanitizePhone(c.phone) === sanitizePhone(form.phone))
+    : null;
 
   const refs = useRef<Focusable[]>([]);
   const saveBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -268,6 +291,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
       }
 
       toast.success(form.id ? "تم تحديث العميل" : "تم إضافة العميل");
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
       onSaved(saved);
       onClose();
     } catch (e: any) {
@@ -298,6 +322,11 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
               <input ref={el => refs.current[k] = el} value={form.name}
                 onChange={e => setForm({ ...form, name: e.target.value })}
                 onKeyDown={handleEnter(k)} className={inp} placeholder="أدخل اسم العميل" />
+              {duplicateName && (
+                <p className="text-[10px] text-yellow-500 mt-1">
+                  ⚠️ يوجد عميل آخر بنفس الاسم
+                </p>
+              )}
             </div>
           ); })()}
 
@@ -306,15 +335,33 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
               <label className={lbl}>هاتف</label>
               <input ref={el => refs.current[k] = el} value={form.phone} dir="ltr"
                 onChange={e => setForm({ ...form, phone: e.target.value })}
+                onBlur={e => setForm({ ...form, phone: sanitizePhone(e.target.value) })}
                 onKeyDown={handleEnter(k)} className={inp} placeholder="09xxxxxxxx" />
+              {duplicatePhone && (
+                <p className="text-[10px] text-yellow-500 mt-1">
+                  ⚠️ الهاتف مسجل لـ: {duplicatePhone.name}
+                </p>
+              )}
             </div>
           ); })()}
 
           {(() => { const k = idx(); return (
             <div>
-              <label className={lbl}>هاتف الواتساب</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className={lbl}>هاتف الواتساب</label>
+                {form.phone && (
+                  <button 
+                    type="button" 
+                    onClick={() => setForm({ ...form, whatsapp: form.phone })}
+                    className="text-[10px] text-primary hover:underline"
+                  >
+                    مماثل للهاتف
+                  </button>
+                )}
+              </div>
               <input ref={el => refs.current[k] = el} value={form.whatsapp} dir="ltr"
                 onChange={e => setForm({ ...form, whatsapp: e.target.value })}
+                onBlur={e => setForm({ ...form, whatsapp: sanitizePhone(e.target.value) })}
                 onKeyDown={handleEnter(k)} className={inp}
                 placeholder="رقم WhatsApp" />
             </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useSuppliers } from "@/hooks/useData";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SupplierDetailView from "@/components/SupplierDetailView";
 
@@ -67,10 +68,27 @@ export default function SuppliersPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("هل أنت متأكد من حذف هذا المورد؟")) return;
     try {
+      const [purchaseCheck, transactionCheck, productCheck] = await Promise.all([
+        supabase.from("purchase_orders").select("id", { count: "exact", head: true }).eq("supplier_id", id),
+        supabase.from("transactions").select("id", { count: "exact", head: true }).eq("supplier_id", id),
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("supplier_id", id),
+      ]);
+
+      if (
+        (purchaseCheck.count ?? 0) > 0 ||
+        (transactionCheck.count ?? 0) > 0 ||
+        (productCheck.count ?? 0) > 0
+      ) {
+        toast.error("لا يمكن حذف المورد لأنه مرتبط بحركات أو بضائع في النظام (مشتريات، معاملات مالية، أو منتجات).");
+        return;
+      }
+
       await remove.mutateAsync(id);
       toast.success("تم الحذف");
       if (viewSupplier && viewSupplier.id === id) setViewSupplier(null);
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      toast.error(e.message || "حدث خطأ أثناء محاولة الحذف");
+    }
   };
 
   const inputCls = "bg-muted rounded-lg px-4 py-2.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary w-full";

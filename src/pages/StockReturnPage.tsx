@@ -52,7 +52,7 @@ export default function StockReturnPage() {
     if (statusFilter !== "all" && (r.status || "pending") !== statusFilter) return false;
     if (customerSearch.trim()) {
       const cs = customerSearch.trim().toLowerCase();
-      if (!(r.customers?.name || "").toLowerCase().startsWith(cs)) return false;
+      if (!(r.customers?.name || "").toLowerCase().includes(cs)) return false;
     }
     if (dateFrom && (r.date || "") < dateFrom) return false;
     if (dateTo && (r.date || "") > dateTo) return false;

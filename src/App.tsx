@@ -93,6 +93,7 @@ const PackagingTypesPage = lazy(() => import("./pages/PackagingTypesPage"));
 const PackagingTypeAddPage = lazy(() => import("./pages/PackagingTypeAddPage"));
 const QuoteTransportPage = lazy(() => import("./pages/QuoteTransportPage"));
 const CustomerLogisticsPage = lazy(() => import("./pages/CustomerLogisticsPage"));
+const DispatchPage = lazy(() => import("./pages/DispatchPage"));
 const ActivityLogPage = lazy(() => import("./pages/ActivityLogPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const DeletedItemsPage = lazy(() => import("./pages/DeletedItemsPage"));
@@ -226,6 +227,7 @@ const App = () => {
             <Route path="/quotes/*" element={lazyEl(<QuotesPage />, "عروض الأسعار")} />
             <Route path="/customers/:id/logistics" element={lazyEl(<CustomerLogisticsPage />, "لوجستيات العميل")} />
             <Route path="/customers/logistics" element={lazyEl(<CustomerLogisticsPage />, "لوجستيات العملاء")} />
+            <Route path="/dispatch" element={lazyEl(<DispatchPage />, "الترحيلات")} />
             {/* Inventory */}
             <Route path="/products" element={lazyEl(<ProductsPage />, "المنتجات")} />
             <Route path="/products/add" element={lazyEl(<ProductsPage />, "إضافة منتج")} />

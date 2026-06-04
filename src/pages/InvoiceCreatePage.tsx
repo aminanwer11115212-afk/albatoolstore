@@ -321,6 +321,10 @@ export default function InvoiceCreatePage() {
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState("");
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const selectedCustomerIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedCustomerIdRef.current = customer?.id || null;
+  }, [customer]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerSugg, setShowCustomerSugg] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -472,11 +476,38 @@ export default function InvoiceCreatePage() {
       setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
       setProductsLoading(false);
     };
+    // Refetch customers when they change elsewhere or when user returns to this tab.
+    const refetchCustomers = async () => {
+      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      if (data) {
+        setCustomers(data as Customer[]);
+        const currentId = selectedCustomerIdRef.current;
+        if (currentId) {
+          const { data: bal } = await supabase
+            .from("customers")
+            .select("balance, credit_balance")
+            .eq("id", currentId)
+            .maybeSingle();
+          if (bal) {
+            setCustomerBalances({
+              debt: Number((bal as any).balance || 0),
+              credit: Number((bal as any).credit_balance || 0),
+            });
+          }
+        }
+      }
+    };
+    const handleFocus = () => {
+      refetchProducts();
+      refetchCustomers();
+    };
     window.addEventListener("products:changed", refetchProducts);
-    window.addEventListener("focus", refetchProducts);
+    window.addEventListener("customers:changed", refetchCustomers);
+    window.addEventListener("focus", handleFocus);
     return () => {
       window.removeEventListener("products:changed", refetchProducts);
-      window.removeEventListener("focus", refetchProducts);
+      window.removeEventListener("customers:changed", refetchCustomers);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [editId]);
 
@@ -1014,6 +1045,8 @@ export default function InvoiceCreatePage() {
           if (cErr) { toast.error(`تعذّر إنشاء العميل: ${cErr.message}`); return false; }
           activeCustomer = created as any;
           toast.message(`تم إنشاء عميل جديد: ${insertPayload.name}`);
+          // إخطار الشاشات الأخرى بالعميل الجديد
+          try { window.dispatchEvent(new Event("customers:changed")); } catch {}
         }
         // مزامنة الواجهة
         setCustomer(activeCustomer as any);
@@ -1270,6 +1303,8 @@ export default function InvoiceCreatePage() {
       savedRef.current = true;
       lastSavedIdRef.current = invId!;
       setSavedInvoiceId(invId!);
+      // بث حدث لتحديث الشاشات المرتبطة (الترحيلات، قائمة الفواتير)
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       // تحديث بيانات الدفع المحفوظة لتعكس القيم الجديدة بعد الحفظ
       setSavedTotal(Number(totals.total) || 0);
       setSavedPaid(computedPaid);
@@ -1658,7 +1693,9 @@ export default function InvoiceCreatePage() {
                     return matches.map((p, i) => (
                       <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoQuick(p)}>
                         <span>{p.name}</span>
-                        <span className="price-badge">{Number(p.sale_price || 0).toLocaleString()}</span>
+                        <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                          {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                        </span>
                       </div>
                     ));
                   })()}
@@ -1804,8 +1841,8 @@ export default function InvoiceCreatePage() {
                       const q = tableSearch.trim().toLowerCase();
                       if (!q) return true;
                       return (
-                        (r.product_name || "").toLowerCase().startsWith(q) ||
-                        (r.productSearch || "").toLowerCase().startsWith(q)
+                        (r.product_name || "").toLowerCase().includes(q) ||
+                        (r.productSearch || "").toLowerCase().includes(q)
                       );
                     });
                     const NAV_COLS = ["product", "quantity", "unit_price", "foreign_price", "total"];
@@ -1845,7 +1882,9 @@ export default function InvoiceCreatePage() {
                                   return matches.map((p, i) => (
                                     <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoRow(r.uid, p)}>
                                       <span>{p.name}</span>
-                                      <span className="price-badge">{Number(p.sale_price || 0).toLocaleString()}</span>
+                                      <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                                        {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                                      </span>
                                     </div>
                                   ));
                                 })()}
@@ -2021,7 +2060,7 @@ export default function InvoiceCreatePage() {
                   group: "2-files",
                   node: (
                     <button
-                      onClick={() => setTransportDialogOpen(true)}
+                      onClick={() => saveThen(() => setTransportDialogOpen(true))}
                       title="إضافة ترحيل" style={btnStyle("#16a34a")}>
                       <Truck size={14} />
                     </button>
@@ -2046,6 +2085,19 @@ export default function InvoiceCreatePage() {
                       onClick={() => saveThen((id) => navigate(`/preview/invoice/${id}/packaging`))}
                       title="تقرير التغليف" style={btnStyle("#0d9488")}>
                       <FileText size={14} /> تقرير التغليف
+                    </button>
+                  ),
+                },
+                {
+                  id: "dispatch-page",
+                  group: "2-files",
+                  node: (
+                    <button
+                      onClick={() => navigate("/dispatch")}
+                      title="صفحة إدارة الترحيلات الكاملة"
+                      style={btnStyle("#7c3aed")}
+                    >
+                      <Truck size={14} /> الترحيلات
                     </button>
                   ),
                 },
@@ -2486,7 +2538,7 @@ export default function InvoiceCreatePage() {
               parentType="invoice"
               parentId={effectiveId}
               customerId={customer?.id || null}
-              showAllReady={true}
+              showAllReady={false}
             />
             <InvoiceAttachmentsDialog
               invoiceId={effectiveId}

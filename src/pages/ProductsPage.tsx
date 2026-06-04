@@ -24,15 +24,14 @@ function normalizeNumStr(v: string): string {
   return v.replace(/[٠-٩۰-۹٫،]/g, (c) => map[c] ?? c).trim();
 }
 
-
 function useProductCompanies() {
   return useQuery({
     queryKey: ["product_companies"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("product_companies").select("*").order("name");
+      const { data, error } = await supabase.from("product_companies").select("*").order("name");
       if (error) throw error;
-      return data as any[];
-    },
+      return data;
+    }
   });
 }
 
@@ -54,23 +53,29 @@ export default function ProductsPage() {
   const PP_STOCK_FILTER = userScopedLegacyKey("products-page:stockFilter");
   const PP_PAGE = userScopedLegacyKey("products-page:page");
   const PP_PER_PAGE = userScopedLegacyKey("products-page:perPage");
+
   const [showFrozen, setShowFrozen] = useState<boolean>(() => {
     try { const v = localStorage.getItem(PP_SHOW_FROZEN); return v === null ? true : v === "1"; } catch { return true; }
   });
   useEffect(() => { try { localStorage.setItem(PP_SHOW_FROZEN, showFrozen ? "1" : "0"); } catch {} }, [showFrozen]);
+
   const [stockFilter, setStockFilter] = useState<"all" | "in" | "out" | "low">(() => {
     try { const v = localStorage.getItem(PP_STOCK_FILTER); return (v === "in" || v === "out" || v === "low" || v === "all") ? v : "all"; } catch { return "all"; }
   });
   useEffect(() => { try { localStorage.setItem(PP_STOCK_FILTER, stockFilter); } catch {} }, [stockFilter]);
+
   const [page, setPage] = useState<number>(() => {
     try { return Math.max(1, Number(localStorage.getItem(PP_PAGE) || 1)); } catch { return 1; }
   });
   useEffect(() => { try { localStorage.setItem(PP_PAGE, String(page)); } catch {} }, [page]);
+
   const [perPage, setPerPage] = useState<number>(() => {
     try { return Number(localStorage.getItem(PP_PER_PAGE) || 25); } catch { return 25; }
   });
   useEffect(() => { try { localStorage.setItem(PP_PER_PAGE, String(perPage)); } catch {} }, [perPage]);
+
   const [openFilter, setOpenFilter] = useState<{ key: string; mode: "list" | "search" } | null>(null);
+  
   // كشف الجوّال لتجنّب رندر آلاف البطاقات على الديسكتوب
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches);
   useEffect(() => {
@@ -80,10 +85,10 @@ export default function ProductsPage() {
     try { mq.addEventListener("change", handler); } catch { mq.addListener(handler); }
     return () => { try { mq.removeEventListener("change", handler); } catch { mq.removeListener(handler); } };
   }, []);
+
   const [filterQuery, setFilterQuery] = useState("");
   const [filterHighlight, setFilterHighlight] = useState(0);
-  
-  // صف Quick-Add
+
   const [quickAdd, setQuickAdd] = useState<{ name: string; sku: string; category_id: string; company_id: string; warehouse_id: string; sale_price: string; foreign_price: string; supplier_id: string }>({ name: "", sku: "", category_id: "", company_id: "", warehouse_id: "", sale_price: "", foreign_price: "", supplier_id: "" });
   const [quickSaving, setQuickSaving] = useState(false);
   const [form, setForm] = useState({
@@ -103,6 +108,34 @@ export default function ProductsPage() {
   const [newCatName, setNewCatName] = useState("");
   const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState("");
+  const [keepFields, setKeepFields] = useState<boolean>(false);
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+
+  useEffect(() => {
+    const fetchRate = async () => {
+      try {
+        const { data: currencies } = await supabase.from("currencies").select("*").eq("is_active", true).order("is_base", { ascending: false });
+        if (currencies && currencies.length > 0) {
+          const nonBase = currencies.find((c: any) => !c.is_base);
+          if (nonBase) {
+            const { data: er } = await supabase
+              .from("exchange_rates")
+              .select("rate_to_base")
+              .eq("currency_code", nonBase.code)
+              .order("effective_date", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (er?.rate_to_base) {
+              setExchangeRate(Number(er.rate_to_base));
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error fetching rate:", e);
+      }
+    };
+    fetchRate();
+  }, []);
 
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -138,18 +171,13 @@ export default function ProductsPage() {
 
   // Dashboard removed — table-only view
 
-  // أعمدة قابلة للسحب لجدول إدارة جميع المنتجات (10 أعمدة)
-  const PRODUCTS_COLS_KEY = userScopedLegacyKey("products-page:colWidths:v1");
-  const PRODUCTS_LOCK_KEY = userScopedLegacyKey("products-page:colsLocked:v1");
+  // أعمدة قابلة للسحب لجدول إدارة جميع المنتجات
   // [#, الاسم, الفئة, الشركة, المستودع, السعر, السعر الأجنبي, الصورة, المورد, تجميد, إعدادات]
   // 11 columns for isAllProducts: #, اسم, الفئة, الشركة, المستودع, السعر, السعر الأجنبي, الصورة, المورد, تجميد, إعدادات
+  const PRODUCTS_COLS_KEY = userScopedLegacyKey("products-page:colWidths:v1");
+  const PRODUCTS_LOCK_KEY = userScopedLegacyKey("products-page:colsLocked:v1");
   const PRODUCTS_DEFAULTS: (number | null)[] = [60, null, 140, 140, 140, 110, 110, 130, 140, 80, 110];
-  const [colsLocked, setColsLocked] = useSharedColsLocked(() => {
-    try { return localStorage.getItem(PRODUCTS_LOCK_KEY) === "1"; } catch { return false; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(PRODUCTS_LOCK_KEY, colsLocked ? "1" : "0"); } catch {}
-  }, [colsLocked]);
+  const { locked: colsLocked } = useSharedColsLocked(PRODUCTS_LOCK_KEY);
   const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, reset: resetColWidths, saveAsUserDefault: saveColDefault, tableProps } = useColumnWidths(
     PRODUCTS_COLS_KEY,
     PRODUCTS_DEFAULTS,
@@ -158,6 +186,34 @@ export default function ProductsPage() {
 
   const { data: products, isLoading, error } = useProductsWithDetails();
   const { insert, update, remove } = useProducts();
+  const handleDeleteProduct = async (pId: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+    try {
+      const [invoiceCheck, quoteCheck, purchaseCheck, returnCheck, transferCheck] = await Promise.all([
+        supabase.from("invoice_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
+        supabase.from("quote_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
+        supabase.from("purchase_order_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
+        supabase.from("stock_return_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
+        supabase.from("stock_transfers").select("id", { count: "exact", head: true }).eq("product_id", pId)
+      ]);
+
+      if (
+        (invoiceCheck.count ?? 0) > 0 ||
+        (quoteCheck.count ?? 0) > 0 ||
+        (purchaseCheck.count ?? 0) > 0 ||
+        (returnCheck.count ?? 0) > 0 ||
+        (transferCheck.count ?? 0) > 0
+      ) {
+        toast.error("لا يمكن حذف المنتج لأنه مرتبط بحركات في النظام (فواتير، عروض أسعار، مشتريات، أو تحويلات). يمكنك تجميده بدلاً من ذلك.");
+        return;
+      }
+
+      await remove.mutateAsync(pId);
+      toast.success("تم حذف المنتج بنجاح");
+    } catch (e: any) {
+      toast.error(e.message || "حدث خطأ أثناء محاولة الحذف");
+    }
+  };
   const { data: categories, insert: insertCategory } = useProductCategories();
   const { data: warehouses } = useWarehouses();
   const { data: companies } = useProductCompanies();
@@ -556,7 +612,24 @@ export default function ProductsPage() {
       queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
       queryClient.invalidateQueries({ queryKey: ["product_category_links_all"] });
       window.dispatchEvent(new Event("products:changed"));
-      setShowForm(false); setEditId(null); resetForm();
+      if (keepFields && !editId) {
+        setForm(prev => ({
+          ...prev,
+          name: "",
+          sku: "",
+          purchase_price: "",
+          sale_price: "",
+          foreign_price: "",
+          stock_quantity: "",
+          min_stock: "",
+          description: "",
+          image_url: "",
+        }));
+      } else {
+        setShowForm(false);
+        setEditId(null);
+        resetForm();
+      }
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -1220,6 +1293,25 @@ export default function ProductsPage() {
                       <input ref={el => fieldRefs.current[k] = el} type="number" value={form.sale_price}
                         onChange={e => setForm({ ...form, sale_price: e.target.value })}
                         onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0.00" />
+                      {(() => {
+                        const pVal = parseFloat(form.purchase_price) || 0;
+                        const sVal = parseFloat(form.sale_price) || 0;
+                        if (pVal > 0 && sVal > 0) {
+                          const diff = sVal - pVal;
+                          const percent = (diff / pVal) * 100;
+                          return (
+                            <div className="text-[11px] mt-1 flex gap-2 justify-end font-bold">
+                              <span className={diff >= 0 ? "text-green-500" : "text-red-500"}>
+                                الربح: {diff.toFixed(2)}
+                              </span>
+                              <span className={diff >= 0 ? "text-green-500" : "text-red-500"}>
+                                ({percent.toFixed(1)}%)
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   ); })()}
 
@@ -1230,6 +1322,17 @@ export default function ProductsPage() {
                       <input ref={el => fieldRefs.current[k] = el} type="number" value={form.foreign_price}
                         onChange={e => setForm({ ...form, foreign_price: e.target.value })}
                         onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0.00" />
+                      {(() => {
+                        const fVal = parseFloat(form.foreign_price) || 0;
+                        if (fVal > 0) {
+                          return (
+                            <div className="text-[11px] mt-1 text-muted-foreground font-semibold text-left">
+                              يعادل: {(fVal * exchangeRate).toFixed(2)} (صرف: {exchangeRate})
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   ); })()}
 
@@ -1300,13 +1403,22 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                <DialogFooter className="gap-2">
-                  <button onClick={() => { setShowForm(false); setEditId(null); }}
-                    className="px-5 py-2 rounded-lg text-sm bg-muted text-foreground">إلغاء</button>
-                  <button ref={saveBtnRef} onClick={handleSubmit}
-                    className="px-5 py-2 rounded-lg text-sm bg-primary text-primary-foreground font-medium hover:opacity-90">
-                    {editId ? "تحديث" : "حفظ"}
-                  </button>
+                <DialogFooter className="gap-2 flex-row-reverse items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setShowForm(false); setEditId(null); }}
+                      className="px-5 py-2 rounded-lg text-sm bg-muted text-foreground">إلغاء</button>
+                    <button ref={saveBtnRef} onClick={handleSubmit}
+                      className="px-5 py-2 rounded-lg text-sm bg-primary text-primary-foreground font-medium hover:opacity-90">
+                      {editId ? "تحديث" : "حفظ"}
+                    </button>
+                  </div>
+                  {!editId && (
+                    <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                      <input type="checkbox" checked={keepFields}
+                        onChange={e => setKeepFields(e.target.checked)} className="w-4 h-4" />
+                      <span className="text-xs text-muted-foreground font-semibold">تثبيت الفئة والمستودع والمورد للإضافة التالية</span>
+                    </label>
+                  )}
                 </DialogFooter>
               </>
             );
@@ -1787,7 +1899,7 @@ export default function ProductsPage() {
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-1">
                           <button onClick={() => handleEdit(p)} className="p-1.5 text-yellow-500 hover:bg-yellow-500/10 rounded"><Edit size={15} /></button>
-                          <button onClick={async () => { if (!confirm("حذف المنتج؟")) return; try { await remove.mutateAsync(p.id); toast.success("تم الحذف"); } catch (e: any) { toast.error(e.message); } }} className="p-1.5 text-destructive hover:bg-destructive/10 rounded"><Trash2 size={15} /></button>
+                          <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 text-destructive hover:bg-destructive/10 rounded"><Trash2 size={15} /></button>
                         </div>
                       </td>
                     </>
@@ -2015,7 +2127,7 @@ export default function ProductsPage() {
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
                           <button onClick={() => handleEdit(p)} className="p-1.5 text-yellow-500 hover:bg-yellow-500/10 rounded"><Edit size={15} /></button>
-                          <button onClick={async () => { if (!confirm("حذف المنتج؟")) return; try { await remove.mutateAsync(p.id); toast.success("تم الحذف"); } catch (e: any) { toast.error(e.message); } }} className="p-1.5 text-destructive hover:bg-destructive/10 rounded"><Trash2 size={15} /></button>
+                          <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 text-destructive hover:bg-destructive/10 rounded"><Trash2 size={15} /></button>
                         </div>
                       </td>
                     </>
@@ -2057,7 +2169,7 @@ export default function ProductsPage() {
                   <>
                     <button onClick={() => handleEdit(p)} className="btn-xs btn-warning">✎ تعديل</button>
                     <button
-                      onClick={async () => { if (!confirm("حذف المنتج؟")) return; try { await remove.mutateAsync(p.id); toast.success("تم الحذف"); } catch (e: any) { toast.error(e.message); } }}
+                      onClick={() => handleDeleteProduct(p.id)}
                       className="btn-xs btn-danger"
                     >🗑 حذف</button>
                   </>

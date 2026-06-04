@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { receiveStockForPurchaseOnce } from "@/utils/stockReceive";
 
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },
@@ -51,27 +52,63 @@ export default function PurchasePage() {
   (suppliers || []).forEach((s: any) => supplierMap.set(s.id, s));
 
   const handleDelete = async (id: string) => {
+    const order = (orders || []).find((o: any) => o.id === id);
     if (!confirm("هل أنت متأكد من حذف هذا الأمر؟")) return;
-    try { await remove.mutateAsync(id); toast.success("تم الحذف"); }
-    catch (e: any) { toast.error(e.message); }
+    try {
+      // إرجاع المخزون إذا كان الأمر مستلماً (كان قد أضاف كميات للمخزون)
+      if (order?.status === "received") {
+        const { data: items } = await supabase
+          .from("purchase_order_items")
+          .select("product_id, quantity")
+          .eq("purchase_order_id", id);
+        if (items && items.length > 0) {
+          for (const it of items as any[]) {
+            if (!it.product_id) continue;
+            const { data: prod } = await supabase
+              .from("products")
+              .select("stock_quantity")
+              .eq("id", it.product_id)
+              .maybeSingle();
+            if (prod) {
+              await supabase.from("products").update({
+                stock_quantity: Math.max(0, Number(prod.stock_quantity || 0) - Number(it.quantity || 0)),
+              }).eq("id", it.product_id);
+            }
+          }
+        }
+      }
+      // حذف بنود الأمر أولاً لتجنب مشاكل FK
+      await supabase.from("purchase_order_items").delete().eq("purchase_order_id", id);
+      await remove.mutateAsync(id);
+      toast.success("تم الحذف" + (order?.status === "received" ? " وإرجاع المخزون" : ""));
+      window.dispatchEvent(new Event("products:changed"));
+    } catch (e: any) { toast.error(e.message); }
   };
 
   const handleConvertToInvoice = async (o: any) => {
     if (!confirm(`تحويل أمر الشراء ${o.order_number} إلى فاتورة مشتريات (استلام البضاعة وتحديث المخزون)؟`)) return;
     try {
       const { data: items } = await supabase.from("purchase_order_items").select("*").eq("purchase_order_id", o.id);
+      const lines = (items || []).map((it: any) => ({
+        product_id: it.product_id,
+        quantity: Number(it.quantity || 0),
+      }));
 
-      // Increment stock for each item (purchase = +stock)
+      // استخدام حارس idempotency: يتحقق من الحالة الحالية في DB قبل الإضافة
+      const result = await receiveStockForPurchaseOnce(o.id, lines);
+      if (!result.added) {
+        toast.info("تم استلام هذا الأمر مسبقاً");
+        queryClient.invalidateQueries({ queryKey: ["purchase-orders-full"] });
+        return;
+      }
+
+      // تحديث سعر الشراء لكل منتج
       if (items && items.length > 0) {
         for (const it of items as any[]) {
           if (!it.product_id) continue;
-          const { data: prod } = await supabase.from("products").select("stock_quantity, purchase_price").eq("id", it.product_id).maybeSingle();
-          if (prod) {
-            await supabase.from("products").update({
-              stock_quantity: Number(prod.stock_quantity || 0) + Number(it.quantity || 0),
-              purchase_price: Number(it.unit_price || prod.purchase_price || 0),
-            }).eq("id", it.product_id);
-          }
+          await supabase.from("products").update({
+            purchase_price: Number(it.unit_price || 0),
+          }).eq("id", it.product_id);
         }
       }
 
@@ -80,7 +117,7 @@ export default function PurchasePage() {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders-full"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
-      window.dispatchEvent(new Event("products:changed"));
+      // products:changed يُرسَل تلقائياً من receiveStockForPurchaseOnce → stockReceive.applyDeltas
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -110,7 +147,7 @@ export default function PurchasePage() {
     if (statusFilter !== "all" && (o.status || "pending") !== statusFilter) return false;
     if (supplierSearch.trim()) {
       const sName = supplierMap.get(o.supplier_id)?.name || "";
-      if (!sName.toLowerCase().startsWith(supplierSearch.trim().toLowerCase())) return false;
+      if (!sName.toLowerCase().includes(supplierSearch.trim().toLowerCase())) return false;
     }
     if (dateFrom && (o.date || "") < dateFrom) return false;
     if (dateTo && (o.date || "") > dateTo) return false;

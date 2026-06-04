@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Image as ImageIcon, StickyNote, Printer, Save, ArrowRight } from "lucide-react";
 import StatusButton, { PURCHASE_STATUS_OPTIONS } from "@/components/StatusButton";
 import { useSuppliers, useProductsWithDetails, useWarehouses, useCompanySettings } from "@/hooks/useData";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
@@ -233,6 +234,7 @@ export default function PurchaseCreatePage() {
   const pageRef = useRef<HTMLDivElement>(null);
   useKeyboardNav(pageRef);
 
+  const queryClient = useQueryClient();
   const { data: suppliers } = useSuppliers();
   const { data: products } = useProductsWithDetails();
   const { data: warehouses } = useWarehouses();
@@ -304,6 +306,21 @@ export default function PurchaseCreatePage() {
   }, []);
 
   useEffect(() => {
+    const handleSync = () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+    };
+    window.addEventListener("products:changed", handleSync);
+    window.addEventListener("suppliers:changed", handleSync);
+    window.addEventListener("focus", handleSync);
+    return () => {
+      window.removeEventListener("products:changed", handleSync);
+      window.removeEventListener("suppliers:changed", handleSync);
+      window.removeEventListener("focus", handleSync);
+    };
+  }, [queryClient]);
+
+  useEffect(() => {
     if (!editId) return;
     (async () => {
       const { data: order } = await (supabase as any).from("purchase_orders").select("*").eq("id", editId).maybeSingle();
@@ -359,7 +376,7 @@ export default function PurchaseCreatePage() {
     );
     return (products || []).filter((p: any) => {
       if (usedIds.has(p.id)) return false;
-      const m = (p.name || "").toLowerCase().startsWith(q) || (p.sku || "").toLowerCase().startsWith(q);
+      const m = (p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q);
       if (!warehouseId) return m;
       return m && p.warehouse_id === warehouseId;
     }).slice(0, 10);
@@ -401,6 +418,7 @@ export default function PurchaseCreatePage() {
           productSearch: p.name,
           unit_price: price,
           foreign_price: fp,
+          unit: p.unit || r.unit,
           discount: 0,
           showSuggestions: false,
         });
@@ -426,6 +444,7 @@ export default function PurchaseCreatePage() {
       productSearch: p.name,
       unit_price: price,
       foreign_price: fp,
+      unit: p.unit || r.unit,
       discount: 0,
       quantity: 0,
       showSuggestions: false,
@@ -519,6 +538,9 @@ export default function PurchaseCreatePage() {
     selectSupplier(data);
     setAddSupplierOpen(false);
     setNewSupplier(emptySupplierForm);
+    // إبطال كاش الموردين + إخطار الشاشات الأخرى
+    queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+    try { window.dispatchEvent(new Event("suppliers:changed")); } catch {}
     toast.success("تم إضافة المورد");
   }
 
@@ -911,7 +933,9 @@ export default function PurchaseCreatePage() {
                   {productMatches(quickRow.productSearch).map((p, i) => (
                     <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoQuick(p)}>
                       <span>{p.name}</span>
-                      <span className="price-badge">{Number(p.purchase_price || 0).toLocaleString()}</span>
+                      <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                        {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1081,7 +1105,9 @@ export default function PurchaseCreatePage() {
                               {matches.map((p, i) => (
                                 <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoRow(r.uid, p)}>
                                   <span>{p.name}</span>
-                                  <span className="price-badge">{Number(p.purchase_price || 0).toLocaleString()}</span>
+                                  <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                                    {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                                  </span>
                                 </div>
                               ))}
                             </div>
