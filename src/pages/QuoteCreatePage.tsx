@@ -333,6 +333,10 @@ export default function QuoteCreatePage() {
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const selectedCustomerIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedCustomerIdRef.current = customer?.id || null;
+  }, [customer]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerSugg, setShowCustomerSugg] = useState(false);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
@@ -455,11 +459,29 @@ export default function QuoteCreatePage() {
       setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
       setProductsLoading(false);
     };
+    // Refetch customers when they change elsewhere or when user returns to this tab.
+    const refetchCustomers = async () => {
+      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      if (data) {
+        setCustomers(data as Customer[]);
+        const currentId = selectedCustomerIdRef.current;
+        if (currentId) {
+          const matched = data.find((c: any) => c.id === currentId);
+          if (matched) setCustomer(matched as Customer);
+        }
+      }
+    };
+    const handleFocus = () => {
+      refetchProducts();
+      refetchCustomers();
+    };
     window.addEventListener("products:changed", refetchProducts);
-    window.addEventListener("focus", refetchProducts);
+    window.addEventListener("customers:changed", refetchCustomers);
+    window.addEventListener("focus", handleFocus);
     return () => {
       window.removeEventListener("products:changed", refetchProducts);
-      window.removeEventListener("focus", refetchProducts);
+      window.removeEventListener("customers:changed", refetchCustomers);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [editId]);
 
@@ -1320,7 +1342,9 @@ export default function QuoteCreatePage() {
                         onMouseDown={() => pickProductIntoQuick(p)}
                       >
                         <span>{p.name}</span>
-                        <span className="price-badge">{Number(p.sale_price || 0).toLocaleString()}</span>
+                        <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                          {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                        </span>
                       </div>
                     ));
                   })()}
@@ -1548,8 +1572,8 @@ export default function QuoteCreatePage() {
                     const q = tableSearch.trim().toLowerCase();
                     if (!q) return true;
                     return (
-                      (r.product_name || "").toLowerCase().startsWith(q) ||
-                      (r.productSearch || "").toLowerCase().startsWith(q)
+                      (r.product_name || "").toLowerCase().includes(q) ||
+                      (r.productSearch || "").toLowerCase().includes(q)
                     );
                   });
                   const NAV_COLS = ["product", "quantity", "unit_price", "foreign_price", "total"];
@@ -1611,7 +1635,9 @@ export default function QuoteCreatePage() {
                                     onMouseDown={() => pickProductIntoRow(r.uid, p)}
                                   >
                                     <span>{p.name}</span>
-                                    <span className="price-badge">{Number(p.sale_price || 0).toLocaleString()}</span>
+                                    <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                                      {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                                    </span>
                                   </div>
                                 ));
                               })()}

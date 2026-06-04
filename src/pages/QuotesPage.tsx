@@ -114,7 +114,7 @@ export default function QuotesPage() {
     if (statusFilter !== "all" && (q.status || "draft") !== statusFilter) return false;
     if (customerSearch.trim()) {
       const cs = customerSearch.trim().toLowerCase();
-      if (!(q.customers?.name || "").toLowerCase().startsWith(cs)) return false;
+      if (!(q.customers?.name || "").toLowerCase().includes(cs)) return false;
     }
     if (dateFrom && (q.date || "") < dateFrom) return false;
     if (dateTo && (q.date || "") > dateTo) return false;

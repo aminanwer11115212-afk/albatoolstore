@@ -30,33 +30,31 @@ async function applyDeltas(deltas: Map<string, number>): Promise<void> {
   const entries = Array.from(deltas.entries()).filter(([, d]) => d !== 0);
   if (!entries.length) return;
 
-  const ids = entries.map(([id]) => id);
-  const { data: products, error } = await supabase
-    .from("products")
-    .select("id, stock_quantity")
-    .in("id", ids);
-  if (error) {
-    console.error("[stockDeduction] failed to read products", error);
-    throw new Error(`فشل قراءة المخزون الحالي: ${error.message}`);
+  // تحديث تسلسلي: نقرأ القيمة الحالية ونحدّثها مباشرة لكل منتج
+  // لتقليل نافذة السباق (race condition) مقارنة بالتحديث المتوازي.
+  const failures: Array<{ id: string; error: string }> = [];
+  for (const [id, delta] of entries) {
+    const { data: prod, error: readErr } = await supabase
+      .from("products")
+      .select("stock_quantity")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr) {
+      console.error("[stockDeduction] failed to read product", id, readErr);
+      failures.push({ id, error: readErr.message });
+      continue;
+    }
+    const currentQty = Number(prod?.stock_quantity || 0);
+    const newQty = currentQty + delta;
+    const { error: upErr } = await supabase
+      .from("products")
+      .update({ stock_quantity: newQty })
+      .eq("id", id);
+    if (upErr) {
+      console.error("[stockDeduction] update failed for", id, upErr);
+      failures.push({ id, error: upErr.message });
+    }
   }
-
-  const current = new Map<string, number>();
-  (products || []).forEach((p: any) => current.set(p.id, Number(p.stock_quantity || 0)));
-
-  const results = await Promise.all(
-    entries.map(async ([id, delta]) => {
-      const newQty = (current.get(id) || 0) + delta;
-      const { error: upErr } = await supabase
-        .from("products")
-        .update({ stock_quantity: newQty })
-        .eq("id", id);
-      if (upErr) {
-        console.error("[stockDeduction] update failed for", id, upErr);
-        return { id, error: upErr.message };
-      }
-      return { id, error: null as string | null };
-    }),
-  );
 
   // Notify the rest of the app (Products page, open Invoice/Quote create pages)
   // so they invalidate caches and reflect the new stock immediately.
@@ -64,7 +62,6 @@ async function applyDeltas(deltas: Map<string, number>): Promise<void> {
     try { window.dispatchEvent(new Event("products:changed")); } catch {}
   }
 
-  const failures = results.filter((r) => r.error);
   if (failures.length) {
     throw new Error(
       `فشل تحديث المخزون لـ ${failures.length} منتج: ${failures.map((f) => f.error).join("; ")}`,

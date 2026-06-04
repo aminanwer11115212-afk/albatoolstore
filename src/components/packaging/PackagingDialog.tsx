@@ -398,6 +398,8 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
           _target: "ready_to_ship",
           _reason: "إضافة تغليف",
         });
+        // بث حدث لتحديث شاشة الترحيلات وغيرها
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       } catch { /* غير حرجة */ }
     }
   };
@@ -427,6 +429,7 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
           _target: "ready_to_ship",
           _reason: "حفظ التغليف",
         });
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       } catch { /* غير حرجة */ }
     }
   };

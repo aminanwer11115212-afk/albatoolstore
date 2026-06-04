@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useInvoicesWithCustomers, useInvoices, useCompanySettings } from "@/hooks/useData";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +43,13 @@ export default function InvoicesPage() {
   const currency = company?.currency || "SDG";
   const [showDispatch, setShowDispatch] = useState(false);
   const qc = useQueryClient();
+
+  // التحديث اللحظي عند تغيير حالة فواتير من شاشات أخرى (مثل الترحيلات)
+  useEffect(() => {
+    const refresh = () => refetch();
+    window.addEventListener("invoices:changed", refresh);
+    return () => window.removeEventListener("invoices:changed", refresh);
+  }, [refetch]);
 
   const handleWhatsApp = (inv: any) => {
     const phone = inv.customers?.phone;
@@ -147,7 +154,7 @@ export default function InvoicesPage() {
     if (paymentFilter !== "all" && getPaymentStatus(inv) !== paymentFilter) return false;
     if (customerSearch.trim()) {
       const cs = customerSearch.trim().toLowerCase();
-      if (!(inv.customers?.name || "").toLowerCase().startsWith(cs)) return false;
+      if (!(inv.customers?.name || "").toLowerCase().includes(cs)) return false;
     }
     if (dateFrom && (inv.date || "") < dateFrom) return false;
     if (dateTo && (inv.date || "") > dateTo) return false;
@@ -215,7 +222,23 @@ export default function InvoicesPage() {
       <div className="legacy-card">
         <div className="grid_3 grid_4 table-responsive">
           <h5 style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            الفواتير
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              الفواتير
+              <button
+                type="button"
+                id="btn-open-dispatch"
+                onClick={() => navigate("/dispatch")}
+                style={{
+                  background: "linear-gradient(135deg,#3b5bdb,#1c3faa)",
+                  color: "#fff", border: "none", borderRadius: 6,
+                  padding: "3px 10px", fontSize: 11, fontWeight: 700,
+                  cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
+                }}
+                title="فتح شاشة تقرير الترحيلات"
+              >
+                🚚 تقرير الترحيلات
+              </button>
+            </span>
           </h5>
           <hr />
 

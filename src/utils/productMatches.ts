@@ -15,6 +15,7 @@
 export interface ProductLike {
   id: string;
   name: string;
+  sku?: string | null;
   warehouse_id?: string | null;
 }
 
@@ -28,7 +29,7 @@ export function productMatches<T extends ProductLike>(
   const seen = new Set<string>();
   return products
     .filter((p) => !warehouseId || p.warehouse_id === warehouseId)
-    .filter((p) => p.name.toLowerCase().startsWith(q))
+    .filter((p) => (p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q))
     .filter((p) => {
       if (seen.has(p.id)) return false;
       seen.add(p.id);

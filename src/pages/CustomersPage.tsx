@@ -455,6 +455,7 @@ export default function CustomersPage() {
         const { error } = await (supabase as any).from("customers").update(patch).eq("id", id);
         if (error) throw error;
         queryClient.invalidateQueries({ queryKey: ["customers"], refetchType: "active" });
+        window.dispatchEvent(new Event("customers:changed"));
       } catch (e: any) {
         if (prev) queryClient.setQueryData(["customers"], prev);
         toast.error(e.message || "فشل التحديث — تم التراجع");

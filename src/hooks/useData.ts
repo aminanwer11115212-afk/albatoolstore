@@ -41,7 +41,37 @@ function useTable<T extends keyof Tables<any>>(table: string) {
     onError: (_err, _vars, context: any) => {
       if (context?.previous) queryClient.setQueryData([table], context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: [table] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [table] });
+      if (table === "products") {
+        window.dispatchEvent(new Event("products:changed"));
+      } else if (table === "customers") {
+        window.dispatchEvent(new Event("customers:changed"));
+      } else if (table === "suppliers") {
+        window.dispatchEvent(new Event("suppliers:changed"));
+      } else if (table === "transactions") {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+        queryClient.invalidateQueries({ queryKey: ["accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["transactions-with-accounts"] });
+        window.dispatchEvent(new Event("customers:changed"));
+        window.dispatchEvent(new Event("suppliers:changed"));
+        window.dispatchEvent(new Event("accounts:changed"));
+      } else if (table === "invoices") {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+        window.dispatchEvent(new Event("customers:changed"));
+      } else if (table === "stock_returns") {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        window.dispatchEvent(new Event("customers:changed"));
+      } else if (table === "purchase_orders") {
+        queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+        window.dispatchEvent(new Event("suppliers:changed"));
+      }
+    },
   });
 
   // ── UPDATE ── يُعدَّل الكاش فوراً ──
@@ -67,7 +97,37 @@ function useTable<T extends keyof Tables<any>>(table: string) {
     },
     // Optimistic update يضمن دقة الكاش — لا داعي لـ refetch فوري بعد كل تعديل.
     // نُعلِّم الاستعلام كـ stale فقط ليُحدَّث عند إعادة التركيب أو focus.
-    onSettled: () => queryClient.invalidateQueries({ queryKey: [table], refetchType: "none" }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [table], refetchType: "none" });
+      if (table === "products") {
+        window.dispatchEvent(new Event("products:changed"));
+      } else if (table === "customers") {
+        window.dispatchEvent(new Event("customers:changed"));
+      } else if (table === "suppliers") {
+        window.dispatchEvent(new Event("suppliers:changed"));
+      } else if (table === "transactions") {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+        queryClient.invalidateQueries({ queryKey: ["accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["transactions-with-accounts"] });
+        window.dispatchEvent(new Event("customers:changed"));
+        window.dispatchEvent(new Event("suppliers:changed"));
+        window.dispatchEvent(new Event("accounts:changed"));
+      } else if (table === "invoices") {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+        window.dispatchEvent(new Event("customers:changed"));
+      } else if (table === "stock_returns") {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        window.dispatchEvent(new Event("customers:changed"));
+      } else if (table === "purchase_orders") {
+        queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+        window.dispatchEvent(new Event("suppliers:changed"));
+      }
+    },
   });
 
   // ── REMOVE ── يُزال الصف فوراً ──
@@ -87,7 +147,37 @@ function useTable<T extends keyof Tables<any>>(table: string) {
     onError: (_err, _vars, context: any) => {
       if (context?.previous) queryClient.setQueryData([table], context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: [table] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [table] });
+      if (table === "products") {
+        window.dispatchEvent(new Event("products:changed"));
+      } else if (table === "customers") {
+        window.dispatchEvent(new Event("customers:changed"));
+      } else if (table === "suppliers") {
+        window.dispatchEvent(new Event("suppliers:changed"));
+      } else if (table === "transactions") {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+        queryClient.invalidateQueries({ queryKey: ["accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["transactions-with-accounts"] });
+        window.dispatchEvent(new Event("customers:changed"));
+        window.dispatchEvent(new Event("suppliers:changed"));
+        window.dispatchEvent(new Event("accounts:changed"));
+      } else if (table === "invoices") {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+        window.dispatchEvent(new Event("customers:changed"));
+      } else if (table === "stock_returns") {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        window.dispatchEvent(new Event("customers:changed"));
+      } else if (table === "purchase_orders") {
+        queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+        window.dispatchEvent(new Event("suppliers:changed"));
+      }
+    },
   });
 
   return { ...query, insert, update, remove };
@@ -178,9 +268,9 @@ export function useTransactionsWithAccounts() {
 export function useProductsWithDetails() {
   return useQuery({
     queryKey: ["products-with-details"],
-    staleTime: 60_000,
+    staleTime: 5_000,
     gcTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       // نجلب كل المنتجات مقسّمة دفعات (تجاوز حدّ Supabase الافتراضي 1000 صف).
       const productsData = await fetchAllProducts<any>(

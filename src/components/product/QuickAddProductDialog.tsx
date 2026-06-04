@@ -186,6 +186,12 @@ export default function QuickAddProductDialog({
       queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
       queryClient.invalidateQueries({ queryKey: ["product_category_links_all"] });
 
+      // Notify screens that use local products state (Invoice/Quote/Return create pages)
+      // so they refetch and the new product appears in suggestions immediately.
+      if (typeof window !== "undefined") {
+        try { window.dispatchEvent(new Event("products:changed")); } catch {}
+      }
+
       toast.success("تم الإضافة");
       onCreated?.({ ...created, categories: cats });
       onOpenChange(false);

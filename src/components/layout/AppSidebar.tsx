@@ -42,6 +42,7 @@ const menuSections: MenuSection[] = [
           { label: "فاتورة جديدة", path: "/invoices/create" },
           { label: "مبيعات كاش", path: "/invoices/cash" },
           { label: "إدارة الفواتير", path: "/invoices" },
+          { label: "🚚 إدارة الترحيلات", path: "/dispatch" },
           { label: "عرض أسعار جديد", path: "/quotes/create" },
           { label: "إدارة عروض الأسعار", path: "/quotes" },
           { label: "عرض سعر جانبي جديد", path: "/quotes/side/new" },

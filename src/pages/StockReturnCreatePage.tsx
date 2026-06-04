@@ -261,6 +261,10 @@ export default function StockReturnCreatePage() {
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const selectedCustomerIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedCustomerIdRef.current = customer?.id || null;
+  }, [customer]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerSugg, setShowCustomerSugg] = useState(false);
   const [reason, setReason] = useState("");
@@ -308,7 +312,7 @@ export default function StockReturnCreatePage() {
     (async () => {
       const [cs, ps, cfg, wh] = await Promise.all([
         supabase.from("customers").select("id,name,phone,balance,company").order("name"),
-        fetchAllProducts<Product>("id,name,sale_price,unit,stock_quantity,is_frozen"),
+        fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
         supabase.from("company_settings").select("currency,return_prefix").maybeSingle(),
         supabase.from("warehouses").select("id,name").order("name"),
       ]);
@@ -335,6 +339,37 @@ export default function StockReturnCreatePage() {
         setReturnNumber(`${prefix}${String(maxN + 1).padStart(4, "0")}`);
       }
     })();
+
+    // Refetch products when stock changes elsewhere (purchase receipt,
+    // invoice creation/edit, product edits) or when the user returns to this tab.
+    const refetchProducts = async () => {
+      const ps = await fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id");
+      setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
+    };
+    // Refetch customers when they change elsewhere or when user returns to this tab.
+    const refetchCustomers = async () => {
+      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      if (data) {
+        setCustomers(data as Customer[]);
+        const currentId = selectedCustomerIdRef.current;
+        if (currentId) {
+          const matched = data.find((c: any) => c.id === currentId);
+          if (matched) setCustomer(matched as Customer);
+        }
+      }
+    };
+    const handleFocus = () => {
+      refetchProducts();
+      refetchCustomers();
+    };
+    window.addEventListener("products:changed", refetchProducts);
+    window.addEventListener("customers:changed", refetchCustomers);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("products:changed", refetchProducts);
+      window.removeEventListener("customers:changed", refetchCustomers);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [editId]);
 
   // ---------- Load for edit ----------
@@ -443,7 +478,7 @@ export default function StockReturnCreatePage() {
       for (const it of linkedInvoiceItems) {
         const key = `${it.product_id || ""}|${it.product_name}`;
         if (seen.has(key)) continue;
-        if (!it.product_name.toLowerCase().startsWith(q)) continue;
+        if (!it.product_name.toLowerCase().includes(q)) continue;
         const candidateId = it.product_id || it.id;
         if (usedIds.has(candidateId)) continue;
         seen.add(key);
@@ -460,7 +495,8 @@ export default function StockReturnCreatePage() {
     }
     return products
       .filter((p) => !usedIds.has(p.id))
-      .filter((p) => p.name.toLowerCase().startsWith(q))
+      .filter((p) => !warehouseId || p.warehouse_id === warehouseId)
+      .filter((p) => p.name.toLowerCase().includes(q))
       .slice(0, 10);
   }
 
@@ -559,9 +595,16 @@ export default function StockReturnCreatePage() {
     if (!target) return;
     if (target.dbId && editId) {
       try {
+        // إرجاع الكمية من المخزون (المرتجع كان قد أضافها سابقاً)
+        if (target.product_id && Number(target.quantity) > 0) {
+          await applyStockDeltaForLines(
+            [],
+            [{ product_id: target.product_id, quantity: Number(target.quantity) }],
+          );
+        }
         const { error } = await supabase.from("stock_return_items").delete().eq("id", target.dbId);
         if (error) throw error;
-        toast.success("تم حذف البند");
+        toast.success("تم حذف البند وتعديل المخزون");
       } catch (e: any) {
         toast.error(e?.message || "فشل حذف البند");
         return;
@@ -636,6 +679,19 @@ export default function StockReturnCreatePage() {
       status: "pending",
     };
 
+    // ── لقطة البنود القديمة قبل أي تعديل (لحساب فرق المخزون بدقة) ──
+    let prevReturnItems: Array<{ product_id: string | null; quantity: number }> = [];
+    if (editId) {
+      const { data: snapshotItems } = await supabase
+        .from("stock_return_items")
+        .select("product_id, quantity")
+        .eq("stock_return_id", editId);
+      prevReturnItems = (snapshotItems || []).map((it: any) => ({
+        product_id: it.product_id,
+        quantity: Number(it.quantity || 0),
+      }));
+    }
+
     let rid = editId;
     if (editId) {
       const { error } = await supabase.from("stock_returns").update(payload).eq("id", editId);
@@ -700,17 +756,12 @@ export default function StockReturnCreatePage() {
           [],
         );
       } else {
-        // تعديل: الأصناف القديمة كانت مُضافة للمخزون سابقاً، الأصناف الجديدة ستُضاف الآن
-        // delta = oldQty - newQty → إذا زادت الكمية: delta سالب (يُضاف المزيد)؛ إذا نقصت: موجب (يُسحب)
-        const { data: oldItems } = await supabase
-          .from("stock_return_items")
-          .select("product_id, quantity")
-          .eq("stock_return_id", editId);
-        const oldStockLines = (oldItems || []).map((it: any) => ({ product_id: it.product_id, quantity: it.quantity }));
+        // تعديل: نستخدم اللقطة المحفوظة مسبقاً (prevReturnItems) لأن البنود القديمة
+        // حُذفت واستُبدلت بالجديدة في DB قبل الوصول لهنا.
         const newStockLines = valid.map((r) => ({ product_id: r.product_id, quantity: r.quantity }));
         // عكس الاتجاه: applyStockDeltaForLines(new, old) → delta = new - old
         // (إذا زاد الإرجاع في التعديل → delta موجب → يُضاف للمخزون ✅)
-        await applyStockDeltaForLines(newStockLines, oldStockLines);
+        await applyStockDeltaForLines(newStockLines, prevReturnItems);
       }
     } catch (stockErr: any) {
       console.error("[StockReturn] stock restoration failed", stockErr);
@@ -991,7 +1042,9 @@ export default function StockReturnCreatePage() {
                       onMouseDown={() => pickProductIntoQuick(p)}
                     >
                       <span>{p.name}</span>
-                      <span className="price-badge">{Number(p.sale_price || 0).toLocaleString()}</span>
+                      <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                        {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1134,7 +1187,7 @@ export default function StockReturnCreatePage() {
                     const visibleRows = rows.filter((r) => {
                       const q = tableSearch.trim().toLowerCase();
                       if (!q) return true;
-                      return (r.product_name || "").toLowerCase().startsWith(q) || (r.productSearch || "").toLowerCase().startsWith(q);
+                      return (r.product_name || "").toLowerCase().includes(q) || (r.productSearch || "").toLowerCase().includes(q);
                     });
                     const NAV_COLS = ["product", "quantity", "unit_price", "foreign_price", "total"];
                     const handleNav = makeRowNavHandler({
@@ -1176,7 +1229,9 @@ export default function StockReturnCreatePage() {
                                   onMouseDown={() => pickProductIntoRow(r.uid, p)}
                                 >
                                   <span>{p.name}</span>
-                                  <span className="price-badge">{Number(p.sale_price || 0).toLocaleString()}</span>
+                                  <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                                    {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                                  </span>
                                 </div>
                               ))}
                             </div>

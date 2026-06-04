@@ -74,6 +74,13 @@ export default function InvoiceViewPage() {
     loadInvoice();
   }, [id]);
 
+  // الاستماع لأحداث النظام لتحديث لحظي (مثلاً عند ترحيل من DispatchPage)
+  useEffect(() => {
+    const refresh = () => loadInvoice();
+    window.addEventListener("invoices:changed", refresh);
+    return () => window.removeEventListener("invoices:changed", refresh);
+  }, [id]);
+
   const loadInvoice = async () => {
     if (!id) return;
     setLoading(true);
@@ -476,6 +483,11 @@ export default function InvoiceViewPage() {
           { id: "transport", node: (
             <Button onClick={() => setTransportDialogOpen(true)} className="bg-green-600 hover:bg-green-700 text-white gap-1.5 text-xs h-9">
               <Truck size={14} /> اضافة ترحيل
+            </Button>
+          )},
+          { id: "dispatch-page", node: (
+            <Button onClick={() => navigate("/dispatch")} variant="outline" className="gap-1.5 text-xs h-9 border-green-600/50 text-green-700 hover:bg-green-50">
+              <Truck size={14} /> صفحة الترحيلات
             </Button>
           )},
           { id: "packaging", node: (
@@ -917,7 +929,7 @@ export default function InvoiceViewPage() {
             parentType="invoice"
             parentId={invoice.id}
             customerId={invoice.customer_id || null}
-            showAllReady={true}
+            showAllReady={false}
           />
         </>
       )}
