@@ -177,7 +177,7 @@ export default function ProductsPage() {
   const PRODUCTS_COLS_KEY = userScopedLegacyKey("products-page:colWidths:v1");
   const PRODUCTS_LOCK_KEY = userScopedLegacyKey("products-page:colsLocked:v1");
   const PRODUCTS_DEFAULTS: (number | null)[] = [60, null, 140, 140, 140, 110, 110, 130, 140, 80, 110];
-  const { locked: colsLocked } = useSharedColsLocked(PRODUCTS_LOCK_KEY);
+  const [colsLocked, setColsLocked] = useSharedColsLocked(() => localStorage.getItem(PRODUCTS_LOCK_KEY) === "true");
   const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, reset: resetColWidths, saveAsUserDefault: saveColDefault, tableProps } = useColumnWidths(
     PRODUCTS_COLS_KEY,
     PRODUCTS_DEFAULTS,
