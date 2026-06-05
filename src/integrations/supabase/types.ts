@@ -50,45 +50,132 @@ export type Database = {
         }
         Relationships: []
       }
-      company_settings: {
+      billing_terms: {
         Row: {
-          address: string | null
-          company_name: string
           created_at: string
-          currency: string | null
-          email: string | null
+          description: string | null
           id: string
-          logo_url: string | null
-          phone: string | null
-          tax_number: string | null
-          tax_rate: number | null
+          name: string
+          type: string | null
           updated_at: string
         }
         Insert: {
-          address?: string | null
-          company_name?: string
           created_at?: string
-          currency?: string | null
-          email?: string | null
+          description?: string | null
           id?: string
-          logo_url?: string | null
-          phone?: string | null
-          tax_number?: string | null
-          tax_rate?: number | null
+          name: string
+          type?: string | null
           updated_at?: string
         }
         Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_settings: {
+        Row: {
+          address: string | null
+          bank_account: string | null
+          bank_name: string | null
+          city: string | null
+          company_name: string
+          country: string | null
+          created_at: string
+          currency: string | null
+          email: string | null
+          iban: string | null
+          id: string
+          invoice_footer: string | null
+          invoice_notes: string | null
+          invoice_prefix: string | null
+          logo_url: string | null
+          payment_terms_days: number | null
+          phone: string | null
+          postbox: string | null
+          purchase_prefix: string | null
+          quote_prefix: string | null
+          recurring_prefix: string | null
+          region: string | null
+          return_prefix: string | null
+          show_discount: boolean | null
+          show_shipping: boolean | null
+          show_tax: boolean | null
+          tax_number: string | null
+          tax_rate: number | null
+          transaction_prefix: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
           address?: string | null
+          bank_account?: string | null
+          bank_name?: string | null
+          city?: string | null
           company_name?: string
+          country?: string | null
           created_at?: string
           currency?: string | null
           email?: string | null
+          iban?: string | null
           id?: string
+          invoice_footer?: string | null
+          invoice_notes?: string | null
+          invoice_prefix?: string | null
           logo_url?: string | null
+          payment_terms_days?: number | null
           phone?: string | null
+          postbox?: string | null
+          purchase_prefix?: string | null
+          quote_prefix?: string | null
+          recurring_prefix?: string | null
+          region?: string | null
+          return_prefix?: string | null
+          show_discount?: boolean | null
+          show_shipping?: boolean | null
+          show_tax?: boolean | null
           tax_number?: string | null
           tax_rate?: number | null
+          transaction_prefix?: string | null
           updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          bank_account?: string | null
+          bank_name?: string | null
+          city?: string | null
+          company_name?: string
+          country?: string | null
+          created_at?: string
+          currency?: string | null
+          email?: string | null
+          iban?: string | null
+          id?: string
+          invoice_footer?: string | null
+          invoice_notes?: string | null
+          invoice_prefix?: string | null
+          logo_url?: string | null
+          payment_terms_days?: number | null
+          phone?: string | null
+          postbox?: string | null
+          purchase_prefix?: string | null
+          quote_prefix?: string | null
+          recurring_prefix?: string | null
+          region?: string | null
+          return_prefix?: string | null
+          show_discount?: boolean | null
+          show_shipping?: boolean | null
+          show_tax?: boolean | null
+          tax_number?: string | null
+          tax_rate?: number | null
+          transaction_prefix?: string | null
+          updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
@@ -168,6 +255,141 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      destinations: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          created_at: string
+          description: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      employees: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          role: string | null
+          salary: number | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          salary?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          salary?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      goals: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          notes: string | null
+          period: string
+          start_date: string | null
+          target_expenses: number | null
+          target_net_income: number | null
+          target_revenue: number | null
+          target_sales: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          period?: string
+          start_date?: string | null
+          target_expenses?: number | null
+          target_net_income?: number | null
+          target_revenue?: number | null
+          target_sales?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          period?: string
+          start_date?: string | null
+          target_expenses?: number | null
+          target_net_income?: number | null
+          target_revenue?: number | null
+          target_sales?: number | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       invoice_items: {
         Row: {
@@ -296,6 +518,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notes: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       packaging_types: {
         Row: {
@@ -895,6 +1141,66 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      todos: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string | null
+          status: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transaction_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
           updated_at?: string
         }
         Relationships: []
