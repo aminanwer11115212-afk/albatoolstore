@@ -35,6 +35,46 @@ const DialogContent = React.forwardRef<
   // فهذا يعني أن المطوّر أراد dialog صغير — لا نفرض الحجم الكبير
   const isSmallDialog = className && /max-w-(sm|md|lg|xl)\b/.test(className);
 
+  // Detect mobile so we go fullscreen and never overflow the viewport
+  const [isMobile, setIsMobile] = React.useState<boolean>(
+    typeof window !== "undefined" ? window.innerWidth <= 640 : false,
+  );
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(max-width: 640px)");
+    const onChange = () => setIsMobile(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  const mobileStyle: React.CSSProperties = {
+    width: "100vw",
+    height: "100dvh",
+    maxWidth: "100vw",
+    maxHeight: "100dvh",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "auto",
+    borderRadius: 0,
+  };
+
+  const desktopLargeStyle: React.CSSProperties = {
+    width: "min(1400px, 96vw)",
+    height: "92vh",
+    maxWidth: "98vw",
+    maxHeight: "98vh",
+    minWidth: 480,
+    minHeight: 360,
+    overflow: "hidden",
+  };
+
+  const finalStyle: React.CSSProperties = isMobile
+    ? { ...mobileStyle, ...style }
+    : isSmallDialog
+      ? (style as React.CSSProperties)
+      : { ...desktopLargeStyle, ...style };
+
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -42,19 +82,10 @@ const DialogContent = React.forwardRef<
         ref={ref}
         className={cn(
           "fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-          isSmallDialog ? "w-full" : "",
+          isSmallDialog ? "w-full max-sm:!w-screen max-sm:!h-[100dvh] max-sm:!max-w-none max-sm:!rounded-none max-sm:!p-4" : "",
           className,
         )}
-        style={isSmallDialog ? style : {
-          width: "min(1400px, 96vw)",
-          height: "92vh",
-          maxWidth: "98vw",
-          maxHeight: "98vh",
-          minWidth: 480,
-          minHeight: 360,
-          overflow: "hidden",
-          ...style,
-        }}
+        style={finalStyle}
         {...props}
       >
         {children}
