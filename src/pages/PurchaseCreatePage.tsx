@@ -47,6 +47,7 @@ interface PurchaseRow {
   total: number;
   showSuggestions: boolean;
   selected: boolean;
+  unit?: string | null;
 }
 
 const EMPTY_ROWS = 10;
