@@ -2139,44 +2139,10 @@ export default function ProductsPage() {
           </table>
         </div>
 
-        {/* Mobile cards list — لا نرندرها على الديسكتوب لتفادي اللاج */}
-        {isMobile && (
+        {/* Mobile cards list معطلة — نعرض الجدول الكامل على الجوال كما في اللابتوب */}
+        {false && isMobile && (
         <div className="mobile-doc-list" style={{ padding: 8 }}>
-          {isLoading ? (
-            <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>جاري تحميل المنتجات...</div>
-          ) : error ? (
-            <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--destructive))" }}>تعذر تحميل المنتجات</div>
-          ) : paginated.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>{emptyMessage}</div>
-          ) : paginated.map((p: any, idx: number) => {
-            const qty = Number(p.stock_quantity || 0);
-            const minS = Number(p.min_stock || 0);
-            const qtyColor = qty <= 0 ? "hsl(var(--destructive))" : qty <= minS ? "hsl(45 93% 47%)" : "hsl(142 76% 36%)";
-            return (
-              <MobileDocCard
-                key={p.id}
-                index={isAllProducts ? (page - 1) * perPage + idx + 1 : idx + 1}
-                number={p.sku || "—"}
-                party={p.name}
-                date={p.product_categories?.name || ""}
-                amount={`${Number(p.sale_price || 0).toLocaleString()}`}
-                status={
-                  <span style={{ background: qtyColor, color: "white", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 12 }}>
-                    {qty}
-                  </span>
-                }
-                actions={
-                  <>
-                    <button onClick={() => handleEdit(p)} className="btn-xs btn-warning">✎ تعديل</button>
-                    <button
-                      onClick={() => handleDeleteProduct(p.id)}
-                      className="btn-xs btn-danger"
-                    >🗑 حذف</button>
-                  </>
-                }
-              />
-            );
-          })}
+          {null}
         </div>
         )}
 
