@@ -152,6 +152,9 @@ interface Product {
   sale_price: number | null;
   unit: string | null;
   stock_quantity: number | null;
+  foreign_price?: number | null;
+  is_frozen?: boolean | null;
+  warehouse_id?: string | null;
 }
 
 interface InvoiceLite {
