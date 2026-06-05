@@ -20,8 +20,21 @@ export function useDialogSize(
   defaults?: { w?: string; h?: string },
 ) {
   const [dlgSize, setDlgSize] = useState<{ w: number; h: number } | null>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(
+    typeof window !== "undefined" ? window.innerWidth <= 640 : false,
+  );
   const dlgRef = useRef<HTMLDivElement>(null);
   const userIdRef = useRef<string | null>(null);
+
+  // Track mobile viewport so dialogs go fullscreen on phones
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(max-width: 640px)");
+    const onChange = () => setIsMobile(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
 
   // Resolve current user id (cached for the session)
   const resolveUserId = useCallback(async () => {
@@ -44,9 +57,9 @@ export function useDialogSize(
     [dialogKey],
   );
 
-  // Load saved size when dialog opens
+  // Load saved size when dialog opens (skip on mobile — always fullscreen)
   useEffect(() => {
-    if (!open) return;
+    if (!open || isMobile) return;
     let cancelled = false;
     (async () => {
       const uid = await resolveUserId();
@@ -61,11 +74,11 @@ export function useDialogSize(
       } catch { /* corrupt data — ignore */ }
     })();
     return () => { cancelled = true; };
-  }, [open, resolveUserId, buildKey]);
+  }, [open, isMobile, resolveUserId, buildKey]);
 
-  // Observe resize and persist
+  // Observe resize and persist (desktop only)
   useEffect(() => {
-    if (!open || !dlgRef.current) return;
+    if (!open || isMobile || !dlgRef.current) return;
     const el = dlgRef.current;
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -74,7 +87,6 @@ export function useDialogSize(
       const h = el.offsetHeight;
       if (!w || !h) return;
 
-      // Debounce writes to localStorage
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(async () => {
         const uid = await resolveUserId();
@@ -90,22 +102,31 @@ export function useDialogSize(
       ro.disconnect();
       if (saveTimer) clearTimeout(saveTimer);
     };
-  }, [open, resolveUserId, buildKey]);
+  }, [open, isMobile, resolveUserId, buildKey]);
 
-  // Helper style object
-  const defaultW = defaults?.w ?? "min(1400px, 96vw)";
-  const defaultH = defaults?.h ?? "92vh";
-
-  const dlgStyle: React.CSSProperties = {
-    width: dlgSize ? `${dlgSize.w}px` : defaultW,
-    height: dlgSize ? `${dlgSize.h}px` : defaultH,
-    maxWidth: "98vw",
-    maxHeight: "98vh",
-    minWidth: 480,
-    minHeight: 360,
-    resize: "both" as const,
-    overflow: "hidden",
-  };
+  // Mobile: fullscreen, no resize, no min sizes (fits 375px phones)
+  const dlgStyle: React.CSSProperties = isMobile
+    ? {
+        width: "100vw",
+        height: "100dvh",
+        maxWidth: "100vw",
+        maxHeight: "100dvh",
+        minWidth: 0,
+        minHeight: 0,
+        resize: "none",
+        overflow: "auto",
+        borderRadius: 0,
+      }
+    : {
+        width: dlgSize ? `${dlgSize.w}px` : (defaults?.w ?? "min(1400px, 96vw)"),
+        height: dlgSize ? `${dlgSize.h}px` : (defaults?.h ?? "92vh"),
+        maxWidth: "98vw",
+        maxHeight: "98vh",
+        minWidth: 480,
+        minHeight: 360,
+        resize: "both" as const,
+        overflow: "hidden",
+      };
 
   return { dlgSize, dlgRef, dlgStyle };
 }

@@ -1072,16 +1072,17 @@ export default function CustomersPage() {
 
       <style>{`
         ${mobileDocListCSS}
-        .mobile-customers-list { display: none; }
+        /* نعرض الجدول الكامل دائماً (حتى على الجوال) — يتم التمرير باللمس */
+        .mobile-customers-list { display: none !important; }
+        .customers-desktop-table { display: block !important; }
         @media (max-width: 767px) {
-          /* hide the inline desktop form on mobile (Sheet replaces it) */
           .customers-inline-form { display: none !important; }
-          /* hide the desktop table area, show cards instead */
-          .customers-desktop-table { display: none !important; }
-          .mobile-customers-list { display: block; padding: 6px 4px; }
-        }
-        @media (min-width: 768px) {
-          /* hide the mobile sheet trigger version on desktop is automatic since Sheet is closed */
+          /* تمرير لمسي سلس على iOS */
+          .customers-desktop-table > div,
+          .customers-desktop-table {
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-x pan-y;
+          }
         }
       `}</style>
 
