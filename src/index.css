@@ -1856,6 +1856,15 @@ input[type="number"] {
    MOBILE FIT — ضبط الخطوط/الهوامش/التباعد ومنع تجاوز المحتوى للارتفاع
    يُطبَّق فقط على الشاشات < 768px ولا يمسّ سطح المكتب.
    ===================================================================== */
+/* تمرير لمسي سلس لجداول إدارة المنتجات والعملاء على الجوال */
+@media (max-width: 767px) {
+  .desktop-table-wrap,
+  .customers-desktop-table {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+}
+
 @media (max-width: 767px) {
   html, body { font-size: 13px; }
   body { overflow-x: hidden; }
