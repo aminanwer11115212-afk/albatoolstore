@@ -75,16 +75,8 @@ export default function ProductsPage() {
   useEffect(() => { try { localStorage.setItem(PP_PER_PAGE, String(perPage)); } catch {} }, [perPage]);
 
   const [openFilter, setOpenFilter] = useState<{ key: string; mode: "list" | "search" } | null>(null);
-  
-  // كشف الجوّال لتجنّب رندر آلاف البطاقات على الديسكتوب
-  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 720px)");
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    try { mq.addEventListener("change", handler); } catch { mq.addListener(handler); }
-    return () => { try { mq.removeEventListener("change", handler); } catch { mq.removeListener(handler); } };
-  }, []);
+  // isMobile state removed — the desktop table is now shown on mobile via the
+  // global `.desktop-on-mobile` CSS, so we no longer branch on viewport here.
 
   const [filterQuery, setFilterQuery] = useState("");
   const [filterHighlight, setFilterHighlight] = useState(0);
