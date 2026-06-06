@@ -812,29 +812,38 @@ export type Database = {
       }
       invoice_revisions: {
         Row: {
+          action: string | null
           change_summary: string | null
           changed_by: string | null
+          changes: Json | null
           created_at: string
           id: string
           invoice_id: string
+          note: string | null
           revision_number: number | null
           snapshot: Json | null
         }
         Insert: {
+          action?: string | null
           change_summary?: string | null
           changed_by?: string | null
+          changes?: Json | null
           created_at?: string
           id?: string
           invoice_id: string
+          note?: string | null
           revision_number?: number | null
           snapshot?: Json | null
         }
         Update: {
+          action?: string | null
           change_summary?: string | null
           changed_by?: string | null
+          changes?: Json | null
           created_at?: string
           id?: string
           invoice_id?: string
+          note?: string | null
           revision_number?: number | null
           snapshot?: Json | null
         }
@@ -907,6 +916,8 @@ export type Database = {
           payment_method: string | null
           shipping: number | null
           status: string | null
+          stock_deducted_at: string | null
+          stock_deduction_id: string | null
           subtotal: number | null
           tax_amount: number | null
           total: number | null
@@ -934,6 +945,8 @@ export type Database = {
           payment_method?: string | null
           shipping?: number | null
           status?: string | null
+          stock_deducted_at?: string | null
+          stock_deduction_id?: string | null
           subtotal?: number | null
           tax_amount?: number | null
           total?: number | null
@@ -961,6 +974,8 @@ export type Database = {
           payment_method?: string | null
           shipping?: number | null
           status?: string | null
+          stock_deducted_at?: string | null
+          stock_deduction_id?: string | null
           subtotal?: number | null
           tax_amount?: number | null
           total?: number | null
