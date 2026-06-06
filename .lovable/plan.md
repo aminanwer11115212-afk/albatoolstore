@@ -1,78 +1,76 @@
-
 ## الهدف
 
-ضمان أن:
-1. **إضافة منتج** من شاشة "إدارة المنتجات" تعمل بالكامل (مع الموردين، التجميد، الفئات والماركات المتعددة).
-2. **إضافة عميل** من شاشة "إدارة العملاء" تعمل بالكامل (الواتساب، الإقليم/الولاية/المدينة/المحلية، المجموعة، الوجهة الافتراضية، الترحيل المفضّل).
-3. **إضافة فاتورة** تعمل بالكامل.
-4. **الأتمتة**: تحويل عرض السعر → فاتورة يُنشئ فاتورة بحالة `new`، وعند الطباعة/أول تغيير تنتقل إلى **"قيد التجهيز"** ويتم خصم المخزون مرة واحدة فقط، ثم "في الطريق" ثم "تم".
+1. شاشتا **إدارة العملاء** و**إدارة المنتجات** يجب أن تعرض على الجوال **نفس** أعمدة الديسكتوب وأزرار شريط الأدوات وأزرار الإجراءات في كل صف، تماماً كما يراها المستخدم على لابتوب/PC.
+2. كل نافذة منبثقة في النظام (Dialog / Sheet / Drawer / AlertDialog) عند فتحها يجب أن **يظهر الكيبورد تلقائياً** على أول حقل قابل للكتابة، وكل حقل آخر داخلها يستقبل الكيبورد بشكل سليم عند النقر.
 
-## التشخيص
+## نطاق التغيير
 
-فحصت الكود الحالي مقابل الـ schema الحالية في قاعدة البيانات. الكود يستدعي حقولاً وجداولاً غير موجودة:
+### الجزء الأول — أعمدة العملاء/المنتجات على الجوال
 
-| الجدول | الأعمدة الناقصة المطلوبة |
-|---|---|
-| `customers` | `whatsapp`, `region_id`, `state_id`, `city_id`, `locality_id`, `created_by_uid` |
-| `products` | `supplier_id`, `is_frozen`, `barcode` |
-| `invoices` | `workflow_status`, `currency_code`, `exchange_rate_to_base`, `created_by_uid`, `user_note`, `warehouse_id` |
-| `invoice_items` | `foreign_price`, `unit`, `warehouse_id`, `discount_value`, `format_discount`, `tax_status` |
-| `quotes` | `workflow_status`, `currency_code`, `exchange_rate_to_base`, `is_side`, `converted_to_invoice_id`, `converted_at`, `converted_by`, `user_note`, `created_by_uid` |
-| `quote_items` | `foreign_price`, `unit`, `discount_value`, `format_discount`, `tax_status` |
-| `company_settings` | `side_quote_prefix` |
+التشخيص الحالي:
 
-**جداول مفقودة كلياً**: `regions`, `states`, `cities`, `localities` (هيكل الجغرافيا الهرمي للعملاء)، و `user_roles` (الأدوار).
+- شاشة العملاء: الكود يحتوي `<MobileDocCard>` للجوال + جدول للديسكتوب. هنالك CSS داخل الصفحة يُلغي بطاقات الجوال (`.mobile-customers-list { display: none }`) ويُظهر الجدول، لكن لا يزال هنالك قواعد عامة في `src/index.css` تكسر التجربة على الموبايل:
+  - `.legacy-dt-toolbar { flex-direction: column }` → شريط الأدوات يصبح عمودياً.
+  - `.legacy-actions { flex-wrap: wrap }` → أزرار الإجراءات في كل صف تلتف لأسطر متعددة.
+  - `.recent-items-sidebar, .desktop-only { display: none }` → أزرار/لوحات مخفية.
+  - `.legacy-table { min-width: 720px }` فقط، فالأعمدة لا تأخذ عرضها الكامل كالديسكتوب.
+- شاشة المنتجات: مماثلة، وقسم بطاقات الجوال معطّل بالفعل (`{false && isMobile && …}`).
 
-**دوال RPC مفقودة**: `delete_invoice_items_silent`, `find_duplicate_invoice` (يستخدمهما `InvoiceCreatePage`).
+التغييرات:
 
-## خطة التنفيذ (هجرة واحدة)
+1. إضافة كلاس مشترك جديد `desktop-on-mobile` نضعه على حاوية صفحتي العملاء والمنتجات.
+2. تجاوز موضعي داخل هذا الكلاس (في `src/index.css` ضمن `@media (max-width: 767px)`) يجعل:
+   - شريط الأدوات يعود **أفقياً** مع تمرير أفقي عند الحاجة بدل التكدّس العمودي.
+   - أزرار الإجراءات داخل الصفوف تبقى في سطر واحد (no-wrap) مع `min-width` ثابت لكل زر.
+   - الجدول يُعرض بعرضه الكامل (يساوي مجموع عرض الأعمدة على الديسكتوب) مع تمرير أفقي ناعم باللمس.
+   - الـ sidebar الجانبي للعناصر الأخيرة يبقى مخفياً (هذا منطقي على الجوال)، أمّا أزرار التولبار الرئيسية فتظهر كما هي.
+   - حذف نهائي لقسم `<MobileDocCard>` من شاشة العملاء (في المنتجات معطّل أصلاً) لتقليل الكود.
 
-### 1) إضافة الأعمدة الناقصة (`ALTER TABLE … ADD COLUMN IF NOT EXISTS`)
-لكل جدول من الجداول أعلاه، بدون مساس بالبيانات الموجودة.
+نتيجة الزووم: المستخدم سيستخدم zoom/تمرير أفقي ليرى نفس الأعمدة، وهذا هو السلوك المطلوب.
 
-### 2) إنشاء جداول الجغرافيا الهرمية
-```text
-regions ──< states ──< cities ──< localities
-```
-كل جدول يحوي `id`, `name`, ومرجع للأب. مع RLS عام (مطابق لباقي النظام) و GRANT.
+### الجزء الثاني — autofocus الكيبورد في كل النوافذ
 
-### 3) إنشاء `user_roles` بالنمط الآمن
-- enum `app_role` (`admin`, `manager`, `staff`, `viewer`)
-- جدول `user_roles(user_id, role)` + RLS + GRANT
-- دالة `has_role(_uid, _role)` بـ `SECURITY DEFINER` لتفادي الـ recursion
+الوضع الحالي بعد جرد سريع لـ 35 ملف يحتوي `DialogContent`/`SheetContent`:
 
-### 4) إنشاء دوال RPC للفواتير
-- **`delete_invoice_items_silent(p_invoice_id uuid)`** — يحذف بنود فاتورة دون تشغيل أي تريغرات خصم/إرجاع، ضرورية عند إعادة كتابة بنود الفاتورة في وضع التعديل.
-- **`find_duplicate_invoice(_customer_id uuid, _date date, _items jsonb, _exclude_invoice_id uuid)`** — تعيد أول فاتورة لنفس العميل/اليوم بنفس مجموع المنتجات والكميات (لمنع التكرار العرضي).
+- بعض النوافذ فيها `autoFocus` يدوي على حقل واحد (QuickAddProductDialog، ItemNoteDialog، MessageImportDialog).
+- **معظم** النوافذ لا تعتمد autoFocus على أول حقل (CustomerFormDialog، TransportDialog، PackagingDialog، ShippingDispatchDialog، ExchangeRateDialog، ChargeBalanceDialog، AccountsOpeningBalanceDialog، InvoiceRevisionsDialog، DeletedItemsTrayDialog، PrintTilesDialog، QuoteConvertedDialog، InstallPwaDialog، UnsavedChangesDialog، InvoiceAttachmentsDialog، QuoteAttachmentsDialog، PurchaseAttachmentsDialog، CurrenciesPage dialog، PackagingTypesPage dialog، إلخ).
+- Radix افتراضياً يُركّز على أول عنصر قابل للتركيز عند فتح Dialog، لكن غالباً يكون زر إغلاق أو زر Save بدل أول input، فلا يظهر الكيبورد.
 
-### 5) أتمتة سير عمل الفاتورة
-- إضافة CHECK لـ `workflow_status` يسمح فقط بـ: `new`, `preparing`, `ready_to_ship`, `in_transit`, `done`.
-- إنشاء **trigger** `invoices_workflow_stock_deduction` على `UPDATE` للفاتورة:
-  - إذا انتقلت `workflow_status` من `new` إلى أي قيمة أخرى **لأول مرة فقط** → خصم كميات بنود الفاتورة من `products.stock_quantity` وتسجيل صف في `activity_log` (`action='stock_deducted'`) لضمان الـ idempotency.
-  - لا يخصم ثانية إذا أُعيد التحويل أو تغيّرت الحالات لاحقاً (يفحص وجود سجل `stock_deducted` لنفس الفاتورة).
-- مزامنة الكود: `InvoiceViewPage` يقوم حالياً عند الطباعة بتغيير الحالة إلى `preparing` — هذا يبقى كما هو ويعتمد على التريغر للخصم.
+الحل (طبقة موحّدة بدل تعديل 35 ملف يدوياً):
 
-### 6) تأكيد دالة تحويل عرض السعر → فاتورة
-الدالة `convertQuoteToInvoice` موجودة بالفعل في `src/utils/quoteToInvoice.ts` وتنشئ فاتورة بـ `workflow_status='new'` وتربط `converted_to_invoice_id` في عرض السعر. بعد إضافة الأعمدة في الخطوة 1 ستعمل بدون تعديل كود.
+1. **توسيع `DialogContent` و `SheetContent` في `src/components/ui/dialog.tsx` و `src/components/ui/sheet.tsx`**: عند الفتح، نبحث برمجياً عن أول حقل كتابة قابل للاستخدام داخل النافذة (`input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), [contenteditable=true]`) ونستدعي `.focus()` بعد frame واحد. هذا يفعّل الكيبورد على iOS/Android تلقائياً.
+2. علم انسحاب اختياري `data-no-autofocus` على `DialogContent` للنوافذ التي لا نريد فيها هذا السلوك (مثل نوافذ التأكيد فقط أو القوائم المتدرّجة الكبيرة).
+3. الحفاظ على وصول لوحة المفاتيح والـ Esc والـ focus trap كما يفعل Radix افتراضياً (لا نلمس آلية التركيز الداخلية لـ Radix، فقط نوجّه أول focus لحقل كتابة).
+4. AlertDialog يبقى كما هو (نوافذ تأكيد، لا يوجد حقول).
 
-### 7) بيانات بذرة بسيطة
-- إقليم/ولاية افتراضية واحدة للسودان (الخرطوم) كي لا تكون قوائم الجغرافيا فارغة تماماً.
-- `side_quote_prefix = 'SQ-'` في `company_settings`.
+### الجزء الثالث — فحص شامل لكل النوافذ
 
-### 8) إعادة توليد types
-بعد الـ migration سيُعاد توليد `src/integrations/supabase/types.ts` تلقائياً.
+بعد التعديل، أمشط 35 ملف يحتوي نوافذ منبثقة وأتأكد من:
 
-## ملاحظات تقنية
+- لا يوجد حقل كتابة بـ `readOnly` بطريق الخطأ يمنع ظهور الكيبورد (حالياً جرد سريع لم يُظهر أي `readOnly` في مكونات النوافذ — جيد).
+- كل `<Input>` فعلاً `<input>` HTML قياسي (الـ shadcn input يلتزم بذلك).
+- النوافذ الكبيرة (CustomerFormDialog، QuickAddProductDialog، TransportDialog، PackagingDialog، InvoiceCreatePage modals، QuoteCreatePage modals، StockReturnCreatePage، PurchaseCreatePage) — أتحقق يدوياً أن أول حقل في كل واحدة منها هو الحقل الصحيح للبدء (الاسم/الرقم/الوصف…).
+- على iOS: تكبير-الصفحة-عند-التركيز (zoom) معطّل عالمياً (`font-size: 16px` في الـ media query لكل input داخل dialog) — موجود في `src/index.css` السطر 940-945.
 
-- جميع الـ RLS تُحافظ على نمط النظام الحالي (`USING (true) WITH CHECK (true)` للجداول التشغيلية)، باستثناء `user_roles` التي تُقفل عبر `has_role`.
-- التريغر يستخدم `SECURITY DEFINER` و `SET search_path = public` ليتجاوز RLS عند الخصم.
-- التحقق من الـ idempotency يتم بـ `WHERE NOT EXISTS (SELECT 1 FROM activity_log WHERE entity_type='invoice' AND entity_id=NEW.id AND action='stock_deducted')` داخل التريغر.
+## تحذيرات (يجب مراعاتها)
 
-## التحقّق بعد التطبيق
+1. **تجربة الجوال على الجدول الكامل**: مع آلاف العملاء/المنتجات وأعمدة كثيرة، الجدول الكامل على شاشة 360px سيتطلب تمريراً أفقياً واسعاً جداً. هذا ما طلبته بوضوح، لكن يُستحسن إبقاء **عمود الاسم** ثابتاً (sticky-right في RTL) ليبقى مرئياً أثناء التمرير. سأطبّق هذا.
+2. **iOS auto-keyboard**: Safari يفتح الكيبورد فقط على focus ناتج عن إيماءة مستخدم. فتح Dialog ناتج عن نقر = إيماءة، لذا التركيز البرمجي بعد فتح Dialog يعمل عادةً. في حالات نادرة (Dialog يُفتح من setTimeout غير ناتج عن نقر) قد لا يفتح الكيبورد — هذا قيد المتصفح وليس قابلاً للحل برمجياً.
+3. **نوافذ Command/Popover للبحث** (CommandInput) لها `autoFocus` بالفعل، لكن في بعض المتصفحات لا يفتح الكيبورد إلا بعد نقرة. لن أغيّر سلوكها لأنها تعمل كما هو متوقع داخل combobox.
+4. **التولبار الأفقي على شاشة صغيرة** للعملاء/المنتجات سيكون قابلاً للتمرير أفقياً (overflow-x: auto)؛ لن أقلّص الأزرار أو أُخفي منها شيئاً.
+5. **اختبار شامل بعد التطبيق**: سأفتح بريفيو الموبايل وأتحقق بصرياً من الشاشتين، ثم أفتح عينة من 5–6 نوافذ منبثقة وأرى الكيبورد ينفتح تلقائياً.
 
-1. فتح "إدارة المنتجات" → إضافة منتج جديد ← يُحفظ ويظهر في القائمة.
-2. فتح "إدارة العملاء" → إضافة عميل مع واتساب وولاية ومدينة ← يُحفظ.
-3. إنشاء فاتورة جديدة من شاشة الفاتورة ← تُحفظ بحالة `new`.
-4. إنشاء عرض سعر → الضغط على "تحويل لفاتورة" ← تُنشأ فاتورة مرتبطة، عرض السعر يصبح `accepted` ومرتبط بـ `converted_to_invoice_id`.
-5. فتح الفاتورة الجديدة → تغيير الحالة إلى **قيد التجهيز** ← خصم المخزون يحدث مرة واحدة (يمكن التحقق من `activity_log` و `products.stock_quantity`).
-6. تغيير الحالة إلى **في الطريق** ثم **تم** ← لا خصم إضافي.
+## الملفات التي ستُعدَّل
+
+- `src/components/ui/dialog.tsx` — إضافة auto-focus لأول حقل كتابة.
+- `src/components/ui/sheet.tsx` — نفس الشيء.
+- `src/index.css` — قواعد `.desktop-on-mobile` تحت `@media (max-width: 767px)` + عمود الاسم sticky.
+- `src/pages/CustomersPage.tsx` — إضافة كلاس `desktop-on-mobile` للحاوية وحذف قسم بطاقات الجوال.
+- `src/pages/ProductsPage.tsx` — إضافة كلاس `desktop-on-mobile` وحذف بقايا قسم بطاقات الجوال المعطّل.
+- (اختياري عند الحاجة) ملف نافذة بمحتوى خاص لا يريد autofocus → نضع له `data-no-autofocus`.
+
+## الذي **لن** يتغير
+
+- شاشات الفواتير وعروض الأسعار على الجوال تبقى ببطاقات `MobileDocCard` (لم يطلب المستخدم تغييرها).
+- أزرار/ألوان/أحجام الأزرار في الديسكتوب لا تتغير.
+- منطق RLS، triggers، أي شيء في قاعدة البيانات.
