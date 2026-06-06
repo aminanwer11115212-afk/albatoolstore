@@ -980,7 +980,7 @@ export default function ProductsPage() {
 
   return (
     <div className={`space-y-0`}>
-      <article className="content invoices-compact flex-1 flex flex-col">
+      <article className="content invoices-compact desktop-on-mobile flex-1 flex flex-col">
         <style>{`
           .invoices-compact { font-size: 14px; font-weight: 600; }
           .invoices-compact .legacy-card { padding: 6px; }
