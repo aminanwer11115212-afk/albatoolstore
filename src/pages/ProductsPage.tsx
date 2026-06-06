@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 import EditableCell from "@/components/EditableCell";
@@ -75,16 +75,8 @@ export default function ProductsPage() {
   useEffect(() => { try { localStorage.setItem(PP_PER_PAGE, String(perPage)); } catch {} }, [perPage]);
 
   const [openFilter, setOpenFilter] = useState<{ key: string; mode: "list" | "search" } | null>(null);
-  
-  // كشف الجوّال لتجنّب رندر آلاف البطاقات على الديسكتوب
-  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 720px)");
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    try { mq.addEventListener("change", handler); } catch { mq.addListener(handler); }
-    return () => { try { mq.removeEventListener("change", handler); } catch { mq.removeListener(handler); } };
-  }, []);
+  // isMobile state removed — the desktop table is now shown on mobile via the
+  // global `.desktop-on-mobile` CSS, so we no longer branch on viewport here.
 
   const [filterQuery, setFilterQuery] = useState("");
   const [filterHighlight, setFilterHighlight] = useState(0);
@@ -980,7 +972,7 @@ export default function ProductsPage() {
 
   return (
     <div className={`space-y-0`}>
-      <article className="content invoices-compact flex-1 flex flex-col">
+      <article className="content invoices-compact desktop-on-mobile flex-1 flex flex-col">
         <style>{`
           .invoices-compact { font-size: 14px; font-weight: 600; }
           .invoices-compact .legacy-card { padding: 6px; }
@@ -2139,12 +2131,7 @@ export default function ProductsPage() {
           </table>
         </div>
 
-        {/* Mobile cards list معطلة — نعرض الجدول الكامل على الجوال كما في اللابتوب */}
-        {false && isMobile && (
-        <div className="mobile-doc-list" style={{ padding: 8 }}>
-          {null}
-        </div>
-        )}
+        {/* Mobile cards list removed — desktop table is shown on mobile too (desktop-on-mobile). */}
 
         {isAllProducts && !isLoading && filtered.length > 0 && (
           <>

@@ -9,7 +9,7 @@ import CustomerDetailView from "@/components/CustomerDetailView";
 import LocationPicker, { LocationValue, validateLocation } from "@/components/LocationPicker";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
 import { userScopedLegacyKey } from "@/lib/userScopedKey";
@@ -1087,7 +1087,7 @@ export default function CustomersPage() {
       `}</style>
 
 
-      <article className={`content invoices-compact ${!showDashboard ? "flex-1 flex flex-col" : ""}`}>
+      <article className={`content invoices-compact desktop-on-mobile ${!showDashboard ? "flex-1 flex flex-col" : ""}`}>
         <style>{`
           .invoices-compact { font-size: 14px; font-weight: 600; }
           .invoices-compact .legacy-card { padding: 6px; }
@@ -1726,100 +1726,7 @@ export default function CustomersPage() {
               </table>
             </div>
 
-            {/* Mobile cards list */}
-            <div className="mobile-customers-list">
-              {isLoading ? (
-                <div style={{ textAlign: "center", padding: 30 }}>Processing...</div>
-              ) : paginated.length === 0 ? (
-                <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا يوجد عملاء</div>
-              ) : paginated.map((c: any, idx: number) => {
-                const balance = Number(c.balance || 0);
-                const credit = Number(c.credit_balance || 0);
-                const regionName = regions.find((r: any) => r.id === c.region_id)?.name || "";
-                const stateName = states.find((s: any) => s.id === c.state_id)?.name || "";
-                return (
-                  <MobileDocCard
-                    key={c.id}
-                    index={(page - 1) * perPage + idx + 1}
-                    number={c.whatsapp || c.phone || "—"}
-                    party={c.name}
-                    date={[regionName, stateName].filter(Boolean).join(" • ")}
-                    amount={
-                      balance > 0
-                        ? `مدين: ${balance.toLocaleString()}`
-                        : credit > 0
-                        ? `دائن: ${credit.toLocaleString()}`
-                        : ""
-                    }
-                    onOpen={() => openView(c)}
-                    actions={
-                      <>
-                        <button className="btn-xs btn-success" onClick={() => openView(c)}>عرض</button>
-                        <button className="btn-xs btn-warning" onClick={() => handleEdit(c)}>✎ تعديل</button>
-                        <button className="btn-xs btn-danger" onClick={() => handleDelete(c.id)}>🗑 حذف</button>
-                      </>
-                    }
-                  />
-                );
-              })}
-
-              {!isLoading && filtered.length > 0 && totalPages > 1 && (
-                <div
-                  className="mobile-customers-pager"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    marginTop: 10,
-                    padding: "8px 6px",
-                    borderTop: "1px solid hsl(var(--border))",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page <= 1}
-                    style={{
-                      flex: 1,
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      border: "1px solid hsl(var(--border))",
-                      background: page <= 1 ? "hsl(var(--muted))" : "hsl(var(--primary))",
-                      color: page <= 1 ? "hsl(var(--muted-foreground))" : "hsl(var(--primary-foreground))",
-                      fontWeight: 700,
-                      fontSize: 13,
-                      cursor: page <= 1 ? "not-allowed" : "pointer",
-                      opacity: page <= 1 ? 0.6 : 1,
-                    }}
-                  >
-                    ← السابق
-                  </button>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "hsl(var(--foreground))", whiteSpace: "nowrap" }}>
-                    {page} / {totalPages}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
-                    style={{
-                      flex: 1,
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      border: "1px solid hsl(var(--border))",
-                      background: page >= totalPages ? "hsl(var(--muted))" : "hsl(var(--primary))",
-                      color: page >= totalPages ? "hsl(var(--muted-foreground))" : "hsl(var(--primary-foreground))",
-                      fontWeight: 700,
-                      fontSize: 13,
-                      cursor: page >= totalPages ? "not-allowed" : "pointer",
-                      opacity: page >= totalPages ? 0.6 : 1,
-                    }}
-                  >
-                    التالي →
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Mobile cards list removed — the desktop table is now shown on mobile too (desktop-on-mobile). */}
 
             {!isLoading && filtered.length > 0 && (
               <>

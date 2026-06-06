@@ -2044,3 +2044,81 @@ input[type="number"] {
   width: 13px !important;
   height: 13px !important;
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   "desktop-on-mobile" — صفحات إدارة العملاء وإدارة المنتجات
+   تعرض على الجوال نفس أعمدة وأزرار شريط الأدوات كما على اللابتوب،
+   مع تمرير أفقي ناعم باللمس. لا نُخفي أي عمود أو زر.
+   ───────────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* 1) شريط الأدوات يبقى أفقياً بدل العمودي + قابل للتمرير أفقياً */
+  .desktop-on-mobile .legacy-dt-toolbar {
+    flex-direction: row !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px !important;
+    padding-bottom: 4px;
+  }
+  .desktop-on-mobile .legacy-dt-toolbar label {
+    flex: 0 0 auto !important;
+    width: auto !important;
+  }
+  .desktop-on-mobile .legacy-dt-toolbar input,
+  .desktop-on-mobile .legacy-dt-toolbar select {
+    flex: 0 0 auto !important;
+    min-width: 110px;
+    width: auto !important;
+  }
+
+  /* 2) أزرار الإجراءات في كل صف تبقى في سطر واحد */
+  .desktop-on-mobile .legacy-actions {
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+  }
+  .desktop-on-mobile .legacy-actions .btn-xs,
+  .desktop-on-mobile .legacy-actions button {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+
+  /* 3) الجدول يأخذ عرضه الكامل كما على الديسكتوب مع تمرير أفقي */
+  .desktop-on-mobile .table-responsive,
+  .desktop-on-mobile .customers-desktop-table,
+  .desktop-on-mobile .products-desktop-table {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+  .desktop-on-mobile .legacy-table {
+    /* أكبر من 720px ليأخذ الجدول عرضه الفعلي بدل الانكماش */
+    min-width: 1100px !important;
+    white-space: nowrap;
+  }
+  .desktop-on-mobile .legacy-table th,
+  .desktop-on-mobile .legacy-table td {
+    white-space: nowrap !important;
+  }
+
+  /* 4) إخفاء قسم بطاقات الجوال نهائياً لهذه الصفحات */
+  .desktop-on-mobile .mobile-customers-list,
+  .desktop-on-mobile .mobile-doc-list {
+    display: none !important;
+  }
+
+  /* 5) عمود الاسم/الـ index يبقى ثابتاً على يمين الجدول أثناء التمرير (RTL) */
+  .desktop-on-mobile .legacy-table thead th.sticky-col,
+  .desktop-on-mobile .legacy-table tbody td.sticky-col {
+    position: sticky;
+    right: 0;
+    background: hsl(var(--card));
+    z-index: 2;
+    box-shadow: -2px 0 4px -2px hsl(var(--border));
+  }
+  .desktop-on-mobile .legacy-table thead th.sticky-col {
+    background: hsl(var(--muted));
+    z-index: 3;
+  }
+}
+
