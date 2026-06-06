@@ -9,7 +9,7 @@ import CustomerDetailView from "@/components/CustomerDetailView";
 import LocationPicker, { LocationValue, validateLocation } from "@/components/LocationPicker";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
 import { userScopedLegacyKey } from "@/lib/userScopedKey";
