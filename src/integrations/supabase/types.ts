@@ -110,6 +110,35 @@ export type Database = {
         }
         Relationships: []
       }
+      cities: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          state_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          state_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          state_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cities_state_id_fkey"
+            columns: ["state_id"]
+            isOneToOne: false
+            referencedRelation: "states"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_settings: {
         Row: {
           address: string | null
@@ -138,6 +167,7 @@ export type Database = {
           show_discount: boolean | null
           show_shipping: boolean | null
           show_tax: boolean | null
+          side_quote_prefix: string | null
           tax_number: string | null
           tax_rate: number | null
           transaction_prefix: string | null
@@ -171,6 +201,7 @@ export type Database = {
           show_discount?: boolean | null
           show_shipping?: boolean | null
           show_tax?: boolean | null
+          side_quote_prefix?: string | null
           tax_number?: string | null
           tax_rate?: number | null
           transaction_prefix?: string | null
@@ -204,6 +235,7 @@ export type Database = {
           show_discount?: boolean | null
           show_shipping?: boolean | null
           show_tax?: boolean | null
+          side_quote_prefix?: string | null
           tax_number?: string | null
           tax_rate?: number | null
           transaction_prefix?: string | null
@@ -340,43 +372,61 @@ export type Database = {
           address: string | null
           balance: number | null
           city: string | null
+          city_id: string | null
           company: string | null
           created_at: string
+          created_by_uid: string | null
           email: string | null
           group_id: string | null
           id: string
+          locality_id: string | null
           name: string
           notes: string | null
           phone: string | null
+          region_id: string | null
+          state_id: string | null
           updated_at: string
+          whatsapp: string | null
         }
         Insert: {
           address?: string | null
           balance?: number | null
           city?: string | null
+          city_id?: string | null
           company?: string | null
           created_at?: string
+          created_by_uid?: string | null
           email?: string | null
           group_id?: string | null
           id?: string
+          locality_id?: string | null
           name: string
           notes?: string | null
           phone?: string | null
+          region_id?: string | null
+          state_id?: string | null
           updated_at?: string
+          whatsapp?: string | null
         }
         Update: {
           address?: string | null
           balance?: number | null
           city?: string | null
+          city_id?: string | null
           company?: string | null
           created_at?: string
+          created_by_uid?: string | null
           email?: string | null
           group_id?: string | null
           id?: string
+          locality_id?: string | null
           name?: string
           notes?: string | null
           phone?: string | null
+          region_id?: string | null
+          state_id?: string | null
           updated_at?: string
+          whatsapp?: string | null
         }
         Relationships: [
           {
@@ -662,38 +712,56 @@ export type Database = {
         Row: {
           created_at: string
           discount: number | null
+          discount_value: number | null
+          foreign_price: number | null
+          format_discount: string | null
           id: string
           invoice_id: string
           product_id: string | null
           product_name: string
           quantity: number
           tax_rate: number | null
+          tax_status: string | null
           total: number
+          unit: string | null
           unit_price: number
+          warehouse_id: string | null
         }
         Insert: {
           created_at?: string
           discount?: number | null
+          discount_value?: number | null
+          foreign_price?: number | null
+          format_discount?: string | null
           id?: string
           invoice_id: string
           product_id?: string | null
           product_name: string
           quantity?: number
           tax_rate?: number | null
+          tax_status?: string | null
           total: number
+          unit?: string | null
           unit_price: number
+          warehouse_id?: string | null
         }
         Update: {
           created_at?: string
           discount?: number | null
+          discount_value?: number | null
+          foreign_price?: number | null
+          format_discount?: string | null
           id?: string
           invoice_id?: string
           product_id?: string | null
           product_name?: string
           quantity?: number
           tax_rate?: number | null
+          tax_status?: string | null
           total?: number
+          unit?: string | null
           unit_price?: number
+          warehouse_id?: string | null
         }
         Relationships: [
           {
@@ -823,12 +891,15 @@ export type Database = {
       invoices: {
         Row: {
           created_at: string
+          created_by_uid: string | null
+          currency_code: string | null
           customer_id: string | null
           date: string
           discount: number | null
           due_amount: number | null
           due_date: string | null
           exchange_rate: number | null
+          exchange_rate_to_base: number | null
           id: string
           invoice_number: string
           notes: string | null
@@ -841,15 +912,21 @@ export type Database = {
           total: number | null
           type: string | null
           updated_at: string
+          user_note: string | null
+          warehouse_id: string | null
+          workflow_status: string | null
         }
         Insert: {
           created_at?: string
+          created_by_uid?: string | null
+          currency_code?: string | null
           customer_id?: string | null
           date?: string
           discount?: number | null
           due_amount?: number | null
           due_date?: string | null
           exchange_rate?: number | null
+          exchange_rate_to_base?: number | null
           id?: string
           invoice_number: string
           notes?: string | null
@@ -862,15 +939,21 @@ export type Database = {
           total?: number | null
           type?: string | null
           updated_at?: string
+          user_note?: string | null
+          warehouse_id?: string | null
+          workflow_status?: string | null
         }
         Update: {
           created_at?: string
+          created_by_uid?: string | null
+          currency_code?: string | null
           customer_id?: string | null
           date?: string
           discount?: number | null
           due_amount?: number | null
           due_date?: string | null
           exchange_rate?: number | null
+          exchange_rate_to_base?: number | null
           id?: string
           invoice_number?: string
           notes?: string | null
@@ -883,6 +966,9 @@ export type Database = {
           total?: number | null
           type?: string | null
           updated_at?: string
+          user_note?: string | null
+          warehouse_id?: string | null
+          workflow_status?: string | null
         }
         Relationships: [
           {
@@ -929,6 +1015,35 @@ export type Database = {
           unit_price?: number | null
         }
         Relationships: []
+      }
+      localities: {
+        Row: {
+          city_id: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          city_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          city_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "localities_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notes: {
         Row: {
@@ -1055,6 +1170,7 @@ export type Database = {
       }
       products: {
         Row: {
+          barcode: string | null
           category_id: string | null
           company_id: string | null
           created_at: string
@@ -1063,18 +1179,21 @@ export type Database = {
           foreign_price: number | null
           id: string
           image_url: string | null
+          is_frozen: boolean | null
           min_stock: number | null
           name: string
           purchase_price: number | null
           sale_price: number | null
           sku: string | null
           stock_quantity: number | null
+          supplier_id: string | null
           tax_rate: number | null
           unit: string | null
           updated_at: string
           warehouse_id: string | null
         }
         Insert: {
+          barcode?: string | null
           category_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -1083,18 +1202,21 @@ export type Database = {
           foreign_price?: number | null
           id?: string
           image_url?: string | null
+          is_frozen?: boolean | null
           min_stock?: number | null
           name: string
           purchase_price?: number | null
           sale_price?: number | null
           sku?: string | null
           stock_quantity?: number | null
+          supplier_id?: string | null
           tax_rate?: number | null
           unit?: string | null
           updated_at?: string
           warehouse_id?: string | null
         }
         Update: {
+          barcode?: string | null
           category_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -1103,12 +1225,14 @@ export type Database = {
           foreign_price?: number | null
           id?: string
           image_url?: string | null
+          is_frozen?: boolean | null
           min_stock?: number | null
           name?: string
           purchase_price?: number | null
           sale_price?: number | null
           sku?: string | null
           stock_quantity?: number | null
+          supplier_id?: string | null
           tax_rate?: number | null
           unit?: string | null
           updated_at?: string
@@ -1296,34 +1420,49 @@ export type Database = {
         Row: {
           created_at: string
           discount: number | null
+          discount_value: number | null
+          foreign_price: number | null
+          format_discount: string | null
           id: string
           product_id: string | null
           product_name: string
           quantity: number
           quote_id: string
+          tax_status: string | null
           total: number
+          unit: string | null
           unit_price: number
         }
         Insert: {
           created_at?: string
           discount?: number | null
+          discount_value?: number | null
+          foreign_price?: number | null
+          format_discount?: string | null
           id?: string
           product_id?: string | null
           product_name: string
           quantity?: number
           quote_id: string
+          tax_status?: string | null
           total: number
+          unit?: string | null
           unit_price: number
         }
         Update: {
           created_at?: string
           discount?: number | null
+          discount_value?: number | null
+          foreign_price?: number | null
+          format_discount?: string | null
           id?: string
           product_id?: string | null
           product_name?: string
           quantity?: number
           quote_id?: string
+          tax_status?: string | null
           total?: number
+          unit?: string | null
           unit_price?: number
         }
         Relationships: [
@@ -1387,11 +1526,18 @@ export type Database = {
       }
       quotes: {
         Row: {
+          converted_at: string | null
+          converted_by: string | null
+          converted_to_invoice_id: string | null
           created_at: string
+          created_by_uid: string | null
+          currency_code: string | null
           customer_id: string | null
           date: string
           discount: number | null
+          exchange_rate_to_base: number | null
           id: string
+          is_side: boolean | null
           notes: string | null
           quote_number: string
           status: string | null
@@ -1399,14 +1545,23 @@ export type Database = {
           tax_amount: number | null
           total: number | null
           updated_at: string
+          user_note: string | null
           valid_until: string | null
+          workflow_status: string | null
         }
         Insert: {
+          converted_at?: string | null
+          converted_by?: string | null
+          converted_to_invoice_id?: string | null
           created_at?: string
+          created_by_uid?: string | null
+          currency_code?: string | null
           customer_id?: string | null
           date?: string
           discount?: number | null
+          exchange_rate_to_base?: number | null
           id?: string
+          is_side?: boolean | null
           notes?: string | null
           quote_number: string
           status?: string | null
@@ -1414,14 +1569,23 @@ export type Database = {
           tax_amount?: number | null
           total?: number | null
           updated_at?: string
+          user_note?: string | null
           valid_until?: string | null
+          workflow_status?: string | null
         }
         Update: {
+          converted_at?: string | null
+          converted_by?: string | null
+          converted_to_invoice_id?: string | null
           created_at?: string
+          created_by_uid?: string | null
+          currency_code?: string | null
           customer_id?: string | null
           date?: string
           discount?: number | null
+          exchange_rate_to_base?: number | null
           id?: string
+          is_side?: boolean | null
           notes?: string | null
           quote_number?: string
           status?: string | null
@@ -1429,7 +1593,9 @@ export type Database = {
           tax_amount?: number | null
           total?: number | null
           updated_at?: string
+          user_note?: string | null
           valid_until?: string | null
+          workflow_status?: string | null
         }
         Relationships: [
           {
@@ -1506,6 +1672,53 @@ export type Database = {
           unit_price?: number | null
         }
         Relationships: []
+      }
+      regions: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      states: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          region_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          region_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          region_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "states_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_return_items: {
         Row: {
@@ -1882,6 +2095,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       warehouses: {
         Row: {
           created_at: string
@@ -1911,10 +2145,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      delete_invoice_items_silent: {
+        Args: { p_invoice_id: string }
+        Returns: undefined
+      }
+      find_duplicate_invoice: {
+        Args: {
+          _customer_id: string
+          _date: string
+          _exclude_invoice_id: string
+          _items: Json
+        }
+        Returns: {
+          id: string
+          invoice_number: string
+        }[]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "manager" | "staff" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2041,6 +2297,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "manager", "staff", "viewer"],
+    },
   },
 } as const

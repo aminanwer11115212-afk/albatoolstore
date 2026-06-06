@@ -1,76 +1,78 @@
 
 ## الهدف
-1) كل النوافذ المنبثقة (إضافة منتج / إضافة عميل / إضافة فئة / إضافة ماركة / ترحيلات … إلخ) تظهر بشكل صحيح على الهواتف بدون قص أو خروج عن الشاشة.
-2) شاشتا "إدارة المنتجات" و"إدارة العملاء" تعرضان نفس تجربة اللابتوب على الجوال (نفس الأعمدة والجدول) مع دعم كامل للمس: تمرير أفقي/عمودي بإصبع، تكبير الأعمدة بسحب الحواف باللمس، نقر مطوّل = تحديد، إلخ.
 
----
+ضمان أن:
+1. **إضافة منتج** من شاشة "إدارة المنتجات" تعمل بالكامل (مع الموردين، التجميد، الفئات والماركات المتعددة).
+2. **إضافة عميل** من شاشة "إدارة العملاء" تعمل بالكامل (الواتساب، الإقليم/الولاية/المدينة/المحلية، المجموعة، الوجهة الافتراضية، الترحيل المفضّل).
+3. **إضافة فاتورة** تعمل بالكامل.
+4. **الأتمتة**: تحويل عرض السعر → فاتورة يُنشئ فاتورة بحالة `new`، وعند الطباعة/أول تغيير تنتقل إلى **"قيد التجهيز"** ويتم خصم المخزون مرة واحدة فقط، ثم "في الطريق" ثم "تم".
 
-## المشكلة الجذرية (مكتشفة)
-الملف `src/hooks/useDialogSize.ts` يفرض على كل المنبثقات:
+## التشخيص
+
+فحصت الكود الحالي مقابل الـ schema الحالية في قاعدة البيانات. الكود يستدعي حقولاً وجداولاً غير موجودة:
+
+| الجدول | الأعمدة الناقصة المطلوبة |
+|---|---|
+| `customers` | `whatsapp`, `region_id`, `state_id`, `city_id`, `locality_id`, `created_by_uid` |
+| `products` | `supplier_id`, `is_frozen`, `barcode` |
+| `invoices` | `workflow_status`, `currency_code`, `exchange_rate_to_base`, `created_by_uid`, `user_note`, `warehouse_id` |
+| `invoice_items` | `foreign_price`, `unit`, `warehouse_id`, `discount_value`, `format_discount`, `tax_status` |
+| `quotes` | `workflow_status`, `currency_code`, `exchange_rate_to_base`, `is_side`, `converted_to_invoice_id`, `converted_at`, `converted_by`, `user_note`, `created_by_uid` |
+| `quote_items` | `foreign_price`, `unit`, `discount_value`, `format_discount`, `tax_status` |
+| `company_settings` | `side_quote_prefix` |
+
+**جداول مفقودة كلياً**: `regions`, `states`, `cities`, `localities` (هيكل الجغرافيا الهرمي للعملاء)، و `user_roles` (الأدوار).
+
+**دوال RPC مفقودة**: `delete_invoice_items_silent`, `find_duplicate_invoice` (يستخدمهما `InvoiceCreatePage`).
+
+## خطة التنفيذ (هجرة واحدة)
+
+### 1) إضافة الأعمدة الناقصة (`ALTER TABLE … ADD COLUMN IF NOT EXISTS`)
+لكل جدول من الجداول أعلاه، بدون مساس بالبيانات الموجودة.
+
+### 2) إنشاء جداول الجغرافيا الهرمية
+```text
+regions ──< states ──< cities ──< localities
 ```
-minWidth: 480, minHeight: 360, resize: both
-```
-بينما عرض الجوال 375px فقط → كل المنبثقات تخرج عن الشاشة.
-كما أن المقاس المحفوظ من اللابتوب (مثلاً 900×700) يُعاد استخدامه حرفياً على الجوال.
+كل جدول يحوي `id`, `name`, ومرجع للأب. مع RLS عام (مطابق لباقي النظام) و GRANT.
 
-المنبثقات المتأثرة (نموذج): `QuickAddProductDialog`, `CustomerFormDialog`, `TransportDialog`, `PackagingDialog`, `ChargeBalanceDialog`, `ExchangeRateDialog`, `AccountsOpeningBalanceDialog`, `QuoteAttachmentsDialog`, `PurchaseAttachmentsDialog`, `PrintTilesDialog`, `MessageImportDialog`, `InstallPwaDialog`, `UnsavedChangesDialog`، …
+### 3) إنشاء `user_roles` بالنمط الآمن
+- enum `app_role` (`admin`, `manager`, `staff`, `viewer`)
+- جدول `user_roles(user_id, role)` + RLS + GRANT
+- دالة `has_role(_uid, _role)` بـ `SECURITY DEFINER` لتفادي الـ recursion
 
----
+### 4) إنشاء دوال RPC للفواتير
+- **`delete_invoice_items_silent(p_invoice_id uuid)`** — يحذف بنود فاتورة دون تشغيل أي تريغرات خصم/إرجاع، ضرورية عند إعادة كتابة بنود الفاتورة في وضع التعديل.
+- **`find_duplicate_invoice(_customer_id uuid, _date date, _items jsonb, _exclude_invoice_id uuid)`** — تعيد أول فاتورة لنفس العميل/اليوم بنفس مجموع المنتجات والكميات (لمنع التكرار العرضي).
 
-## الخطة
+### 5) أتمتة سير عمل الفاتورة
+- إضافة CHECK لـ `workflow_status` يسمح فقط بـ: `new`, `preparing`, `ready_to_ship`, `in_transit`, `done`.
+- إنشاء **trigger** `invoices_workflow_stock_deduction` على `UPDATE` للفاتورة:
+  - إذا انتقلت `workflow_status` من `new` إلى أي قيمة أخرى **لأول مرة فقط** → خصم كميات بنود الفاتورة من `products.stock_quantity` وتسجيل صف في `activity_log` (`action='stock_deducted'`) لضمان الـ idempotency.
+  - لا يخصم ثانية إذا أُعيد التحويل أو تغيّرت الحالات لاحقاً (يفحص وجود سجل `stock_deducted` لنفس الفاتورة).
+- مزامنة الكود: `InvoiceViewPage` يقوم حالياً عند الطباعة بتغيير الحالة إلى `preparing` — هذا يبقى كما هو ويعتمد على التريغر للخصم.
 
-### 1) إصلاح `useDialogSize` (إصلاح مركزي = يصلح كل المنبثقات دفعة واحدة)
-- اكتشاف الجوال (`window.innerWidth ≤ 640` + `matchMedia`).
-- على الجوال:
-  - `minWidth: 0`, `minHeight: 0`
-  - `width: 100vw`, `height: 100dvh` (شاشة كاملة)
-  - `maxWidth: 100vw`, `maxHeight: 100dvh`
-  - `resize: none` (لا يوجد سحب لتغيير الحجم باللمس)
-  - تجاهل المقاس المحفوظ من اللابتوب (مفتاح تخزين مختلف للجوال أو تخطي القراءة).
-  - `borderRadius: 0`, `overflow: auto` للمحتوى.
-- على اللابتوب: السلوك الحالي يبقى كما هو.
-- تحديث `dlgStyle` ليُرجع `overflowY: "auto"` افتراضياً على الجوال حتى لا تختفي أزرار الحفظ.
+### 6) تأكيد دالة تحويل عرض السعر → فاتورة
+الدالة `convertQuoteToInvoice` موجودة بالفعل في `src/utils/quoteToInvoice.ts` وتنشئ فاتورة بـ `workflow_status='new'` وتربط `converted_to_invoice_id` في عرض السعر. بعد إضافة الأعمدة في الخطوة 1 ستعمل بدون تعديل كود.
 
-### 2) جعل `DialogContent` الافتراضي محترماً لشاشة الجوال
-- مراجعة `src/components/ui/dialog.tsx`: التأكد من أن الـ overlay و content يستخدمان `inset-0` على الجوال وبدون `translate-x/y` يسبب القص.
-- إضافة class شرطي `sm:rounded-lg rounded-none` و`sm:max-w-lg w-full` ليكون متجاوباً.
+### 7) بيانات بذرة بسيطة
+- إقليم/ولاية افتراضية واحدة للسودان (الخرطوم) كي لا تكون قوائم الجغرافيا فارغة تماماً.
+- `side_quote_prefix = 'SQ-'` في `company_settings`.
 
-### 3) أزرار الإغلاق/الحفظ مرئية دائماً على الجوال
-- في كل منبثق: footer ثابت `sticky bottom-0 bg-background border-t` بحيث لا يضيع زر "حفظ" أسفل المحتوى.
-- الإدخالات بحجم 16px+ (مطبّق مسبقاً في `index.css`).
+### 8) إعادة توليد types
+بعد الـ migration سيُعاد توليد `src/integrations/supabase/types.ts` تلقائياً.
 
-### 4) شاشة "إدارة المنتجات" و"إدارة العملاء" على الجوال = نسخة اللابتوب + لمس
-حالياً يوجد توجيه إلى `MobileDocList` أو CSS يخفي أعمدة. سنوقف هذا التحويل في الشاشتين فقط:
-- **`ProductsPage.tsx`** و **`CustomersPage.tsx`**:
-  - إزالة أي شرط `useIsMobile()` يبدّل العرض إلى قائمة بطاقات.
-  - تغليف الجدول بـ `<div className="overflow-auto touch-pan-x touch-pan-y -webkit-overflow-scrolling-touch">` للتمرير الكامل بإصبعين.
-  - الحفاظ على نفس الأعمدة وعرضها كما اللابتوب (لا `hidden sm:table-cell`).
-- في `src/index.css`: استثناء هاتين الصفحتين من قواعد إخفاء الأعمدة على الجوال عبر selector `body[data-page="products"]` / `body[data-page="customers"]` (نضيف `data-page` في الصفحتين).
+## ملاحظات تقنية
 
-### 5) دعم اللمس في تغيير عرض الأعمدة
-`useColumnWidths` يستخدم `mousedown/mousemove`. سنضيف معالجات `pointerdown/pointermove/pointerup` (Pointer Events تغطي الفأرة واللمس) في `ColumnResizeHandle` مع `touch-action: none` على المقبض حتى لا يتعارض مع تمرير الجدول.
+- جميع الـ RLS تُحافظ على نمط النظام الحالي (`USING (true) WITH CHECK (true)` للجداول التشغيلية)، باستثناء `user_roles` التي تُقفل عبر `has_role`.
+- التريغر يستخدم `SECURITY DEFINER` و `SET search_path = public` ليتجاوز RLS عند الخصم.
+- التحقق من الـ idempotency يتم بـ `WHERE NOT EXISTS (SELECT 1 FROM activity_log WHERE entity_type='invoice' AND entity_id=NEW.id AND action='stock_deducted')` داخل التريغر.
 
-### 6) فحص نهائي
-- فتح المعاينة على 375×668 والتأكد من:
-  - زر "+ منتج جديد" داخل شاشة إنشاء فاتورة يفتح المنبثق ملء الشاشة، حقوله واضحة، الحفظ مرئي.
-  - نفس الشيء لإضافة عميل / فئة / ماركة / ترحيلات.
-  - `/products` و `/customers` تعرضان الجدول الكامل قابلاً للتمرير باللمس وتغيير عرض الأعمدة بإصبع.
+## التحقّق بعد التطبيق
 
----
-
-## ملفات سيتم تعديلها (تقريبياً)
-- `src/hooks/useDialogSize.ts` (الإصلاح المركزي)
-- `src/components/ui/dialog.tsx` (responsive classes)
-- `src/index.css` (استثناء صفحتي products/customers من قواعد إخفاء الأعمدة)
-- `src/pages/ProductsPage.tsx` و `src/pages/CustomersPage.tsx` (إلغاء تبديل عرض الجوال + إضافة `data-page` + غلاف تمرير لمسي)
-- `src/hooks/useColumnWidths.tsx` (Pointer Events + `touch-action`)
-- لا حاجة لتعديل كل منبثق على حدة — الإصلاح المركزي في #1 يكفي.
-
----
-
-## خارج النطاق (سيُنفّذ في طلب لاحق إن طلبت)
-- إعادة تصميم بصري للمنبثقات (ألوان/تخطيط).
-- نقل بيانات النظام القديم.
-- شاشات إدارة جديدة للفئات/الماركات (الموجودة حالياً ستستفيد تلقائياً من إصلاح #1).
-
-هل أبدأ التنفيذ؟
+1. فتح "إدارة المنتجات" → إضافة منتج جديد ← يُحفظ ويظهر في القائمة.
+2. فتح "إدارة العملاء" → إضافة عميل مع واتساب وولاية ومدينة ← يُحفظ.
+3. إنشاء فاتورة جديدة من شاشة الفاتورة ← تُحفظ بحالة `new`.
+4. إنشاء عرض سعر → الضغط على "تحويل لفاتورة" ← تُنشأ فاتورة مرتبطة، عرض السعر يصبح `accepted` ومرتبط بـ `converted_to_invoice_id`.
+5. فتح الفاتورة الجديدة → تغيير الحالة إلى **قيد التجهيز** ← خصم المخزون يحدث مرة واحدة (يمكن التحقق من `activity_log` و `products.stock_quantity`).
+6. تغيير الحالة إلى **في الطريق** ثم **تم** ← لا خصم إضافي.
