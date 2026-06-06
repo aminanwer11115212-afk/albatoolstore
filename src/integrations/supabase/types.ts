@@ -50,6 +50,39 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          user_email: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          user_email?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          user_email?: string | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       billing_terms: {
         Row: {
           created_at: string
@@ -179,6 +212,63 @@ export type Database = {
         }
         Relationships: []
       }
+      currencies: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          is_base: boolean | null
+          name: string
+          symbol: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_base?: boolean | null
+          name: string
+          symbol?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_base?: boolean | null
+          name?: string
+          symbol?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      customer_destinations: {
+        Row: {
+          created_at: string
+          customer_id: string
+          destination_id: string
+          id: string
+          is_default: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          destination_id: string
+          id?: string
+          is_default?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          destination_id?: string
+          id?: string
+          is_default?: boolean | null
+        }
+        Relationships: []
+      }
       customer_groups: {
         Row: {
           created_at: string
@@ -200,6 +290,48 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      customer_preferred_transporter: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          transporter_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          transporter_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          transporter_id?: string
+        }
+        Relationships: []
+      }
+      customer_transporters: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          transporter_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          transporter_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          transporter_id?: string
         }
         Relationships: []
       }
@@ -255,6 +387,114 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      deleted_invoice_items: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          discount: number | null
+          id: string
+          invoice_id: string
+          product_id: string | null
+          product_name: string
+          quantity: number | null
+          reason: string | null
+          total: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          discount?: number | null
+          id?: string
+          invoice_id: string
+          product_id?: string | null
+          product_name: string
+          quantity?: number | null
+          reason?: string | null
+          total?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          discount?: number | null
+          id?: string
+          invoice_id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number | null
+          reason?: string | null
+          total?: number | null
+          unit_price?: number | null
+        }
+        Relationships: []
+      }
+      deleted_quote_items: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          discount: number | null
+          id: string
+          product_id: string | null
+          product_name: string
+          quantity: number | null
+          quote_id: string
+          reason: string | null
+          total: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          discount?: number | null
+          id?: string
+          product_id?: string | null
+          product_name: string
+          quantity?: number | null
+          quote_id: string
+          reason?: string | null
+          total?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          discount?: number | null
+          id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number | null
+          quote_id?: string
+          reason?: string | null
+          total?: number | null
+          unit_price?: number | null
+        }
+        Relationships: []
+      }
+      destination_transporters: {
+        Row: {
+          cost: number | null
+          created_at: string
+          destination_id: string
+          id: string
+          transporter_id: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          destination_id: string
+          id?: string
+          transporter_id: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          destination_id?: string
+          id?: string
+          transporter_id?: string
+        }
+        Relationships: []
       }
       destinations: {
         Row: {
@@ -346,6 +586,33 @@ export type Database = {
           salary?: number | null
           status?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      exchange_rates: {
+        Row: {
+          created_at: string
+          effective_date: string
+          from_currency: string
+          id: string
+          rate: number
+          to_currency: string
+        }
+        Insert: {
+          created_at?: string
+          effective_date?: string
+          from_currency: string
+          id?: string
+          rate: number
+          to_currency: string
+        }
+        Update: {
+          created_at?: string
+          effective_date?: string
+          from_currency?: string
+          id?: string
+          rate?: number
+          to_currency?: string
         }
         Relationships: []
       }
@@ -445,6 +712,114 @@ export type Database = {
           },
         ]
       }
+      invoice_packaging: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_id: string
+          notes: string | null
+          packaging_type_id: string | null
+          total: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_id: string
+          notes?: string | null
+          packaging_type_id?: string | null
+          total?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+          packaging_type_id?: string | null
+          total?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      invoice_revisions: {
+        Row: {
+          change_summary: string | null
+          changed_by: string | null
+          created_at: string
+          id: string
+          invoice_id: string
+          revision_number: number | null
+          snapshot: Json | null
+        }
+        Insert: {
+          change_summary?: string | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          invoice_id: string
+          revision_number?: number | null
+          snapshot?: Json | null
+        }
+        Update: {
+          change_summary?: string | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          revision_number?: number | null
+          snapshot?: Json | null
+        }
+        Relationships: []
+      }
+      invoice_transports: {
+        Row: {
+          cost: number | null
+          created_at: string
+          delivered_at: string | null
+          destination_id: string | null
+          driver_name: string | null
+          id: string
+          invoice_id: string
+          notes: string | null
+          shipped_at: string | null
+          status: string | null
+          transporter_id: string | null
+          updated_at: string
+          vehicle_number: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          delivered_at?: string | null
+          destination_id?: string | null
+          driver_name?: string | null
+          id?: string
+          invoice_id: string
+          notes?: string | null
+          shipped_at?: string | null
+          status?: string | null
+          transporter_id?: string | null
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          delivered_at?: string | null
+          destination_id?: string | null
+          driver_name?: string | null
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+          shipped_at?: string | null
+          status?: string | null
+          transporter_id?: string | null
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           created_at: string
@@ -519,6 +894,42 @@ export type Database = {
           },
         ]
       }
+      invoices_packaging_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          invoice_id: string
+          packaging_id: string | null
+          packaging_type_id: string | null
+          quantity: number | null
+          total: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id: string
+          packaging_id?: string | null
+          packaging_type_id?: string | null
+          quantity?: number | null
+          total?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id?: string
+          packaging_id?: string | null
+          packaging_type_id?: string | null
+          quantity?: number | null
+          total?: number | null
+          unit_price?: number | null
+        }
+        Relationships: []
+      }
       notes: {
         Row: {
           content: string | null
@@ -564,6 +975,24 @@ export type Database = {
         }
         Relationships: []
       }
+      product_brand_links: {
+        Row: {
+          brand_id: string
+          created_at: string
+          product_id: string
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          product_id: string
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          product_id?: string
+        }
+        Relationships: []
+      }
       product_categories: {
         Row: {
           created_at: string
@@ -582,6 +1011,24 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      product_category_links: {
+        Row: {
+          category_id: string
+          created_at: string
+          product_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          product_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          product_id?: string
         }
         Relationships: []
       }
@@ -896,6 +1343,48 @@ export type Database = {
           },
         ]
       }
+      quote_transports: {
+        Row: {
+          cost: number | null
+          created_at: string
+          destination_id: string | null
+          driver_name: string | null
+          id: string
+          notes: string | null
+          quote_id: string
+          status: string | null
+          transporter_id: string | null
+          updated_at: string
+          vehicle_number: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          destination_id?: string | null
+          driver_name?: string | null
+          id?: string
+          notes?: string | null
+          quote_id: string
+          status?: string | null
+          transporter_id?: string | null
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          destination_id?: string | null
+          driver_name?: string | null
+          id?: string
+          notes?: string | null
+          quote_id?: string
+          status?: string | null
+          transporter_id?: string | null
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Relationships: []
+      }
       quotes: {
         Row: {
           created_at: string
@@ -951,6 +1440,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      quotes_packaging: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          packaging_type_id: string | null
+          quote_id: string
+          total: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          packaging_type_id?: string | null
+          quote_id: string
+          total?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          packaging_type_id?: string | null
+          quote_id?: string
+          total?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      quotes_packaging_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          packaging_id: string | null
+          packaging_type_id: string | null
+          quantity: number | null
+          quote_id: string
+          total: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          packaging_id?: string | null
+          packaging_type_id?: string | null
+          quantity?: number | null
+          quote_id: string
+          total?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          packaging_id?: string | null
+          packaging_type_id?: string | null
+          quantity?: number | null
+          quote_id?: string
+          total?: number | null
+          unit_price?: number | null
+        }
+        Relationships: []
       }
       stock_return_items: {
         Row: {
