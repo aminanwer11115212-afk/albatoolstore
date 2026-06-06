@@ -1087,7 +1087,7 @@ export default function CustomersPage() {
       `}</style>
 
 
-      <article className={`content invoices-compact ${!showDashboard ? "flex-1 flex flex-col" : ""}`}>
+      <article className={`content invoices-compact desktop-on-mobile ${!showDashboard ? "flex-1 flex flex-col" : ""}`}>
         <style>{`
           .invoices-compact { font-size: 14px; font-weight: 600; }
           .invoices-compact .legacy-card { padding: 6px; }
