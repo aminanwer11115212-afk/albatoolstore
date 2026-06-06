@@ -2139,12 +2139,7 @@ export default function ProductsPage() {
           </table>
         </div>
 
-        {/* Mobile cards list معطلة — نعرض الجدول الكامل على الجوال كما في اللابتوب */}
-        {false && isMobile && (
-        <div className="mobile-doc-list" style={{ padding: 8 }}>
-          {null}
-        </div>
-        )}
+        {/* Mobile cards list removed — desktop table is shown on mobile too (desktop-on-mobile). */}
 
         {isAllProducts && !isLoading && filtered.length > 0 && (
           <>
