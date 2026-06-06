@@ -87,6 +87,10 @@ const DialogContent = React.forwardRef<
           className,
         )}
         style={finalStyle}
+        onOpenAutoFocus={(e) => {
+          handleOpenAutoFocus(e);
+          props.onOpenAutoFocus?.(e);
+        }}
         {...props}
       >
         {children}
