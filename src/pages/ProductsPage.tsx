@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 import EditableCell from "@/components/EditableCell";
