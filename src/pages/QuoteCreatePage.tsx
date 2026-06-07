@@ -33,6 +33,7 @@ import { ItemsScroll } from "@/components/items/ItemsScroll";
 import { TableFiller } from "@/components/items/TableFiller";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import PackagingDialog from "@/components/packaging/PackagingDialog";
 import QuickAddProductDialog from "@/components/product/QuickAddProductDialog";
@@ -294,6 +295,7 @@ function quoteItemsHash(items: Array<{ product_id?: string | null; quantity?: an
 
 export default function QuoteCreatePage() {
   usePageRenderCount("/quotes/create");
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { id: editId } = useParams();
   const [searchParams] = useSearchParams();
@@ -1039,7 +1041,39 @@ export default function QuoteCreatePage() {
           /* ارتفاع ثابت لجدول البنود على الجوال حتى تظهر صفوف TableFiller الفارغة دائماً قبل الأزرار */
           .neo-quote-scope .items-table-wrap { height: 55vh !important; min-height: 360px !important; max-height: 60vh !important; flex: 0 0 auto !important; }
           .neo-quote-scope .items-scroll { height: 100% !important; min-height: 0 !important; max-height: none !important; }
+          /* === Mobile layout overrides for batch 1 === */
+          .neo-quote-scope .header-bar { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; padding: 8px !important; }
+          .neo-quote-scope .header-bar > .field { width: 100% !important; flex: 1 1 100% !important; max-width: 100% !important; min-width: 0 !important; }
+          .neo-quote-scope .header-bar .field .form-control { height: 40px !important; font-size: 16px !important; padding: 6px 10px !important; }
+          .neo-quote-scope .header-bar .field label { font-size: 12px !important; margin-bottom: 4px !important; color: hsl(var(--muted-foreground)) !important; }
+          .neo-quote-scope .header-bar .field .form-control.customer-name-input { font-size: 16px !important; }
+          .neo-quote-scope .header-bar [title*="إضافة عميل جديد"],
+          .neo-quote-scope .header-bar .field button[aria-label="إضافة عميل جديد"] { min-height: 40px !important; height: 40px !important; }
+          .neo-quote-scope .quick-add-row { grid-template-columns: 1fr 1fr !important; gap: 8px !important; padding: 8px !important; }
+          .neo-quote-scope .quick-add-row > .product-search-container { grid-column: 1 / -1 !important; }
+          .neo-quote-scope .quick-add-row .form-control,
+          .neo-quote-scope .quick-add-row input,
+          .neo-quote-scope .quick-add-row select { height: 40px !important; font-size: 16px !important; padding: 6px 10px !important; }
+          .neo-quote-scope .quick-add-row > button[type="button"]:last-child { grid-column: 1 / -1 !important; min-height: 44px !important; font-size: 15px !important; }
+          /* Hide column-resize handles & expand-field buttons on mobile (drag UX doesn't work on touch) */
+          .neo-quote-scope .col-resize-handle,
+          .neo-quote-scope .expand-field-btn { display: none !important; }
+          /* Mobile item cards layout */
+          .neo-quote-scope .mobile-items-list { display: flex !important; flex-direction: column; gap: 10px; padding: 4px; overflow-y: auto; flex: 1 1 0; min-height: 360px; }
+          .neo-quote-scope .mobile-item-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 10px; padding: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.04); display: flex; flex-direction: column; gap: 8px; }
+          .neo-quote-scope .mobile-item-card.is-selected { border-color: hsl(var(--destructive)); background: hsl(var(--destructive) / 0.05); }
+          .neo-quote-scope .mobile-item-card .mic-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+          .neo-quote-scope .mobile-item-card .mic-index { font-size: 12px; font-weight: 700; color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); padding: 3px 8px; border-radius: 999px; }
+          .neo-quote-scope .mobile-item-card .mic-field { display: flex; flex-direction: column; gap: 4px; }
+          .neo-quote-scope .mobile-item-card .mic-field label { font-size: 11px; color: hsl(var(--muted-foreground)); }
+          .neo-quote-scope .mobile-item-card .mic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+          .neo-quote-scope .mobile-item-card input.form-control { height: 40px !important; font-size: 16px !important; padding: 6px 10px !important; }
+          .neo-quote-scope .mobile-item-card .mic-total { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 8px; background: hsl(var(--success) / 0.08); border: 1px solid hsl(var(--success) / 0.3); color: hsl(var(--success)); font-weight: 700; }
+          .neo-quote-scope .mobile-item-card .mic-actions { display: flex; gap: 8px; }
+          .neo-quote-scope .mobile-item-card .mic-actions button { flex: 1; min-height: 40px; }
+          .neo-quote-scope .mobile-item-card .mic-note { background: hsl(var(--primary) / 0.08); border-radius: 6px; padding: 6px 10px; font-size: 13px; color: hsl(var(--primary)); white-space: pre-wrap; }
         }
+        .neo-quote-scope .mobile-items-list { display: none; }
         .neo-quote-scope .panel { background: hsl(var(--card)); border-radius: 6px; padding: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.04); border: 1px solid hsl(var(--border)); }
         .neo-quote-scope .quick-add-row { background: hsl(var(--muted)); padding:2px 4px; border-radius:6px; border:1px solid hsl(var(--border)); margin-bottom: 6px; display: grid; grid-template-columns: 4fr 70px 1fr 1fr 1fr 1fr auto; gap: 4px; align-items: center; }
         .neo-quote-scope .quick-add-row .form-control,
@@ -1484,7 +1518,8 @@ export default function QuoteCreatePage() {
             </div>
           )}
 
-          {/* ============ Items table ============ */}
+          {/* ============ Items table (Desktop) ============ */}
+          {!isMobile && (
           <div className="items-table-wrap" style={{ background: "#fff", borderRadius: 8, overflow: "hidden", border: "1px solid #e6e6ee", flex: "1 1 0", minHeight: 0, display: "flex", flexDirection: "column" }}>
             {/* In-form search box to filter table rows */}
             <ItemsScroll ref={itemsScrollRef}>
@@ -1732,6 +1767,169 @@ export default function QuoteCreatePage() {
             </table>
             </ItemsScroll>
           </div>
+          )}
+
+          {/* ============ Items list (Mobile cards) ============ */}
+          {isMobile && (
+          <div className="mobile-items-list">
+            {(() => {
+              const visibleRows = rows.filter((r) => {
+                const q = tableSearch.trim().toLowerCase();
+                if (!q) return true;
+                return (
+                  (r.product_name || "").toLowerCase().includes(q) ||
+                  (r.productSearch || "").toLowerCase().includes(q)
+                );
+              });
+              if (visibleRows.length === 0) {
+                return (
+                  <div style={{ padding: 24, textAlign: "center", color: "hsl(var(--muted-foreground))", fontSize: 13 }}>
+                    لا توجد بنود — أضف منتجاً من الأعلى
+                  </div>
+                );
+              }
+              return visibleRows.map((r, idx) => (
+                <div key={r.uid} className={`mobile-item-card${r.selected ? " is-selected" : ""}`}>
+                  <div className="mic-head">
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "hsl(var(--foreground))" }}>
+                      <input
+                        type="checkbox"
+                        checked={r.selected}
+                        onChange={(e) => updateRow(r.uid, { selected: e.target.checked })}
+                        style={{ width: 18, height: 18 }}
+                      />
+                      <span className="mic-index">#{idx + 1}</span>
+                    </label>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => setItemNoteEditing({ uid: r.uid, productName: r.product_name, value: r.note || "" })}
+                        title="ملاحظة"
+                        style={{
+                          minWidth: 40, height: 40, borderRadius: 8,
+                          background: r.note ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                          color: r.note ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+                          border: "1px solid hsl(var(--border))",
+                          fontSize: 18, cursor: "pointer",
+                        }}
+                      >📝</button>
+                      <button
+                        type="button"
+                        onClick={() => removeRow(r.uid)}
+                        title="حذف"
+                        style={{
+                          minWidth: 40, height: 40, borderRadius: 8,
+                          background: "hsl(var(--destructive))", color: "hsl(var(--destructive-foreground))",
+                          border: "none", fontSize: 18, fontWeight: 700, cursor: "pointer",
+                        }}
+                      >×</button>
+                    </div>
+                  </div>
+
+                  <div className="mic-field product-search-container">
+                    <label>المنتج</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="اكتب اسم المنتج..."
+                      data-row-search-mobile={r.uid}
+                      value={r.productSearch}
+                      onChange={(e) =>
+                        updateRow(r.uid, { productSearch: e.target.value, showSuggestions: true, product_id: null })
+                      }
+                      onFocus={() => updateRow(r.uid, { showSuggestions: true })}
+                      onBlur={() => setTimeout(() => updateRow(r.uid, { showSuggestions: false }), 150)}
+                    />
+                    <SuggestionsPortal anchorSelector={`[data-row-search-mobile="${r.uid}"]`} open={r.showSuggestions} width={suggWidth}>
+                      <div className="search-suggestions" style={{ position: "relative", top: "auto", left: "auto", right: "auto" }}>
+                        {r.showSuggestions && (() => {
+                          const matches = productMatches(r.productSearch, r.uid);
+                          if (productsLoading) {
+                            return <div className="item suggestions-status" data-status="loading">جارٍ تحميل المنتجات…</div>;
+                          }
+                          if (!r.productSearch.trim()) {
+                            return <div className="item suggestions-status" data-status="hint">اكتب للبحث ({products.length} منتج)</div>;
+                          }
+                          if (matches.length === 0) {
+                            return <div className="item suggestions-status" data-status="empty">لا توجد نتائج</div>;
+                          }
+                          return matches.map((p, i) => (
+                            <div
+                              key={p.id}
+                              className="item"
+                              data-sugg-item
+                              data-active={i === 0 ? "true" : "false"}
+                              onMouseDown={() => pickProductIntoRow(r.uid, p)}
+                            >
+                              <span>{p.name}</span>
+                              <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                                {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                              </span>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </SuggestionsPortal>
+                  </div>
+
+                  <div className="mic-grid">
+                    <div className="mic-field">
+                      <label>الكمية</label>
+                      <input
+                        type="number"
+                        className="form-control text-center"
+                        value={r.quantity}
+                        onChange={(e) => updateRow(r.uid, { quantity: Number(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="mic-field">
+                      <label>السعر المحلي</label>
+                      <input
+                        step="any"
+                        type="number"
+                        className="form-control text-center"
+                        value={r.unit_price || ""}
+                        onChange={(e) => {
+                          setRows((prev) =>
+                            prev.map((row) => {
+                              if (row.uid !== r.uid) return row;
+                              const up = Number(e.target.value) || 0;
+                              const merged = { ...row, unit_price: up };
+                              merged.total = calcTotal(merged);
+                              return merged;
+                            }),
+                          );
+                        }}
+                        style={{ background: "#fff8e6" }}
+                      />
+                    </div>
+                    <div className="mic-field">
+                      <label>السعر الأجنبي $</label>
+                      <input
+                        step="any"
+                        type="number"
+                        className="form-control text-center"
+                        value={r.foreign_price || ""}
+                        onChange={(e) => updateRow(r.uid, { foreign_price: Number(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="mic-field">
+                      <label>الإجمالي ({companyCurrency})</label>
+                      <div className="mic-total">
+                        <span>الإجمالي</span>
+                        <span>{r.total.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {r.note && (
+                    <div className="mic-note">📝 <strong>ملاحظة:</strong> {r.note}</div>
+                  )}
+                </div>
+              ));
+            })()}
+          </div>
+          )}
 
 
 
