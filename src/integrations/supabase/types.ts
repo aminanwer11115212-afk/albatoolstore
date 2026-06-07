@@ -1385,41 +1385,65 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          discount: number | null
+          due_amount: number | null
+          expected_delivery_date: string | null
           id: string
           notes: string | null
           order_number: string
+          paid_amount: number | null
+          shipping: number | null
           status: string | null
           subtotal: number | null
           supplier_id: string | null
+          supplier_invoice_number: string | null
           tax_amount: number | null
           total: number | null
           updated_at: string
+          user_note: string | null
+          warehouse_id: string | null
         }
         Insert: {
           created_at?: string
           date?: string
+          discount?: number | null
+          due_amount?: number | null
+          expected_delivery_date?: string | null
           id?: string
           notes?: string | null
           order_number: string
+          paid_amount?: number | null
+          shipping?: number | null
           status?: string | null
           subtotal?: number | null
           supplier_id?: string | null
+          supplier_invoice_number?: string | null
           tax_amount?: number | null
           total?: number | null
           updated_at?: string
+          user_note?: string | null
+          warehouse_id?: string | null
         }
         Update: {
           created_at?: string
           date?: string
+          discount?: number | null
+          due_amount?: number | null
+          expected_delivery_date?: string | null
           id?: string
           notes?: string | null
           order_number?: string
+          paid_amount?: number | null
+          shipping?: number | null
           status?: string | null
           subtotal?: number | null
           supplier_id?: string | null
+          supplier_invoice_number?: string | null
           tax_amount?: number | null
           total?: number | null
           updated_at?: string
+          user_note?: string | null
+          warehouse_id?: string | null
         }
         Relationships: [
           {
