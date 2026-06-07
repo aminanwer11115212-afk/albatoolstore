@@ -1518,7 +1518,8 @@ export default function QuoteCreatePage() {
             </div>
           )}
 
-          {/* ============ Items table ============ */}
+          {/* ============ Items table (Desktop) ============ */}
+          {!isMobile && (
           <div className="items-table-wrap" style={{ background: "#fff", borderRadius: 8, overflow: "hidden", border: "1px solid #e6e6ee", flex: "1 1 0", minHeight: 0, display: "flex", flexDirection: "column" }}>
             {/* In-form search box to filter table rows */}
             <ItemsScroll ref={itemsScrollRef}>
