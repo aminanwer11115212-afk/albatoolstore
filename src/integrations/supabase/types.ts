@@ -19,8 +19,10 @@ export type Database = {
           account_number: string | null
           account_type: string | null
           balance: number | null
+          bank_name: string | null
           created_at: string
           description: string | null
+          iban: string | null
           id: string
           is_default: boolean | null
           name: string
@@ -30,8 +32,10 @@ export type Database = {
           account_number?: string | null
           account_type?: string | null
           balance?: number | null
+          bank_name?: string | null
           created_at?: string
           description?: string | null
+          iban?: string | null
           id?: string
           is_default?: boolean | null
           name: string
@@ -41,8 +45,10 @@ export type Database = {
           account_number?: string | null
           account_type?: string | null
           balance?: number | null
+          bank_name?: string | null
           created_at?: string
           description?: string | null
+          iban?: string | null
           id?: string
           is_default?: boolean | null
           name?: string
@@ -707,6 +713,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          login_enabled: boolean
           name: string
           notes: string | null
           phone: string | null
@@ -719,6 +726,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          login_enabled?: boolean
           name: string
           notes?: string | null
           phone?: string | null
@@ -731,6 +739,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          login_enabled?: boolean
           name?: string
           notes?: string | null
           phone?: string | null
@@ -1077,6 +1086,7 @@ export type Database = {
       invoices: {
         Row: {
           created_at: string
+          created_by: string | null
           created_by_uid: string | null
           currency_code: string | null
           customer_id: string | null
@@ -1107,6 +1117,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           created_by_uid?: string | null
           currency_code?: string | null
           customer_id?: string | null
@@ -1137,6 +1148,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           created_by_uid?: string | null
           currency_code?: string | null
           customer_id?: string | null
@@ -1950,6 +1962,7 @@ export type Database = {
           converted_by: string | null
           converted_to_invoice_id: string | null
           created_at: string
+          created_by: string | null
           created_by_uid: string | null
           currency_code: string | null
           customer_id: string | null
@@ -1976,6 +1989,7 @@ export type Database = {
           converted_by?: string | null
           converted_to_invoice_id?: string | null
           created_at?: string
+          created_by?: string | null
           created_by_uid?: string | null
           currency_code?: string | null
           customer_id?: string | null
@@ -2002,6 +2016,7 @@ export type Database = {
           converted_by?: string | null
           converted_to_invoice_id?: string | null
           created_at?: string
+          created_by?: string | null
           created_by_uid?: string | null
           currency_code?: string | null
           customer_id?: string | null
@@ -2566,19 +2581,25 @@ export type Database = {
       user_roles: {
         Row: {
           created_at: string
+          employee_id: string | null
           id: string
+          permissions: Json
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           created_at?: string
+          employee_id?: string | null
           id?: string
+          permissions?: Json
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           created_at?: string
+          employee_id?: string | null
           id?: string
+          permissions?: Json
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
