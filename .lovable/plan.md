@@ -1,76 +1,76 @@
-## الهدف
+## المشكلة في الصورة
 
-1. شاشتا **إدارة العملاء** و**إدارة المنتجات** يجب أن تعرض على الجوال **نفس** أعمدة الديسكتوب وأزرار شريط الأدوات وأزرار الإجراءات في كل صف، تماماً كما يراها المستخدم على لابتوب/PC.
-2. كل نافذة منبثقة في النظام (Dialog / Sheet / Drawer / AlertDialog) عند فتحها يجب أن **يظهر الكيبورد تلقائياً** على أول حقل قابل للكتابة، وكل حقل آخر داخلها يستقبل الكيبورد بشكل سليم عند النقر.
+من الصورة على شاشة /products (375px) ألاحظ مشكلتين حقيقيتين، وليست واحدة:
 
-## نطاق التغيير
+1. **أزرار شريط الأدوات مهروسة** — الحروف العربية تظهر مكدّسة عمودياً (ح/ي/ل…) لأن العرض أقل من حرف واحد. السبب: قواعد `desktop-on-mobile .legacy-dt-toolbar` في `src/index.css` تجعل الشريط `flex-wrap: nowrap` و`overflow-x: auto`، لكنها تطبّق `flex: 0 0 auto` و`white-space: nowrap` **على input/select/label فقط**، وليس على الأزرار `.btn-xxs` / `.btn-xs` / `<a>`. النتيجة flex يضغط الأزرار إلى pixel واحد ويلفّ النص داخلها.
 
-### الجزء الأول — أعمدة العملاء/المنتجات على الجوال
+2. **منطقة الجدول فارغة تماماً** بين "2 منتج" والترقيم رغم وجود منتجين. الحاوية `.desktop-table-wrap` لها `maxHeight: calc(100vh - 280px)` و`overflowY: auto`. على ارتفاع جوال 669px تصبح ~389px، لكن مع أشرطة شريط الأدوات + الـ chips + الصور المرسومة قد تصبح الحاوية بارتفاع موجب صغير جداً أو تحجب الجدول بصرياً. كما أن `min-width: 1100px` على `.legacy-table` مع `tableLayout: fixed` وقيم `colWidths` المخزّنة من الديسكتوب قد تجعل التمرير الأفقي لا يبدأ من بداية الجدول.
 
-التشخيص الحالي:
+## الخطة
 
-- شاشة العملاء: الكود يحتوي `<MobileDocCard>` للجوال + جدول للديسكتوب. هنالك CSS داخل الصفحة يُلغي بطاقات الجوال (`.mobile-customers-list { display: none }`) ويُظهر الجدول، لكن لا يزال هنالك قواعد عامة في `src/index.css` تكسر التجربة على الموبايل:
-  - `.legacy-dt-toolbar { flex-direction: column }` → شريط الأدوات يصبح عمودياً.
-  - `.legacy-actions { flex-wrap: wrap }` → أزرار الإجراءات في كل صف تلتف لأسطر متعددة.
-  - `.recent-items-sidebar, .desktop-only { display: none }` → أزرار/لوحات مخفية.
-  - `.legacy-table { min-width: 720px }` فقط، فالأعمدة لا تأخذ عرضها الكامل كالديسكتوب.
-- شاشة المنتجات: مماثلة، وقسم بطاقات الجوال معطّل بالفعل (`{false && isMobile && …}`).
+### 1) `src/index.css` — توسيع قاعدة الشريط لتشمل الأزرار
 
-التغييرات:
+داخل `@media (max-width: 767px)`، أُضيف للأزرار نفس معاملة input/select:
 
-1. إضافة كلاس مشترك جديد `desktop-on-mobile` نضعه على حاوية صفحتي العملاء والمنتجات.
-2. تجاوز موضعي داخل هذا الكلاس (في `src/index.css` ضمن `@media (max-width: 767px)`) يجعل:
-   - شريط الأدوات يعود **أفقياً** مع تمرير أفقي عند الحاجة بدل التكدّس العمودي.
-   - أزرار الإجراءات داخل الصفوف تبقى في سطر واحد (no-wrap) مع `min-width` ثابت لكل زر.
-   - الجدول يُعرض بعرضه الكامل (يساوي مجموع عرض الأعمدة على الديسكتوب) مع تمرير أفقي ناعم باللمس.
-   - الـ sidebar الجانبي للعناصر الأخيرة يبقى مخفياً (هذا منطقي على الجوال)، أمّا أزرار التولبار الرئيسية فتظهر كما هي.
-   - حذف نهائي لقسم `<MobileDocCard>` من شاشة العملاء (في المنتجات معطّل أصلاً) لتقليل الكود.
+```css
+.desktop-on-mobile .legacy-dt-toolbar button,
+.desktop-on-mobile .legacy-dt-toolbar a {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  min-width: auto !important;
+  width: auto !important;
+}
+.desktop-on-mobile .legacy-dt-toolbar > * {
+  flex-shrink: 0 !important;
+}
+```
 
-نتيجة الزووم: المستخدم سيستخدم zoom/تمرير أفقي ليرى نفس الأعمدة، وهذا هو السلوك المطلوب.
+كذلك أزيل `marginInlineStart: "auto"` على زر "+ منتج جديد" بصرياً ضمن نفس الميديا (لأنه يجبر باقي العناصر إلى أقصى اليمين فيُسرّع الانهيار):
 
-### الجزء الثاني — autofocus الكيبورد في كل النوافذ
+```css
+.desktop-on-mobile .legacy-dt-toolbar button[style*="margin-inline-start: auto"] {
+  margin-inline-start: 8px !important;
+}
+```
 
-الوضع الحالي بعد جرد سريع لـ 35 ملف يحتوي `DialogContent`/`SheetContent`:
+### 2) `src/index.css` — تأكيد ظهور الجدول
 
-- بعض النوافذ فيها `autoFocus` يدوي على حقل واحد (QuickAddProductDialog، ItemNoteDialog، MessageImportDialog).
-- **معظم** النوافذ لا تعتمد autoFocus على أول حقل (CustomerFormDialog، TransportDialog، PackagingDialog، ShippingDispatchDialog، ExchangeRateDialog، ChargeBalanceDialog، AccountsOpeningBalanceDialog، InvoiceRevisionsDialog، DeletedItemsTrayDialog، PrintTilesDialog، QuoteConvertedDialog، InstallPwaDialog، UnsavedChangesDialog، InvoiceAttachmentsDialog، QuoteAttachmentsDialog، PurchaseAttachmentsDialog، CurrenciesPage dialog، PackagingTypesPage dialog، إلخ).
-- Radix افتراضياً يُركّز على أول عنصر قابل للتركيز عند فتح Dialog، لكن غالباً يكون زر إغلاق أو زر Save بدل أول input، فلا يظهر الكيبورد.
+أضيف `.desktop-table-wrap` إلى قائمة الحاويات التي تأخذ `overflow-x: auto`، وأُلغي `maxHeight` المحسوبة على الجوال لتترك الجدول يأخذ ارتفاعه الطبيعي:
 
-الحل (طبقة موحّدة بدل تعديل 35 ملف يدوياً):
+```css
+.desktop-on-mobile .desktop-table-wrap {
+  max-height: none !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch;
+}
+```
 
-1. **توسيع `DialogContent` و `SheetContent` في `src/components/ui/dialog.tsx` و `src/components/ui/sheet.tsx`**: عند الفتح، نبحث برمجياً عن أول حقل كتابة قابل للاستخدام داخل النافذة (`input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), [contenteditable=true]`) ونستدعي `.focus()` بعد frame واحد. هذا يفعّل الكيبورد على iOS/Android تلقائياً.
-2. علم انسحاب اختياري `data-no-autofocus` على `DialogContent` للنوافذ التي لا نريد فيها هذا السلوك (مثل نوافذ التأكيد فقط أو القوائم المتدرّجة الكبيرة).
-3. الحفاظ على وصول لوحة المفاتيح والـ Esc والـ focus trap كما يفعل Radix افتراضياً (لا نلمس آلية التركيز الداخلية لـ Radix، فقط نوجّه أول focus لحقل كتابة).
-4. AlertDialog يبقى كما هو (نوافذ تأكيد، لا يوجد حقول).
+هكذا يصبح التمرير الأفقي للجدول صفحياً (داخل `.desktop-on-mobile`) ولا يُخفى ارتفاعه.
 
-### الجزء الثالث — فحص شامل لكل النوافذ
+### 3) `src/index.css` — احترام `tableLayout: fixed` مع min-width
 
-بعد التعديل، أمشط 35 ملف يحتوي نوافذ منبثقة وأتأكد من:
+نضمن أن الجدول ذو الأعمدة الثابتة لا يُكسر `colgroup`:
 
-- لا يوجد حقل كتابة بـ `readOnly` بطريق الخطأ يمنع ظهور الكيبورد (حالياً جرد سريع لم يُظهر أي `readOnly` في مكونات النوافذ — جيد).
-- كل `<Input>` فعلاً `<input>` HTML قياسي (الـ shadcn input يلتزم بذلك).
-- النوافذ الكبيرة (CustomerFormDialog، QuickAddProductDialog، TransportDialog، PackagingDialog، InvoiceCreatePage modals، QuoteCreatePage modals، StockReturnCreatePage، PurchaseCreatePage) — أتحقق يدوياً أن أول حقل في كل واحدة منها هو الحقل الصحيح للبدء (الاسم/الرقم/الوصف…).
-- على iOS: تكبير-الصفحة-عند-التركيز (zoom) معطّل عالمياً (`font-size: 16px` في الـ media query لكل input داخل dialog) — موجود في `src/index.css` السطر 940-945.
+```css
+.desktop-on-mobile .legacy-table[style*="table-layout: fixed"] {
+  width: max-content !important;
+  min-width: 1100px !important;
+}
+```
 
-## تحذيرات (يجب مراعاتها)
+### 4) لا تغييرات على ملفات الصفحات
 
-1. **تجربة الجوال على الجدول الكامل**: مع آلاف العملاء/المنتجات وأعمدة كثيرة، الجدول الكامل على شاشة 360px سيتطلب تمريراً أفقياً واسعاً جداً. هذا ما طلبته بوضوح، لكن يُستحسن إبقاء **عمود الاسم** ثابتاً (sticky-right في RTL) ليبقى مرئياً أثناء التمرير. سأطبّق هذا.
-2. **iOS auto-keyboard**: Safari يفتح الكيبورد فقط على focus ناتج عن إيماءة مستخدم. فتح Dialog ناتج عن نقر = إيماءة، لذا التركيز البرمجي بعد فتح Dialog يعمل عادةً. في حالات نادرة (Dialog يُفتح من setTimeout غير ناتج عن نقر) قد لا يفتح الكيبورد — هذا قيد المتصفح وليس قابلاً للحل برمجياً.
-3. **نوافذ Command/Popover للبحث** (CommandInput) لها `autoFocus` بالفعل، لكن في بعض المتصفحات لا يفتح الكيبورد إلا بعد نقرة. لن أغيّر سلوكها لأنها تعمل كما هو متوقع داخل combobox.
-4. **التولبار الأفقي على شاشة صغيرة** للعملاء/المنتجات سيكون قابلاً للتمرير أفقياً (overflow-x: auto)؛ لن أقلّص الأزرار أو أُخفي منها شيئاً.
-5. **اختبار شامل بعد التطبيق**: سأفتح بريفيو الموبايل وأتحقق بصرياً من الشاشتين، ثم أفتح عينة من 5–6 نوافذ منبثقة وأرى الكيبورد ينفتح تلقائياً.
+لا حاجة لتعديل `ProductsPage.tsx` ولا `CustomersPage.tsx`؛ كل الإصلاح في CSS العالمي ضمن نفس قسم `desktop-on-mobile`، فينطبق تلقائياً على الشاشتين.
 
-## الملفات التي ستُعدَّل
+### 5) التحقق
 
-- `src/components/ui/dialog.tsx` — إضافة auto-focus لأول حقل كتابة.
-- `src/components/ui/sheet.tsx` — نفس الشيء.
-- `src/index.css` — قواعد `.desktop-on-mobile` تحت `@media (max-width: 767px)` + عمود الاسم sticky.
-- `src/pages/CustomersPage.tsx` — إضافة كلاس `desktop-on-mobile` للحاوية وحذف قسم بطاقات الجوال.
-- `src/pages/ProductsPage.tsx` — إضافة كلاس `desktop-on-mobile` وحذف بقايا قسم بطاقات الجوال المعطّل.
-- (اختياري عند الحاجة) ملف نافذة بمحتوى خاص لا يريد autofocus → نضع له `data-no-autofocus`.
+- زيارة `/products` على viewport 375 والتأكد من:
+  - أن أزرار شريط الأدوات تظهر بنصها كاملاً على سطر واحد قابل للتمرير أفقياً.
+  - أن صفوف المنتجين تظهر فعلاً في الجدول.
+- زيارة `/customers` للتأكد من عدم تكسّر التخطيط (نفس القواعد).
+- التأكد من أن نسخة الديسكتوب (≥768px) لم تتأثر — كل التعديلات داخل `@media (max-width: 767px)` فقط.
 
-## الذي **لن** يتغير
+## الملفات المتأثرة
 
-- شاشات الفواتير وعروض الأسعار على الجوال تبقى ببطاقات `MobileDocCard` (لم يطلب المستخدم تغييرها).
-- أزرار/ألوان/أحجام الأزرار في الديسكتوب لا تتغير.
-- منطق RLS، triggers، أي شيء في قاعدة البيانات.
+- `src/index.css` (إضافة ~15 سطر داخل ميديا الجوال الحالية)
