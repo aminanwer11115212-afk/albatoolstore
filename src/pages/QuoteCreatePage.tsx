@@ -1041,39 +1041,7 @@ export default function QuoteCreatePage() {
           /* ارتفاع ثابت لجدول البنود على الجوال حتى تظهر صفوف TableFiller الفارغة دائماً قبل الأزرار */
           .neo-quote-scope .items-table-wrap { height: 55vh !important; min-height: 360px !important; max-height: 60vh !important; flex: 0 0 auto !important; }
           .neo-quote-scope .items-scroll { height: 100% !important; min-height: 0 !important; max-height: none !important; }
-          /* === Mobile layout overrides for batch 1 === */
-          .neo-quote-scope .header-bar { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; padding: 8px !important; }
-          .neo-quote-scope .header-bar > .field { width: 100% !important; flex: 1 1 100% !important; max-width: 100% !important; min-width: 0 !important; }
-          .neo-quote-scope .header-bar .field .form-control { height: 40px !important; font-size: 16px !important; padding: 6px 10px !important; }
-          .neo-quote-scope .header-bar .field label { font-size: 12px !important; margin-bottom: 4px !important; color: hsl(var(--muted-foreground)) !important; }
-          .neo-quote-scope .header-bar .field .form-control.customer-name-input { font-size: 16px !important; }
-          .neo-quote-scope .header-bar [title*="إضافة عميل جديد"],
-          .neo-quote-scope .header-bar .field button[aria-label="إضافة عميل جديد"] { min-height: 40px !important; height: 40px !important; }
-          .neo-quote-scope .quick-add-row { grid-template-columns: 1fr 1fr !important; gap: 8px !important; padding: 8px !important; }
-          .neo-quote-scope .quick-add-row > .product-search-container { grid-column: 1 / -1 !important; }
-          .neo-quote-scope .quick-add-row .form-control,
-          .neo-quote-scope .quick-add-row input,
-          .neo-quote-scope .quick-add-row select { height: 40px !important; font-size: 16px !important; padding: 6px 10px !important; }
-          .neo-quote-scope .quick-add-row > button[type="button"]:last-child { grid-column: 1 / -1 !important; min-height: 44px !important; font-size: 15px !important; }
-          /* Hide column-resize handles & expand-field buttons on mobile (drag UX doesn't work on touch) */
-          .neo-quote-scope .col-resize-handle,
-          .neo-quote-scope .expand-field-btn { display: none !important; }
-          /* Mobile item cards layout */
-          .neo-quote-scope .mobile-items-list { display: flex !important; flex-direction: column; gap: 10px; padding: 4px; overflow-y: auto; flex: 1 1 0; min-height: 360px; }
-          .neo-quote-scope .mobile-item-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 10px; padding: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.04); display: flex; flex-direction: column; gap: 8px; }
-          .neo-quote-scope .mobile-item-card.is-selected { border-color: hsl(var(--destructive)); background: hsl(var(--destructive) / 0.05); }
-          .neo-quote-scope .mobile-item-card .mic-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-          .neo-quote-scope .mobile-item-card .mic-index { font-size: 12px; font-weight: 700; color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); padding: 3px 8px; border-radius: 999px; }
-          .neo-quote-scope .mobile-item-card .mic-field { display: flex; flex-direction: column; gap: 4px; }
-          .neo-quote-scope .mobile-item-card .mic-field label { font-size: 11px; color: hsl(var(--muted-foreground)); }
-          .neo-quote-scope .mobile-item-card .mic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-          .neo-quote-scope .mobile-item-card input.form-control { height: 40px !important; font-size: 16px !important; padding: 6px 10px !important; }
-          .neo-quote-scope .mobile-item-card .mic-total { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 8px; background: hsl(var(--success) / 0.08); border: 1px solid hsl(var(--success) / 0.3); color: hsl(var(--success)); font-weight: 700; }
-          .neo-quote-scope .mobile-item-card .mic-actions { display: flex; gap: 8px; }
-          .neo-quote-scope .mobile-item-card .mic-actions button { flex: 1; min-height: 40px; }
-          .neo-quote-scope .mobile-item-card .mic-note { background: hsl(var(--primary) / 0.08); border-radius: 6px; padding: 6px 10px; font-size: 13px; color: hsl(var(--primary)); white-space: pre-wrap; }
         }
-        .neo-quote-scope .mobile-items-list { display: none; }
         .neo-quote-scope .panel { background: hsl(var(--card)); border-radius: 6px; padding: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.04); border: 1px solid hsl(var(--border)); }
         .neo-quote-scope .quick-add-row { background: hsl(var(--muted)); padding:2px 4px; border-radius:6px; border:1px solid hsl(var(--border)); margin-bottom: 6px; display: grid; grid-template-columns: 4fr 70px 1fr 1fr 1fr 1fr auto; gap: 4px; align-items: center; }
         .neo-quote-scope .quick-add-row .form-control,
