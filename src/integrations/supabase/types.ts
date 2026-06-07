@@ -642,26 +642,35 @@ export type Database = {
       exchange_rates: {
         Row: {
           created_at: string
+          currency_code: string | null
           effective_date: string
           from_currency: string
           id: string
+          notes: string | null
           rate: number
+          rate_to_base: number | null
           to_currency: string
         }
         Insert: {
           created_at?: string
+          currency_code?: string | null
           effective_date?: string
           from_currency: string
           id?: string
+          notes?: string | null
           rate: number
+          rate_to_base?: number | null
           to_currency: string
         }
         Update: {
           created_at?: string
+          currency_code?: string | null
           effective_date?: string
           from_currency?: string
           id?: string
+          notes?: string | null
           rate?: number
+          rate_to_base?: number | null
           to_currency?: string
         }
         Relationships: []
