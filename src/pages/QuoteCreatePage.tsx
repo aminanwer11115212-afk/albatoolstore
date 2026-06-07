@@ -33,7 +33,7 @@ import { ItemsScroll } from "@/components/items/ItemsScroll";
 import { TableFiller } from "@/components/items/TableFiller";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useIsMobile } from "@/hooks/use-mobile";
+
 
 import PackagingDialog from "@/components/packaging/PackagingDialog";
 import QuickAddProductDialog from "@/components/product/QuickAddProductDialog";
