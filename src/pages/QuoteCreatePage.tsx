@@ -295,6 +295,7 @@ function quoteItemsHash(items: Array<{ product_id?: string | null; quantity?: an
 
 export default function QuoteCreatePage() {
   usePageRenderCount("/quotes/create");
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { id: editId } = useParams();
   const [searchParams] = useSearchParams();
