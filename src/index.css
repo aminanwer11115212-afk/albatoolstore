@@ -2124,11 +2124,17 @@ input[type="number"] {
   }
   .desktop-on-mobile .legacy-table {
     /* أكبر من 720px ليأخذ الجدول عرضه الفعلي بدل الانكماش */
+    display: table !important; /* تخطّى قاعدة الجوال العامة التي تحوّل الجدول إلى block */
     min-width: 1100px !important;
     white-space: nowrap;
   }
+  .desktop-on-mobile .legacy-table thead { display: table-header-group !important; }
+  .desktop-on-mobile .legacy-table tbody { display: table-row-group !important; }
+  .desktop-on-mobile .legacy-table tfoot { display: table-footer-group !important; }
+  .desktop-on-mobile .legacy-table tr { display: table-row !important; }
   .desktop-on-mobile .legacy-table th,
   .desktop-on-mobile .legacy-table td {
+    display: table-cell !important;
     white-space: nowrap !important;
   }
 
