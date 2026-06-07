@@ -1336,33 +1336,45 @@ export type Database = {
       purchase_order_items: {
         Row: {
           created_at: string
+          discount: number | null
+          foreign_price: number | null
           id: string
           product_id: string | null
           product_name: string
           purchase_order_id: string
           quantity: number
           total: number
+          unit: string | null
           unit_price: number
+          warehouse_id: string | null
         }
         Insert: {
           created_at?: string
+          discount?: number | null
+          foreign_price?: number | null
           id?: string
           product_id?: string | null
           product_name: string
           purchase_order_id: string
           quantity?: number
           total: number
+          unit?: string | null
           unit_price: number
+          warehouse_id?: string | null
         }
         Update: {
           created_at?: string
+          discount?: number | null
+          foreign_price?: number | null
           id?: string
           product_id?: string | null
           product_name?: string
           purchase_order_id?: string
           quantity?: number
           total?: number
+          unit?: string | null
           unit_price?: number
+          warehouse_id?: string | null
         }
         Relationships: [
           {
