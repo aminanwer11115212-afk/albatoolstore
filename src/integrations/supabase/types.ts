@@ -59,31 +59,49 @@ export type Database = {
       activity_log: {
         Row: {
           action: string
+          changed_by: string | null
+          changed_fields: string[] | null
           created_at: string
           details: Json | null
           entity_id: string | null
           entity_type: string
           id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string | null
+          table_name: string | null
           user_email: string | null
           user_name: string | null
         }
         Insert: {
           action: string
+          changed_by?: string | null
+          changed_fields?: string[] | null
           created_at?: string
           details?: Json | null
           entity_id?: string | null
           entity_type: string
           id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          table_name?: string | null
           user_email?: string | null
           user_name?: string | null
         }
         Update: {
           action?: string
+          changed_by?: string | null
+          changed_fields?: string[] | null
           created_at?: string
           details?: Json | null
           entity_id?: string | null
           entity_type?: string
           id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          table_name?: string | null
           user_email?: string | null
           user_name?: string | null
         }
@@ -385,6 +403,7 @@ export type Database = {
           company: string | null
           created_at: string
           created_by_uid: string | null
+          credit_balance: number | null
           email: string | null
           group_id: string | null
           id: string
@@ -405,6 +424,7 @@ export type Database = {
           company?: string | null
           created_at?: string
           created_by_uid?: string | null
+          credit_balance?: number | null
           email?: string | null
           group_id?: string | null
           id?: string
@@ -425,6 +445,7 @@ export type Database = {
           company?: string | null
           created_at?: string
           created_by_uid?: string | null
+          credit_balance?: number | null
           email?: string | null
           group_id?: string | null
           id?: string
@@ -721,6 +742,7 @@ export type Database = {
           salary: number | null
           status: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -734,6 +756,7 @@ export type Database = {
           salary?: number | null
           status?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -747,6 +770,7 @@ export type Database = {
           salary?: number | null
           status?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -2155,16 +2179,19 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          sort_order: number | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          sort_order?: number | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          sort_order?: number | null
         }
         Relationships: []
       }
@@ -2686,7 +2713,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "manager" | "staff" | "viewer"
+      app_role: "admin" | "manager" | "staff" | "viewer" | "sales"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2814,7 +2841,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "staff", "viewer"],
+      app_role: ["admin", "manager", "staff", "viewer", "sales"],
     },
   },
 } as const
