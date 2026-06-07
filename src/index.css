@@ -2072,6 +2072,23 @@ input[type="number"] {
     width: auto !important;
   }
 
+  /* 1b) الأزرار والروابط داخل شريط الأدوات: تأخذ نفس معاملة الحقول */
+  .desktop-on-mobile .legacy-dt-toolbar button,
+  .desktop-on-mobile .legacy-dt-toolbar a {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+    min-width: auto !important;
+    width: auto !important;
+  }
+  .desktop-on-mobile .legacy-dt-toolbar > * {
+    flex-shrink: 0 !important;
+  }
+  /* زر "+ منتج جديد" يستخدم margin-inline-start: auto ⇒ يُسرّع انهيار الشريط على الجوال */
+  .desktop-on-mobile .legacy-dt-toolbar button[style*="margin-inline-start: auto"],
+  .desktop-on-mobile .legacy-dt-toolbar button[style*="margin-inline-start:auto"] {
+    margin-inline-start: 8px !important;
+  }
+
   /* 2) أزرار الإجراءات في كل صف تبقى في سطر واحد */
   .desktop-on-mobile .legacy-actions {
     flex-wrap: nowrap !important;
@@ -2082,6 +2099,20 @@ input[type="number"] {
     flex: 0 0 auto !important;
     white-space: nowrap !important;
   }
+
+  /* 2b) حاوية الجدول العامة: تمرير أفقي وارتفاع طبيعي على الجوال */
+  .desktop-on-mobile .desktop-table-wrap {
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .desktop-on-mobile .legacy-table[style*="table-layout: fixed"],
+  .desktop-on-mobile .legacy-table[style*="table-layout:fixed"] {
+    width: max-content !important;
+    min-width: 1100px !important;
+  }
+
 
   /* 3) الجدول يأخذ عرضه الكامل كما على الديسكتوب مع تمرير أفقي */
   .desktop-on-mobile .table-responsive,
