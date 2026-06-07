@@ -1,80 +1,45 @@
-# خطة فحص نظام الأوتوميشن وإصلاح الفجوات
+## المشكلة
 
-سأقوم بمراجعة جميع سلاسل الأتمتة الموجودة في النظام، التحقّق من سلامتها، وإغلاق الفجوات. لن أُعيد كتابة المنطق السليم — فقط أُكمل الناقص وأُوحّد التطبيق.
+في `src/pages/InvoiceViewPage.tsx` على شاشة الجوال:
 
----
+1. **شريط الأدوات (الأسطر 446-469)**: كل زر يأخذ `min-w-[30%]` (3 أزرار في السطر). الخلية تصبح ضيقة جداً فتنكسر التسمية العربية حرفاً حرفاً عمودياً (دفع، طباعة، معاينة، تعديل، المستندات، الوضع، تغليف، ترحيل، المزيد).
+2. **خطوات حالة التجهيز (الأسطر 644-668)**: 5 خطوات داخل `flex` بـ `flex-1`. على الجوال كل عمود ~60px فتنكسر التسميات الطويلة مثل «في الطريق للترحيلات» و«قيد التجهيز» حرفاً حرفاً.
 
-## 1) سلاسل الأتمتة الحالية (موجودة وتعمل)
+السبب الجذري: الخلية أضيق من أصغر «كلمة» عربية، ونظراً لقواعد global mobile word-break الحالية في `index.css` يتم الكسر داخل الكلمة.
 
-| السلسلة | الملف | الحالة |
-|---|---|---|
-| خصم المخزون عند إنشاء/تحويل فاتورة | `stockDeduction.ts` + `InvoiceCreatePage` / `InvoiceViewPage` / `InvoicesPage` | يعمل، محمي بـ `stock_deduction_id` (idempotent) |
-| إضافة المخزون عند استلام أمر شراء | `stockReceive.ts` + `PurchasePage` / `PurchaseCreatePage` | يعمل، محمي بالحالة `received` |
-| فرق المخزون عند تعديل فاتورة/شراء | `applyStockDeltaForLines` / `applyStockDeltaForPurchaseLines` | يعمل |
-| إرجاع المخزون عند حذف فاتورة | `deleteInvoice.ts` | يعمل |
-| تقسيم الدفعة الزائدة → سلفة عميل | `overpayment.ts` + `InvoiceViewPage` (transactions: `customer_credit`) | يعمل |
-| حساب حالة الفاتورة بعد الدفع | `invoiceStatus.ts` (`paid/partial/pending`) | يعمل |
-| تحويل عرض سعر → فاتورة | `quoteToInvoice.ts` | يعمل |
-| مزامنة أعمدة `exchange_rates` (legacy/new) | DB trigger `sync_exchange_rate_columns` | يعمل |
-| سجلّ المراجعات (Invoice revisions) | `invoiceRevisions.ts` | يعمل |
-| Activity log | `activity_log` | يعمل |
-| بث `products:changed` لإبطال الكاش | `ProductsCacheSync` | يعمل |
+## الحل (UI فقط، لا تغييرات في منطق الأعمال)
 
-## 2) الفجوات المكتشفة (تحتاج إصلاح)
+اخترت: **سطرين كحد أقصى مع توسيع الخلية**.
 
-### أ) رصيد العميل `customers.balance` لا يُحدَّث تلقائياً
-- عند إنشاء/تعديل/حذف فاتورة لا يتغيّر `customers.balance` ولا `credit_balance`.
-- `CustomerDebtReport` يُظهر فعلياً عدم تطابق بين `balance` و `computed_due`.
-- **الحل:** إنشاء **DB trigger** يعيد حساب `balance = SUM(due_amount)` و `credit_balance = SUM(customer_credit transactions)` تلقائياً بعد أي `INSERT/UPDATE/DELETE` على `invoices` أو `transactions`. هذا يُلغي الاعتماد على التحديث اليدوي ويحلّ مشكلة عدم التطابق نهائياً.
+### 1) شريط الأدوات على الجوال (lines 446-469)
 
-### ب) حالة الفاتورة `overdue` لا تُحسب تلقائياً
-- `overdue` حالياً تُضبط يدوياً فقط (انظر تعليق `invoiceStatus.ts`).
-- **الحل:** trigger خفيف يضع `status='overdue'` للفواتير التي `due_date < now()` وما زالت `pending/partial`، أو دالة دورية بسيطة عند فتح صفحة الفواتير.
+- تغيير `min-w-[30%]` → `min-w-[calc(50%-0.375rem)]` لكل زر ⇒ زرّان في السطر، عرض كافٍ.
+- على كل `<Button>`: إضافة `whitespace-normal leading-tight text-[11px]` وحدّ السطر بـ `line-clamp-2` للنصوص (لمنع تكدّس > سطرين).
+- زيادة `h-9` → `h-auto min-h-10 py-1.5` ليتسع للسطر الثاني بدون قصّ.
+- ترك الأيقونة (`size={14}`) وألوان الخلفية كما هي.
 
-### ج) `paid_amount` للمشتريات لا يُربط بدفعات حقيقية
-- `purchase_orders.paid_amount` و `due_amount` موجودان لكن لا يوجد منطق دفع مرتبط بـ `transactions` (مدفوعات الموردين).
-- **الحل:** نفس آلية الفواتير: تسجيل `supplier_payment` في `transactions` + إعادة حساب `paid_amount`/`due_amount` تلقائياً.
+### 2) خطوات «حالة التجهيز» (lines 644-668)
 
-### د) عدم تحديث رصيد المورد `suppliers.balance` تلقائياً
-- نفس مشكلة العميل بالضبط.
-- **الحل:** trigger مماثل من `purchase_orders` + `transactions`.
+- تحويل الحاوية الخارجية إلى شريط أفقي قابل للتمرير عند ≤640px:
+  - `flex items-start gap-2 overflow-x-auto pb-2 -mx-1 px-1` بدل `justify-between`.
+- كل خطوة: استبدال `flex-1` بـ `flex-shrink-0 w-[96px]` على الجوال (و `sm:flex-1 sm:w-auto` على الشاشات الأكبر للحفاظ على المظهر الحالي).
+- التسمية (`<span>` السطر 660): إضافة `whitespace-normal break-keep leading-tight line-clamp-2 min-h-[2.2em] px-1`.
+- الخط الفاصل بين الخطوات: `min-w-[16px]` حتى لا ينضغط ويختفي.
 
-### هـ) `quote.workflow_status='converted'` بعد التحويل
-- التحويل يُسجّل `converted_to_invoice_id` لكن لا يُغيّر `workflow_status` بشكل موحّد.
-- **الحل:** تحديث الحالة ضمن نفس عملية التحويل.
+### 3) لا تغييرات أخرى
 
-### و) خصم المخزون عند **التحويل المباشر** من عرض سعر إلى فاتورة
-- `quoteToInvoice.ts` ينشئ الفاتورة لكن لا يستدعي `deductStockForInvoiceOnce` دائماً (يعتمد على فتح صفحة الفاتورة).
-- **الحل:** استدعاء الخصم داخل التحويل فوراً.
+- لا تعديل على `index.css` العام (القواعد المتداخلة المحمية في الذاكرة تبقى).
+- لا تغيير على نسخة الديسكتوب (`md:` و`sm:` تحافظ على السلوك القائم).
+- لا تغيير في قاعدة البيانات أو الأتمتة.
 
-### ز) `stock_returns` — التحقق من عدم الخصم المزدوج
-- مراجعة سريعة للتأكد أن إرجاع البضاعة لا يُضاعف الإضافة عند تعديل مرتجع موجود.
+## الملفات المعدّلة
 
-## 3) خطوات التنفيذ (بالترتيب، على دفعات)
+- `src/pages/InvoiceViewPage.tsx` — تعديلان موضعيان فقط:
+  - كتلة شريط أدوات الجوال (≈ 446-469).
+  - كتلة Workflow Stepper (≈ 644-668).
 
-**الدفعة 1 — أرصدة الأطراف (الأعلى أولوية):**
-1. Migration: trigger لإعادة حساب `customers.balance` و `credit_balance` من `invoices` + `transactions`.
-2. Migration: trigger مماثل لـ `suppliers.balance` من `purchase_orders` + `transactions`.
-3. Backfill: تشغيل مرّة واحدة لتصحيح القيم الحالية.
+## التحقق
 
-**الدفعة 2 — حالات الفواتير والمشتريات:**
-4. Trigger/دالة لتحديث `overdue` تلقائياً.
-5. توحيد منطق دفع المورد (تسجيل `supplier_payment` + تحديث `paid_amount/due_amount` للمشتريات).
-
-**الدفعة 3 — تحويل العروض:**
-6. ضمان خصم المخزون داخل `quoteToInvoice` مباشرة (مع حماية idempotent).
-7. ضبط `quotes.workflow_status='converted'` و `converted_at` و `converted_to_invoice_id` ضمن transaction واحدة.
-
-**الدفعة 4 — تحقق نهائي:**
-8. تشغيل `data-anomaly-scanner` بعد التعديلات للتأكد من عدم وجود تباينات.
-9. تشغيل اختبارات `stockDeductionWorkflow` و `stockDeductionIdempotency` الموجودة.
-
-## التفاصيل التقنية
-
-- جميع التريغرات: `SECURITY DEFINER`, `SET search_path = public`.
-- إعادة حساب الأرصدة تتم بـ `SUM(due_amount) WHERE customer_id = NEW.customer_id` فقط (مستهدف، ليس جدولاً كاملاً).
-- لا تعديل على `auth/storage/supabase_functions`.
-- لا تغيير على واجهات المستخدم — فقط طبقة البيانات والمنطق.
-- اختبار كل دفعة عبر `supabase--read_query` قبل المتابعة للدفعة التالية.
-
-بعد موافقتك سأبدأ بالدفعة 1.
+- فتح فاتورة على عرض الجوال (~390px): يجب أن تظهر أزرار الأدوات بزرّين في السطر بنص واضح بسطرين كحد أقصى.
+- شريط حالة التجهيز يمرّر أفقياً بسلاسة وتسميات «مقبول / قيد التجهيز / جاهز للرفع / في الطريق للترحيلات / تم» مقروءة بدون كسر حرف-حرف.
+- عرض الديسكتوب يبقى كما هو دون تغيير.

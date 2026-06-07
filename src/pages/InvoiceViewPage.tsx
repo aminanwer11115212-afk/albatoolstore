@@ -444,16 +444,16 @@ export default function InvoiceViewPage() {
       <ToolbarCustomizationProvider storageKey="invoice-view">
       {isMobile ? (
         <div className="flex flex-wrap gap-1.5" dir="rtl">
-          <Button onClick={() => setShowPayment(true)} className="bg-purple-600 hover:bg-purple-700 text-white gap-1 text-xs h-9 px-2 flex-1 min-w-[30%]"><CreditCard size={14} />دفع</Button>
-          <Button onClick={() => handlePrint("full", false)} className="bg-blue-600 hover:bg-blue-700 text-white gap-1 text-xs h-9 px-2 flex-1 min-w-[30%]"><Printer size={14} />طباعة</Button>
-          <Button onClick={handlePreview} variant="outline" className="gap-1 text-xs h-9 px-2 flex-1 min-w-[30%]"><Eye size={14} />معاينة</Button>
-          <Button onClick={() => navigate(`/invoices/edit/${id}`)} className="bg-amber-500 hover:bg-amber-600 text-white gap-1 text-xs h-9 px-2 flex-1 min-w-[30%]"><Edit size={14} />تعديل</Button>
-          <Button onClick={() => setShowAttachments(true)} variant="outline" className="gap-1 text-xs h-9 px-2 flex-1 min-w-[30%] border-primary/40 text-primary"><FileText size={14} />المستندات</Button>
-          <Button onClick={() => setShowStatusChange(true)} className="bg-sky-500 hover:bg-sky-600 text-white gap-1 text-xs h-9 px-2 flex-1 min-w-[30%]"><RefreshCw size={14} />الوضع</Button>
-          <Button onClick={() => setPackagingDialogOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white gap-1 text-xs h-9 px-2 flex-1 min-w-[30%]"><Package size={14} />تغليف</Button>
-          <Button onClick={() => setTransportDialogOpen(true)} className="bg-green-600 hover:bg-green-700 text-white gap-1 text-xs h-9 px-2 flex-1 min-w-[30%]"><Truck size={14} />ترحيل</Button>
-          <div className="relative flex-1 min-w-[30%]">
-            <Button onClick={() => setShowMobileMore(!showMobileMore)} variant="outline" className="gap-1 text-xs h-9 px-2 w-full"><MoreHorizontal size={14} />المزيد</Button>
+          <Button onClick={() => setShowPayment(true)} className="bg-purple-600 hover:bg-purple-700 text-white gap-1 text-[11px] leading-tight whitespace-normal h-auto min-h-10 py-1.5 px-2 flex-1 min-w-[calc(50%-0.375rem)]"><CreditCard size={14} className="shrink-0" /><span className="line-clamp-2">دفع</span></Button>
+          <Button onClick={() => handlePrint("full", false)} className="bg-blue-600 hover:bg-blue-700 text-white gap-1 text-[11px] leading-tight whitespace-normal h-auto min-h-10 py-1.5 px-2 flex-1 min-w-[calc(50%-0.375rem)]"><Printer size={14} className="shrink-0" /><span className="line-clamp-2">طباعة</span></Button>
+          <Button onClick={handlePreview} variant="outline" className="gap-1 text-[11px] leading-tight whitespace-normal h-auto min-h-10 py-1.5 px-2 flex-1 min-w-[calc(50%-0.375rem)]"><Eye size={14} className="shrink-0" /><span className="line-clamp-2">معاينة</span></Button>
+          <Button onClick={() => navigate(`/invoices/edit/${id}`)} className="bg-amber-500 hover:bg-amber-600 text-white gap-1 text-[11px] leading-tight whitespace-normal h-auto min-h-10 py-1.5 px-2 flex-1 min-w-[calc(50%-0.375rem)]"><Edit size={14} className="shrink-0" /><span className="line-clamp-2">تعديل</span></Button>
+          <Button onClick={() => setShowAttachments(true)} variant="outline" className="gap-1 text-[11px] leading-tight whitespace-normal h-auto min-h-10 py-1.5 px-2 flex-1 min-w-[calc(50%-0.375rem)] border-primary/40 text-primary"><FileText size={14} className="shrink-0" /><span className="line-clamp-2">المستندات</span></Button>
+          <Button onClick={() => setShowStatusChange(true)} className="bg-sky-500 hover:bg-sky-600 text-white gap-1 text-[11px] leading-tight whitespace-normal h-auto min-h-10 py-1.5 px-2 flex-1 min-w-[calc(50%-0.375rem)]"><RefreshCw size={14} className="shrink-0" /><span className="line-clamp-2">الوضع</span></Button>
+          <Button onClick={() => setPackagingDialogOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white gap-1 text-[11px] leading-tight whitespace-normal h-auto min-h-10 py-1.5 px-2 flex-1 min-w-[calc(50%-0.375rem)]"><Package size={14} className="shrink-0" /><span className="line-clamp-2">تغليف</span></Button>
+          <Button onClick={() => setTransportDialogOpen(true)} className="bg-green-600 hover:bg-green-700 text-white gap-1 text-[11px] leading-tight whitespace-normal h-auto min-h-10 py-1.5 px-2 flex-1 min-w-[calc(50%-0.375rem)]"><Truck size={14} className="shrink-0" /><span className="line-clamp-2">ترحيل</span></Button>
+          <div className="relative flex-1 min-w-[calc(50%-0.375rem)]">
+            <Button onClick={() => setShowMobileMore(!showMobileMore)} variant="outline" className="gap-1 text-[11px] leading-tight whitespace-normal h-auto min-h-10 py-1.5 px-2 w-full"><MoreHorizontal size={14} className="shrink-0" /><span className="line-clamp-2">المزيد</span></Button>
             {showMobileMore && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 py-1">
                 <button onClick={() => { navigate(`/invoices/${invoice.id}/transport-report`); setShowMobileMore(false); }} className="block w-full text-right px-3 py-2 text-xs hover:bg-muted">📋 تقرير الترحيل</button>
