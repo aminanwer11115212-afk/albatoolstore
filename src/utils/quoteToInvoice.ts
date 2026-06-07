@@ -120,6 +120,7 @@ export async function convertQuoteToInvoice(
     .from("quotes")
     .update({
       status: "accepted",
+      workflow_status: "converted",
       converted_to_invoice_id: inv.id,
       converted_at: new Date().toISOString(),
       converted_by: userData?.user?.id || null,
