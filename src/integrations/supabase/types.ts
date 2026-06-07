@@ -2711,6 +2711,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      mark_overdue_invoices: { Args: never; Returns: number }
+      recompute_customer_balance: {
+        Args: { _customer_id: string }
+        Returns: undefined
+      }
+      recompute_supplier_balance: {
+        Args: { _supplier_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "staff" | "viewer" | "sales"

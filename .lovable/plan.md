@@ -1,76 +1,80 @@
-## المشكلة في الصورة
+# خطة فحص نظام الأوتوميشن وإصلاح الفجوات
 
-من الصورة على شاشة /products (375px) ألاحظ مشكلتين حقيقيتين، وليست واحدة:
+سأقوم بمراجعة جميع سلاسل الأتمتة الموجودة في النظام، التحقّق من سلامتها، وإغلاق الفجوات. لن أُعيد كتابة المنطق السليم — فقط أُكمل الناقص وأُوحّد التطبيق.
 
-1. **أزرار شريط الأدوات مهروسة** — الحروف العربية تظهر مكدّسة عمودياً (ح/ي/ل…) لأن العرض أقل من حرف واحد. السبب: قواعد `desktop-on-mobile .legacy-dt-toolbar` في `src/index.css` تجعل الشريط `flex-wrap: nowrap` و`overflow-x: auto`، لكنها تطبّق `flex: 0 0 auto` و`white-space: nowrap` **على input/select/label فقط**، وليس على الأزرار `.btn-xxs` / `.btn-xs` / `<a>`. النتيجة flex يضغط الأزرار إلى pixel واحد ويلفّ النص داخلها.
+---
 
-2. **منطقة الجدول فارغة تماماً** بين "2 منتج" والترقيم رغم وجود منتجين. الحاوية `.desktop-table-wrap` لها `maxHeight: calc(100vh - 280px)` و`overflowY: auto`. على ارتفاع جوال 669px تصبح ~389px، لكن مع أشرطة شريط الأدوات + الـ chips + الصور المرسومة قد تصبح الحاوية بارتفاع موجب صغير جداً أو تحجب الجدول بصرياً. كما أن `min-width: 1100px` على `.legacy-table` مع `tableLayout: fixed` وقيم `colWidths` المخزّنة من الديسكتوب قد تجعل التمرير الأفقي لا يبدأ من بداية الجدول.
+## 1) سلاسل الأتمتة الحالية (موجودة وتعمل)
 
-## الخطة
+| السلسلة | الملف | الحالة |
+|---|---|---|
+| خصم المخزون عند إنشاء/تحويل فاتورة | `stockDeduction.ts` + `InvoiceCreatePage` / `InvoiceViewPage` / `InvoicesPage` | يعمل، محمي بـ `stock_deduction_id` (idempotent) |
+| إضافة المخزون عند استلام أمر شراء | `stockReceive.ts` + `PurchasePage` / `PurchaseCreatePage` | يعمل، محمي بالحالة `received` |
+| فرق المخزون عند تعديل فاتورة/شراء | `applyStockDeltaForLines` / `applyStockDeltaForPurchaseLines` | يعمل |
+| إرجاع المخزون عند حذف فاتورة | `deleteInvoice.ts` | يعمل |
+| تقسيم الدفعة الزائدة → سلفة عميل | `overpayment.ts` + `InvoiceViewPage` (transactions: `customer_credit`) | يعمل |
+| حساب حالة الفاتورة بعد الدفع | `invoiceStatus.ts` (`paid/partial/pending`) | يعمل |
+| تحويل عرض سعر → فاتورة | `quoteToInvoice.ts` | يعمل |
+| مزامنة أعمدة `exchange_rates` (legacy/new) | DB trigger `sync_exchange_rate_columns` | يعمل |
+| سجلّ المراجعات (Invoice revisions) | `invoiceRevisions.ts` | يعمل |
+| Activity log | `activity_log` | يعمل |
+| بث `products:changed` لإبطال الكاش | `ProductsCacheSync` | يعمل |
 
-### 1) `src/index.css` — توسيع قاعدة الشريط لتشمل الأزرار
+## 2) الفجوات المكتشفة (تحتاج إصلاح)
 
-داخل `@media (max-width: 767px)`، أُضيف للأزرار نفس معاملة input/select:
+### أ) رصيد العميل `customers.balance` لا يُحدَّث تلقائياً
+- عند إنشاء/تعديل/حذف فاتورة لا يتغيّر `customers.balance` ولا `credit_balance`.
+- `CustomerDebtReport` يُظهر فعلياً عدم تطابق بين `balance` و `computed_due`.
+- **الحل:** إنشاء **DB trigger** يعيد حساب `balance = SUM(due_amount)` و `credit_balance = SUM(customer_credit transactions)` تلقائياً بعد أي `INSERT/UPDATE/DELETE` على `invoices` أو `transactions`. هذا يُلغي الاعتماد على التحديث اليدوي ويحلّ مشكلة عدم التطابق نهائياً.
 
-```css
-.desktop-on-mobile .legacy-dt-toolbar button,
-.desktop-on-mobile .legacy-dt-toolbar a {
-  flex: 0 0 auto !important;
-  white-space: nowrap !important;
-  min-width: auto !important;
-  width: auto !important;
-}
-.desktop-on-mobile .legacy-dt-toolbar > * {
-  flex-shrink: 0 !important;
-}
-```
+### ب) حالة الفاتورة `overdue` لا تُحسب تلقائياً
+- `overdue` حالياً تُضبط يدوياً فقط (انظر تعليق `invoiceStatus.ts`).
+- **الحل:** trigger خفيف يضع `status='overdue'` للفواتير التي `due_date < now()` وما زالت `pending/partial`، أو دالة دورية بسيطة عند فتح صفحة الفواتير.
 
-كذلك أزيل `marginInlineStart: "auto"` على زر "+ منتج جديد" بصرياً ضمن نفس الميديا (لأنه يجبر باقي العناصر إلى أقصى اليمين فيُسرّع الانهيار):
+### ج) `paid_amount` للمشتريات لا يُربط بدفعات حقيقية
+- `purchase_orders.paid_amount` و `due_amount` موجودان لكن لا يوجد منطق دفع مرتبط بـ `transactions` (مدفوعات الموردين).
+- **الحل:** نفس آلية الفواتير: تسجيل `supplier_payment` في `transactions` + إعادة حساب `paid_amount`/`due_amount` تلقائياً.
 
-```css
-.desktop-on-mobile .legacy-dt-toolbar button[style*="margin-inline-start: auto"] {
-  margin-inline-start: 8px !important;
-}
-```
+### د) عدم تحديث رصيد المورد `suppliers.balance` تلقائياً
+- نفس مشكلة العميل بالضبط.
+- **الحل:** trigger مماثل من `purchase_orders` + `transactions`.
 
-### 2) `src/index.css` — تأكيد ظهور الجدول
+### هـ) `quote.workflow_status='converted'` بعد التحويل
+- التحويل يُسجّل `converted_to_invoice_id` لكن لا يُغيّر `workflow_status` بشكل موحّد.
+- **الحل:** تحديث الحالة ضمن نفس عملية التحويل.
 
-أضيف `.desktop-table-wrap` إلى قائمة الحاويات التي تأخذ `overflow-x: auto`، وأُلغي `maxHeight` المحسوبة على الجوال لتترك الجدول يأخذ ارتفاعه الطبيعي:
+### و) خصم المخزون عند **التحويل المباشر** من عرض سعر إلى فاتورة
+- `quoteToInvoice.ts` ينشئ الفاتورة لكن لا يستدعي `deductStockForInvoiceOnce` دائماً (يعتمد على فتح صفحة الفاتورة).
+- **الحل:** استدعاء الخصم داخل التحويل فوراً.
 
-```css
-.desktop-on-mobile .desktop-table-wrap {
-  max-height: none !important;
-  overflow-x: auto !important;
-  overflow-y: visible !important;
-  -webkit-overflow-scrolling: touch;
-}
-```
+### ز) `stock_returns` — التحقق من عدم الخصم المزدوج
+- مراجعة سريعة للتأكد أن إرجاع البضاعة لا يُضاعف الإضافة عند تعديل مرتجع موجود.
 
-هكذا يصبح التمرير الأفقي للجدول صفحياً (داخل `.desktop-on-mobile`) ولا يُخفى ارتفاعه.
+## 3) خطوات التنفيذ (بالترتيب، على دفعات)
 
-### 3) `src/index.css` — احترام `tableLayout: fixed` مع min-width
+**الدفعة 1 — أرصدة الأطراف (الأعلى أولوية):**
+1. Migration: trigger لإعادة حساب `customers.balance` و `credit_balance` من `invoices` + `transactions`.
+2. Migration: trigger مماثل لـ `suppliers.balance` من `purchase_orders` + `transactions`.
+3. Backfill: تشغيل مرّة واحدة لتصحيح القيم الحالية.
 
-نضمن أن الجدول ذو الأعمدة الثابتة لا يُكسر `colgroup`:
+**الدفعة 2 — حالات الفواتير والمشتريات:**
+4. Trigger/دالة لتحديث `overdue` تلقائياً.
+5. توحيد منطق دفع المورد (تسجيل `supplier_payment` + تحديث `paid_amount/due_amount` للمشتريات).
 
-```css
-.desktop-on-mobile .legacy-table[style*="table-layout: fixed"] {
-  width: max-content !important;
-  min-width: 1100px !important;
-}
-```
+**الدفعة 3 — تحويل العروض:**
+6. ضمان خصم المخزون داخل `quoteToInvoice` مباشرة (مع حماية idempotent).
+7. ضبط `quotes.workflow_status='converted'` و `converted_at` و `converted_to_invoice_id` ضمن transaction واحدة.
 
-### 4) لا تغييرات على ملفات الصفحات
+**الدفعة 4 — تحقق نهائي:**
+8. تشغيل `data-anomaly-scanner` بعد التعديلات للتأكد من عدم وجود تباينات.
+9. تشغيل اختبارات `stockDeductionWorkflow` و `stockDeductionIdempotency` الموجودة.
 
-لا حاجة لتعديل `ProductsPage.tsx` ولا `CustomersPage.tsx`؛ كل الإصلاح في CSS العالمي ضمن نفس قسم `desktop-on-mobile`، فينطبق تلقائياً على الشاشتين.
+## التفاصيل التقنية
 
-### 5) التحقق
+- جميع التريغرات: `SECURITY DEFINER`, `SET search_path = public`.
+- إعادة حساب الأرصدة تتم بـ `SUM(due_amount) WHERE customer_id = NEW.customer_id` فقط (مستهدف، ليس جدولاً كاملاً).
+- لا تعديل على `auth/storage/supabase_functions`.
+- لا تغيير على واجهات المستخدم — فقط طبقة البيانات والمنطق.
+- اختبار كل دفعة عبر `supabase--read_query` قبل المتابعة للدفعة التالية.
 
-- زيارة `/products` على viewport 375 والتأكد من:
-  - أن أزرار شريط الأدوات تظهر بنصها كاملاً على سطر واحد قابل للتمرير أفقياً.
-  - أن صفوف المنتجين تظهر فعلاً في الجدول.
-- زيارة `/customers` للتأكد من عدم تكسّر التخطيط (نفس القواعد).
-- التأكد من أن نسخة الديسكتوب (≥768px) لم تتأثر — كل التعديلات داخل `@media (max-width: 767px)` فقط.
-
-## الملفات المتأثرة
-
-- `src/index.css` (إضافة ~15 سطر داخل ميديا الجوال الحالية)
+بعد موافقتك سأبدأ بالدفعة 1.

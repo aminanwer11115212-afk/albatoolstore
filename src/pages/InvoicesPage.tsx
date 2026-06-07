@@ -51,6 +51,23 @@ export default function InvoicesPage() {
     return () => window.removeEventListener("invoices:changed", refresh);
   }, [refetch]);
 
+  // أتمتة: تعليم الفواتير المتأخرة تلقائياً عند فتح الصفحة (مرة واحدة لكل جلسة)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data } = await (supabase as any).rpc("mark_overdue_invoices");
+        if (!cancelled && typeof data === "number" && data > 0) {
+          refetch();
+        }
+      } catch (e) {
+        // فشل صامت — لا يعطّل الصفحة
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [refetch]);
+
   const handleWhatsApp = (inv: any) => {
     const phone = inv.customers?.phone;
     if (!phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
