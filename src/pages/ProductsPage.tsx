@@ -1539,7 +1539,7 @@ export default function ProductsPage() {
         )}
 
         <div
-          className={`items-scroll products-grid desktop-table-wrap`}
+          className={`items-scroll products-grid products-desktop-table`}
           style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto", overflowX: "auto", border: "1px solid hsl(var(--border))", borderRadius: 4 }}
           onKeyDown={(e) => {
             if (!isAllProducts) return;
