@@ -641,15 +641,15 @@ export default function InvoiceViewPage() {
             ))}
           </select>
         </div>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-start gap-2 overflow-x-auto pb-2 -mx-1 px-1 sm:overflow-visible sm:justify-between">
           {WORKFLOW_STATUSES.map((s, idx) => {
             const currentIdx = WORKFLOW_STATUSES.findIndex(w => w.value === (invoice.workflow_status || "new"));
             const isDone = idx <= currentIdx;
             const isCurrent = idx === currentIdx;
             const Icon = s.icon;
             return (
-              <div key={s.value} className="flex-1 flex items-center">
-                <div className="flex flex-col items-center gap-1 flex-1">
+              <div key={s.value} className="flex items-center flex-shrink-0 w-[96px] sm:flex-1 sm:w-auto">
+                <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition ${
                     isCurrent ? `${s.bg} ${s.color} border-current ring-2 ring-offset-2 ring-current` :
                     isDone ? `${s.bg} ${s.color} border-current` :
@@ -657,10 +657,10 @@ export default function InvoiceViewPage() {
                   }`}>
                     <Icon className="w-4 h-4" />
                   </div>
-                  <span className={`text-[11px] text-center font-medium ${isDone ? s.color : "text-muted-foreground"}`}>{s.label}</span>
+                  <span className={`text-[11px] text-center font-medium whitespace-normal leading-tight line-clamp-2 min-h-[2.2em] px-1 ${isDone ? s.color : "text-muted-foreground"}`}>{s.label}</span>
                 </div>
                 {idx < WORKFLOW_STATUSES.length - 1 && (
-                  <div className={`h-0.5 flex-1 mx-1 ${idx < currentIdx ? "bg-primary" : "bg-border"}`} />
+                  <div className={`h-0.5 flex-1 mx-1 min-w-[16px] ${idx < currentIdx ? "bg-primary" : "bg-border"}`} />
                 )}
               </div>
             );
