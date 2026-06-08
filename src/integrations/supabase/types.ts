@@ -2688,6 +2688,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_login_status: { Args: never; Returns: string }
       delete_invoice_items_silent: {
         Args: { p_invoice_id: string }
         Returns: undefined
