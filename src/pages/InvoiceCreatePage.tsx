@@ -45,6 +45,8 @@ import FreePositionToolbar from "@/components/toolbar/FreePositionToolbar";
 import SummaryChip from "@/components/toolbar/SummaryChip";
 import { ToolbarCustomizationProvider } from "@/components/toolbar/ToolbarCustomizationContext";
 import { productMatches as sharedProductMatches } from "@/utils/productMatches";
+import { normalizeAr } from "@/utils/arabicNormalize";
+import { getAvailableStock } from "@/utils/availableStock";
 import MessageImportDialog, { MessageImportButton } from "@/components/MessageImportDialog";
 import type { ParsedLine } from "@/hooks/useMessageImport";
 import { ALLOWED_INVOICE_STATUSES, computeInvoiceStatusAfterPayment, isAllowedInvoiceStatus } from "@/utils/invoiceStatus";
@@ -646,9 +648,10 @@ export default function InvoiceCreatePage() {
   // ---------- Search ----------
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    const q = customerSearch.toLowerCase();
+    const q = normalizeAr(customerSearch);
+    if (!q) return [];
     return customers
-      .filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q))
+      .filter((c) => normalizeAr(c.name).includes(q) || (c.phone || "").includes(q))
       .slice(0, 8);
   }, [customerSearch, customers]);
 
