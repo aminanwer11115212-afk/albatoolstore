@@ -571,6 +571,54 @@ export default function ProductsPage() {
     } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
   };
 
+  // حذف مستودع من النظام كلياً إن لم يكن مستخدماً
+  const deleteWarehouseFromSystem = async (warehouseId: string): Promise<boolean> => {
+    try {
+      const { data: used, error: uerr } = await (supabase as any)
+        .from("products").select("id, name").eq("warehouse_id", warehouseId).limit(20);
+      if (uerr) throw uerr;
+      if ((used || []).length > 0) {
+        const names = (used || []).map((p: any) => p.name);
+        toast.error(`لا يمكن حذف المستودع، مستخدم في: ${formatUsageList(names)}`);
+        return false;
+      }
+      const { error: derr } = await (supabase as any).from("warehouses").delete().eq("id", warehouseId);
+      if (derr) throw derr;
+      queryClient.invalidateQueries({ queryKey: ["warehouses"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      toast.success("تم حذف المستودع");
+      return true;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+  // حذف مورد من النظام كلياً إن لم يكن مستخدماً
+  const deleteSupplierFromSystem = async (supplierId: string): Promise<boolean> => {
+    try {
+      const { data: usedP, error: uerr } = await (supabase as any)
+        .from("products").select("id, name").eq("supplier_id", supplierId).limit(20);
+      if (uerr) throw uerr;
+      const { data: usedPO, error: poerr } = await (supabase as any)
+        .from("purchase_orders").select("id").eq("supplier_id", supplierId).limit(1);
+      if (poerr) throw poerr;
+      if ((usedP || []).length > 0) {
+        const names = (usedP || []).map((p: any) => p.name);
+        toast.error(`لا يمكن حذف المورد، مستخدم في منتجات: ${formatUsageList(names)}`);
+        return false;
+      }
+      if ((usedPO || []).length > 0) {
+        toast.error("لا يمكن حذف المورد، يوجد فواتير شراء مرتبطة به");
+        return false;
+      }
+      const { error: derr } = await (supabase as any).from("suppliers").delete().eq("id", supplierId);
+      if (derr) throw derr;
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      toast.success("تم حذف المورد");
+      return true;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+
   const handleSubmit = async () => {
     if (!form.name) { toast.error("اسم المنتج مطلوب"); return; }
     // أول ماركة محفوظة كـ company_id للحفاظ على التكامل الخلفي مع باقي النظام
