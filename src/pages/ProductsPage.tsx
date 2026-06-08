@@ -278,7 +278,8 @@ export default function ProductsPage() {
       if (filterSupplier && p.supplier_id !== filterSupplier) return false;
       if (fName && !String(p.name || "").toLowerCase().includes(fName)) return false;
       if (fSku && !String(p.sku || "").toLowerCase().includes(fSku)) return false;
-      if (!showFrozen && p.is_frozen) return false;
+      if (onlyFrozen) { if (!p.is_frozen) return false; }
+      else if (!showFrozen && p.is_frozen) return false;
       if (!term) return true;
       const catNames = (p.categories || []).map((c: any) => c.name).join(" ");
       const brandNames = (p.brands || []).map((b: any) => b.name).join(" ");
