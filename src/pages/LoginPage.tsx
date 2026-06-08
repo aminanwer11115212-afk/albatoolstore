@@ -4,24 +4,36 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo.png";
 
+function translateAuthError(msg: string): string {
+  const m = (msg || "").toLowerCase();
+  if (m.includes("invalid login") || m.includes("invalid_credentials")) return "البريد الإلكتروني أو كلمة المرور غير صحيحة";
+  if (m.includes("email not confirmed")) return "لم يتم تأكيد البريد الإلكتروني. تواصل مع المسؤول.";
+  if (m.includes("too many") || m.includes("rate limit")) return "محاولات كثيرة متتالية. حاول بعد دقيقة.";
+  if (m.includes("network")) return "تعذّر الاتصال بالخادم. تحقق من الإنترنت.";
+  if (m.includes("user not found")) return "هذا الحساب غير موجود. تواصل مع المسؤول.";
+  if (m.includes("disabled")) return "تم إيقاف هذا الحساب. تواصل مع المسؤول.";
+  return msg || "حدث خطأ غير متوقع";
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast({ title: "خطأ", description: "يرجى إدخال البريد وكلمة المرور", variant: "destructive" });
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      toast({ title: "بيانات ناقصة", description: "يرجى إدخال البريد وكلمة المرور", variant: "destructive" });
       return;
     }
     setLoading(true);
-    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
     if (error) {
-      toast({ title: "خطأ في تسجيل الدخول", description: error.message, variant: "destructive" });
+      toast({ title: "تعذّر تسجيل الدخول", description: translateAuthError(error.message), variant: "destructive" });
       setLoading(false);
       return;
     }
@@ -33,7 +45,7 @@ export default function LoginPage() {
 
     if (statusErr) {
       await supabase.auth.signOut();
-      toast({ title: "تعذّر التحقق", description: statusErr.message, variant: "destructive" });
+      toast({ title: "تعذّر التحقق", description: translateAuthError(statusErr.message), variant: "destructive" });
       setLoading(false);
       return;
     }
@@ -42,11 +54,11 @@ export default function LoginPage() {
       await supabase.auth.signOut();
       const msg =
         status === "pending"
-          ? "حسابك بانتظار موافقة المسؤول. سيتم إعلامك عند تفعيل الدخول."
+          ? "حسابك بانتظار موافقة المسؤول. يجب أن يضيفك من صفحة الموظفين."
           : status === "disabled"
           ? "تم إيقاف حسابك. يرجى التواصل مع المسؤول."
           : "غير مصرح لك بالدخول. يرجى التواصل مع المسؤول.";
-      toast({ title: "Aminco System", description: msg, variant: "destructive" });
+      toast({ title: "الدخول مرفوض", description: msg, variant: "destructive" });
       setLoading(false);
       return;
     }
@@ -64,6 +76,7 @@ export default function LoginPage() {
     navigate("/");
     setLoading(false);
   };
+
 
   return (
     <div style={{ minHeight: "100vh", background: "hsl(var(--muted))", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} dir="rtl">
@@ -84,19 +97,15 @@ export default function LoginPage() {
             </div>
             <div className="legacy-form-row">
               <label className="legacy-form-label">كلمة المرور</label>
-              <div className="legacy-form-control-wrap">
-                <input type="password" className="legacy-control" placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <div className="legacy-form-control-wrap" style={{ display: "flex", gap: 6 }}>
+                <input type={showPassword ? "text" : "password"} className="legacy-control" placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ flex: 1 }} />
+                <button type="button" onClick={() => setShowPassword((v) => !v)} className="legacy-btn" style={{ minWidth: 64 }}>
+                  {showPassword ? "إخفاء" : "إظهار"}
+                </button>
               </div>
             </div>
-            <div className="legacy-form-row">
-              <label className="legacy-form-label"></label>
-              <div className="legacy-form-control-wrap" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <label style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> تذكرني
-                </label>
-                <button type="button" style={{ background: "none", border: "none", color: "hsl(var(--primary))", fontSize: 13, cursor: "pointer" }}>هل نسيت كلمة المرور؟</button>
-              </div>
-            </div>
+
+
             <div className="legacy-form-row">
               <label className="legacy-form-label"></label>
               <div className="legacy-form-control-wrap">
