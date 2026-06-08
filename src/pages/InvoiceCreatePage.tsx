@@ -4,6 +4,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { fetchAllCustomers } from "@/lib/fetchAllCustomers";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Plus, Edit, Printer, MessageCircle, Share2, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet } from "lucide-react";
@@ -430,7 +431,7 @@ export default function InvoiceCreatePage() {
     (async () => {
       setProductsLoading(true);
       const [cs, ps, cfg] = await Promise.all([
-        supabase.from("customers").select("id,name,phone,balance,company").order("name"),
+        fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" }).then((data) => ({ data })),
         fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
         supabase.from("company_settings").select("*").maybeSingle(),
       ]);
@@ -478,7 +479,7 @@ export default function InvoiceCreatePage() {
     };
     // Refetch customers when they change elsewhere or when user returns to this tab.
     const refetchCustomers = async () => {
-      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      const data = await fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" });
       if (data) {
         setCustomers(data as Customer[]);
         const currentId = selectedCustomerIdRef.current;

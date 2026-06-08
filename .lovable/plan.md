@@ -1,66 +1,73 @@
-## الهدف
-إعادة تصميم **الطرف الأيمن** من `/dispatch` ليطابق الشكل في الصورة المرفقة (تبويبات + جدول مدمج بـ checkbox)، مع إظهار فواتير حالتها **"جاهز للرفع"** (`workflow_status = ready_to_ship`) فقط — وهي تلقائياً الفواتير التي تم تغليفها. الطرف الأيسر يبقى صفحة معاينة الطباعة الحالية كما هو.
 
-## الشكل المطلوب (من الصورة)
+# الهدف
+ضمان أن أي منتج أو عميل يُضاف للنظام يظهر فوراً في **جميع** شاشات الإدخال (فاتورة/عرض سعر/مرتجع مخزون/تحويل مخزون/تغليف/ترحيل) بكامل بياناته، بدون فقدان بسبب حد PostgREST الافتراضي (1000 صف) أو بسبب عدم تحديث الكاش.
 
-بطاقة بإطار رفيع داخل لوحة جانبية على اليمين، تحتوي:
+# تشخيص الوضع الحالي
 
-1. **رأس** ملوّن خفيف بعنوان «تقرير الترحيلات» + زر إغلاق رمزي (decorative).
-2. **شريط تبويبات أفقي** (3 تبويبات بأيقونات النظام `lucide-react`):
-   - 🚛 **كل الترحيلات** (افتراضي) — كل الفواتير الجاهزة للرفع.
-   - 🚆 **حسب الترحيلات** — تجميع حسب الناقل/الوجهة (من `invoice_transports`).
-   - 👤 **حسب اسم الزبون** — تجميع حسب الزبون.
-3. **نص إرشادي** صغير: «الرجاء اختيار زبون أو مجموعة من الزبائن».
-4. **شريط "Drag a column header here to group by that column"** (decorative، يطابق الصورة) — بدون منطق سحب فعلي.
-5. **جدول مدمج** بأعمدة (من اليمين لليسار في RTL):
-   - ☐ Checkbox
-   - رقم الفاتورة
-   - اسم الزبون
-   - تاريخ الفاتورة (بصيغة `dd/mm/yyyy`)
-   - صف فلتر تحت العناوين (أيقونات `=`, `abc`, `▼` ـ decorative للمطابقة البصرية).
-6. **شريط سفلي ثابت داخل البطاقة**:
-   - عداد «N محدد من M».
-   - زر «تحديد الكل / إلغاء».
-   - زر أساسي: **«طباعة وتحويل إلى ترحيلات»**.
+## 1) ✅ يعمل بشكل صحيح
+- **صفحة المنتجات (`ProductsPage`)** تستخدم `useProductsWithDetails()` المبنية على `fetchAllProducts` التي تجلب كل الصفحات (لا حد 1000).
+- **صفحات الإنشاء (فاتورة/عرض سعر/مرتجع مخزون)** تستخدم `fetchAllProducts` للمنتجات.
+- **حدث `products:changed` و `customers:changed`** يُطلَق من `useTable` ومن `QuickAddProductDialog` و`CustomerFormDialog` وملفات `stockDeduction` / `stockReceive`، وكل صفحة إنشاء تستمع له وتعيد الجلب.
 
-التنسيق يستخدم tokens النظام فقط (`--card`, `--border`, `--primary`, `--muted`...) — لا ألوان مرمّزة. الخط Cairo bold كما هو معتاد.
+## 2) ⚠️ مشاكل تحدّ من ظهور البيانات
 
-## السلوك
+### أ) جلب العملاء محدود بـ 1000 صف
+حالياً 307 عميل فقط، فالأمر يعمل، لكن جميع شاشات الإنشاء تستخدم:
+```ts
+supabase.from("customers").select("id,name,phone,balance,company").order("name")
+```
+بدون `range()`. سيتوقف عن إظهار العملاء الجدد بعد العميل رقم 1000.
+- `InvoiceCreatePage` (سطر 433, 481)
+- `QuoteCreatePage` (سطر 420, 466)
+- `StockReturnCreatePage` (سطر 317, 354, 390)
 
-- استعلام React Query جديد `["dispatch-ready-to-ship"]`:
-  ```
-  invoices.select("id, invoice_number, date, customer_id, customers(name)")
-    .eq("workflow_status", "ready_to_ship")
-    .order("date", { ascending: false })
-  ```
-- تحديد متعدد بـ `Set<string>`.
-- زر **«طباعة وتحويل إلى ترحيلات»**:
-  1. يبني HTML الطباعة بنفس دالة `buildDispatchReportHTML` الحالية لتوحيد التقرير.
-  2. يفتح نافذة طباعة (نفس آلية الصفحة الحالية).
-  3. بعد `onload` → 
-     ```
-     supabase.from("invoices")
-       .update({ workflow_status: "in_transit" })
-       .in("id", selectedIds)
-     ```
-  4. `qc.invalidateQueries` لـ `dispatch-ready-to-ship` و`invoices-with-customers`.
-  5. `toast.success("تم تحويل N فاتورة إلى في الطريق للترحيلات")` ومسح التحديد.
-- التبويبات الثلاثة تستخدم نفس البيانات مع تغيير العرض فقط:
-  - **كل الترحيلات**: قائمة مسطحة.
-  - **حسب الترحيلات**: مجموعات قابلة للطي حسب الناقل (`invoice_transports.transporter_id`).
-  - **حسب اسم الزبون**: مجموعات قابلة للطي حسب الزبون.
+### ب) شاشات تستخدم `useProducts()` المحدود بـ 1000 صف
+المنتجات الآن 638، لكن مع نمو الكتالوج ستُفقد منتجات في:
+- `src/pages/StockTransferPage.tsx` (سطر 37) — صفحة تحويل المخزون
+- `src/components/packaging/PackagingItemsManager.tsx` (سطر 32) — مدير عناصر التغليف داخل الفواتير
+- `src/components/transport/TransportItemsManager.tsx` (سطر 26) — مدير عناصر الترحيل داخل الفواتير
 
-## التخطيط العام للصفحة
+### ج) صفحة إدارة العملاء (`CustomersPage`) محدودة بـ 1000 صف
+تستخدم `useCustomers()` → `useTable("customers").select("*")` بدون pagination.
 
-- Grid في `≥1024px`: `[ معاينة الطباعة (يسار) | اللوحة الجديدة (يمين) ]` بعرض ~360–400px للوحة.
-- على الموبايل: زر عائم RTL «الفواتير الجاهزة للرفع (N)» يفتح Sheet من اليمين بنفس المحتوى — مع الحفاظ على قواعد الموبايل في `index.css`.
+## 3) ملاحظة عن البيانات الكاملة
+- استعلامات شاشات الإنشاء تختار **أعمدة محدودة عمداً** (id, name, phone, balance, company للعميل) لتسريع الفتح. هذا سلوك مقصود — البحث والاختيار يحتاج هذه الحقول فقط، أما التفاصيل الكاملة فتُجلب عند الاختيار. سأبقي هذا السلوك ولن أوسّعه.
 
-## الملفات
+# الخطة
 
-- `src/pages/DispatchPage.tsx`: تعديل واحد فقط — إضافة اللوحة اليمنى الجديدة، التبويبات، الاستعلام الجديد، ومنطق الطباعة+التحويل. لا تغيير في schema ولا في صفحات أخرى ولا في `ShippingDispatchDialog`.
+## A) ملف مساعد جديد: `src/lib/fetchAllCustomers.ts`
+نسخ نمط `fetchAllProducts` (تقسيم بـ `range()` صفحات 1000) ليجلب كل العملاء مع إمكانية تحديد الأعمدة والترتيب.
 
-## ما لن يتغيّر
+## B) تحديث شاشات الإنشاء لاستخدام `fetchAllCustomers`
+استبدال `supabase.from("customers").select(...).order("name")` بـ `fetchAllCustomers("id,name,phone,balance,company", { column: "name" })` في:
+- `InvoiceCreatePage` (الجلب الأولي + `refetchCustomers`)
+- `QuoteCreatePage` (الجلب الأولي + `refetchCustomers`)
+- `StockReturnCreatePage` (الجلب الأولي + `refetchCustomers` + جلب العميل عند التحرير لن يتغير لأنه `.eq("id", ...)`)
 
-- شكل/منطق صفحة معاينة الطباعة (الطرف الأيسر) يبقى كما هو.
-- قالب الطباعة `buildDispatchReportHTML` يبقى كما هو.
-- المخطط (database) لا يتغيّر.
+## C) تحديث الشاشات التي تستخدم `useProducts()` لاستخدام `useProductsWithDetails()`
+ل-`StockTransferPage`, `PackagingItemsManager`, `TransportItemsManager` (الأخيرتان تحتاج فقط `id, name, unit, stock_quantity` — لكن `useProductsWithDetails` تجلب كل الصفحات وبيانات مخصبة — مقبول لأنها مُكاش 5 دقائق ومشتركة).
+
+## D) صفحة إدارة العملاء — إضافة Hook غير محدود
+إضافة `useCustomersAll()` في `src/hooks/useData.ts` تستخدم `fetchAllCustomers`، واستخدامها داخل `CustomersPage` بدل `useCustomers().data`. أبقي `useCustomers()` للاستخدامات الخفيفة (Dispatch, Transactions, Statistics) التي لا تتأثر حالياً.
+
+## E) لا تغييرات على
+- مخطط قاعدة البيانات / RLS / الصلاحيات.
+- منطق إضافة عميل/منتج جديد (QuickAdd + CustomerFormDialog) — يعمل الآن صحيحاً عبر الأحداث.
+- استعلامات تفاصيل العميل/المنتج عند الاختيار (تبقى كما هي).
+
+# الملفات التي ستُلمس
+1. **جديد:** `src/lib/fetchAllCustomers.ts`
+2. **تعديل:** `src/hooks/useData.ts` — إضافة `useCustomersAll` فقط.
+3. **تعديل:** `src/pages/InvoiceCreatePage.tsx`
+4. **تعديل:** `src/pages/QuoteCreatePage.tsx`
+5. **تعديل:** `src/pages/StockReturnCreatePage.tsx`
+6. **تعديل:** `src/pages/StockTransferPage.tsx`
+7. **تعديل:** `src/pages/CustomersPage.tsx`
+8. **تعديل:** `src/components/packaging/PackagingItemsManager.tsx`
+9. **تعديل:** `src/components/transport/TransportItemsManager.tsx`
+
+# الاختبار بعد التنفيذ
+1. إضافة عميل جديد عبر QuickAdd داخل صفحة الفاتورة → يظهر فوراً في البحث.
+2. إضافة منتج جديد عبر QuickAdd داخل صفحة الفاتورة → يظهر فوراً.
+3. فتح صفحة تحويل المخزون والتغليف والترحيل والتأكد من ظهور كل المنتجات.
+4. فتح صفحة إدارة العملاء — تظهر كل الـ307 (وستظهر كل ما يُضاف لاحقاً ولو تجاوز 1000).

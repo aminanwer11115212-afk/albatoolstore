@@ -184,6 +184,36 @@ function useTable<T extends keyof Tables<any>>(table: string) {
 }
 
 export function useCustomers() { return useTable("customers"); }
+
+/**
+ * Returns ALL customers (paginated past Supabase's default 1000-row cap)
+ * with full row columns. Use in the Customers management page and any place
+ * that must guarantee every customer is visible regardless of table size.
+ */
+export function useCustomersAll() {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: ["customers-all"],
+    queryFn: async () => {
+      const { fetchAllCustomers } = await import("@/lib/fetchAllCustomers");
+      return await fetchAllCustomers<any>("*", { column: "created_at", ascending: false });
+    },
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+  });
+  // Sync with mutations that fire `customers:changed`.
+  if (typeof window !== "undefined") {
+    const handler = () => queryClient.invalidateQueries({ queryKey: ["customers-all"] });
+    // De-dupe by storing on window
+    const key = "__customersAllListener";
+    if (!(window as any)[key]) {
+      window.addEventListener("customers:changed", handler);
+      (window as any)[key] = true;
+    }
+  }
+  const base = useTable("customers");
+  return { ...query, insert: base.insert, update: base.update, remove: base.remove };
+}
 export function useCustomerGroups() { return useTable("customer_groups"); }
 export function useSuppliers() { return useTable("suppliers"); }
 export function useProducts() { return useTable("products"); }
