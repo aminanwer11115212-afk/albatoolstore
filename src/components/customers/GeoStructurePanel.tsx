@@ -35,8 +35,8 @@ export default function GeoStructurePanel({ open, onOpenChange, regions, states,
   }, [customers]);
 
   const tree = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    const match = (n: string) => !term || (n || "").toLowerCase().includes(term);
+    const term = q.trim();
+    const match = (n: string) => !term || startsWithMatch(n, term);
 
     return (regions || [])
       .slice()
