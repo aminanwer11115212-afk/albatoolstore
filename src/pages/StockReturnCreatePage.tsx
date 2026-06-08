@@ -456,6 +456,21 @@ export default function StockReturnCreatePage() {
     })();
   }, [customer?.id]);
 
+  // ---------- Refresh live balance for selected customer ----------
+  useEffect(() => {
+    if (!customer?.id) return;
+    (async () => {
+      const { data: bal } = await supabase
+        .from("customers")
+        .select("balance, credit_balance")
+        .eq("id", customer.id)
+        .maybeSingle();
+      if (bal && Number((bal as any).balance || 0) !== Number(customer.balance || 0)) {
+        setCustomer((prev) => prev ? { ...prev, balance: Number((bal as any).balance || 0) } as Customer : prev);
+      }
+    })();
+  }, [customer?.id]);
+
   // ---------- Load items of linked invoice ----------
   useEffect(() => {
     if (!linkedInvoiceId) { setLinkedInvoiceItems([]); return; }
