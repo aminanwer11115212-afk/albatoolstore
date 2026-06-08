@@ -417,7 +417,7 @@ export default function QuoteCreatePage() {
     (async () => {
       setProductsLoading(true);
       const [cs, ps, cfg, wh, gs] = await Promise.all([
-        supabase.from("customers").select("id,name,phone,balance,company").order("name"),
+        fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" }).then((data) => ({ data })),
         fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,category_id,warehouse_id,is_frozen"),
         supabase.from("company_settings").select("currency,quote_prefix,side_quote_prefix").maybeSingle(),
         supabase.from("warehouses").select("id,name").order("name"),
@@ -463,7 +463,7 @@ export default function QuoteCreatePage() {
     };
     // Refetch customers when they change elsewhere or when user returns to this tab.
     const refetchCustomers = async () => {
-      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      const data = await fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" });
       if (data) {
         setCustomers(data as Customer[]);
         const currentId = selectedCustomerIdRef.current;

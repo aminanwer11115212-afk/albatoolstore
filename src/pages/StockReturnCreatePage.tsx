@@ -314,7 +314,7 @@ export default function StockReturnCreatePage() {
   useEffect(() => {
     (async () => {
       const [cs, ps, cfg, wh] = await Promise.all([
-        supabase.from("customers").select("id,name,phone,balance,company").order("name"),
+        fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" }).then((data) => ({ data })),
         fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
         supabase.from("company_settings").select("currency,return_prefix").maybeSingle(),
         supabase.from("warehouses").select("id,name").order("name"),
@@ -351,7 +351,7 @@ export default function StockReturnCreatePage() {
     };
     // Refetch customers when they change elsewhere or when user returns to this tab.
     const refetchCustomers = async () => {
-      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      const data = await fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" });
       if (data) {
         setCustomers(data as Customer[]);
         const currentId = selectedCustomerIdRef.current;
