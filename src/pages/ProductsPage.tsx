@@ -2047,6 +2047,7 @@ export default function ProductsPage() {
                                 onAdd={createCategoryInline}
                                 onDelete={(opt) => deleteCategoryFromSystem(opt.value)}
                                 deleteConfirm={(opt) => `هل تريد حذف الفئة "${opt.label}" من النظام نهائيًا؟`}
+                                showDeleteButton
                                 placeholder={allNames ? "تغيير الفئة الأساسية" : "—"} addLabel="إضافة فئة"
                               />
                             </div>
@@ -2099,6 +2100,7 @@ export default function ProductsPage() {
                                 }}
                                 onDelete={(opt) => deleteBrandFromSystem(opt.value)}
                                 deleteConfirm={(opt) => `هل تريد حذف الماركة "${opt.label}" من النظام نهائيًا؟`}
+                                showDeleteButton
                                 placeholder="—" addLabel="إضافة ماركة"
                               />
                             </div>
@@ -2113,6 +2115,7 @@ export default function ProductsPage() {
                           onAdd={createWarehouseInline}
                           onDelete={(opt) => deleteWarehouseFromSystem(opt.value)}
                           deleteConfirm={(opt) => `هل تريد حذف المستودع "${opt.label}" من النظام نهائيًا؟`}
+                          showDeleteButton
                           placeholder="—" addLabel="إضافة مستودع"
                         />
 
@@ -2214,6 +2217,7 @@ export default function ProductsPage() {
                           onAdd={createSupplierInline}
                           onDelete={(opt) => deleteSupplierFromSystem(opt.value)}
                           deleteConfirm={(opt) => `هل تريد حذف المورد "${opt.label}" من النظام نهائيًا؟`}
+                          showDeleteButton
                           placeholder="—" addLabel="إضافة مورد"
                         />
                       </td>
