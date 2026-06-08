@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
-import { fetchAllCustomers } from "@/lib/fetchAllCustomers";
-import { normalizeAr } from "@/utils/arabicNormalize";
 import { toast } from "sonner";
 import { applyStockDeltaForLines } from "@/utils/stockDeduction";
 import { Plus, Edit, Printer, StickyNote } from "lucide-react";
@@ -316,7 +314,7 @@ export default function StockReturnCreatePage() {
   useEffect(() => {
     (async () => {
       const [cs, ps, cfg, wh] = await Promise.all([
-        fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" }).then((data) => ({ data })),
+        supabase.from("customers").select("id,name,phone,balance,company").order("name"),
         fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
         supabase.from("company_settings").select("currency,return_prefix").maybeSingle(),
         supabase.from("warehouses").select("id,name").order("name"),
@@ -353,7 +351,7 @@ export default function StockReturnCreatePage() {
     };
     // Refetch customers when they change elsewhere or when user returns to this tab.
     const refetchCustomers = async () => {
-      const data = await fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" });
+      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
       if (data) {
         setCustomers(data as Customer[]);
         const currentId = selectedCustomerIdRef.current;
@@ -413,9 +411,8 @@ export default function StockReturnCreatePage() {
   // ---------- Customer search ----------
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    const q = normalizeAr(customerSearch);
-    if (!q) return [];
-    return customers.filter((c) => normalizeAr(c.name).includes(q) || (c.phone || "").includes(q)).slice(0, 8);
+    const q = customerSearch.toLowerCase();
+    return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)).slice(0, 8);
   }, [customerSearch, customers]);
 
   function pickCustomer(c: Customer) {
@@ -456,21 +453,6 @@ export default function StockReturnCreatePage() {
     })();
   }, [customer?.id]);
 
-  // ---------- Refresh live balance for selected customer ----------
-  useEffect(() => {
-    if (!customer?.id) return;
-    (async () => {
-      const { data: bal } = await supabase
-        .from("customers")
-        .select("balance, credit_balance")
-        .eq("id", customer.id)
-        .maybeSingle();
-      if (bal && Number((bal as any).balance || 0) !== Number(customer.balance || 0)) {
-        setCustomer((prev) => prev ? { ...prev, balance: Number((bal as any).balance || 0) } as Customer : prev);
-      }
-    })();
-  }, [customer?.id]);
-
   // ---------- Load items of linked invoice ----------
   useEffect(() => {
     if (!linkedInvoiceId) { setLinkedInvoiceItems([]); return; }
@@ -488,18 +470,18 @@ export default function StockReturnCreatePage() {
   /** Suggestions: when an invoice is linked, restrict to its items; else show all products. */
   function productMatches(query: string, excludeRowUid?: string): Product[] {
     if (!query.trim()) return [];
-    const q = normalizeAr(query);
-    if (!q) return [];
+    const q = query.toLowerCase();
     const usedIds = new Set(
       rows.filter((r) => r.product_id && r.uid !== excludeRowUid).map((r) => r.product_id),
     );
     if (linkedInvoiceId && linkedInvoiceItems.length) {
+      // map invoice items -> Product-like shape; dedupe by product_id+name
       const seen = new Set<string>();
       const list: Product[] = [];
       for (const it of linkedInvoiceItems) {
         const key = `${it.product_id || ""}|${it.product_name}`;
         if (seen.has(key)) continue;
-        if (!normalizeAr(it.product_name).includes(q)) continue;
+        if (!it.product_name.toLowerCase().includes(q)) continue;
         const candidateId = it.product_id || it.id;
         if (usedIds.has(candidateId)) continue;
         seen.add(key);
@@ -517,7 +499,7 @@ export default function StockReturnCreatePage() {
     return products
       .filter((p) => !usedIds.has(p.id))
       .filter((p) => !warehouseId || p.warehouse_id === warehouseId)
-      .filter((p) => normalizeAr(p.name).includes(q))
+      .filter((p) => p.name.toLowerCase().includes(q))
       .slice(0, 10);
   }
 

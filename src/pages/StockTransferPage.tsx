@@ -1,7 +1,7 @@
 import { useState } from "react";
 import ZoomControls from "@/components/ZoomControls";
 import { Plus, Search, ArrowLeftRight } from "lucide-react";
-import { useProductsWithDetails, useWarehouses, useStockTransfers } from "@/hooks/useData";
+import { useProducts, useWarehouses, useStockTransfers } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -34,7 +34,7 @@ export default function StockTransferPage() {
   const [form, setForm] = useState({ product_id: "", from_warehouse_id: "", to_warehouse_id: "", quantity: "", notes: "" });
 
   const { data: transfers, isLoading } = useStockTransfersWithDetails();
-  const { data: products } = useProductsWithDetails();
+  const { data: products } = useProducts();
   const { data: warehouses } = useWarehouses();
   const { insert } = useStockTransfers();
 

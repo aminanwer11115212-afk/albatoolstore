@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
-import { usePackagingTypes, useProductsWithDetails } from "@/hooks/useData";
+import { usePackagingTypes, useProducts } from "@/hooks/useData";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ export default function PackagingItemsManager({
 }: Props) {
   const qc = useQueryClient();
   const { data: types } = usePackagingTypes();
-  const { data: allProducts } = useProductsWithDetails();
+  const { data: allProducts } = useProducts();
 
   const docProducts = allowedProductIds && allowedProductIds.length > 0
     ? (allProducts || []).filter((p: any) => allowedProductIds.includes(p.id))

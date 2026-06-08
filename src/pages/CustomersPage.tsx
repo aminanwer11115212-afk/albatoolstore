@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, X, Maximize2, Minimize2 } from "lucide-react";
-import { useCustomersAll } from "@/hooks/useData";
+import { useCustomers } from "@/hooks/useData";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,7 +37,7 @@ export default function CustomersPage() {
   const [perPage, setPerPage] = useState(10);
   const [duplicates, setDuplicates] = useState<any[]>([]);
   const [showGeo, setShowGeo] = useState(false);
-  const { data: customers, isLoading, insert, update, remove } = useCustomersAll();
+  const { data: customers, isLoading, insert, update, remove } = useCustomers();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 

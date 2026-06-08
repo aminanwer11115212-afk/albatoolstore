@@ -2,8 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Image as ImageIcon, StickyNote, Printer, Save, ArrowRight } from "lucide-react";
 import StatusButton, { PURCHASE_STATUS_OPTIONS } from "@/components/StatusButton";
-import { useSuppliersAll, useProductsWithDetails, useWarehouses, useCompanySettings } from "@/hooks/useData";
-import { normalizeAr } from "@/utils/arabicNormalize";
+import { useSuppliers, useProductsWithDetails, useWarehouses, useCompanySettings } from "@/hooks/useData";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -237,7 +236,7 @@ export default function PurchaseCreatePage() {
   useKeyboardNav(pageRef);
 
   const queryClient = useQueryClient();
-  const { data: suppliers } = useSuppliersAll();
+  const { data: suppliers } = useSuppliers();
   const { data: products } = useProductsWithDetails();
   const { data: warehouses } = useWarehouses();
   const { data: companyArr } = useCompanySettings();
@@ -364,24 +363,21 @@ export default function PurchaseCreatePage() {
 
   const filteredSuppliers = useMemo(() => {
     if (!supplierSearch.trim()) return [];
-    const q = normalizeAr(supplierSearch);
-    if (!q) return [];
+    const q = supplierSearch.toLowerCase();
     return (suppliers || []).filter((s: any) =>
-      normalizeAr(s.name).includes(q) || (s.phone || "").includes(q)
+      (s.name || "").toLowerCase().includes(q) || (s.phone || "").includes(q)
     ).slice(0, 8);
   }, [supplierSearch, suppliers]);
 
   function productMatches(query: string, excludeRowUid?: string): any[] {
     if (!query.trim()) return [];
-    const q = normalizeAr(query);
-    if (!q) return [];
+    const q = query.toLowerCase();
     const usedIds = new Set(
       rows.filter((r) => r.product_id && r.uid !== excludeRowUid).map((r) => r.product_id),
     );
     return (products || []).filter((p: any) => {
       if (usedIds.has(p.id)) return false;
-      if (p.is_frozen) return false; // إخفاء المجمّدة من اقتراحات الشراء
-      const m = normalizeAr(p.name).includes(q) || normalizeAr(p.sku || "").includes(q);
+      const m = (p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q);
       if (!warehouseId) return m;
       return m && p.warehouse_id === warehouseId;
     }).slice(0, 10);

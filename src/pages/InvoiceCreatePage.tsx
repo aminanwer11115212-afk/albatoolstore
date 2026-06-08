@@ -4,7 +4,6 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
-import { fetchAllCustomers } from "@/lib/fetchAllCustomers";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Plus, Edit, Printer, MessageCircle, Share2, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet } from "lucide-react";
@@ -45,8 +44,6 @@ import FreePositionToolbar from "@/components/toolbar/FreePositionToolbar";
 import SummaryChip from "@/components/toolbar/SummaryChip";
 import { ToolbarCustomizationProvider } from "@/components/toolbar/ToolbarCustomizationContext";
 import { productMatches as sharedProductMatches } from "@/utils/productMatches";
-import { normalizeAr } from "@/utils/arabicNormalize";
-import { getAvailableStock } from "@/utils/availableStock";
 import MessageImportDialog, { MessageImportButton } from "@/components/MessageImportDialog";
 import type { ParsedLine } from "@/hooks/useMessageImport";
 import { ALLOWED_INVOICE_STATUSES, computeInvoiceStatusAfterPayment, isAllowedInvoiceStatus } from "@/utils/invoiceStatus";
@@ -433,7 +430,7 @@ export default function InvoiceCreatePage() {
     (async () => {
       setProductsLoading(true);
       const [cs, ps, cfg] = await Promise.all([
-        fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" }).then((data) => ({ data })),
+        supabase.from("customers").select("id,name,phone,balance,company").order("name"),
         fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
         supabase.from("company_settings").select("*").maybeSingle(),
       ]);
@@ -481,7 +478,7 @@ export default function InvoiceCreatePage() {
     };
     // Refetch customers when they change elsewhere or when user returns to this tab.
     const refetchCustomers = async () => {
-      const data = await fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" });
+      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
       if (data) {
         setCustomers(data as Customer[]);
         const currentId = selectedCustomerIdRef.current;
@@ -648,10 +645,9 @@ export default function InvoiceCreatePage() {
   // ---------- Search ----------
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    const q = normalizeAr(customerSearch);
-    if (!q) return [];
+    const q = customerSearch.toLowerCase();
     return customers
-      .filter((c) => normalizeAr(c.name).includes(q) || (c.phone || "").includes(q))
+      .filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q))
       .slice(0, 8);
   }, [customerSearch, customers]);
 
@@ -1694,17 +1690,14 @@ export default function InvoiceCreatePage() {
                     if (productsLoading) return <div className="item suggestions-status" data-status="loading">جارٍ تحميل المنتجات…</div>;
                     if (!quickRow.productSearch.trim()) return <div className="item suggestions-status" data-status="hint">اكتب للبحث ({products.length} منتج)</div>;
                     if (matches.length === 0) return <div className="item suggestions-status" data-status="empty">لا توجد نتائج</div>;
-                    return matches.map((p, i) => {
-                      const avail = getAvailableStock(p, rows);
-                      return (
-                        <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoQuick(p)}>
-                          <span>{p.name}</span>
-                          <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: avail > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: avail > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${avail > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
-                            {avail > 0 ? avail.toLocaleString() : "0"}
-                          </span>
-                        </div>
-                      );
-                    });
+                    return matches.map((p, i) => (
+                      <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoQuick(p)}>
+                        <span>{p.name}</span>
+                        <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                          {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                        </span>
+                      </div>
+                    ));
                   })()}
                 </div>
               </SuggestionsPortal>
@@ -1886,17 +1879,14 @@ export default function InvoiceCreatePage() {
                                   if (productsLoading) return <div className="item suggestions-status" data-status="loading">جارٍ تحميل المنتجات…</div>;
                                   if (!r.productSearch.trim()) return <div className="item suggestions-status" data-status="hint">اكتب للبحث ({products.length} منتج)</div>;
                                   if (matches.length === 0) return <div className="item suggestions-status" data-status="empty">لا توجد نتائج</div>;
-                                  return matches.map((p, i) => {
-                                    const avail = getAvailableStock(p, rows, r.uid);
-                                    return (
-                                      <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoRow(r.uid, p)}>
-                                        <span>{p.name}</span>
-                                        <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: avail > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: avail > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${avail > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
-                                          {avail > 0 ? avail.toLocaleString() : "0"}
-                                        </span>
-                                      </div>
-                                    );
-                                  });
+                                  return matches.map((p, i) => (
+                                    <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoRow(r.uid, p)}>
+                                      <span>{p.name}</span>
+                                      <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                                        {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                                      </span>
+                                    </div>
+                                  ));
                                 })()}
                               </div>
                             </SuggestionsPortal>
