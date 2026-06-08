@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, X, Maximize2, Minimize2 } from "lucide-react";
 import { useCustomers } from "@/hooks/useData";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CustomerDetailView from "@/components/CustomerDetailView";
@@ -205,17 +206,15 @@ export default function CustomersPage() {
 
   const filtered = useMemo(() => (customers || []).filter((c: any) => {
     if (search) {
-      const s = search.toLowerCase();
-      const hay = [c.name, c.phone, c.city, c.address].filter(Boolean).join(" ").toLowerCase();
-      if (!hay.includes(s)) return false;
+      if (!startsWithAny([c.name, c.phone, c.city, c.address], search)) return false;
     }
     if (filterCity && c.city_id !== filterCity) return false;
     if (filterRegion && c.region_id !== filterRegion) return false;
     if (filterState && c.state_id !== filterState) return false;
     if (filterLocality && c.locality_id !== filterLocality) return false;
-    if (filterName && !(c.name || "").toLowerCase().includes(filterName.toLowerCase())) return false;
+    if (filterName && !startsWithMatch(c.name, filterName)) return false;
     if (filterPhone && !normalizePhone(c.whatsapp || c.phone || "").includes(normalizePhone(filterPhone))) return false;
-    if (filterAddress && !(c.address || "").toLowerCase().includes(filterAddress.toLowerCase())) return false;
+    if (filterAddress && !startsWithMatch(c.address, filterAddress)) return false;
     if (filterGroup && c.group_id !== filterGroup) return false;
     if (filterTransporter && customerTransporter[c.id] !== filterTransporter) return false;
     if (filterDestination && customerDestination[c.id] !== filterDestination) return false;
@@ -1312,7 +1311,7 @@ export default function CustomersPage() {
                           else { setOpenFilter(null); setFilterQuery(""); }
                         };
                         const filteredOptions = col.filter?.kind === "select" && filterQuery
-                          ? col.filter.options!.filter(o => o.label.toLowerCase().includes(filterQuery.toLowerCase()))
+                          ? col.filter.options!.filter(o => startsWithMatch(o.label, filterQuery))
                           : col.filter?.options || [];
                         return (
                           <th key={col.i} style={{ position: "relative", userSelect: "none", cursor: col.filter ? "pointer" : "default", background: filterActive ? "hsl(var(--primary) / 0.15)" : undefined }} onClick={onHeaderClick} title={col.filter ? "ضغطة: قائمة • ضغطتان: بحث" : undefined}>

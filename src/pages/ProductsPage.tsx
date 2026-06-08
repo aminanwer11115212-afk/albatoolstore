@@ -3,6 +3,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { Search, Plus, Edit, Trash2, Package as PackageIcon, Boxes, AlertTriangle, CheckCircle2, BarChart3, DollarSign, Upload, X, FileDown, Snowflake } from "lucide-react";
 import { useProductsWithDetails, useProducts, useProductCategories, useWarehouses, useSuppliers } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";

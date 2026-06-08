@@ -3,6 +3,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useInvoicesWithCustomers, useInvoices, useCompanySettings } from "@/hooks/useData";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { useQueryClient } from "@tanstack/react-query";
 import { openWhatsAppInvoice } from "@/utils/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
@@ -170,8 +171,7 @@ export default function InvoicesPage() {
     if (workflowFilter !== "all" && (inv.workflow_status || "new") !== workflowFilter) return false;
     if (paymentFilter !== "all" && getPaymentStatus(inv) !== paymentFilter) return false;
     if (customerSearch.trim()) {
-      const cs = customerSearch.trim().toLowerCase();
-      if (!(inv.customers?.name || "").toLowerCase().includes(cs)) return false;
+      if (!startsWithMatch(inv.customers?.name, customerSearch)) return false;
     }
     if (dateFrom && (inv.date || "") < dateFrom) return false;
     if (dateTo && (inv.date || "") > dateTo) return false;
@@ -180,11 +180,7 @@ export default function InvoicesPage() {
       if (Number(inv.total || 0) < min) return false;
     }
     if (!search) return true;
-    const s = search.toLowerCase();
-    return (
-      inv.invoice_number?.toLowerCase().includes(s) ||
-      inv.customers?.name?.toLowerCase().includes(s)
-    );
+    return startsWithAny([inv.invoice_number, inv.customers?.name], search);
   }), [invoices, workflowFilter, paymentFilter, customerSearch, dateFrom, dateTo, minAmount, search]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const start = (page - 1) * perPage;

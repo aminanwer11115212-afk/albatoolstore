@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { startsWithAny } from "@/utils/searchMatch";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompanySettings } from "@/hooks/useData";
 import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
@@ -67,12 +68,9 @@ export default function SideQuotesPage() {
   });
 
   const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
+    const s = search.trim();
     const base = (quotes || []).filter((q: any) =>
-      !s
-        ? true
-        : (q.quote_number?.toLowerCase().includes(s) ||
-           (q.customers?.name || "").toLowerCase().includes(s))
+      !s ? true : startsWithAny([q.quote_number, q.customers?.name], s)
     );
     return base.slice(0, limit);
   }, [quotes, search, limit]);
