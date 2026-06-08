@@ -753,6 +753,28 @@ export default function DispatchPage() {
           </div>
         )}
       </div>
+        </div>
+
+        {/* Desktop right panel */}
+        <aside className="dispatch-right hidden lg:block">
+          <ReadyToShipPanel buildPrintHTML={buildDispatchReportHTML} company={company} />
+        </aside>
+      </div>
+
+      {/* Mobile floating trigger + sheet */}
+      <Sheet>
+        <SheetTrigger asChild>
+          <button className="dispatch-right-mobile-trigger" type="button">
+            <PackageCheck size={16} />
+            الفواتير الجاهزة للرفع
+          </button>
+        </SheetTrigger>
+        <SheetContent side="right" className="w-[92vw] sm:w-[420px] p-0">
+          <div style={{ height: "100%", padding: 8 }}>
+            <ReadyToShipPanel buildPrintHTML={buildDispatchReportHTML} company={company} />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Click outside to close dropdown */}
       {showCustomerDropdown && (
