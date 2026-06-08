@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { fetchAllCustomers } from "@/lib/fetchAllCustomers";
+import { normalizeAr } from "@/utils/arabicNormalize";
 import { toast } from "sonner";
 import { applyStockDeltaForLines } from "@/utils/stockDeduction";
 import { Plus, Edit, Printer, StickyNote } from "lucide-react";
@@ -412,8 +413,9 @@ export default function StockReturnCreatePage() {
   // ---------- Customer search ----------
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    const q = customerSearch.toLowerCase();
-    return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)).slice(0, 8);
+    const q = normalizeAr(customerSearch);
+    if (!q) return [];
+    return customers.filter((c) => normalizeAr(c.name).includes(q) || (c.phone || "").includes(q)).slice(0, 8);
   }, [customerSearch, customers]);
 
   function pickCustomer(c: Customer) {
@@ -471,18 +473,18 @@ export default function StockReturnCreatePage() {
   /** Suggestions: when an invoice is linked, restrict to its items; else show all products. */
   function productMatches(query: string, excludeRowUid?: string): Product[] {
     if (!query.trim()) return [];
-    const q = query.toLowerCase();
+    const q = normalizeAr(query);
+    if (!q) return [];
     const usedIds = new Set(
       rows.filter((r) => r.product_id && r.uid !== excludeRowUid).map((r) => r.product_id),
     );
     if (linkedInvoiceId && linkedInvoiceItems.length) {
-      // map invoice items -> Product-like shape; dedupe by product_id+name
       const seen = new Set<string>();
       const list: Product[] = [];
       for (const it of linkedInvoiceItems) {
         const key = `${it.product_id || ""}|${it.product_name}`;
         if (seen.has(key)) continue;
-        if (!it.product_name.toLowerCase().includes(q)) continue;
+        if (!normalizeAr(it.product_name).includes(q)) continue;
         const candidateId = it.product_id || it.id;
         if (usedIds.has(candidateId)) continue;
         seen.add(key);
@@ -500,7 +502,7 @@ export default function StockReturnCreatePage() {
     return products
       .filter((p) => !usedIds.has(p.id))
       .filter((p) => !warehouseId || p.warehouse_id === warehouseId)
-      .filter((p) => p.name.toLowerCase().includes(q))
+      .filter((p) => normalizeAr(p.name).includes(q))
       .slice(0, 10);
   }
 
