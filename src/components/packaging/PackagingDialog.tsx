@@ -374,6 +374,7 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
     const finalName = pname || parentProducts.find((p: any) => p.id === pid)?.name || null;
 
     const { error } = await (supabase as any).from(itemsTable).insert({
+      [idColumn]: parentId,
       [parentFkColumn]: headerId,
       packaging_type_id: packagingTypeId || null,
       product_id: pid || null,
