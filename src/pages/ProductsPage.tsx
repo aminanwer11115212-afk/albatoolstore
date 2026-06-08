@@ -2040,8 +2040,13 @@ export default function ProductsPage() {
                                     }
                                   })();
                                 }}
-                                onDelete={(opt) => deleteProductBrand(p.id, opt.value)}
-                                placeholder="—"
+                                onAdd={async (name) => {
+                                  const id = await createCompanyInline(name);
+                                  return id;
+                                }}
+                                onDelete={(opt) => deleteBrandFromSystem(opt.value)}
+                                deleteConfirm={(opt) => `هل تريد حذف الماركة "${opt.label}" من النظام نهائيًا؟`}
+                                placeholder="—" addLabel="إضافة ماركة"
                               />
                             </div>
                           );
@@ -2053,9 +2058,11 @@ export default function ProductsPage() {
                           options={(warehouses || []).map((w: any) => ({ value: w.id, label: w.name }))}
                           onChange={(v) => updateField(p.id, "warehouse_id", v || null)}
                           onAdd={createWarehouseInline}
-                          onDelete={() => deleteProductWarehouse(p.id)}
+                          onDelete={(opt) => deleteWarehouseFromSystem(opt.value)}
+                          deleteConfirm={(opt) => `هل تريد حذف المستودع "${opt.label}" من النظام نهائيًا؟`}
                           placeholder="—" addLabel="إضافة مستودع"
                         />
+
                       </td>
                       <td className="tabular-nums" style={{ padding: 0 }}>
                         <EditableCell
