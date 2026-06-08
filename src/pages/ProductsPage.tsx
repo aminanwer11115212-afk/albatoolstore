@@ -850,6 +850,17 @@ export default function ProductsPage() {
     toast.success(`تم تجميد ${ids.length} منتج`);
     setSelectedIds(new Set());
   };
+  const unfreezeSelected = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) { toast.info("لم يتم تحديد أي منتج"); return; }
+    const ok = await setFrozenOptimistic(ids, false);
+    if (!ok) return;
+    toast.success(`تم إلغاء تجميد ${ids.length} منتج`);
+    setSelectedIds(new Set());
+  };
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(paginated.map((p: any) => p.id)));
+  };
 
   const toggleAllFrozen = async (freeze: boolean) => {
     const ids = filtered.map((p: any) => p.id);
