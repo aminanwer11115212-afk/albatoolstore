@@ -73,6 +73,17 @@ export default function PrintVisibilityToolbar({
     }
   });
   const [downloading, setDownloading] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 767 : false,
+  );
+  const [collapsed, setCollapsed] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 767 : false,
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 767);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const html2pdfRef = useRef<any>(null);
 
   // inject hide styles globally once
