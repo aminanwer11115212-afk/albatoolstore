@@ -183,7 +183,8 @@ const App = () => {
         <AppLayout>
           <Routes>
             <Route path="/login" element={lazyEl(<LoginPage />, "تسجيل الدخول")} />
-            <Route path="/signup" element={lazyEl(<SignUpPage />, "إنشاء حساب")} />
+            {/* /signup معطّل — الحسابات تُنشأ من المسؤول فقط */}
+            <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/share/customer/t/:token" element={lazyEl(<PublicCustomerStatementPage />, "كشف الحساب")} />
             <Route path="/share/document/:token" element={lazyEl(<PublicDocumentSharePage />, "معاينة المستند")} />
             {/* Staff Portal */}
