@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { Plus, Image as ImageIcon, StickyNote, Printer, Save, ArrowRight } from "lucide-react";
 import StatusButton, { PURCHASE_STATUS_OPTIONS } from "@/components/StatusButton";
 import { useSuppliers, useProductsWithDetails, useWarehouses, useCompanySettings } from "@/hooks/useData";
@@ -363,21 +364,19 @@ export default function PurchaseCreatePage() {
 
   const filteredSuppliers = useMemo(() => {
     if (!supplierSearch.trim()) return [];
-    const q = supplierSearch.toLowerCase();
     return (suppliers || []).filter((s: any) =>
-      (s.name || "").toLowerCase().includes(q) || (s.phone || "").includes(q)
+      startsWithAny([s.name, s.phone], supplierSearch)
     ).slice(0, 8);
   }, [supplierSearch, suppliers]);
 
   function productMatches(query: string, excludeRowUid?: string): any[] {
     if (!query.trim()) return [];
-    const q = query.toLowerCase();
     const usedIds = new Set(
       rows.filter((r) => r.product_id && r.uid !== excludeRowUid).map((r) => r.product_id),
     );
     return (products || []).filter((p: any) => {
       if (usedIds.has(p.id)) return false;
-      const m = (p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q);
+      const m = startsWithAny([p.name, p.sku], query);
       if (!warehouseId) return m;
       return m && p.warehouse_id === warehouseId;
     }).slice(0, 10);
@@ -526,8 +525,7 @@ export default function PurchaseCreatePage() {
 
   const filteredRows = useMemo(() => {
     if (!tableSearch.trim()) return rows;
-    const q = tableSearch.toLowerCase();
-    return rows.filter((r) => !r.product_id || r.product_name.toLowerCase().includes(q));
+    return rows.filter((r) => !r.product_id || startsWithMatch(r.product_name, tableSearch));
   }, [rows, tableSearch]);
 
   async function handleCreateSupplier() {

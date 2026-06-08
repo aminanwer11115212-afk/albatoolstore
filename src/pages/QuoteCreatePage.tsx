@@ -3,6 +3,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { startsWithAny } from "@/utils/searchMatch";
 import { toast } from "sonner";
 import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, Share2, FileText, StickyNote, Package, Truck } from "lucide-react";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";
@@ -577,8 +578,7 @@ export default function QuoteCreatePage() {
   // ---------- Customer search ----------
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    const q = customerSearch.toLowerCase();
-    return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)).slice(0, 8);
+    return customers.filter((c) => startsWithAny([c.name, c.phone], customerSearch)).slice(0, 8);
   }, [customerSearch, customers]);
 
   function pickCustomer(c: Customer) {
@@ -1571,12 +1571,9 @@ export default function QuoteCreatePage() {
               <tbody>
                 {(() => {
                   const visibleRows = rows.filter((r) => {
-                    const q = tableSearch.trim().toLowerCase();
+                    const q = tableSearch.trim();
                     if (!q) return true;
-                    return (
-                      (r.product_name || "").toLowerCase().includes(q) ||
-                      (r.productSearch || "").toLowerCase().includes(q)
-                    );
+                    return startsWithAny([r.product_name, r.productSearch], q);
                   });
                   const NAV_COLS = ["product", "quantity", "unit_price", "foreign_price", "total"];
                   const handleNav = makeRowNavHandler({

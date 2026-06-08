@@ -4,6 +4,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Plus, Edit, Printer, MessageCircle, Share2, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet } from "lucide-react";
@@ -645,9 +646,8 @@ export default function InvoiceCreatePage() {
   // ---------- Search ----------
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    const q = customerSearch.toLowerCase();
     return customers
-      .filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q))
+      .filter((c) => startsWithAny([c.name, c.phone], customerSearch))
       .slice(0, 8);
   }, [customerSearch, customers]);
 
@@ -1838,12 +1838,9 @@ export default function InvoiceCreatePage() {
                 <tbody>
                   {(() => {
                     const visibleRows = rows.filter((r) => {
-                      const q = tableSearch.trim().toLowerCase();
+                      const q = tableSearch.trim();
                       if (!q) return true;
-                      return (
-                        (r.product_name || "").toLowerCase().includes(q) ||
-                        (r.productSearch || "").toLowerCase().includes(q)
-                      );
+                      return startsWithAny([r.product_name, r.productSearch], q);
                     });
                     const NAV_COLS = ["product", "quantity", "unit_price", "foreign_price", "total"];
                     const handleNav = makeRowNavHandler({
