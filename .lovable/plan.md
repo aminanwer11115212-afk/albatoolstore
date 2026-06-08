@@ -1,89 +1,98 @@
-# خطة: توحيد سلوك البحث في كل النظام على "يبدأ بـ"
 
-## الهدف
-عند كتابة حرف/كلمة في **أي خانة بحث في النظام**، يجب أن تظهر فقط النتائج التي **تبدأ** بهذا الحرف/الكلمة (startsWith) — في الاسم أو رقم المستند أو SKU أو الهاتف أو اسم العميل/المورّد. لا تطابق في وسط الكلمة (لا includes).
+## ما فهمته من طلبك
 
-سلوك إضافي مهم لكي يبقى البحث طبيعياً بالعربية:
-- تطبيع عربي قبل المطابقة: إزالة التشكيل، توحيد (أ/إ/آ → ا)، (ى → ي)، (ة → ه)، تحويل لأحرف صغيرة، تقليص الفراغات.
-- **مطابقة على بداية أي كلمة** داخل الحقل (token startsWith) — مثلاً كتابة "اور" تُظهر "بسكويت اوريو" لأن كلمة "اوريو" تبدأ بـ"اور". هذا يحافظ على راحة الاستخدام مع التزام قاعدة "يبدأ بـ".
-- بحث فارغ ⇒ يرجع كل العناصر (أو لا اقتراحات في حالة قوائم الإكمال التلقائي).
-- إزالة التكرار عبر id حيث يلزم (لقوائم اقتراح المنتجات).
+1. **الجدول البرتقالي (يمين، رئيسي)** — يتحول ليعرض **الفواتير الجاهزة للرفع** (`workflow_status = ready_to_ship`)، بنفس التقسيمات الحالية: تبويب "حسب الزبون" وتبويب "حسب الناقل/الترحيل"، مع checkbox لكل فاتورة لاختيارها.
+2. **لوحة المعاينة الزرقاء (يسار)** — تصبح **معاينة طباعة A4** للفواتير المختارة فقط:
+   - كل فاتورة = كرت معاينة فيه: تغليف الفاتورة + الجهة المرحَّل إليها (الناقل/المدينة/الوجهة) + بيانات الترحيل.
+   - الشكل العام مطابق لقالب الطباعة الحالي للنظام (RTL + Cairo + A4).
+   - لو المحتوى أطول من صفحة A4 واحدة → ينقسم تلقائيًا على عدة صفحات مع شريط تنقل **"صفحة 1 / 2 / 3"**.
+   - أزرار: **طباعة الصفحة الحالية** + **طباعة كل الصفحات**.
 
-## المخرَجات
+---
 
-### 1) أداة موحَّدة جديدة
-ملف جديد: `src/utils/searchMatch.ts` يحتوي:
-- `normalizeAr(s)` — التطبيع العربي/الإنجليزي.
-- `startsWithMatch(haystack, query)` — true إذا أي كلمة في haystack تبدأ بـ query (بعد التطبيع).
-- `startsWithAny(fields[], query)` — تطبيقها على عدة حقول.
-- `filterByStartsWith(items, getFields, query)` — مساعد لقوائم.
+## التغييرات التفصيلية
 
-### 2) تحديث `src/utils/productMatches.ts`
-استبدال `includes` بـ `startsWithAny` على `name` و `sku` مع الحفاظ على فلتر المخزن وإزالة التكرار وحد الـ 10.
+### 1. تبادل المحتوى يمين/يسار
 
-### 3) تحديث مكوّنات البحث المشتركة
-- `src/components/InlineSearchSelect.tsx` — تبديل `includes` بـ `startsWithMatch`.
-- `src/components/transport/SearchableSelect.tsx` — يستخدم حالياً `includes` بعد تطبيع؛ سيتحوّل لـ `startsWithMatch` (مع الإبقاء على نفس التطبيع).
-- `src/components/MessageImportDialog.tsx` — بحث المنتجات.
-- `src/components/packaging/PackagingItemsManager.tsx` و `src/components/transport/TransportItemsManager.tsx` — دالة `filter` في `<Command>`.
-- `src/components/customers/GeoStructurePanel.tsx`.
-- `src/components/dashboard/ChargeBalanceDialog.tsx` — بحث العملاء.
-- `src/components/SupplierDetailView.tsx` — فلترة "دفع/سداد" تبقى كما هي (ليست خانة بحث مستخدم).
+ملف: `src/pages/DispatchPage.tsx`
 
-### 4) تحديث صفحات القوائم/الجداول (شريط البحث العلوي)
-في كل الصفحات أدناه: استبدال كل استخدامات `(...).toLowerCase().includes(s)` على حقول البحث (الاسم/الرقم/الهاتف/الفئة/الحالة/وصف…) بـ `startsWithMatch` عبر الأداة الموحَّدة:
+- الـ grid الحالي `1fr 360px` نقلبه أو نوسّع لوحة اليسار لأنها بقت لوحة المعاينة الأهم: `360px 1fr` يعني الزرقاء (المعاينة) شمال البصر، والبرتقالي (الجدول) يمين البصر. (في RTL: `dispatch-left` = البرتقالي يمين، `dispatch-right` = الأزرق يسار — بتغيير عرضي العمودين والمحتوى).
+- العمود البرتقالي يكبر (`1fr`)، عمود المعاينة يثبت بعرض A4 تقريبًا (`560–620px`) على الشاشات الكبيرة.
+- على الموبايل: المعاينة تبقى في Sheet ينفتح بزر عائم اسمه "معاينة الطباعة".
 
-- `src/pages/InvoicesPage.tsx`
-- `src/pages/QuotesPage.tsx`
-- `src/pages/SideQuotesPage.tsx`
-- `src/pages/CustomersPage.tsx` (شريط البحث + فلاتر الأعمدة بقائمة الخيارات)
-- `src/pages/SuppliersPage.tsx`
-- `src/pages/ProductsPage.tsx` (فلاتر العمود `name`/`sku` + فلتر الخيارات المنسدلة)
-- `src/pages/ProductCompaniesPage.tsx`
-- `src/pages/PurchasePage.tsx`
-- `src/pages/PackagingTypesPage.tsx`
-- `src/pages/StockTransferPage.tsx`
-- `src/pages/StockReturnPage.tsx`
-- `src/pages/TransactionsPage.tsx`
-- `src/pages/FilteredTransactionsPage.tsx`
-- `src/pages/AccountsPage.tsx`
-- `src/pages/AccountStatementPage.tsx`
-- `src/pages/CustomerStatementPage.tsx`
-- `src/pages/BankTransfersReportPage.tsx`
-- `src/pages/DailyInvoicesReportPage.tsx`
-- `src/pages/ActivityLogPage.tsx`
-- `src/pages/DataHealthPage.tsx`
-- `src/pages/NotificationsPage.tsx`
-- `src/pages/CloudUsagePage.tsx`
-- `src/pages/ProjectsPage.tsx`
-- `src/pages/DispatchPage.tsx`
-- `src/pages/InvoicePackagingPage.tsx`، `src/pages/InvoiceTransportPage.tsx`، `src/pages/QuotePackagingPage.tsx`
-- `src/pages/EmployeesPage.tsx`
-- `src/pages/staff/StaffListPage.tsx`, `StaffCustomersPage.tsx`, `StaffMyRecordsPage.tsx`
+### 2. الجدول الرئيسي البرتقالي (يمين)
 
-### 5) تحديث شاشات الإنشاء (منتقي العميل/المورّد/المنتج)
-- `src/pages/InvoiceCreatePage.tsx`
-- `src/pages/QuoteCreatePage.tsx`
-- `src/pages/PurchaseCreatePage.tsx`
-- `src/pages/StockReturnCreatePage.tsx`
+أنقل/أحوّل `ReadyToShipPanel` ليكون هو المحتوى الرئيسي:
+- مصدر البيانات: نفس `useQuery(["dispatch-ready-to-ship"])` الموجود (workflow_status = ready_to_ship).
+- التبويبات تبقى كما هي: **"كل الفواتير" / "حسب الزبون" / "حسب الناقل"**.
+- كل صف فيه checkbox، اختياره يضيف الفاتورة لـ `selectedIds` (state على مستوى صفحة Dispatch).
+- يحتفظ ببحث `startsWithMatch` الموجود وفلاتر الزبون/التاريخ.
+- يحتفظ بأزرار "طباعة الكل" / "طباعة المحصل" الموجودة في `DispatchPage`، لكن مصدرها يبقى نفس بيانات الجاهزة للرفع.
 
-كلها لمنتقي العميل/المورد (بحث اسم/هاتف) ومنتقي المنتج وفلتر الصفوف داخل الجدول.
+التقرير الحالي للترحيلات (المنقولة فعليًا) يُنقل لتاب جانبي أو نخفيه مؤقتًا — **محتاج تأكيدك**:
+- خيار أ: نخفيه (نمسحه من الصفحة).
+- خيار ب: نضيفه كتبويب رابع اسمه "المرحَّلة".
 
-### 6) شريط البحث العام في الـ Navbar/Sidebar
-- `src/components/layout/AppNavbar.tsx` و `AppSidebar.tsx` — إن وُجد فيهما منطق فلترة محلي، يُحوَّل لـ startsWith.
+### 3. لوحة معاينة الطباعة (يسار)
 
-### 7) الاختبارات
-- تحديث `src/test/productSearchFilter.test.ts` و `src/test/productSearchLiveDedup.test.ts` لتوافق قاعدة "يبدأ بـ" مع تطبيع عربي.
-- إضافة `src/test/searchMatch.test.ts` يغطّي: التطبيع، startsWith على بداية الكلمة، بحث فارغ، تعدّد الحقول، حساسية الأحرف، علامات الترقيم العربية.
+مكوّن جديد: `src/components/dispatch/DispatchPrintPreview.tsx`
 
-## ملاحظات مهمّة
-- لن نمسّ منطق الأعمال (لا تغييرات على قواعد البيانات/الاستعلامات/الـ RLS). كل التغيير في طبقة الفلترة على الواجهة.
-- نحافظ على كل خيارات الفلاتر الأخرى (الحالة، التاريخ، المخزن، التجميد، …) كما هي.
-- نحافظ على إزالة التكرار وحدود النتائج الحالية (10 اقتراحات للمنتجات، 8 للعملاء…).
-- التنفيذ على دفعات لضمان الجودة:
-  - **الدفعة 1**: الأداة الموحَّدة + `productMatches` + المكوّنات المشتركة (InlineSearchSelect/SearchableSelect/Command filters) + اختبارات الأداة.
-  - **الدفعة 2**: شاشات الإنشاء الأربع (Invoice/Quote/Purchase/StockReturn).
-  - **الدفعة 3**: صفحات القوائم (الفواتير، عروض الأسعار، العملاء، الموردين، المنتجات، المشتريات، …).
-  - **الدفعة 4**: باقي الصفحات (التقارير، الإشعارات، النشاطات، المخزون، الموظفين، Staff*) + شريط Navbar/Sidebar + تشغيل الاختبارات وفحص شامل.
+**Props:**
+- `selectedInvoices: Invoice[]` — الفواتير المختارة من الجدول، كل واحدة بكامل بياناتها (items + packaging + transports + customer).
+- `company: CompanySettings` — لشعار/اسم الشركة في رأس الصفحة.
 
-هل أبدأ بالدفعة 1؟
+**ما يعرضه كل كرت فاتورة:**
+- ترويسة: رقم الفاتورة + اسم الزبون + التاريخ.
+- جدول التغليف: نوع الكرتون/العبوة + الكمية + إجمالي القطع (من `invoice_packaging`/`invoices_packaging_items`).
+- صندوق "الجهة المرحَّل إليها": اسم الناقل + المدينة/المنطقة/الوجهة (من `invoice_transports` + relations).
+- جدول الترحيلات: لو الفاتورة فيها أكثر من عملية ترحيل، يُعرض كل واحدة في صف.
+
+**منطق التقسيم على صفحات A4:**
+- container ثابت العرض = 794px (A4 portrait at 96dpi)، ارتفاع كل صفحة ≈ 1100px فعّال (بعد margins).
+- بعد render أول رندر، أحسب ارتفاع كل كرت فاتورة (ref + `getBoundingClientRect`) وأوزّعهم على صفحات بحيث مجموع ارتفاع الكروت ≤ ارتفاع الصفحة.
+- كل صفحة تُغلَّف في `<div class="a4-page">` مستقل عشان `page-break-after: always` يشتغل وقت الطباعة.
+- شريط أعلى المعاينة: **«صفحة 1 من N»** + أزرار `< >` للتنقل + زر **🖨 طباعة الصفحة** + زر **🖨 طباعة الكل**.
+- View mode: تعرض صفحة واحدة في الوقت (المختارة)، بـ `transform: scale(...)` لتنضبط على عرض اللوحة الجانبية.
+
+**أسلوب الطباعة:**
+- بدلًا من توليد HTML string وفتح نافذة جديدة، أستخدم نفس النمط الموجود (window.open + document.write) لإن باقي النظام شغّال بكده — لكن المحتوى يُولَّد من نفس React markup عبر `renderToStaticMarkup` لضمان التطابق بين المعاينة والطباعة.
+- `@page { size: A4; margin: 10mm; }` و `font-family: 'Cairo'` كالمعتاد.
+
+### 4. التحديثات في `DispatchPage.tsx`
+
+- `const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())` — state موحّد على مستوى الصفحة.
+- أُمرّره لـ `ReadyToShipPanel` (يصير "MainGrid") و `DispatchPrintPreview`.
+- `useQuery` للفواتير المختارة بكامل بياناتها (packaging + transports + destination) — أحمّلها مرة واحدة لما `selectedIds` يتغير.
+- الـ Sheet على الموبايل يحتوي على `DispatchPrintPreview` بدل `ReadyToShipPanel`.
+
+### 5. القواعد الملتزَم بها (checklist الـ skill)
+
+- ✅ RTL + كل النصوص عربي.
+- ✅ Design tokens فقط: `bg-card`, `border-border`, `text-foreground`, `bg-primary`, `text-muted-foreground` — لا hex، لا `text-white`.
+- ✅ Cairo + bold body inheritance.
+- ✅ Mobile: inputs ≥16px (لا نلمس index.css).
+- ✅ `startsWithMatch` لأي بحث.
+- ✅ لا تعديل على `client.ts` / `types.ts` / `.env` / `supabase/config.toml`.
+- ✅ لا تغيير على schema قاعدة البيانات (التعديل UI فقط).
+- ✅ لا ذكر لـ "Supabase" في أي toast/نص.
+
+---
+
+## ملفات سيتم تعديلها/إنشاؤها
+
+| الملف | التغيير |
+|---|---|
+| `src/pages/DispatchPage.tsx` | قلب الأعمدة، state التحديد، إزالة/إخفاء التقرير القديم، تمرير props للوحة المعاينة |
+| `src/components/dispatch/ReadyToShipPanel.tsx` | تعديل ليستقبل `selectedIds` + `onToggle` من الخارج، توسيع الـ layout ليلائم العمود الأكبر |
+| `src/components/dispatch/DispatchPrintPreview.tsx` | **جديد** — لوحة معاينة A4 + تقسيم تلقائي + تنقل صفحات + زر طباعة |
+| `src/components/dispatch/DispatchPrintDocument.tsx` | **جديد (اختياري)** — markup الطباعة المشترك بين المعاينة و window.print لضمان التطابق |
+
+---
+
+## نقطة واحدة محتاج تأكيدها قبل البدء
+
+**التقرير القديم** (تقرير الترحيلات المنفَّذة فعليًا، اللي حاليًا في `DispatchPage`):
+- (أ) أمسحه نهائيًا من الصفحة دي — لأنه موجود غالبًا في `TransportPackagingReportPage`.
+- (ب) أخليه كتبويب رابع داخل الجدول البرتقالي اسمه "المرحَّلة".
+
+افتراضي هاخد **(أ)** لو ما حددتش — أبسط وأنضف، وموجود في صفحة منفصلة.

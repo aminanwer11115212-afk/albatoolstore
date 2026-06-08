@@ -13,6 +13,11 @@ import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft } f
 type Props = {
   buildPrintHTML: (invoices: any[], company: any, mode: "all" | "collected") => string;
   company: any;
+  /** Optional controlled selection (lifted by parent for preview pane). */
+  checked?: Set<string>;
+  onCheckedChange?: (next: Set<string>) => void;
+  /** When true, hide the bottom "طباعة وتحويل" footer (parent shows its own actions). */
+  hideFooter?: boolean;
 };
 
 const fmtDateAr = (d?: string) => {
@@ -23,10 +28,16 @@ const fmtDateAr = (d?: string) => {
 
 type Tab = "all" | "by_transport" | "by_customer";
 
-export default function ReadyToShipPanel({ buildPrintHTML, company }: Props) {
+export default function ReadyToShipPanel({ buildPrintHTML, company, checked: checkedProp, onCheckedChange, hideFooter }: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("all");
-  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [internalChecked, setInternalChecked] = useState<Set<string>>(new Set());
+  const checked = checkedProp ?? internalChecked;
+  const setChecked = (updater: Set<string> | ((prev: Set<string>) => Set<string>)) => {
+    const next = typeof updater === "function" ? (updater as any)(checked) : updater;
+    if (onCheckedChange) onCheckedChange(next);
+    else setInternalChecked(next);
+  };
   const [busy, setBusy] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -399,29 +410,31 @@ export default function ReadyToShipPanel({ buildPrintHTML, company }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="rts-footer">
-        <div className="rts-footer-row">
-          <div className="rts-counter">
-            <b>{checked.size}</b> محدد من <b>{invoices.length}</b>
+      {!hideFooter && (
+        <div className="rts-footer">
+          <div className="rts-footer-row">
+            <div className="rts-counter">
+              <b>{checked.size}</b> محدد من <b>{invoices.length}</b>
+            </div>
+            <button
+              className="rts-btn rts-btn-ghost"
+              onClick={toggleAll}
+              disabled={invoices.length === 0}
+            >
+              {allChecked ? <X size={11} /> : null}
+              {allChecked ? "إلغاء التحديد" : "تحديد الكل"}
+            </button>
           </div>
           <button
-            className="rts-btn rts-btn-ghost"
-            onClick={toggleAll}
-            disabled={invoices.length === 0}
+            className="rts-btn rts-btn-primary"
+            onClick={printAndDispatch}
+            disabled={busy || checked.size === 0}
           >
-            {allChecked ? <X size={11} /> : null}
-            {allChecked ? "إلغاء التحديد" : "تحديد الكل"}
+            <Printer size={14} />
+            {busy ? "جارٍ المعالجة…" : "طباعة وتحويل إلى ترحيلات"}
           </button>
         </div>
-        <button
-          className="rts-btn rts-btn-primary"
-          onClick={printAndDispatch}
-          disabled={busy || checked.size === 0}
-        >
-          <Printer size={14} />
-          {busy ? "جارٍ المعالجة…" : "طباعة وتحويل إلى ترحيلات"}
-        </button>
-      </div>
+      )}
     </div>
   );
 }
