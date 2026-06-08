@@ -2227,4 +2227,11 @@ input[type="number"] {
   }
 }
 
+/* إخفاء تلميحات قائمة اقتراحات البحث عن منتج (hint + empty) في كل النظام */
+.suggestions-status[data-status="hint"],
+.suggestions-status[data-status="empty"] {
+  display: none !important;
+}
+
+
 
