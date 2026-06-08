@@ -50,14 +50,28 @@ export default function ProductsPage() {
   const [filterName, setFilterName] = useState("");
   const [filterSku, setFilterSku] = useState("");
   const PP_SHOW_FROZEN = userScopedLegacyKey("products-page:showFrozen");
+  const PP_FROZEN_MODE = userScopedLegacyKey("products-page:frozenMode");
   const PP_STOCK_FILTER = userScopedLegacyKey("products-page:stockFilter");
   const PP_PAGE = userScopedLegacyKey("products-page:page");
   const PP_PER_PAGE = userScopedLegacyKey("products-page:perPage");
 
-  const [showFrozen, setShowFrozen] = useState<boolean>(() => {
-    try { const v = localStorage.getItem(PP_SHOW_FROZEN); return v === null ? true : v === "1"; } catch { return true; }
+  // وضع تجميد ثلاثي: hide = إخفاء المجمدة, all = إظهار الكل, only = المجمدة فقط
+  const [frozenMode, setFrozenMode] = useState<"hide" | "all" | "only">(() => {
+    try {
+      const v = localStorage.getItem(PP_FROZEN_MODE);
+      if (v === "hide" || v === "all" || v === "only") return v;
+      // ترقية من القديم
+      const legacy = localStorage.getItem(PP_SHOW_FROZEN);
+      return legacy === "0" ? "hide" : "all";
+    } catch { return "all"; }
   });
-  useEffect(() => { try { localStorage.setItem(PP_SHOW_FROZEN, showFrozen ? "1" : "0"); } catch {} }, [showFrozen]);
+  useEffect(() => { try { localStorage.setItem(PP_FROZEN_MODE, frozenMode); } catch {} }, [frozenMode]);
+  const showFrozen = frozenMode !== "hide";
+  const onlyFrozen = frozenMode === "only";
+  const setShowFrozen = (v: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof v === "function" ? (v as any)(showFrozen) : v;
+    setFrozenMode(next ? "all" : "hide");
+  };
 
   const [stockFilter, setStockFilter] = useState<"all" | "in" | "out" | "low">(() => {
     try { const v = localStorage.getItem(PP_STOCK_FILTER); return (v === "in" || v === "out" || v === "low" || v === "all") ? v : "all"; } catch { return "all"; }
