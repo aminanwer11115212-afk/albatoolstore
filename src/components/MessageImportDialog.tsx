@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { parseMessage, type ParsedLine, type ProductLike } from "@/hooks/useMessageImport";
 import { useDialogSize } from "@/hooks/useDialogSize";
+import { startsWithMatch } from "@/utils/searchMatch";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const IcoCheck = () => (
