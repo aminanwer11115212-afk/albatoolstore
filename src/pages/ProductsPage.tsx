@@ -259,9 +259,7 @@ export default function ProductsPage() {
 
   // Apply dropdown filters + per-column header filters — memoized
   const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const fName = filterName.toLowerCase();
-    const fSku = filterSku.toLowerCase();
+    const term = search.trim();
     return pageProducts.filter((p: any) => {
       if (filterWarehouse && p.warehouse_id !== filterWarehouse) return false;
       if (filterCategory) {
@@ -277,15 +275,17 @@ export default function ProductsPage() {
         if (!matchesM2M && !matchesLegacy) return false;
       }
       if (filterSupplier && p.supplier_id !== filterSupplier) return false;
-      if (fName && !String(p.name || "").toLowerCase().includes(fName)) return false;
-      if (fSku && !String(p.sku || "").toLowerCase().includes(fSku)) return false;
+      if (filterName && !startsWithMatch(p.name, filterName)) return false;
+      if (filterSku && !startsWithMatch(p.sku, filterSku)) return false;
       if (onlyFrozen) { if (!p.is_frozen) return false; }
       else if (!showFrozen && p.is_frozen) return false;
       if (!term) return true;
       const catNames = (p.categories || []).map((c: any) => c.name).join(" ");
       const brandNames = (p.brands || []).map((b: any) => b.name).join(" ");
-      return [p.name, p.sku, p.product_categories?.name, catNames, p.product_companies?.name, brandNames, p.warehouses?.name, p.suppliers?.name]
-        .some((value) => String(value || "").toLowerCase().includes(term));
+      return startsWithAny(
+        [p.name, p.sku, p.product_categories?.name, catNames, p.product_companies?.name, brandNames, p.warehouses?.name, p.suppliers?.name],
+        term,
+      );
     });
   }, [pageProducts, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, showFrozen, onlyFrozen, search]);
 
