@@ -367,8 +367,8 @@ export default function ReadyToShipPanel({ buildPrintHTML, company }: Props) {
                 const collapsed = collapsedGroups.has(g.key);
                 const allInGroup = g.items.every((i) => checked.has(i.id));
                 return (
-                  <>
-                    <tr key={`g-${g.key}`}>
+                  <Fragment key={`g-${g.key}`}>
+                    <tr>
                       <td colSpan={4} style={{ padding: 0 }}>
                         <div
                           className="rts-group-head"
@@ -390,7 +390,7 @@ export default function ReadyToShipPanel({ buildPrintHTML, company }: Props) {
                       </td>
                     </tr>
                     {!collapsed && g.items.map((inv, i) => renderRow(inv, i))}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
