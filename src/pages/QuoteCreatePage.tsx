@@ -43,6 +43,8 @@ import FreePositionToolbar from "@/components/toolbar/FreePositionToolbar";
 import SummaryChip from "@/components/toolbar/SummaryChip";
 import { ToolbarCustomizationProvider } from "@/components/toolbar/ToolbarCustomizationContext";
 import { productMatches as sharedProductMatches } from "@/utils/productMatches";
+import { normalizeAr } from "@/utils/arabicNormalize";
+import { getAvailableStock } from "@/utils/availableStock";
 import MessageImportDialog, { MessageImportButton } from "@/components/MessageImportDialog";
 import type { ParsedLine } from "@/hooks/useMessageImport";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
@@ -340,6 +342,20 @@ export default function QuoteCreatePage() {
   useEffect(() => {
     selectedCustomerIdRef.current = customer?.id || null;
   }, [customer]);
+  // Refresh live balance for the selected customer (mirrors InvoiceCreatePage).
+  useEffect(() => {
+    if (!customer?.id) return;
+    (async () => {
+      const { data: bal } = await supabase
+        .from("customers")
+        .select("balance, credit_balance")
+        .eq("id", customer.id)
+        .maybeSingle();
+      if (bal && Number((bal as any).balance || 0) !== Number(customer.balance || 0)) {
+        setCustomer((prev) => prev ? { ...prev, balance: Number((bal as any).balance || 0) } as Customer : prev);
+      }
+    })();
+  }, [customer?.id]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerSugg, setShowCustomerSugg] = useState(false);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
@@ -578,8 +594,9 @@ export default function QuoteCreatePage() {
   // ---------- Customer search ----------
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    const q = customerSearch.toLowerCase();
-    return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)).slice(0, 8);
+    const q = normalizeAr(customerSearch);
+    if (!q) return [];
+    return customers.filter((c) => normalizeAr(c.name).includes(q) || (c.phone || "").includes(q)).slice(0, 8);
   }, [customerSearch, customers]);
 
   function pickCustomer(c: Customer) {
@@ -1336,20 +1353,23 @@ export default function QuoteCreatePage() {
                     if (matches.length === 0) {
                       return <div className="item suggestions-status" data-status="empty">لا توجد نتائج</div>;
                     }
-                    return matches.map((p, i) => (
-                      <div
-                        key={p.id}
-                        className="item"
-                        data-sugg-item
-                        data-active={i === 0 ? "true" : "false"}
-                        onMouseDown={() => pickProductIntoQuick(p)}
-                      >
-                        <span>{p.name}</span>
-                        <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
-                          {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
-                        </span>
-                      </div>
-                    ));
+                    return matches.map((p, i) => {
+                      const avail = getAvailableStock(p, rows);
+                      return (
+                        <div
+                          key={p.id}
+                          className="item"
+                          data-sugg-item
+                          data-active={i === 0 ? "true" : "false"}
+                          onMouseDown={() => pickProductIntoQuick(p)}
+                        >
+                          <span>{p.name}</span>
+                          <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: avail > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: avail > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${avail > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                            {avail > 0 ? avail.toLocaleString() : "0"}
+                          </span>
+                        </div>
+                      );
+                    });
                   })()}
                 </div>
               </SuggestionsPortal>
@@ -1629,20 +1649,23 @@ export default function QuoteCreatePage() {
                                 if (matches.length === 0) {
                                   return <div className="item suggestions-status" data-status="empty">لا توجد نتائج</div>;
                                 }
-                                return matches.map((p, i) => (
-                                  <div
-                                    key={p.id}
-                                    className="item"
-                                    data-sugg-item
-                                    data-active={i === 0 ? "true" : "false"}
-                                    onMouseDown={() => pickProductIntoRow(r.uid, p)}
-                                  >
-                                    <span>{p.name}</span>
-                                    <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
-                                      {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
-                                    </span>
-                                  </div>
-                                ));
+                                return matches.map((p, i) => {
+                                  const avail = getAvailableStock(p, rows, r.uid);
+                                  return (
+                                    <div
+                                      key={p.id}
+                                      className="item"
+                                      data-sugg-item
+                                      data-active={i === 0 ? "true" : "false"}
+                                      onMouseDown={() => pickProductIntoRow(r.uid, p)}
+                                    >
+                                      <span>{p.name}</span>
+                                      <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: avail > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: avail > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${avail > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                                        {avail > 0 ? avail.toLocaleString() : "0"}
+                                      </span>
+                                    </div>
+                                  );
+                                });
                               })()}
                             </div>
                           </SuggestionsPortal>

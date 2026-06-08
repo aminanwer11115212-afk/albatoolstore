@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useSuppliers } from "@/hooks/useData";
+import { useSuppliersAll } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SupplierDetailView from "@/components/SupplierDetailView";
@@ -15,7 +15,7 @@ export default function SuppliersPage() {
   const [form, setForm] = useState(emptyForm);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
-  const { data: suppliers, isLoading, insert, update, remove } = useSuppliers();
+  const { data: suppliers, isLoading, insert, update, remove } = useSuppliersAll();
 
   const filtered = (suppliers || []).filter((s: any) => s.name?.includes(search) || s.phone?.includes(search) || s.company?.includes(search) || s.email?.includes(search));
   const totalPages = Math.ceil(filtered.length / perPage);

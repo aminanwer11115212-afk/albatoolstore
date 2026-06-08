@@ -1,73 +1,124 @@
 
 # الهدف
-ضمان أن أي منتج أو عميل يُضاف للنظام يظهر فوراً في **جميع** شاشات الإدخال (فاتورة/عرض سعر/مرتجع مخزون/تحويل مخزون/تغليف/ترحيل) بكامل بياناته، بدون فقدان بسبب حد PostgREST الافتراضي (1000 صف) أو بسبب عدم تحديث الكاش.
+في كل شاشات الإنشاء — الفاتورة، عرض السعر، عرض السعر الجانبي، مرتجع المخزون، أمر الشراء — يجب أن:
+1. يظهر **كل** العملاء/الموردين والمنتجات (بدون قطع عند 1000).
+2. يعرض البحث **الكمية الحقيقية المتاحة** لحظياً مع طرح ما تمّت إضافته للسلة.
+3. تكون البيانات المعروضة (رصيد العميل، رصيد مدين/دائن، سعر، تجميد) متّسقة بين كل الشاشات.
+4. سلوك التصفية يحترم الكتابة العربية (تطبيع الهمزات والتشكيل) ولا يستثني/يُظهر المنتجات المجمّدة بشكل متناقض.
 
-# تشخيص الوضع الحالي
+---
 
-## 1) ✅ يعمل بشكل صحيح
-- **صفحة المنتجات (`ProductsPage`)** تستخدم `useProductsWithDetails()` المبنية على `fetchAllProducts` التي تجلب كل الصفحات (لا حد 1000).
-- **صفحات الإنشاء (فاتورة/عرض سعر/مرتجع مخزون)** تستخدم `fetchAllProducts` للمنتجات.
-- **حدث `products:changed` و `customers:changed`** يُطلَق من `useTable` ومن `QuickAddProductDialog` و`CustomerFormDialog` وملفات `stockDeduction` / `stockReceive`، وكل صفحة إنشاء تستمع له وتعيد الجلب.
+# نتائج الفحص الميداني (مهندس برمجيات — كل سطر مُتحقَّق منه)
 
-## 2) ⚠️ مشاكل تحدّ من ظهور البيانات
+## الفواتير `InvoiceCreatePage.tsx`
+- العملاء: ✅ `fetchAllCustomers` بأعمدة `id,name,phone,balance,company` — غير محدود. ✅ يستمع `customers:changed`. ✅ يُعاد جلب `balance, credit_balance` بعد اختيار العميل (سطر 526).
+- المنتجات: ✅ `fetchAllProducts` بأعمدة `id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id`. ✅ يُخفي المجمّدة عند التحميل. ⚠️ الكمية في القائمة هي `stock_quantity` الخام بدون طرح الكميات الموجودة فعلاً في بنود الفاتورة الحالية.
 
-### أ) جلب العملاء محدود بـ 1000 صف
-حالياً 307 عميل فقط، فالأمر يعمل، لكن جميع شاشات الإنشاء تستخدم:
-```ts
-supabase.from("customers").select("id,name,phone,balance,company").order("name")
-```
-بدون `range()`. سيتوقف عن إظهار العملاء الجدد بعد العميل رقم 1000.
-- `InvoiceCreatePage` (سطر 433, 481)
-- `QuoteCreatePage` (سطر 420, 466)
-- `StockReturnCreatePage` (سطر 317, 354, 390)
+## عرض السعر + الجانبي `QuoteCreatePage.tsx` (الجانبية مجرد wrapper)
+- العملاء: ✅ `fetchAllCustomers` غير محدود.
+- ⚠️ **لا** يُعاد جلب `balance, credit_balance` بعد الاختيار (خلاف الفاتورة) — الرصيد يُعرض من النسخة المخزنة بقيمتها الموجودة عند تحميل القائمة.
+- المنتجات: ✅ `fetchAllProducts` + إخفاء المجمّدة. ⚠️ نفس مشكلة الكمية الخام.
 
-### ب) شاشات تستخدم `useProducts()` المحدود بـ 1000 صف
-المنتجات الآن 638، لكن مع نمو الكتالوج ستُفقد منتجات في:
-- `src/pages/StockTransferPage.tsx` (سطر 37) — صفحة تحويل المخزون
-- `src/components/packaging/PackagingItemsManager.tsx` (سطر 32) — مدير عناصر التغليف داخل الفواتير
-- `src/components/transport/TransportItemsManager.tsx` (سطر 26) — مدير عناصر الترحيل داخل الفواتير
+## مرتجع المخزون `StockReturnCreatePage.tsx`
+- العملاء: ✅ `fetchAllCustomers`. ⚠️ لا يُعاد جلب `credit_balance` بعد الاختيار.
+- المنتجات: ✅ `fetchAllProducts`. ❌ **لا يُخفي المنتجات المجمّدة** (سطر 319 لا يحوي filter)، عكس الفاتورة/عرض السعر.
+- ⚠️ بحث المنتجات يستخدم دالة محلية بدلاً من `sharedProductMatches` (تباعد في السلوك).
 
-### ج) صفحة إدارة العملاء (`CustomersPage`) محدودة بـ 1000 صف
-تستخدم `useCustomers()` → `useTable("customers").select("*")` بدون pagination.
+## أمر الشراء `PurchaseCreatePage.tsx`
+- 🔴 **الموردون محدودون بـ 1000**: `useSuppliers()` → `useTable("suppliers")` يستعمل `select("*")` بدون pagination (`useData.ts:218→19`). حالياً مورد واحد فقط، لكن المشكلة هيكلية.
+- المنتجات: ✅ `useProductsWithDetails()` → `fetchAllProducts("*")` غير محدود وفيه كل الأعمدة + `purchase_price`.
+- ⚠️ **لا يُخفي المجمّدة** في قائمة البحث.
+- ⚠️ نفس مشكلة الكمية الخام في القائمة.
+- ⚠️ يَكتب `purchase_price` في جدول `products` عند الحفظ (تأثير جانبي مقصود لكن غير موثّق).
 
-## 3) ملاحظة عن البيانات الكاملة
-- استعلامات شاشات الإنشاء تختار **أعمدة محدودة عمداً** (id, name, phone, balance, company للعميل) لتسريع الفتح. هذا سلوك مقصود — البحث والاختيار يحتاج هذه الحقول فقط، أما التفاصيل الكاملة فتُجلب عند الاختيار. سأبقي هذا السلوك ولن أوسّعه.
+## ملاحظات عرضية مكتشَفة في الخمس شاشات
+- ⚠️ لا يوجد **تطبيع للنص العربي** في أي بحث (الهمزات أ/إ/آ، ى/ي، ة/ه، التشكيل) — `q.toLowerCase().includes(...)` فقط.
+- ⚠️ لا توجد قائمة منسدلة لـ**وجهات/عناوين الشحن** للعميل المختار في أي شاشة (الجدول `customer_destinations` موجود لكن لا يُجلب).
+- ✅ كل المنتجات الجديدة المضافة عبر QuickAdd تظهر فوراً عبر `products:changed`.
 
-# الخطة
+---
 
-## A) ملف مساعد جديد: `src/lib/fetchAllCustomers.ts`
-نسخ نمط `fetchAllProducts` (تقسيم بـ `range()` صفحات 1000) ليجلب كل العملاء مع إمكانية تحديد الأعمدة والترتيب.
+# الخطة (بأقل تغيير ممكن، مع تأثيرات مدروسة)
 
-## B) تحديث شاشات الإنشاء لاستخدام `fetchAllCustomers`
-استبدال `supabase.from("customers").select(...).order("name")` بـ `fetchAllCustomers("id,name,phone,balance,company", { column: "name" })` في:
-- `InvoiceCreatePage` (الجلب الأولي + `refetchCustomers`)
-- `QuoteCreatePage` (الجلب الأولي + `refetchCustomers`)
-- `StockReturnCreatePage` (الجلب الأولي + `refetchCustomers` + جلب العميل عند التحرير لن يتغير لأنه `.eq("id", ...)`)
+## 1) إصلاح حد الموردين (الأخطر هيكلياً) 🔴
+- ملف جديد `src/lib/fetchAllSuppliers.ts` بنفس نمط `fetchAllProducts/Customers` (range pagination).
+- إضافة hook `useSuppliersAll()` في `src/hooks/useData.ts` يستخدم `fetchAllSuppliers`، ويُبطِل الكاش على `suppliers:changed`، ويُعيد نفس `insert/update/remove` من `useTable("suppliers")`.
+- استبدال `useSuppliers()` بـ `useSuppliersAll()` في:
+  - `src/pages/PurchaseCreatePage.tsx` (سطر 5)
+  - `src/pages/SuppliersPage.tsx` (صفحة إدارة الموردين — نفس الحجة).
+- إبقاء `useSuppliers()` للصفحات الخفيفة التي لا تَعرض القائمة (تقارير، dashboards) لتفادي ضغط إضافي.
 
-## C) تحديث الشاشات التي تستخدم `useProducts()` لاستخدام `useProductsWithDetails()`
-ل-`StockTransferPage`, `PackagingItemsManager`, `TransportItemsManager` (الأخيرتان تحتاج فقط `id, name, unit, stock_quantity` — لكن `useProductsWithDetails` تجلب كل الصفحات وبيانات مخصبة — مقبول لأنها مُكاش 5 دقائق ومشتركة).
+## 2) الكميات الحقيقية في قائمة البحث (طلب المستخدم الأساسي) 🟠
+في كل من الفاتورة/عرض السعر/المرتجع/الشراء:
+- إنشاء دالة مساعدة مشتركة `src/utils/availableStock.ts`:
+  ```ts
+  // يحسب الكمية المتاحة للعرض في الـ picker
+  // = stock_quantity - sum(qty لنفس product_id في البنود الحالية, باستثناء الصف الحالي)
+  // للمرتجع: لا يُطرَح شيء (المرتجع يُضيف للمخزون)
+  // للشراء: لا يُطرَح شيء (الشراء يُضيف للمخزون)
+  getAvailableQty(product, currentItems, opts: { mode: "sale" | "return" | "purchase", excludeRowId? })
+  ```
+- في كل صفحة، عند رسم القائمة المنسدلة لمنتج، استخدام `getAvailableQty` بدلاً من `product.stock_quantity` المباشر.
+- شارة الكمية حمراء إذا كانت ≤ 0 (يعمل تلقائياً مع المنطق الحالي).
+- **لن** أغيّر صيغة الإدراج/الحفظ — هذا تحسين عرض فقط، لا يمسّ قاعدة البيانات أو التحقق من توفر المخزون عند الحفظ.
 
-## D) صفحة إدارة العملاء — إضافة Hook غير محدود
-إضافة `useCustomersAll()` في `src/hooks/useData.ts` تستخدم `fetchAllCustomers`، واستخدامها داخل `CustomersPage` بدل `useCustomers().data`. أبقي `useCustomers()` للاستخدامات الخفيفة (Dispatch, Transactions, Statistics) التي لا تتأثر حالياً.
+## 3) توحيد سلوك المجمّدة 🟠
+- `StockReturnCreatePage.tsx` سطر 319 و 350: إضافة `.filter(x => !x.is_frozen)` كما في الفاتورة (يبقى تعديل البنود المحفوظة سابقاً يعرض أسماء المنتجات المجمّدة، لكن لا تظهر في البحث).
+- `PurchaseCreatePage.tsx` بحث المنتج (سطر 372–386): استثناء المجمّدة من اقتراحات البحث (لأن شراء منتج مجمّد لا يُطابق سير العمل المعتاد). إن أردت إبقاءه قابلاً، أتركه — أُفضّل **استثناءه** لتوحيد السلوك. **سأطبّق الاستثناء** ما لم تطلب العكس.
 
-## E) لا تغييرات على
-- مخطط قاعدة البيانات / RLS / الصلاحيات.
-- منطق إضافة عميل/منتج جديد (QuickAdd + CustomerFormDialog) — يعمل الآن صحيحاً عبر الأحداث.
-- استعلامات تفاصيل العميل/المنتج عند الاختيار (تبقى كما هي).
+## 4) رصيد العميل لحظياً بعد الاختيار 🟠
+نقل النمط الموجود في `InvoiceCreatePage.tsx:526` (إعادة جلب `balance, credit_balance` فور اختيار العميل) إلى:
+- `QuoteCreatePage.tsx` داخل دالة `pickCustomer` (حوالي سطر 597).
+- `StockReturnCreatePage.tsx` داخل اختيار العميل.
+- (الشراء لا يحتاج لأن `suppliers.balance` يُحَدَّث بـ trigger من PostgreSQL وفي الكاش الجديد لـ `useSuppliersAll`).
+
+## 5) تطبيع البحث العربي 🟢
+- إنشاء `src/utils/arabicNormalize.ts`:
+  ```ts
+  export function normalizeAr(s: string) {
+    return s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u064B-\u0652]/g, "")     // إزالة التشكيل
+      .replace(/[إأآا]/g, "ا")
+      .replace(/ى/g, "ي")
+      .replace(/ة/g, "ه")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  ```
+- استخدامه في:
+  - `src/utils/productMatches.ts` (يُغطّي الفاتورة وعرض السعر تلقائياً).
+  - دالة بحث المنتجات المحلية في `StockReturnCreatePage.tsx` وفي `PurchaseCreatePage.tsx`.
+  - بحث العملاء في الصفحات الأربع، وبحث المورد في الشراء.
+- **بدون تغيير سلوك أي شيء آخر** — مجرد توسيع المطابقة لتشمل صيغ كتابة عربية مختلفة لنفس الاسم.
+
+---
+
+# خارج النطاق (لن أعمل عليها هذه المرة)
+- ❌ قوائم وجهات/عناوين الشحن للعميل — تتطلب تصميم UI جديد. اقترحها كطلب منفصل.
+- ❌ توحيد دالة بحث المنتجات بين الشاشات الأربع في hook واحد — إعادة هيكلة كبيرة، خارج طلبك الحالي.
+- ❌ التحقق من توفّر المخزون عند **حفظ** الفاتورة — هذا منطق حفظ منفصل، أنت لم تطلبه.
+
+---
 
 # الملفات التي ستُلمس
-1. **جديد:** `src/lib/fetchAllCustomers.ts`
-2. **تعديل:** `src/hooks/useData.ts` — إضافة `useCustomersAll` فقط.
-3. **تعديل:** `src/pages/InvoiceCreatePage.tsx`
-4. **تعديل:** `src/pages/QuoteCreatePage.tsx`
-5. **تعديل:** `src/pages/StockReturnCreatePage.tsx`
-6. **تعديل:** `src/pages/StockTransferPage.tsx`
-7. **تعديل:** `src/pages/CustomersPage.tsx`
-8. **تعديل:** `src/components/packaging/PackagingItemsManager.tsx`
-9. **تعديل:** `src/components/transport/TransportItemsManager.tsx`
+| النوع | المسار |
+|------|--------|
+| جديد | `src/lib/fetchAllSuppliers.ts` |
+| جديد | `src/utils/availableStock.ts` |
+| جديد | `src/utils/arabicNormalize.ts` |
+| تعديل | `src/hooks/useData.ts` (إضافة `useSuppliersAll`) |
+| تعديل | `src/utils/productMatches.ts` (دمج التطبيع العربي) |
+| تعديل | `src/pages/InvoiceCreatePage.tsx` (الكمية الحقيقية + تطبيع) |
+| تعديل | `src/pages/QuoteCreatePage.tsx` (الكمية الحقيقية + تطبيع + إعادة جلب رصيد العميل) |
+| تعديل | `src/pages/StockReturnCreatePage.tsx` (إخفاء المجمّدة + تطبيع + إعادة جلب رصيد العميل + دمج productMatches) |
+| تعديل | `src/pages/PurchaseCreatePage.tsx` (useSuppliersAll + إخفاء المجمّدة + تطبيع) |
+| تعديل | `src/pages/SuppliersPage.tsx` (useSuppliersAll) |
 
-# الاختبار بعد التنفيذ
-1. إضافة عميل جديد عبر QuickAdd داخل صفحة الفاتورة → يظهر فوراً في البحث.
-2. إضافة منتج جديد عبر QuickAdd داخل صفحة الفاتورة → يظهر فوراً.
-3. فتح صفحة تحويل المخزون والتغليف والترحيل والتأكد من ظهور كل المنتجات.
-4. فتح صفحة إدارة العملاء — تظهر كل الـ307 (وستظهر كل ما يُضاف لاحقاً ولو تجاوز 1000).
+# خطة التحقق بعد التنفيذ
+1. **الفاتورة**: ابحث عن عميل بأسماء متعددة الإملاء ("احمد"/"أحمد"). ابحث عن منتج. أضف 5 قطع لمنتج مخزونه 10 → ثم ابحث مرة أخرى عن نفس المنتج: يظهر "متاح: 5".
+2. **عرض السعر + الجانبي**: نفس اختبار الفاتورة، ويظهر رصيد العميل المُحَدَّث في الشريط بعد الاختيار حتى لو غُيِّر من تبويب آخر.
+3. **المرتجع**: ابحث عن منتج مجمّد → لا يظهر في القائمة. ابحث عن منتج عادي → الكمية المعروضة هي الكمية الحقيقية (لا تُطرَح بنود المرتجع).
+4. **الشراء**: ابحث عن منتج مجمّد → لا يظهر. ابحث عن مورد جديد بعد إضافته عبر QuickAdd → يظهر. لو كان لدينا أكثر من 1000 مورد لاحقاً → كلهم يظهرون.
+5. **QuickAdd**: إضافة منتج وعميل جديد من داخل كل شاشة → يظهر فوراً في البحث.
