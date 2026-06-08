@@ -2100,6 +2100,7 @@ export default function ProductsPage() {
                                 }}
                                 onDelete={(opt) => deleteBrandFromSystem(opt.value)}
                                 deleteConfirm={(opt) => `هل تريد حذف الماركة "${opt.label}" من النظام نهائيًا؟`}
+                                showDeleteButton
                                 placeholder="—" addLabel="إضافة ماركة"
                               />
                             </div>
