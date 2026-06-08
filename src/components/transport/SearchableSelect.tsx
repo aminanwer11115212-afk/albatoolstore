@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { startsWithMatch } from "@/utils/searchMatch";
 
 interface Option {
   id: string;

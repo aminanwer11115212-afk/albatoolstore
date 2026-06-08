@@ -137,9 +137,9 @@ export default function MessageImportDialog({ open, onClose, products, warehouse
   }, [parsed, focusedRow, deleteRow]);
 
   const altMatches = useCallback((idx: number) => {
-    const q = (altSearch[idx] || "").trim().toLowerCase();
+    const q = (altSearch[idx] || "").trim();
     if (!q) return [];
-    return products.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 8);
+    return products.filter((p) => startsWithMatch(p.name, q)).slice(0, 8);
   }, [altSearch, products]);
 
   const matchedCount = useMemo(
