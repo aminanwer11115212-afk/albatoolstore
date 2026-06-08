@@ -365,11 +365,11 @@ export default function NotificationsPage() {
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     const now = Date.now();
     const list = items.filter(n => {
       if (kindFilter !== "all" && n.kind !== kindFilter) return false;
-      if (q && !(n.title.toLowerCase().includes(q) || n.desc.toLowerCase().includes(q))) return false;
+      if (q && !startsWithAny([n.title, n.desc], q)) return false;
       if (n.kind === "stock") {
         const until = snoozed[stockKey(n)];
         if (until && until > now) return false;

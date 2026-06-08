@@ -14,7 +14,7 @@ export default function DailyInvoicesReportPage() {
 
   const filtered = (invoices || []).filter((inv: any) => {
     const matchDate = inv.date === date;
-    const matchSearch = !search || inv.invoice_number?.includes(search) || (inv.customers as any)?.name?.includes(search);
+    const matchSearch = !search || startsWithAny([inv.invoice_number, (inv.customers as any)?.name], search);
     return matchDate && matchSearch;
   });
 

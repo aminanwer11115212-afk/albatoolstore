@@ -13,7 +13,7 @@ export default function AccountsPage() {
   const [perPage, setPerPage] = useState(10);
   const { data: accounts, isLoading, insert, update, remove } = useAccounts();
 
-  const filtered = (accounts || []).filter((a: any) => !search || a.name?.includes(search) || a.account_number?.includes(search));
+  const filtered = (accounts || []).filter((a: any) => !search || startsWithAny([a.name, a.account_number], search));
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 

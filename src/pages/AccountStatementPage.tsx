@@ -18,7 +18,7 @@ export default function AccountStatementPage() {
     if (selectedAccount && t.account_id !== selectedAccount) return false;
     if (dateFrom && t.date < dateFrom) return false;
     if (dateTo && t.date > dateTo) return false;
-    if (search && !t.description?.includes(search)) return false;
+    if (search && !startsWithMatch(t.description, search)) return false;
     return true;
   });
 

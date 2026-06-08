@@ -40,7 +40,7 @@ export default function StockTransferPage() {
   const { insert } = useStockTransfers();
 
   const filtered = (transfers || []).filter((t: any) =>
-    !search.trim() || t.product_name.toLowerCase().includes(search.toLowerCase())
+    !search.trim() || startsWithMatch(t.product_name, search),
   );
 
   const handleSubmit = async () => {

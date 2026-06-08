@@ -76,7 +76,7 @@ export default function ProductCompaniesPage() {
   const { data: stats } = useProductCompanyStats();
 
   const filtered = (companies || []).filter((c: any) =>
-    !search.trim() || c.name.toLowerCase().includes(search.toLowerCase())
+    !search.trim() || startsWithMatch(c.name, search),
   );
 
   const handleSubmit = async () => {

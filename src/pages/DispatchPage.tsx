@@ -281,9 +281,8 @@ export default function DispatchPage() {
   // فلترة قائمة الزبائن للبحث
   const filteredCustomers = useMemo(() => {
     if (!customerSearch.trim()) return (allCustomers as any[]).slice(0, 20);
-    const s = customerSearch.toLowerCase();
     return (allCustomers as any[])
-      .filter((c: any) => (c.name || "").toLowerCase().includes(s))
+      .filter((c: any) => startsWithMatch(c.name, customerSearch))
       .slice(0, 20);
   }, [allCustomers, customerSearch]);
 

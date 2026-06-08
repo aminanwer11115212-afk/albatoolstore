@@ -160,8 +160,7 @@ export default function DataHealthPage() {
       .filter(
         (a) =>
           !search ||
-          a.description.toLowerCase().includes(search.toLowerCase()) ||
-          (a.record_label || "").toLowerCase().includes(search.toLowerCase()),
+          startsWithAny([a.description, a.record_label], search),
       )
       .sort((a, b) => {
         const s = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];

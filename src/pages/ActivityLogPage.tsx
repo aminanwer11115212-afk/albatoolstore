@@ -34,7 +34,7 @@ export default function ActivityLogPage() {
 
   useEffect(() => { load();   }, [filterTable, filterAction, limit]);
 
-  const filtered = logs.filter((l) => !search.trim() || JSON.stringify(l.new_data || l.old_data || {}).toLowerCase().includes(search.toLowerCase()));
+  const filtered = logs.filter((l) => !search.trim() || startsWithMatch(JSON.stringify(l.new_data || l.old_data || {}), search));
 
   return (
     <article className="content">

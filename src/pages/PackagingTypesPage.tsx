@@ -27,12 +27,9 @@ export default function PackagingTypesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const filtered = (data || []).filter((r: any) => {
-    const s = search.trim().toLowerCase();
+    const s = search.trim();
     if (!s) return true;
-    return (
-      (r.name || "").toLowerCase().includes(s) ||
-      (r.description || "").toLowerCase().includes(s)
-    );
+    return startsWithAny([r.name, r.description], s);
   });
 
   const showAll = perPage === -1;

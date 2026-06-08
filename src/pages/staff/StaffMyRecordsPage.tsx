@@ -55,11 +55,8 @@ export default function StaffMyRecordsPage() {
   const baseRows = tab === "quotes" ? quotes : invoices;
   const rows = useMemo(() => {
     if (!q.trim()) return baseRows;
-    const s = q.trim().toLowerCase();
     return baseRows.filter(r =>
-      String(r[numKey] || "").toLowerCase().includes(s) ||
-      String(r.customers?.name || "").toLowerCase().includes(s) ||
-      String(r.status || "").toLowerCase().includes(s)
+      startsWithAny([r[numKey], r.customers?.name, r.status], q)
     );
   }, [baseRows, q, numKey]);
 

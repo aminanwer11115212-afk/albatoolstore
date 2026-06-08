@@ -23,10 +23,10 @@ export default function CustomerStatementPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const matches = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return (customers || []).slice(0, 10);
     return (customers || []).filter((c: any) =>
-      c.name?.toLowerCase().includes(q) || (c.phone || "").includes(q)
+      startsWithAny([c.name, c.phone], q)
     ).slice(0, 10);
   }, [search, customers]);
 

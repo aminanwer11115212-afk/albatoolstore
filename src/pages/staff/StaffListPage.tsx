@@ -53,11 +53,8 @@ export default function StaffListPage({ table, title, newPath, numberKey, create
 
   const filtered = useMemo(() => {
     if (!q.trim()) return rows;
-    const s = q.trim().toLowerCase();
     return rows.filter(r =>
-      String(r[numberKey] || "").toLowerCase().includes(s) ||
-      String(r.customers?.name || "").toLowerCase().includes(s) ||
-      String(r.status || "").toLowerCase().includes(s)
+      startsWithAny([r[numberKey], r.customers?.name, r.status], q)
     );
   }, [rows, q, numberKey]);
 

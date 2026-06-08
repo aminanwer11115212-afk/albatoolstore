@@ -21,8 +21,7 @@ export default function TransactionsPage() {
   const { insert, remove } = useTransactions();
 
   const filtered = (transactions || []).filter((t: any) => {
-    const s = search.toLowerCase();
-    return !s || t.description?.toLowerCase().includes(s) || t.category?.toLowerCase().includes(s) || t.accounts?.name?.toLowerCase().includes(s);
+    return !search || startsWithAny([t.description, t.category, t.accounts?.name], search);
   });
 
   const totalPages = Math.ceil(filtered.length / perPage);

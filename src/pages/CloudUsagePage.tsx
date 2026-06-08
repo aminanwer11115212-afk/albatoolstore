@@ -74,9 +74,9 @@ export default function CloudUsagePage() {
   // Filter and paginate tables
   const filteredTables = useMemo(() => {
     if (!data) return [];
-    const query = tableSearch.trim().toLowerCase();
+    const query = tableSearch.trim();
     if (!query) return data.tables;
-    return data.tables.filter(t => t.table_name.toLowerCase().includes(query));
+    return data.tables.filter(t => startsWithMatch(t.table_name, query));
   }, [data, tableSearch]);
 
   const totalTablePages = useMemo(() => Math.max(1, Math.ceil(filteredTables.length / TABLE_PAGE_SIZE)), [filteredTables.length]);
