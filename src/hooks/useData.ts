@@ -216,6 +216,35 @@ export function useCustomersAll() {
 }
 export function useCustomerGroups() { return useTable("customer_groups"); }
 export function useSuppliers() { return useTable("suppliers"); }
+
+/**
+ * Returns ALL suppliers (paginated past Supabase's default 1000-row cap).
+ * Use in PurchaseCreatePage and SuppliersPage where the supplier list must
+ * be complete regardless of table size.
+ */
+export function useSuppliersAll() {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: ["suppliers-all"],
+    queryFn: async () => {
+      const { fetchAllSuppliers } = await import("@/lib/fetchAllSuppliers");
+      return await fetchAllSuppliers<any>("*", { column: "created_at", ascending: false });
+    },
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+  });
+  if (typeof window !== "undefined") {
+    const key = "__suppliersAllListener";
+    if (!(window as any)[key]) {
+      window.addEventListener("suppliers:changed", () =>
+        queryClient.invalidateQueries({ queryKey: ["suppliers-all"] }),
+      );
+      (window as any)[key] = true;
+    }
+  }
+  const base = useTable("suppliers");
+  return { ...query, insert: base.insert, update: base.update, remove: base.remove };
+}
 export function useProducts() { return useTable("products"); }
 export function useProductCategories() { return useTable("product_categories"); }
 export function useWarehouses() { return useTable("warehouses"); }
