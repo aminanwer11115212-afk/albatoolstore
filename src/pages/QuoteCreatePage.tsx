@@ -340,6 +340,20 @@ export default function QuoteCreatePage() {
   useEffect(() => {
     selectedCustomerIdRef.current = customer?.id || null;
   }, [customer]);
+  // Refresh live balance for the selected customer (mirrors InvoiceCreatePage).
+  useEffect(() => {
+    if (!customer?.id) return;
+    (async () => {
+      const { data: bal } = await supabase
+        .from("customers")
+        .select("balance, credit_balance")
+        .eq("id", customer.id)
+        .maybeSingle();
+      if (bal && Number((bal as any).balance || 0) !== Number(customer.balance || 0)) {
+        setCustomer((prev) => prev ? { ...prev, balance: Number((bal as any).balance || 0) } as Customer : prev);
+      }
+    })();
+  }, [customer?.id]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerSugg, setShowCustomerSugg] = useState(false);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
