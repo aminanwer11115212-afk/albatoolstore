@@ -1992,7 +1992,8 @@ export default function ProductsPage() {
                                   })();
                                 }}
                                 onAdd={createCategoryInline}
-                                onDelete={(opt) => deleteProductCategory(p.id, opt.value)}
+                                onDelete={(opt) => deleteCategoryFromSystem(opt.value)}
+                                deleteConfirm={(opt) => `هل تريد حذف الفئة "${opt.label}" من النظام نهائيًا؟`}
                                 placeholder={allNames ? "تغيير الفئة الأساسية" : "—"} addLabel="إضافة فئة"
                               />
                             </div>
