@@ -967,7 +967,7 @@ export default function ProductsPage() {
     if (!isOpen) return null;
     const filterActive = !!col.value;
     const opts = col.kind === "select" && filterQuery
-      ? (col.options || []).filter(o => o.label.toLowerCase().includes(filterQuery.toLowerCase()))
+      ? (col.options || []).filter(o => startsWithMatch(o.label, filterQuery))
       : (col.options || []);
     const onPopKeyDown = (e: React.KeyboardEvent) => {
       if (e.key === "Tab") { closeFilter(); }
