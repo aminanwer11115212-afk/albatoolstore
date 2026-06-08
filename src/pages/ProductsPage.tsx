@@ -1547,10 +1547,14 @@ export default function ProductsPage() {
                 {(suppliers || []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-            <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer whitespace-nowrap">
-              <input type="checkbox" checked={showFrozen} onChange={e => setShowFrozen(e.target.checked)} className="w-4 h-4" />
-              إظهار المجمّدة
-            </label>
+            <div className="filter-item">
+              <label className="text-sm text-muted-foreground">التجميد:</label>
+              <select value={frozenMode} onChange={e => setFrozenMode(e.target.value as any)} className={selectClass}>
+                <option value="hide">إخفاء المجمّدة</option>
+                <option value="all">إظهار الكل</option>
+                <option value="only">المجمّدة فقط</option>
+              </select>
+            </div>
             <button
               type="button"
               onClick={exportFilteredPdf}
