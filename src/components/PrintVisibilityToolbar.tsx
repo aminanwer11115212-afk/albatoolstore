@@ -196,24 +196,6 @@ export default function PrintVisibilityToolbar({
     [hidden, sections.length],
   );
 
-  return (
-    <div
-      className="__lov_pv_toolbar"
-      dir="rtl"
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 40,
-        background: "linear-gradient(135deg, #5b2c8e, #7e3eb5)",
-        color: "#fff",
-        padding: "10px 14px",
-        borderRadius: 10,
-        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-        marginBottom: 16,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-      }}
   if (isMobile && collapsed) {
     return (
       <div
