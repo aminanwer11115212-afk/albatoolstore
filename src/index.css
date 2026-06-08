@@ -2159,3 +2159,72 @@ input[type="number"] {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Mobile overrides for create/edit pages (Quote / Invoice / Purchase / Return)
+   كل هذه الصفحات تشترك في .neo-quote-scope. الهدف:
+   - إظهار كل حقول الشريط العلوي بدل اقتصارها على العميل
+   - إظهار جدول "آخر 50" (recent-*-scope) أسفل الصفحة دائماً
+   - السماح لشريط الأدوات بالتفاف الأزرار حتى تظهر كلها
+   ───────────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* الشريط العلوي: حقول كاملة العرض تلتف لأسطر متعددة */
+  .neo-quote-scope .header-bar {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    overflow: visible !important;
+  }
+  .neo-quote-scope .header-bar .field {
+    flex: 1 1 calc(50% - 4px) !important;
+    width: auto !important;
+    min-width: 130px !important;
+  }
+  /* حقل العميل + تفاصيل العميل: عرض كامل لسهولة الإدخال */
+  .neo-quote-scope .header-bar .field.product-search-container {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+  /* أزرار صغيرة (إضافة عميل/رسالة) تبقى بحجمها الأصلي */
+  .neo-quote-scope .header-bar .field[style*="width: 28"] {
+    flex: 0 0 auto !important;
+    width: 28px !important;
+    min-width: 28px !important;
+  }
+  .neo-quote-scope .header-bar .field .form-control {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 12px !important;
+    height: 30px !important;
+  }
+
+  /* جدول "آخر 50" — يظهر دائماً أسفل الصفحة */
+  .recent-quotes-scope,
+  .recent-invoices-scope,
+  .recent-purchases-scope,
+  .recent-returns-scope {
+    min-height: 380px !important;
+    height: auto !important;
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 auto !important;
+    margin-top: 8px;
+    border-top: 2px solid hsl(var(--border));
+    padding-top: 6px;
+  }
+
+  /* تخطيط الصفحة: عمود واحد (form ثم aside) */
+  .neo-quote-scope .quote-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 100% !important;
+  }
+  .neo-quote-scope { height: auto !important; overflow: auto !important; }
+
+  /* شريط الأدوات (FreePositionToolbar): يسمح بالتفاف العناصر */
+  .neo-quote-scope .free-toolbar {
+    min-height: auto !important;
+  }
+}
+
+
