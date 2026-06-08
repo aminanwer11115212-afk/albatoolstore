@@ -73,6 +73,17 @@ export default function PrintVisibilityToolbar({
     }
   });
   const [downloading, setDownloading] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 767 : false,
+  );
+  const [collapsed, setCollapsed] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 767 : false,
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 767);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const html2pdfRef = useRef<any>(null);
 
   // inject hide styles globally once
@@ -185,6 +196,44 @@ export default function PrintVisibilityToolbar({
     [hidden, sections.length],
   );
 
+  if (isMobile && collapsed) {
+    return (
+      <div
+        className="__lov_pv_toolbar"
+        dir="rtl"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+          marginBottom: 12,
+          display: "flex",
+          justifyContent: "flex-end",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          style={{
+            background: "linear-gradient(135deg, #5b2c8e, #7e3eb5)",
+            color: "#fff",
+            border: "none",
+            padding: "8px 14px",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontWeight: 700,
+            fontSize: 13,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          }}
+        >
+          <Eye size={14} /> تخصيص الرؤية والطباعة
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className="__lov_pv_toolbar"
@@ -226,6 +275,16 @@ export default function PrintVisibilityToolbar({
               <MessageCircle size={14} /> واتساب
             </button>
           </>
+        )}
+        {isMobile && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            style={{ ...btnStyle(), marginInlineStart: "auto" }}
+            title="طي"
+          >
+            ✕
+          </button>
         )}
       </div>
       <div style={{ height: 1, background: "rgba(255,255,255,0.2)" }} />
