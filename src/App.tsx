@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, lazy } from "react";
 import { lazyEl } from "@/components/PageLoader";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useParams, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -183,7 +183,8 @@ const App = () => {
         <AppLayout>
           <Routes>
             <Route path="/login" element={lazyEl(<LoginPage />, "تسجيل الدخول")} />
-            <Route path="/signup" element={lazyEl(<SignUpPage />, "إنشاء حساب")} />
+            {/* /signup معطّل — الحسابات تُنشأ من المسؤول فقط */}
+            <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/share/customer/t/:token" element={lazyEl(<PublicCustomerStatementPage />, "كشف الحساب")} />
             <Route path="/share/document/:token" element={lazyEl(<PublicDocumentSharePage />, "معاينة المستند")} />
             {/* Staff Portal */}
