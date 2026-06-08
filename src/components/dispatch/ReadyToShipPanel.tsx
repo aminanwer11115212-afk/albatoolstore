@@ -410,29 +410,31 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
       </div>
 
       {/* Footer */}
-      <div className="rts-footer">
-        <div className="rts-footer-row">
-          <div className="rts-counter">
-            <b>{checked.size}</b> محدد من <b>{invoices.length}</b>
+      {!hideFooter && (
+        <div className="rts-footer">
+          <div className="rts-footer-row">
+            <div className="rts-counter">
+              <b>{checked.size}</b> محدد من <b>{invoices.length}</b>
+            </div>
+            <button
+              className="rts-btn rts-btn-ghost"
+              onClick={toggleAll}
+              disabled={invoices.length === 0}
+            >
+              {allChecked ? <X size={11} /> : null}
+              {allChecked ? "إلغاء التحديد" : "تحديد الكل"}
+            </button>
           </div>
           <button
-            className="rts-btn rts-btn-ghost"
-            onClick={toggleAll}
-            disabled={invoices.length === 0}
+            className="rts-btn rts-btn-primary"
+            onClick={printAndDispatch}
+            disabled={busy || checked.size === 0}
           >
-            {allChecked ? <X size={11} /> : null}
-            {allChecked ? "إلغاء التحديد" : "تحديد الكل"}
+            <Printer size={14} />
+            {busy ? "جارٍ المعالجة…" : "طباعة وتحويل إلى ترحيلات"}
           </button>
         </div>
-        <button
-          className="rts-btn rts-btn-primary"
-          onClick={printAndDispatch}
-          disabled={busy || checked.size === 0}
-        >
-          <Printer size={14} />
-          {busy ? "جارٍ المعالجة…" : "طباعة وتحويل إلى ترحيلات"}
-        </button>
-      </div>
+      )}
     </div>
   );
 }
