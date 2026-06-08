@@ -11,7 +11,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanySettings, useCustomers } from "@/hooks/useData";
 import { toast } from "sonner";
-import { Truck, Printer, RefreshCw, Search, Users, Calendar, X, CheckSquare, Square } from "lucide-react";
+import { Truck, Printer, RefreshCw, Search, Users, Calendar, X, CheckSquare, Square, PackageCheck } from "lucide-react";
+import ReadyToShipPanel from "@/components/dispatch/ReadyToShipPanel";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
 const fmtDateAr = (d?: string) => {
@@ -447,7 +449,28 @@ export default function DispatchPage() {
           max-height: calc(100vh - 360px); overflow-y: auto;
           border: 1px solid hsl(var(--border)); border-radius: 5px;
         }
+        .dispatch-v2 .dispatch-grid {
+          display: grid; grid-template-columns: 1fr; gap: 12px;
+        }
+        @media (min-width: 1024px) {
+          .dispatch-v2 .dispatch-grid { grid-template-columns: 1fr 360px; align-items: start; }
+          .dispatch-v2 .dispatch-right { position: sticky; top: 12px; max-height: calc(100vh - 24px); }
+        }
+        .dispatch-v2 .dispatch-right-mobile-trigger {
+          position: fixed; bottom: 16px; right: 16px; z-index: 50;
+          background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+          border: none; border-radius: 999px; padding: 10px 14px;
+          font-size: 12px; font-weight: 800; cursor: pointer;
+          display: inline-flex; align-items: center; gap: 6px;
+          box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+        }
+        @media (min-width: 1024px) {
+          .dispatch-v2 .dispatch-right-mobile-trigger { display: none; }
+        }
       `}</style>
+
+      <div className="dispatch-grid">
+        <div className="dispatch-left">
 
       {/* Filter Card */}
       <div className="dv-card">
@@ -730,6 +753,28 @@ export default function DispatchPage() {
           </div>
         )}
       </div>
+        </div>
+
+        {/* Desktop right panel */}
+        <aside className="dispatch-right hidden lg:block">
+          <ReadyToShipPanel buildPrintHTML={buildDispatchReportHTML} company={company} />
+        </aside>
+      </div>
+
+      {/* Mobile floating trigger + sheet */}
+      <Sheet>
+        <SheetTrigger asChild>
+          <button className="dispatch-right-mobile-trigger" type="button">
+            <PackageCheck size={16} />
+            الفواتير الجاهزة للرفع
+          </button>
+        </SheetTrigger>
+        <SheetContent side="right" className="w-[92vw] sm:w-[420px] p-0">
+          <div style={{ height: "100%", padding: 8 }}>
+            <ReadyToShipPanel buildPrintHTML={buildDispatchReportHTML} company={company} />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Click outside to close dropdown */}
       {showCustomerDropdown && (
