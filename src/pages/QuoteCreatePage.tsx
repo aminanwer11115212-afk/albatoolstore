@@ -592,8 +592,9 @@ export default function QuoteCreatePage() {
   // ---------- Customer search ----------
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    const q = customerSearch.toLowerCase();
-    return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)).slice(0, 8);
+    const q = normalizeAr(customerSearch);
+    if (!q) return [];
+    return customers.filter((c) => normalizeAr(c.name).includes(q) || (c.phone || "").includes(q)).slice(0, 8);
   }, [customerSearch, customers]);
 
   function pickCustomer(c: Customer) {
