@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DollarSign } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 interface FilteredTransactionsPageProps {
   type: "income" | "expense";

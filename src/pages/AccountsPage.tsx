@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useAccounts } from "@/hooks/useData";
 import { toast } from "sonner";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function AccountsPage() {
   const [showForm, setShowForm] = useState(false);

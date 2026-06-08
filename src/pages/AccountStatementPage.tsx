@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAccounts, useTransactionsWithAccounts } from "@/hooks/useData";
 import { Search, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function AccountStatementPage() {
   const [selectedAccount, setSelectedAccount] = useState("");

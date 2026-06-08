@@ -5,6 +5,7 @@ import { useProducts, useWarehouses, useStockTransfers } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 function useStockTransfersWithDetails() {
   return useQuery({

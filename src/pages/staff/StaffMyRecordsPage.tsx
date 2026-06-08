@@ -4,6 +4,7 @@ import { FilePlus, ReceiptText, Search, FileText, Receipt } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 type Tab = "quotes" | "invoices";
 

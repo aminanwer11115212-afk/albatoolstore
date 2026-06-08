@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank } from "@/lib/bankTransferValidation";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function TransactionsPage() {
   const [search, setSearch] = useState("");

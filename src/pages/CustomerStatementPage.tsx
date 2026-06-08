@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useCompanySettings } from "@/hooks/useData";
 import { Search, X, Printer } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function CustomerStatementPage() {
   const { data: customers } = useCustomers();

@@ -4,6 +4,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import { Loader2, RefreshCw, AlertTriangle, AlertCircle, Info, CheckCircle2, EyeOff, Search } from "lucide-react";
 import { Link } from "react-router-dom";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 type Anomaly = {
   id: string;

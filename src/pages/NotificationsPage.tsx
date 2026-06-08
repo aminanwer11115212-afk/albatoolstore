@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Bell, AlertTriangle, FileText, Wallet, Activity, Search, RefreshCw, Pin, EyeOff, RotateCcw } from "lucide-react";
 import { useUserScopedLegacyKey } from "@/lib/userScopedKey";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 
 type Severity = "out" | "low";

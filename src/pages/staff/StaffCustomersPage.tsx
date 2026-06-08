@@ -3,6 +3,7 @@ import { Plus, Search, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function StaffCustomersPage() {
   const { permissions } = useUserRole();

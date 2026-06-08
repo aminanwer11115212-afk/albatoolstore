@@ -4,6 +4,7 @@ import { Plus, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 interface Props {
   table: "quotes" | "invoices";

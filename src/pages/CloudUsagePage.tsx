@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Database, HardDrive, Activity, FileText, RefreshCw, AlertTriangle, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCloudUsage, LIMITS, pct, severity, formatBytes } from "@/hooks/useCloudUsage";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 const sevColor: Record<string, string> = {
   ok:   "hsl(142 71% 45%)",

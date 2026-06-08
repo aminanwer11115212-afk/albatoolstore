@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 const ACTION_LABELS: Record<string, string> = { INSERT: "إضافة", UPDATE: "تعديل", DELETE: "حذف" };
 const ACTION_CLS: Record<string, string> = { INSERT: "st-paid", UPDATE: "st-sent", DELETE: "st-due" };

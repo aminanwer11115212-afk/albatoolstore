@@ -8,6 +8,7 @@ import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { receiveStockForPurchaseOnce } from "@/utils/stockReceive";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },

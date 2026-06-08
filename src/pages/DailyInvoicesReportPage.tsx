@@ -3,6 +3,7 @@ import { useInvoicesWithCustomers } from "@/hooks/useData";
 import { Search, ChevronLeft, ChevronRight, Eye, FileText } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function DailyInvoicesReportPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
