@@ -286,12 +286,12 @@ export default function ProductsPage() {
       return [p.name, p.sku, p.product_categories?.name, catNames, p.product_companies?.name, brandNames, p.warehouses?.name, p.suppliers?.name]
         .some((value) => String(value || "").toLowerCase().includes(term));
     });
-  }, [pageProducts, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, showFrozen, search]);
+  }, [pageProducts, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, showFrozen, onlyFrozen, search]);
 
-  const activeFiltersCount = [filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter !== "all" ? stockFilter : "", !showFrozen ? "frozen" : ""].filter(Boolean).length;
+  const activeFiltersCount = [filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter !== "all" ? stockFilter : "", frozenMode !== "all" ? "frozen" : ""].filter(Boolean).length;
   const clearFilters = () => {
     setFilterWarehouse(""); setFilterCategory(""); setFilterCompany(""); setFilterSupplier("");
-    setFilterName(""); setFilterSku(""); setStockFilter("all"); setShowFrozen(true);
+    setFilterName(""); setFilterSku(""); setStockFilter("all"); setFrozenMode("hide");
     setSearch(""); setPage(1);
   };
 
@@ -305,7 +305,7 @@ export default function ProductsPage() {
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return; }
     setPage(1);
-  }, [search, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter, showFrozen, perPage]);
+  }, [search, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter, frozenMode, perPage]);
 
   const { outOfStockCount, inStockCount, lowStockCount, inventoryValue } = useMemo(() => {
     let out = 0, inS = 0, low = 0, val = 0;
