@@ -12,6 +12,8 @@
  * "حيّاً" ويستطيع المستخدم تأكيد وجوده — وتظهر له رسالة "مُضاف مسبقاً"
  * عند المحاولة فعلياً (يُتعامَل معها في pickProductIntoRow).
  */
+import { startsWithAny } from "./searchMatch";
+
 export interface ProductLike {
   id: string;
   name: string;
@@ -25,11 +27,10 @@ export function productMatches<T extends ProductLike>(
   warehouseId?: string | null,
 ): T[] {
   if (!query.trim()) return [];
-  const q = query.toLowerCase();
   const seen = new Set<string>();
   return products
     .filter((p) => !warehouseId || p.warehouse_id === warehouseId)
-    .filter((p) => (p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q))
+    .filter((p) => startsWithAny([p.name, p.sku], query))
     .filter((p) => {
       if (seen.has(p.id)) return false;
       seen.add(p.id);
