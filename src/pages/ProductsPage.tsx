@@ -50,14 +50,28 @@ export default function ProductsPage() {
   const [filterName, setFilterName] = useState("");
   const [filterSku, setFilterSku] = useState("");
   const PP_SHOW_FROZEN = userScopedLegacyKey("products-page:showFrozen");
+  const PP_FROZEN_MODE = userScopedLegacyKey("products-page:frozenMode");
   const PP_STOCK_FILTER = userScopedLegacyKey("products-page:stockFilter");
   const PP_PAGE = userScopedLegacyKey("products-page:page");
   const PP_PER_PAGE = userScopedLegacyKey("products-page:perPage");
 
-  const [showFrozen, setShowFrozen] = useState<boolean>(() => {
-    try { const v = localStorage.getItem(PP_SHOW_FROZEN); return v === null ? true : v === "1"; } catch { return true; }
+  // وضع تجميد ثلاثي: hide = إخفاء المجمدة, all = إظهار الكل, only = المجمدة فقط
+  const [frozenMode, setFrozenMode] = useState<"hide" | "all" | "only">(() => {
+    try {
+      const v = localStorage.getItem(PP_FROZEN_MODE);
+      if (v === "hide" || v === "all" || v === "only") return v;
+      // ترقية من القديم
+      const legacy = localStorage.getItem(PP_SHOW_FROZEN);
+      return legacy === "0" ? "hide" : "all";
+    } catch { return "all"; }
   });
-  useEffect(() => { try { localStorage.setItem(PP_SHOW_FROZEN, showFrozen ? "1" : "0"); } catch {} }, [showFrozen]);
+  useEffect(() => { try { localStorage.setItem(PP_FROZEN_MODE, frozenMode); } catch {} }, [frozenMode]);
+  const showFrozen = frozenMode !== "hide";
+  const onlyFrozen = frozenMode === "only";
+  const setShowFrozen = (v: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof v === "function" ? (v as any)(showFrozen) : v;
+    setFrozenMode(next ? "all" : "hide");
+  };
 
   const [stockFilter, setStockFilter] = useState<"all" | "in" | "out" | "low">(() => {
     try { const v = localStorage.getItem(PP_STOCK_FILTER); return (v === "in" || v === "out" || v === "low" || v === "all") ? v : "all"; } catch { return "all"; }
@@ -264,19 +278,20 @@ export default function ProductsPage() {
       if (filterSupplier && p.supplier_id !== filterSupplier) return false;
       if (fName && !String(p.name || "").toLowerCase().includes(fName)) return false;
       if (fSku && !String(p.sku || "").toLowerCase().includes(fSku)) return false;
-      if (!showFrozen && p.is_frozen) return false;
+      if (onlyFrozen) { if (!p.is_frozen) return false; }
+      else if (!showFrozen && p.is_frozen) return false;
       if (!term) return true;
       const catNames = (p.categories || []).map((c: any) => c.name).join(" ");
       const brandNames = (p.brands || []).map((b: any) => b.name).join(" ");
       return [p.name, p.sku, p.product_categories?.name, catNames, p.product_companies?.name, brandNames, p.warehouses?.name, p.suppliers?.name]
         .some((value) => String(value || "").toLowerCase().includes(term));
     });
-  }, [pageProducts, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, showFrozen, search]);
+  }, [pageProducts, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, showFrozen, onlyFrozen, search]);
 
-  const activeFiltersCount = [filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter !== "all" ? stockFilter : "", !showFrozen ? "frozen" : ""].filter(Boolean).length;
+  const activeFiltersCount = [filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter !== "all" ? stockFilter : "", frozenMode !== "all" ? "frozen" : ""].filter(Boolean).length;
   const clearFilters = () => {
     setFilterWarehouse(""); setFilterCategory(""); setFilterCompany(""); setFilterSupplier("");
-    setFilterName(""); setFilterSku(""); setStockFilter("all"); setShowFrozen(true);
+    setFilterName(""); setFilterSku(""); setStockFilter("all"); setFrozenMode("hide");
     setSearch(""); setPage(1);
   };
 
@@ -290,7 +305,7 @@ export default function ProductsPage() {
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return; }
     setPage(1);
-  }, [search, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter, showFrozen, perPage]);
+  }, [search, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter, frozenMode, perPage]);
 
   const { outOfStockCount, inStockCount, lowStockCount, inventoryValue } = useMemo(() => {
     let out = 0, inS = 0, low = 0, val = 0;
@@ -835,6 +850,17 @@ export default function ProductsPage() {
     toast.success(`تم تجميد ${ids.length} منتج`);
     setSelectedIds(new Set());
   };
+  const unfreezeSelected = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) { toast.info("لم يتم تحديد أي منتج"); return; }
+    const ok = await setFrozenOptimistic(ids, false);
+    if (!ok) return;
+    toast.success(`تم إلغاء تجميد ${ids.length} منتج`);
+    setSelectedIds(new Set());
+  };
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(paginated.map((p: any) => p.id)));
+  };
 
   const toggleAllFrozen = async (freeze: boolean) => {
     const ids = filtered.map((p: any) => p.id);
@@ -1145,14 +1171,21 @@ export default function ProductsPage() {
                     {s.label}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => setShowFrozen(v => !v)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition ${!showFrozen ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
-                  title="إخفاء/إظهار المنتجات المجمّدة"
-                >
-                  {showFrozen ? "إخفاء المجمّدة" : "إظهار المجمّدة"}
-                </button>
+                {([
+                  { v: "hide", label: "إخفاء المجمّدة" },
+                  { v: "all", label: "إظهار الكل" },
+                  { v: "only", label: "المجمّدة فقط" },
+                ] as { v: typeof frozenMode; label: string }[]).map(f => (
+                  <button
+                    key={f.v}
+                    type="button"
+                    onClick={() => setFrozenMode(f.v)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition ${frozenMode === f.v ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
+                    title="عرض المنتجات بحسب حالة التجميد"
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
             )}
 
@@ -1514,10 +1547,14 @@ export default function ProductsPage() {
                 {(suppliers || []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-            <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer whitespace-nowrap">
-              <input type="checkbox" checked={showFrozen} onChange={e => setShowFrozen(e.target.checked)} className="w-4 h-4" />
-              إظهار المجمّدة
-            </label>
+            <div className="filter-item">
+              <label className="text-sm text-muted-foreground">التجميد:</label>
+              <select value={frozenMode} onChange={e => setFrozenMode(e.target.value as any)} className={selectClass}>
+                <option value="hide">إخفاء المجمّدة</option>
+                <option value="all">إظهار الكل</option>
+                <option value="only">المجمّدة فقط</option>
+              </select>
+            </div>
             <button
               type="button"
               onClick={exportFilteredPdf}
@@ -1567,21 +1604,37 @@ export default function ProductsPage() {
           .products-grid tr:hover > td { background: hsl(var(--primary) / 0.06) !important; }
         `}</style>
 
-        {isAllProducts && selectedIds.size > 0 && (
+        {isAllProducts && (selectedIds.size > 0 || onlyFrozen) && (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
             padding: "6px 10px", marginBottom: 6, borderRadius: 6,
             background: "hsl(var(--primary) / 0.10)", border: "1px solid hsl(var(--primary) / 0.35)",
-            fontSize: 12,
+            fontSize: 12, flexWrap: "wrap",
           }}>
             <span style={{ color: "hsl(var(--primary))", fontWeight: 600 }}>
-              تم تحديد {selectedIds.size} منتج — اضغط <kbd style={{ padding: "1px 6px", background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>Shift</kbd>+<kbd style={{ padding: "1px 6px", background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>Enter</kbd> للتجميد
+              {selectedIds.size > 0 ? (
+                <>تم تحديد {selectedIds.size} منتج {!onlyFrozen && <>— اضغط <kbd style={{ padding: "1px 6px", background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>Shift</kbd>+<kbd style={{ padding: "1px 6px", background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>Enter</kbd> للتجميد</>}</>
+              ) : (
+                <>وضع المجمّدة فقط — يمكنك تحديد منتجات لفكّ تجميدها</>
+              )}
             </span>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button type="button" className="btn-xs btn-primary" onClick={freezeSelected}>
-                <Snowflake size={12} /> تجميد المحدد
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button type="button" className="btn-xs" onClick={selectAllVisible} title="تحديد كل المنتجات المعروضة في الصفحة">
+                تحديد كل المعروض
               </button>
-              <button type="button" className="btn-xs" onClick={() => setSelectedIds(new Set())}>إلغاء التحديد</button>
+              {selectedIds.size > 0 && onlyFrozen && (
+                <button type="button" className="btn-xs btn-primary" onClick={unfreezeSelected}>
+                  <Snowflake size={12} /> فكّ تجميد المحدد
+                </button>
+              )}
+              {selectedIds.size > 0 && !onlyFrozen && (
+                <button type="button" className="btn-xs btn-primary" onClick={freezeSelected}>
+                  <Snowflake size={12} /> تجميد المحدد
+                </button>
+              )}
+              {selectedIds.size > 0 && (
+                <button type="button" className="btn-xs" onClick={() => setSelectedIds(new Set())}>إلغاء التحديد</button>
+              )}
             </div>
           </div>
         )}
