@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Database, HardDrive, Activity, FileText, RefreshCw, AlertTriangle, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCloudUsage, LIMITS, pct, severity, formatBytes } from "@/hooks/useCloudUsage";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 const sevColor: Record<string, string> = {
   ok:   "hsl(142 71% 45%)",
@@ -73,9 +74,9 @@ export default function CloudUsagePage() {
   // Filter and paginate tables
   const filteredTables = useMemo(() => {
     if (!data) return [];
-    const query = tableSearch.trim().toLowerCase();
+    const query = tableSearch.trim();
     if (!query) return data.tables;
-    return data.tables.filter(t => t.table_name.toLowerCase().includes(query));
+    return data.tables.filter(t => startsWithMatch(t.table_name, query));
   }, [data, tableSearch]);
 
   const totalTablePages = useMemo(() => Math.max(1, Math.ceil(filteredTables.length / TABLE_PAGE_SIZE)), [filteredTables.length]);

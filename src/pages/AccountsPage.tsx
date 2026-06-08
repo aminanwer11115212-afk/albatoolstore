@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useAccounts } from "@/hooks/useData";
 import { toast } from "sonner";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function AccountsPage() {
   const [showForm, setShowForm] = useState(false);
@@ -12,7 +13,7 @@ export default function AccountsPage() {
   const [perPage, setPerPage] = useState(10);
   const { data: accounts, isLoading, insert, update, remove } = useAccounts();
 
-  const filtered = (accounts || []).filter((a: any) => !search || a.name?.includes(search) || a.account_number?.includes(search));
+  const filtered = (accounts || []).filter((a: any) => !search || startsWithAny([a.name, a.account_number], search));
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 

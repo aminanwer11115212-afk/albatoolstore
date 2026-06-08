@@ -4,6 +4,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import { Loader2, RefreshCw, AlertTriangle, AlertCircle, Info, CheckCircle2, EyeOff, Search } from "lucide-react";
 import { Link } from "react-router-dom";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 type Anomaly = {
   id: string;
@@ -159,8 +160,7 @@ export default function DataHealthPage() {
       .filter(
         (a) =>
           !search ||
-          a.description.toLowerCase().includes(search.toLowerCase()) ||
-          (a.record_label || "").toLowerCase().includes(search.toLowerCase()),
+          startsWithAny([a.description, a.record_label], search),
       )
       .sort((a, b) => {
         const s = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];

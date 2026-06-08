@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { startsWithMatch } from "@/utils/searchMatch";
 
 interface Option {
   id: string;
@@ -42,19 +43,8 @@ export default function SearchableSelect({
 
   const selectedOption = options.find((o) => o.id === value);
 
-  // Normalise Arabic text for matching
-  const normalize = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/[\u064B-\u065F\u0670]/g, "")
-      .replace(/[إأآا]/g, "ا")
-      .replace(/ى/g, "ي")
-      .replace(/ة/g, "ه")
-      .replace(/\s+/g, " ")
-      .trim();
-
   const filtered = search.trim()
-    ? options.filter((o) => normalize(o.name).includes(normalize(search)))
+    ? options.filter((o) => startsWithMatch(o.name, search))
     : options;
 
   // Close on click outside

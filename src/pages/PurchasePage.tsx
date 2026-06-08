@@ -8,6 +8,7 @@ import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { receiveStockForPurchaseOnce } from "@/utils/stockReceive";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },
@@ -147,7 +148,7 @@ export default function PurchasePage() {
     if (statusFilter !== "all" && (o.status || "pending") !== statusFilter) return false;
     if (supplierSearch.trim()) {
       const sName = supplierMap.get(o.supplier_id)?.name || "";
-      if (!sName.toLowerCase().includes(supplierSearch.trim().toLowerCase())) return false;
+      if (!startsWithMatch(sName, supplierSearch)) return false;
     }
     if (dateFrom && (o.date || "") < dateFrom) return false;
     if (dateTo && (o.date || "") > dateTo) return false;
@@ -156,11 +157,7 @@ export default function PurchasePage() {
       if (Number(o.total || 0) < min) return false;
     }
     if (!search) return true;
-    const s = search.toLowerCase();
-    return (
-      o.order_number?.toLowerCase().includes(s) ||
-      (supplierMap.get(o.supplier_id)?.name || "").toLowerCase().includes(s)
-    );
+    return startsWithAny([o.order_number, supplierMap.get(o.supplier_id)?.name], search);
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const start = (page - 1) * perPage;

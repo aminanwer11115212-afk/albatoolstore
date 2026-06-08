@@ -4,6 +4,7 @@ import { useSuppliers } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SupplierDetailView from "@/components/SupplierDetailView";
+import { startsWithAny } from "@/utils/searchMatch";
 
 const emptyForm = { name: "", phone: "", email: "", address: "", company: "", notes: "", balance: "" };
 
@@ -17,7 +18,9 @@ export default function SuppliersPage() {
   const [perPage, setPerPage] = useState(10);
   const { data: suppliers, isLoading, insert, update, remove } = useSuppliers();
 
-  const filtered = (suppliers || []).filter((s: any) => s.name?.includes(search) || s.phone?.includes(search) || s.company?.includes(search) || s.email?.includes(search));
+  const filtered = (suppliers || []).filter((s: any) =>
+    !search.trim() || startsWithAny([s.name, s.phone, s.company, s.email], search),
+  );
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 

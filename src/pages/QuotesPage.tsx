@@ -3,6 +3,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useQuotes, useCompanySettings } from "@/hooks/useData";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
@@ -113,8 +114,7 @@ export default function QuotesPage() {
   const filtered = useMemo(() => (quotes || []).filter((q: any) => {
     if (statusFilter !== "all" && (q.status || "draft") !== statusFilter) return false;
     if (customerSearch.trim()) {
-      const cs = customerSearch.trim().toLowerCase();
-      if (!(q.customers?.name || "").toLowerCase().includes(cs)) return false;
+      if (!startsWithMatch(q.customers?.name, customerSearch)) return false;
     }
     if (dateFrom && (q.date || "") < dateFrom) return false;
     if (dateTo && (q.date || "") > dateTo) return false;
@@ -123,11 +123,7 @@ export default function QuotesPage() {
       if (Number(q.total || 0) < min) return false;
     }
     if (!search) return true;
-    const s = search.toLowerCase();
-    return (
-      q.quote_number?.toLowerCase().includes(s) ||
-      q.customers?.name?.toLowerCase().includes(s)
-    );
+    return startsWithAny([q.quote_number, q.customers?.name], search);
   }), [quotes, statusFilter, customerSearch, dateFrom, dateTo, minAmount, search]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const start = (page - 1) * perPage;

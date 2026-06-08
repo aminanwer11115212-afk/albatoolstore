@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
+import { startsWithMatch } from "@/utils/searchMatch";
 
 interface Props {
   parentTable: "invoice_packaging" | "quotes_packaging";
@@ -215,7 +216,7 @@ export default function PackagingItemsManager({
               <Command
                 filter={(value, search) => {
                   if (!search) return 1;
-                  return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+                  return startsWithMatch(value, search) ? 1 : 0;
                 }}
               >
                 <CommandInput placeholder="ابحث عن منتج..." autoFocus />

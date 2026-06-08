@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useCompanySettings } from "@/hooks/useData";
 import { Search, X, Printer } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function CustomerStatementPage() {
   const { data: customers } = useCustomers();
@@ -22,10 +23,10 @@ export default function CustomerStatementPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const matches = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return (customers || []).slice(0, 10);
     return (customers || []).filter((c: any) =>
-      c.name?.toLowerCase().includes(q) || (c.phone || "").includes(q)
+      startsWithAny([c.name, c.phone], q)
     ).slice(0, 10);
   }, [search, customers]);
 

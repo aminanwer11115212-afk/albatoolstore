@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { parseMessage, type ParsedLine, type ProductLike } from "@/hooks/useMessageImport";
 import { useDialogSize } from "@/hooks/useDialogSize";
+import { startsWithMatch } from "@/utils/searchMatch";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const IcoCheck = () => (
@@ -137,9 +138,9 @@ export default function MessageImportDialog({ open, onClose, products, warehouse
   }, [parsed, focusedRow, deleteRow]);
 
   const altMatches = useCallback((idx: number) => {
-    const q = (altSearch[idx] || "").trim().toLowerCase();
+    const q = (altSearch[idx] || "").trim();
     if (!q) return [];
-    return products.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 8);
+    return products.filter((p) => startsWithMatch(p.name, q)).slice(0, 8);
   }, [altSearch, products]);
 
   const matchedCount = useMemo(

@@ -5,6 +5,7 @@ import { useStockReturns, useCompanySettings } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },
@@ -51,8 +52,7 @@ export default function StockReturnPage() {
   const filtered = (returns || []).filter((r: any) => {
     if (statusFilter !== "all" && (r.status || "pending") !== statusFilter) return false;
     if (customerSearch.trim()) {
-      const cs = customerSearch.trim().toLowerCase();
-      if (!(r.customers?.name || "").toLowerCase().includes(cs)) return false;
+      if (!startsWithMatch(r.customers?.name, customerSearch)) return false;
     }
     if (dateFrom && (r.date || "") < dateFrom) return false;
     if (dateTo && (r.date || "") > dateTo) return false;
@@ -61,12 +61,7 @@ export default function StockReturnPage() {
       if (Number(r.total || 0) < min) return false;
     }
     if (!search) return true;
-    const s = search.toLowerCase();
-    return (
-      r.return_number?.toLowerCase().includes(s) ||
-      r.customers?.name?.toLowerCase().includes(s) ||
-      (r.reason || "").toLowerCase().includes(s)
-    );
+    return startsWithAny([r.return_number, r.customers?.name, r.reason], search);
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const start = (page - 1) * perPage;

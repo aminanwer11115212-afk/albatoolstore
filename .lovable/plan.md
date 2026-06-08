@@ -1,56 +1,89 @@
+# خطة: توحيد سلوك البحث في كل النظام على "يبدأ بـ"
+
 ## الهدف
-تحسين صفحة إدارة المنتجات: إضافة سريعة للماركة من الجدول، تأكيد وحذف من النظام بزر ✕ في (الفئة، الماركة، المستودع، المورد)، فلتر المجمدة مع إجراءات جماعية، ثم فحص شامل.
+عند كتابة حرف/كلمة في **أي خانة بحث في النظام**، يجب أن تظهر فقط النتائج التي **تبدأ** بهذا الحرف/الكلمة (startsWith) — في الاسم أو رقم المستند أو SKU أو الهاتف أو اسم العميل/المورّد. لا تطابق في وسط الكلمة (لا includes).
 
----
+سلوك إضافي مهم لكي يبقى البحث طبيعياً بالعربية:
+- تطبيع عربي قبل المطابقة: إزالة التشكيل، توحيد (أ/إ/آ → ا)، (ى → ي)، (ة → ه)، تحويل لأحرف صغيرة، تقليص الفراغات.
+- **مطابقة على بداية أي كلمة** داخل الحقل (token startsWith) — مثلاً كتابة "اور" تُظهر "بسكويت اوريو" لأن كلمة "اوريو" تبدأ بـ"اور". هذا يحافظ على راحة الاستخدام مع التزام قاعدة "يبدأ بـ".
+- بحث فارغ ⇒ يرجع كل العناصر (أو لا اقتراحات في حالة قوائم الإكمال التلقائي).
+- إزالة التكرار عبر id حيث يلزم (لقوائم اقتراح المنتجات).
 
-## دفعة 1 — إضافة الماركة السريعة + توحيد سلوك ✕ في الجدول
+## المخرَجات
 
-العمل في `src/pages/ProductsPage.tsx` (خانات الجدول فقط، بدون لمس صفحات أخرى):
+### 1) أداة موحَّدة جديدة
+ملف جديد: `src/utils/searchMatch.ts` يحتوي:
+- `normalizeAr(s)` — التطبيع العربي/الإنجليزي.
+- `startsWithMatch(haystack, query)` — true إذا أي كلمة في haystack تبدأ بـ query (بعد التطبيع).
+- `startsWithAny(fields[], query)` — تطبيقها على عدة حقول.
+- `filterByStartsWith(items, getFields, query)` — مساعد لقوائم.
 
-1. **عمود الماركة في الجدول** — إضافة `onAdd={createCompanyInline}` و `addLabel="إضافة ماركة"` بحيث لو كتبت اسمًا غير موجود يظهر "+ إضافة ماركة: …" (نفس آلية الفئة).
-2. **توحيد سلوك زر ✕** في خانات الجدول لـ (الفئة، الماركة، المستودع، المورد): الضغط على ✕ بجانب عنصر في القائمة المنسدلة → نافذة تأكيد عربية واضحة → حذف العنصر **من النظام كاملًا** (وليس فقط فكّ الربط بالمنتج).
-   - الفئة → استخدام `deleteCategoryFromSystem` (موجودة).
-   - الماركة → استخدام `deleteBrandFromSystem` (موجودة).
-   - المستودع → دالة جديدة `deleteWarehouseFromSystem` تتحقق من عدم استخدامه في أي منتج/فاتورة/تحويل، ثم تحذف من جدول `warehouses`.
-   - المورد → دالة جديدة `deleteSupplierFromSystem` تتحقق من عدم استخدامه في أي منتج/فاتورة شراء، ثم تحذف من جدول `suppliers`.
-3. **رسائل تأكيد عربية موحّدة** عبر خاصية `deleteConfirm` في `InlineSearchSelect`، مثل: «هل تريد حذف الفئة "كذا" من النظام نهائيًا؟».
-4. **حماية**: إذا كان العنصر مستخدمًا في أي مكان، تظهر رسالة عربية واضحة بأسماء المنتجات/الوثائق المرتبطة ولا يُحذف.
+### 2) تحديث `src/utils/productMatches.ts`
+استبدال `includes` بـ `startsWithAny` على `name` و `sku` مع الحفاظ على فلتر المخزن وإزالة التكرار وحد الـ 10.
 
-ملاحظة: الفعل "إزالة من هذا المنتج فقط" (الذي كان يفعله ✕ سابقًا) يبقى متاحًا في **شارات** الفئات/الماركات داخل نموذج إضافة/تعديل المنتج (الشارات الصغيرة مع X)، أما ✕ في القائمة المنسدلة للجدول → حذف من النظام.
+### 3) تحديث مكوّنات البحث المشتركة
+- `src/components/InlineSearchSelect.tsx` — تبديل `includes` بـ `startsWithMatch`.
+- `src/components/transport/SearchableSelect.tsx` — يستخدم حالياً `includes` بعد تطبيع؛ سيتحوّل لـ `startsWithMatch` (مع الإبقاء على نفس التطبيع).
+- `src/components/MessageImportDialog.tsx` — بحث المنتجات.
+- `src/components/packaging/PackagingItemsManager.tsx` و `src/components/transport/TransportItemsManager.tsx` — دالة `filter` في `<Command>`.
+- `src/components/customers/GeoStructurePanel.tsx`.
+- `src/components/dashboard/ChargeBalanceDialog.tsx` — بحث العملاء.
+- `src/components/SupplierDetailView.tsx` — فلترة "دفع/سداد" تبقى كما هي (ليست خانة بحث مستخدم).
 
----
+### 4) تحديث صفحات القوائم/الجداول (شريط البحث العلوي)
+في كل الصفحات أدناه: استبدال كل استخدامات `(...).toLowerCase().includes(s)` على حقول البحث (الاسم/الرقم/الهاتف/الفئة/الحالة/وصف…) بـ `startsWithMatch` عبر الأداة الموحَّدة:
 
-## دفعة 2 — فلتر "المجمدة فقط" + إجراءات جماعية
+- `src/pages/InvoicesPage.tsx`
+- `src/pages/QuotesPage.tsx`
+- `src/pages/SideQuotesPage.tsx`
+- `src/pages/CustomersPage.tsx` (شريط البحث + فلاتر الأعمدة بقائمة الخيارات)
+- `src/pages/SuppliersPage.tsx`
+- `src/pages/ProductsPage.tsx` (فلاتر العمود `name`/`sku` + فلتر الخيارات المنسدلة)
+- `src/pages/ProductCompaniesPage.tsx`
+- `src/pages/PurchasePage.tsx`
+- `src/pages/PackagingTypesPage.tsx`
+- `src/pages/StockTransferPage.tsx`
+- `src/pages/StockReturnPage.tsx`
+- `src/pages/TransactionsPage.tsx`
+- `src/pages/FilteredTransactionsPage.tsx`
+- `src/pages/AccountsPage.tsx`
+- `src/pages/AccountStatementPage.tsx`
+- `src/pages/CustomerStatementPage.tsx`
+- `src/pages/BankTransfersReportPage.tsx`
+- `src/pages/DailyInvoicesReportPage.tsx`
+- `src/pages/ActivityLogPage.tsx`
+- `src/pages/DataHealthPage.tsx`
+- `src/pages/NotificationsPage.tsx`
+- `src/pages/CloudUsagePage.tsx`
+- `src/pages/ProjectsPage.tsx`
+- `src/pages/DispatchPage.tsx`
+- `src/pages/InvoicePackagingPage.tsx`، `src/pages/InvoiceTransportPage.tsx`، `src/pages/QuotePackagingPage.tsx`
+- `src/pages/EmployeesPage.tsx`
+- `src/pages/staff/StaffListPage.tsx`, `StaffCustomersPage.tsx`, `StaffMyRecordsPage.tsx`
 
-العمل في `src/pages/ProductsPage.tsx` فقط:
+### 5) تحديث شاشات الإنشاء (منتقي العميل/المورّد/المنتج)
+- `src/pages/InvoiceCreatePage.tsx`
+- `src/pages/QuoteCreatePage.tsx`
+- `src/pages/PurchaseCreatePage.tsx`
+- `src/pages/StockReturnCreatePage.tsx`
 
-1. **وضع جديد للفلتر** بثلاث حالات بدل خانة الاختيار الحالية:
-   - "إخفاء المجمدة" (افتراضي)
-   - "إظهار الكل"
-   - "المجمدة فقط"
-2. عند تفعيل **"المجمدة فقط"**:
-   - يظهر شريط إجراءات أعلى الجدول: «تحديد الكل» — «فكّ تجميد المحددة» — «تجميد المحددة» — «إلغاء التحديد».
-   - يظهر عمود اختيار (checkbox) في أول الجدول لكل صف.
-   - زر «تحديد الكل» يحدد كل الصفوف الظاهرة (مع مراعاة الترقيم).
-   - زر «فكّ تجميد المحددة» يستدعي `setFrozenOptimistic(selectedIds, false)` دفعة واحدة ثم يفرّغ التحديد.
-3. الزر الحالي «تجميد الصنف» (checkbox في كل صف) يبقى كما هو لتجميد/فكّ صنف واحد.
+كلها لمنتقي العميل/المورد (بحث اسم/هاتف) ومنتقي المنتج وفلتر الصفوف داخل الجدول.
 
----
+### 6) شريط البحث العام في الـ Navbar/Sidebar
+- `src/components/layout/AppNavbar.tsx` و `AppSidebar.tsx` — إن وُجد فيهما منطق فلترة محلي، يُحوَّل لـ startsWith.
 
-## دفعة 3 — فحص شامل لصفحة إدارة المنتجات
+### 7) الاختبارات
+- تحديث `src/test/productSearchFilter.test.ts` و `src/test/productSearchLiveDedup.test.ts` لتوافق قاعدة "يبدأ بـ" مع تطبيع عربي.
+- إضافة `src/test/searchMatch.test.ts` يغطّي: التطبيع، startsWith على بداية الكلمة، بحث فارغ، تعدّد الحقول، حساسية الأحرف، علامات الترقيم العربية.
 
-مراجعة سريعة وإصلاح أي مشاكل أرصدها أثناء التطوير، تشمل:
-- التأكد من تحديث الكاش بعد كل من: إضافة ماركة سريعة، حذف فئة/ماركة/مستودع/مورد من النظام، إجراءات التجميد الجماعية.
-- التأكد من إعادة احتساب الترقيم (pagination) عند تغيّر عدد المنتجات الظاهرة.
-- التأكد من عمل البحث، الفلاتر، والأعمدة على الموبايل (RTL + الخط Cairo + حدود اللمس).
-- إصلاح أي تحذيرات console تظهر أثناء الاستخدام الفعلي.
-- فحص سريع لتدفّق «حفظ المنتج» (مع الفئات/الماركات المتعددة) للتأكد من عدم وجود تراجع.
+## ملاحظات مهمّة
+- لن نمسّ منطق الأعمال (لا تغييرات على قواعد البيانات/الاستعلامات/الـ RLS). كل التغيير في طبقة الفلترة على الواجهة.
+- نحافظ على كل خيارات الفلاتر الأخرى (الحالة، التاريخ، المخزن، التجميد، …) كما هي.
+- نحافظ على إزالة التكرار وحدود النتائج الحالية (10 اقتراحات للمنتجات، 8 للعملاء…).
+- التنفيذ على دفعات لضمان الجودة:
+  - **الدفعة 1**: الأداة الموحَّدة + `productMatches` + المكوّنات المشتركة (InlineSearchSelect/SearchableSelect/Command filters) + اختبارات الأداة.
+  - **الدفعة 2**: شاشات الإنشاء الأربع (Invoice/Quote/Purchase/StockReturn).
+  - **الدفعة 3**: صفحات القوائم (الفواتير، عروض الأسعار، العملاء، الموردين، المنتجات، المشتريات، …).
+  - **الدفعة 4**: باقي الصفحات (التقارير، الإشعارات، النشاطات، المخزون، الموظفين، Staff*) + شريط Navbar/Sidebar + تشغيل الاختبارات وفحص شامل.
 
----
-
-## التفاصيل التقنية
-- لا تغييرات في قاعدة البيانات؛ كل الحذف يعتمد على صلاحيات `authenticated` على الجداول الموجودة (`warehouses`, `suppliers`, `product_categories`, `product_companies`).
-- لا لمس لصفحات أخرى أو لمكوّن `InlineSearchSelect` إلا بتمرير `deleteConfirm`/`onAdd` المناسبين من جدول المنتجات.
-- كل دفعة قابلة للنشر مستقلة عن التالية.
-
-أبدأ بالدفعة الأولى عند موافقتك.
+هل أبدأ بالدفعة 1؟

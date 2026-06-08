@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDialogSize } from "@/hooks/useDialogSize";
+import { startsWithAny } from "@/utils/searchMatch";
 
 type Customer = { id: string; name: string; phone: string | null; balance: number | null };
 type Account = { id: string; name: string; bank_name: string | null; account_type: string | null };
@@ -199,11 +200,9 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
               {showCustomerSugg && customerSearch.trim() && (
                 <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
                   {(() => {
-                    const q = customerSearch.trim().toLowerCase();
-                    const matches = customers.filter(
-                      (c) =>
-                        (c.name || "").toLowerCase().includes(q) ||
-                        (c.phone || "").toLowerCase().includes(q),
+                    const q = customerSearch.trim();
+                    const matches = customers.filter((c) =>
+                      startsWithAny([c.name, c.phone], q),
                     ).slice(0, 50);
                     if (matches.length === 0) {
                       return <div className="px-3 py-2 text-sm text-muted-foreground">لا توجد نتائج</div>;

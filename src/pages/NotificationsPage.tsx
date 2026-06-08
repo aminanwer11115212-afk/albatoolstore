@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Bell, AlertTriangle, FileText, Wallet, Activity, Search, RefreshCw, Pin, EyeOff, RotateCcw } from "lucide-react";
 import { useUserScopedLegacyKey } from "@/lib/userScopedKey";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 
 type Severity = "out" | "low";
@@ -364,11 +365,11 @@ export default function NotificationsPage() {
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     const now = Date.now();
     const list = items.filter(n => {
       if (kindFilter !== "all" && n.kind !== kindFilter) return false;
-      if (q && !(n.title.toLowerCase().includes(q) || n.desc.toLowerCase().includes(q))) return false;
+      if (q && !startsWithAny([n.title, n.desc], q)) return false;
       if (n.kind === "stock") {
         const until = snoozed[stockKey(n)];
         if (until && until > now) return false;

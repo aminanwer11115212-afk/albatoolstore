@@ -7,6 +7,7 @@ import { useProducts } from "@/hooks/useData";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { startsWithMatch } from "@/utils/searchMatch";
 
 interface Props {
   itemsTable: "invoices_transports_items";
@@ -181,7 +182,7 @@ export default function TransportItemsManager({
               </button>
             </PopoverTrigger>
             <PopoverContent className="p-0 w-[320px]" align="start" dir="rtl">
-              <Command filter={(value, search) => !search ? 1 : value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
+              <Command filter={(value, search) => !search ? 1 : startsWithMatch(value, search) ? 1 : 0}>
                 <CommandInput placeholder="ابحث عن منتج..." autoFocus />
                 <CommandList>
                   <CommandEmpty>لا توجد منتجات</CommandEmpty>

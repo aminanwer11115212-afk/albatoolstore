@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 const ACTION_LABELS: Record<string, string> = { INSERT: "إضافة", UPDATE: "تعديل", DELETE: "حذف" };
 const ACTION_CLS: Record<string, string> = { INSERT: "st-paid", UPDATE: "st-sent", DELETE: "st-due" };
@@ -33,7 +34,7 @@ export default function ActivityLogPage() {
 
   useEffect(() => { load();   }, [filterTable, filterAction, limit]);
 
-  const filtered = logs.filter((l) => !search.trim() || JSON.stringify(l.new_data || l.old_data || {}).toLowerCase().includes(search.toLowerCase()));
+  const filtered = logs.filter((l) => !search.trim() || startsWithMatch(JSON.stringify(l.new_data || l.old_data || {}), search));
 
   return (
     <article className="content">

@@ -3,6 +3,7 @@ import { Plus, Search, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function StaffCustomersPage() {
   const { permissions } = useUserRole();
@@ -24,10 +25,8 @@ export default function StaffCustomersPage() {
 
   const filtered = useMemo(() => {
     if (!q.trim()) return rows;
-    const s = q.trim().toLowerCase();
     return rows.filter(r =>
-      String(r.name || "").toLowerCase().includes(s) ||
-      String(r.phone || "").toLowerCase().includes(s)
+      startsWithAny([r.name, r.phone], q)
     );
   }, [rows, q]);
 

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DollarSign } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 interface FilteredTransactionsPageProps {
   type: "income" | "expense";
@@ -33,10 +34,7 @@ export default function FilteredTransactionsPage({ type }: FilteredTransactionsP
     if (dateFrom && t.date < dateFrom) return false;
     if (dateTo && t.date > dateTo) return false;
     if (search) {
-      const s = search.toLowerCase();
-      if (!(t.description?.toLowerCase().includes(s) ||
-            t.category?.toLowerCase().includes(s) ||
-            t.accounts?.name?.toLowerCase().includes(s))) return false;
+      if (!startsWithAny([t.description, t.category, t.accounts?.name], search)) return false;
     }
     return true;
   });

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ZoomControls from "@/components/ZoomControls";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 function useProductCompanies() {
   const queryClient = useQueryClient();
@@ -75,7 +76,7 @@ export default function ProductCompaniesPage() {
   const { data: stats } = useProductCompanyStats();
 
   const filtered = (companies || []).filter((c: any) =>
-    !search.trim() || c.name.toLowerCase().includes(search.toLowerCase())
+    !search.trim() || startsWithMatch(c.name, search),
   );
 
   const handleSubmit = async () => {

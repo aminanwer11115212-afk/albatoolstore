@@ -3,6 +3,7 @@ import { useInvoicesWithCustomers } from "@/hooks/useData";
 import { Search, ChevronLeft, ChevronRight, Eye, FileText } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function DailyInvoicesReportPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -13,7 +14,7 @@ export default function DailyInvoicesReportPage() {
 
   const filtered = (invoices || []).filter((inv: any) => {
     const matchDate = inv.date === date;
-    const matchSearch = !search || inv.invoice_number?.includes(search) || (inv.customers as any)?.name?.includes(search);
+    const matchSearch = !search || startsWithAny([inv.invoice_number, (inv.customers as any)?.name], search);
     return matchDate && matchSearch;
   });
 

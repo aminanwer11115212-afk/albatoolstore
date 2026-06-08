@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { startsWithMatch, normalizeAr } from "@/utils/searchMatch";
 
 export type InlineOption = { value: string; label: string };
 
@@ -47,8 +48,8 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
 
   const selectedLabel = options.find(o => o.value === value)?.label || "";
   const q = query.trim().toLowerCase();
-  const filtered = q ? options.filter(o => o.label.toLowerCase().includes(q)) : options;
-  const exact = options.some(o => o.label.trim().toLowerCase() === q);
+  const filtered = q ? options.filter(o => startsWithMatch(o.label, q)) : options;
+  const exact = options.some(o => normalizeAr(o.label) === normalizeAr(q));
   const canAdd = !!onAdd && q.length > 0 && !exact;
   const totalItems = (canAdd ? 1 : 0) + filtered.length;
 

@@ -5,6 +5,7 @@ import { useProducts, useWarehouses, useStockTransfers } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 function useStockTransfersWithDetails() {
   return useQuery({
@@ -39,7 +40,7 @@ export default function StockTransferPage() {
   const { insert } = useStockTransfers();
 
   const filtered = (transfers || []).filter((t: any) =>
-    !search.trim() || t.product_name.toLowerCase().includes(search.toLowerCase())
+    !search.trim() || startsWithMatch(t.product_name, search),
   );
 
   const handleSubmit = async () => {
