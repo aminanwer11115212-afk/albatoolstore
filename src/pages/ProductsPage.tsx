@@ -1604,21 +1604,37 @@ export default function ProductsPage() {
           .products-grid tr:hover > td { background: hsl(var(--primary) / 0.06) !important; }
         `}</style>
 
-        {isAllProducts && selectedIds.size > 0 && (
+        {isAllProducts && (selectedIds.size > 0 || onlyFrozen) && (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
             padding: "6px 10px", marginBottom: 6, borderRadius: 6,
             background: "hsl(var(--primary) / 0.10)", border: "1px solid hsl(var(--primary) / 0.35)",
-            fontSize: 12,
+            fontSize: 12, flexWrap: "wrap",
           }}>
             <span style={{ color: "hsl(var(--primary))", fontWeight: 600 }}>
-              تم تحديد {selectedIds.size} منتج — اضغط <kbd style={{ padding: "1px 6px", background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>Shift</kbd>+<kbd style={{ padding: "1px 6px", background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>Enter</kbd> للتجميد
+              {selectedIds.size > 0 ? (
+                <>تم تحديد {selectedIds.size} منتج {!onlyFrozen && <>— اضغط <kbd style={{ padding: "1px 6px", background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>Shift</kbd>+<kbd style={{ padding: "1px 6px", background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>Enter</kbd> للتجميد</>}</>
+              ) : (
+                <>وضع المجمّدة فقط — يمكنك تحديد منتجات لفكّ تجميدها</>
+              )}
             </span>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button type="button" className="btn-xs btn-primary" onClick={freezeSelected}>
-                <Snowflake size={12} /> تجميد المحدد
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button type="button" className="btn-xs" onClick={selectAllVisible} title="تحديد كل المنتجات المعروضة في الصفحة">
+                تحديد كل المعروض
               </button>
-              <button type="button" className="btn-xs" onClick={() => setSelectedIds(new Set())}>إلغاء التحديد</button>
+              {selectedIds.size > 0 && onlyFrozen && (
+                <button type="button" className="btn-xs btn-primary" onClick={unfreezeSelected}>
+                  <Snowflake size={12} /> فكّ تجميد المحدد
+                </button>
+              )}
+              {selectedIds.size > 0 && !onlyFrozen && (
+                <button type="button" className="btn-xs btn-primary" onClick={freezeSelected}>
+                  <Snowflake size={12} /> تجميد المحدد
+                </button>
+              )}
+              {selectedIds.size > 0 && (
+                <button type="button" className="btn-xs" onClick={() => setSelectedIds(new Set())}>إلغاء التحديد</button>
+              )}
             </div>
           </div>
         )}
