@@ -11,7 +11,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanySettings, useCustomers } from "@/hooks/useData";
 import { toast } from "sonner";
-import { Truck, Printer, RefreshCw, Search, Users, Calendar, X, CheckSquare, Square } from "lucide-react";
+import { Truck, Printer, RefreshCw, Search, Users, Calendar, X, CheckSquare, Square, PackageCheck } from "lucide-react";
+import ReadyToShipPanel from "@/components/dispatch/ReadyToShipPanel";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
 const fmtDateAr = (d?: string) => {
