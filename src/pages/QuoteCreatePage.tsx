@@ -43,6 +43,8 @@ import FreePositionToolbar from "@/components/toolbar/FreePositionToolbar";
 import SummaryChip from "@/components/toolbar/SummaryChip";
 import { ToolbarCustomizationProvider } from "@/components/toolbar/ToolbarCustomizationContext";
 import { productMatches as sharedProductMatches } from "@/utils/productMatches";
+import { normalizeAr } from "@/utils/arabicNormalize";
+import { getAvailableStock } from "@/utils/availableStock";
 import MessageImportDialog, { MessageImportButton } from "@/components/MessageImportDialog";
 import type { ParsedLine } from "@/hooks/useMessageImport";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
