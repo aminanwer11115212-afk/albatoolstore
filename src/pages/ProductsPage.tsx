@@ -2115,6 +2115,7 @@ export default function ProductsPage() {
                           onAdd={createWarehouseInline}
                           onDelete={(opt) => deleteWarehouseFromSystem(opt.value)}
                           deleteConfirm={(opt) => `هل تريد حذف المستودع "${opt.label}" من النظام نهائيًا؟`}
+                          showDeleteButton
                           placeholder="—" addLabel="إضافة مستودع"
                         />
 
