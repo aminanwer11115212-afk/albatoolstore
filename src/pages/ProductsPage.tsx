@@ -2159,7 +2159,8 @@ export default function ProductsPage() {
                           options={(suppliers || []).map((s: any) => ({ value: s.id, label: s.name }))}
                           onChange={(v) => updateField(p.id, "supplier_id", v || null)}
                           onAdd={createSupplierInline}
-                          onDelete={() => deleteProductSupplier(p.id)}
+                          onDelete={(opt) => deleteSupplierFromSystem(opt.value)}
+                          deleteConfirm={(opt) => `هل تريد حذف المورد "${opt.label}" من النظام نهائيًا؟`}
                           placeholder="—" addLabel="إضافة مورد"
                         />
                       </td>
