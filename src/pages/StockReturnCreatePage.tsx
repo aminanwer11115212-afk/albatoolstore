@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { fetchAllCustomers } from "@/lib/fetchAllCustomers";
 import { toast } from "sonner";
 import { applyStockDeltaForLines } from "@/utils/stockDeduction";
 import { Plus, Edit, Printer, StickyNote } from "lucide-react";

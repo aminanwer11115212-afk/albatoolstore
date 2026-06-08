@@ -3,6 +3,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { fetchAllCustomers } from "@/lib/fetchAllCustomers";
 import { toast } from "sonner";
 import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, Share2, FileText, StickyNote, Package, Truck } from "lucide-react";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";

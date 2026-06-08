@@ -4,6 +4,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { fetchAllCustomers } from "@/lib/fetchAllCustomers";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Plus, Edit, Printer, MessageCircle, Share2, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet } from "lucide-react";
