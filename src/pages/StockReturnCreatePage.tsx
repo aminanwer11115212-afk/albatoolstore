@@ -316,7 +316,7 @@ export default function StockReturnCreatePage() {
     (async () => {
       const [cs, ps, cfg, wh] = await Promise.all([
         fetchAllCustomers<Customer>("id,name,phone,balance,company", { column: "name" }).then((data) => ({ data })),
-        fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id").then((ps) => (ps as any[]).filter((x:any)=>!x.is_frozen)),
+        fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
         supabase.from("company_settings").select("currency,return_prefix").maybeSingle(),
         supabase.from("warehouses").select("id,name").order("name"),
       ]);
