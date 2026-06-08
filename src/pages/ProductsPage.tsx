@@ -571,6 +571,54 @@ export default function ProductsPage() {
     } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
   };
 
+  // حذف مستودع من النظام كلياً إن لم يكن مستخدماً
+  const deleteWarehouseFromSystem = async (warehouseId: string): Promise<boolean> => {
+    try {
+      const { data: used, error: uerr } = await (supabase as any)
+        .from("products").select("id, name").eq("warehouse_id", warehouseId).limit(20);
+      if (uerr) throw uerr;
+      if ((used || []).length > 0) {
+        const names = (used || []).map((p: any) => p.name);
+        toast.error(`لا يمكن حذف المستودع، مستخدم في: ${formatUsageList(names)}`);
+        return false;
+      }
+      const { error: derr } = await (supabase as any).from("warehouses").delete().eq("id", warehouseId);
+      if (derr) throw derr;
+      queryClient.invalidateQueries({ queryKey: ["warehouses"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      toast.success("تم حذف المستودع");
+      return true;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+  // حذف مورد من النظام كلياً إن لم يكن مستخدماً
+  const deleteSupplierFromSystem = async (supplierId: string): Promise<boolean> => {
+    try {
+      const { data: usedP, error: uerr } = await (supabase as any)
+        .from("products").select("id, name").eq("supplier_id", supplierId).limit(20);
+      if (uerr) throw uerr;
+      const { data: usedPO, error: poerr } = await (supabase as any)
+        .from("purchase_orders").select("id").eq("supplier_id", supplierId).limit(1);
+      if (poerr) throw poerr;
+      if ((usedP || []).length > 0) {
+        const names = (usedP || []).map((p: any) => p.name);
+        toast.error(`لا يمكن حذف المورد، مستخدم في منتجات: ${formatUsageList(names)}`);
+        return false;
+      }
+      if ((usedPO || []).length > 0) {
+        toast.error("لا يمكن حذف المورد، يوجد فواتير شراء مرتبطة به");
+        return false;
+      }
+      const { error: derr } = await (supabase as any).from("suppliers").delete().eq("id", supplierId);
+      if (derr) throw derr;
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      toast.success("تم حذف المورد");
+      return true;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+
   const handleSubmit = async () => {
     if (!form.name) { toast.error("اسم المنتج مطلوب"); return; }
     // أول ماركة محفوظة كـ company_id للحفاظ على التكامل الخلفي مع باقي النظام
@@ -1944,7 +1992,8 @@ export default function ProductsPage() {
                                   })();
                                 }}
                                 onAdd={createCategoryInline}
-                                onDelete={(opt) => deleteProductCategory(p.id, opt.value)}
+                                onDelete={(opt) => deleteCategoryFromSystem(opt.value)}
+                                deleteConfirm={(opt) => `هل تريد حذف الفئة "${opt.label}" من النظام نهائيًا؟`}
                                 placeholder={allNames ? "تغيير الفئة الأساسية" : "—"} addLabel="إضافة فئة"
                               />
                             </div>
@@ -1991,8 +2040,13 @@ export default function ProductsPage() {
                                     }
                                   })();
                                 }}
-                                onDelete={(opt) => deleteProductBrand(p.id, opt.value)}
-                                placeholder="—"
+                                onAdd={async (name) => {
+                                  const id = await createCompanyInline(name);
+                                  return id;
+                                }}
+                                onDelete={(opt) => deleteBrandFromSystem(opt.value)}
+                                deleteConfirm={(opt) => `هل تريد حذف الماركة "${opt.label}" من النظام نهائيًا؟`}
+                                placeholder="—" addLabel="إضافة ماركة"
                               />
                             </div>
                           );
@@ -2004,9 +2058,11 @@ export default function ProductsPage() {
                           options={(warehouses || []).map((w: any) => ({ value: w.id, label: w.name }))}
                           onChange={(v) => updateField(p.id, "warehouse_id", v || null)}
                           onAdd={createWarehouseInline}
-                          onDelete={() => deleteProductWarehouse(p.id)}
+                          onDelete={(opt) => deleteWarehouseFromSystem(opt.value)}
+                          deleteConfirm={(opt) => `هل تريد حذف المستودع "${opt.label}" من النظام نهائيًا؟`}
                           placeholder="—" addLabel="إضافة مستودع"
                         />
+
                       </td>
                       <td className="tabular-nums" style={{ padding: 0 }}>
                         <EditableCell
@@ -2103,7 +2159,8 @@ export default function ProductsPage() {
                           options={(suppliers || []).map((s: any) => ({ value: s.id, label: s.name }))}
                           onChange={(v) => updateField(p.id, "supplier_id", v || null)}
                           onAdd={createSupplierInline}
-                          onDelete={() => deleteProductSupplier(p.id)}
+                          onDelete={(opt) => deleteSupplierFromSystem(opt.value)}
+                          deleteConfirm={(opt) => `هل تريد حذف المورد "${opt.label}" من النظام نهائيًا؟`}
                           placeholder="—" addLabel="إضافة مورد"
                         />
                       </td>
