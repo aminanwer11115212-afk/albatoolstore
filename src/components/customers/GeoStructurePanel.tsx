@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ChevronRight, ChevronDown, Search, MapPin } from "lucide-react";
+import { startsWithMatch } from "@/utils/searchMatch";
 
 interface Props {
   open: boolean;
