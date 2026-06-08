@@ -97,16 +97,14 @@ export default function LoginPage() {
             </div>
             <div className="legacy-form-row">
               <label className="legacy-form-label">كلمة المرور</label>
-              <div className="legacy-form-control-wrap">
-                <input type="password" className="legacy-control" placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <div className="legacy-form-control-wrap" style={{ display: "flex", gap: 6 }}>
+                <input type={showPassword ? "text" : "password"} className="legacy-control" placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ flex: 1 }} />
+                <button type="button" onClick={() => setShowPassword((v) => !v)} className="legacy-btn" style={{ minWidth: 64 }}>
+                  {showPassword ? "إخفاء" : "إظهار"}
+                </button>
               </div>
             </div>
-            <div className="legacy-form-row">
-              <label className="legacy-form-label"></label>
-              <div className="legacy-form-control-wrap" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <label style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> تذكرني
-                </label>
+
                 <button type="button" style={{ background: "none", border: "none", color: "hsl(var(--primary))", fontSize: 13, cursor: "pointer" }}>هل نسيت كلمة المرور؟</button>
               </div>
             </div>
