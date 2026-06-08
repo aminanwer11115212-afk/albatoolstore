@@ -201,7 +201,16 @@ export function useCustomersAll() {
     staleTime: 5_000,
     refetchOnWindowFocus: true,
   });
-  // Keep the standard mutation API in sync with both caches.
+  // Sync with mutations that fire `customers:changed`.
+  if (typeof window !== "undefined") {
+    const handler = () => queryClient.invalidateQueries({ queryKey: ["customers-all"] });
+    // De-dupe by storing on window
+    const key = "__customersAllListener";
+    if (!(window as any)[key]) {
+      window.addEventListener("customers:changed", handler);
+      (window as any)[key] = true;
+    }
+  }
   const base = useTable("customers");
   return { ...query, insert: base.insert, update: base.update, remove: base.remove };
 }
