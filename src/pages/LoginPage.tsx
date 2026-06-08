@@ -105,9 +105,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-                <button type="button" style={{ background: "none", border: "none", color: "hsl(var(--primary))", fontSize: 13, cursor: "pointer" }}>هل نسيت كلمة المرور؟</button>
-              </div>
-            </div>
+
             <div className="legacy-form-row">
               <label className="legacy-form-label"></label>
               <div className="legacy-form-control-wrap">
