@@ -1171,14 +1171,21 @@ export default function ProductsPage() {
                     {s.label}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => setShowFrozen(v => !v)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition ${!showFrozen ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
-                  title="إخفاء/إظهار المنتجات المجمّدة"
-                >
-                  {showFrozen ? "إخفاء المجمّدة" : "إظهار المجمّدة"}
-                </button>
+                {([
+                  { v: "hide", label: "إخفاء المجمّدة" },
+                  { v: "all", label: "إظهار الكل" },
+                  { v: "only", label: "المجمّدة فقط" },
+                ] as { v: typeof frozenMode; label: string }[]).map(f => (
+                  <button
+                    key={f.v}
+                    type="button"
+                    onClick={() => setFrozenMode(f.v)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition ${frozenMode === f.v ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
+                    title="عرض المنتجات بحسب حالة التجميد"
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
             )}
 
