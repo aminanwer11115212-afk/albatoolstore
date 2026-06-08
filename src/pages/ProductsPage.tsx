@@ -2217,6 +2217,7 @@ export default function ProductsPage() {
                           onAdd={createSupplierInline}
                           onDelete={(opt) => deleteSupplierFromSystem(opt.value)}
                           deleteConfirm={(opt) => `هل تريد حذف المورد "${opt.label}" من النظام نهائيًا؟`}
+                          showDeleteButton
                           placeholder="—" addLabel="إضافة مورد"
                         />
                       </td>
