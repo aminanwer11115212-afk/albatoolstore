@@ -82,7 +82,7 @@ export async function convertQuoteToInvoice(
       total: quote.total,
       due_amount: quote.total,
       status: "pending",
-      workflow_status: "new",
+      workflow_status: "preparing",
       currency_code: quote.currency_code,
       exchange_rate_to_base: quote.exchange_rate_to_base,
       date: new Date().toISOString().split("T")[0],
