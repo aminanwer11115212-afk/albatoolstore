@@ -42,10 +42,29 @@ function resolveUserKey(legacyKey: string): string {
  * base value is used unchanged.
  */
 export function useQuickRowWidths(storageKey: string, length: number) {
-  // Reactive per-user key: re-resolves when auth changes.
+  // Reactive per-user × per-form-factor key.
+  const ff = useFormFactor();
   const [resolvedKey, setResolvedKey] = useState<string>(() => resolveUserKey(storageKey));
   const resolvedKeyRef = useRef(resolvedKey);
   resolvedKeyRef.current = resolvedKey;
+
+  // Re-resolve when form factor changes (mobile <-> desktop).
+  useEffect(() => {
+    const next = resolveUserKey(storageKey);
+    setResolvedKey(next);
+    try {
+      const raw = localStorage.getItem(next);
+      if (raw) {
+        const parsed = JSON.parse(raw) as number[];
+        if (Array.isArray(parsed) && parsed.length === length) {
+          setExtras(parsed.map((v) => (typeof v === "number" && isFinite(v) && v >= 0 ? v : 0)));
+          return;
+        }
+      }
+    } catch { /* noop */ }
+    setExtras(new Array(length).fill(0));
+  }, [ff, storageKey, length]);
+
 
   useEffect(() => {
     // Re-resolve whenever the logged-in user changes (login / logout).
