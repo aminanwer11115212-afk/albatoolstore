@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from "react";
-import { userKey, onUserChange } from "@/lib/userScopedKey";
+import { onUserChange } from "@/lib/userScopedKey";
 import { formFactorUserKey } from "@/lib/formFactorKey";
 import { useFormFactor } from "@/hooks/useFormFactor";
 
