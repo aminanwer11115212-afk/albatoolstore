@@ -14,6 +14,7 @@ import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
 import { userScopedLegacyKey } from "@/lib/userScopedKey";
+import { formFactorScopedLegacyKey } from "@/lib/formFactorKey";
 import { useRowHeights } from "@/hooks/useRowHeights";
 import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect from "@/components/InlineSearchSelect";
