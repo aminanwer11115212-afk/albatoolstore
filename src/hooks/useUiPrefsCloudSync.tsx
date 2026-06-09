@@ -58,6 +58,7 @@ const SYNCED_PREFIXES: readonly string[] = [
   "albatoul_",                // appearance / theme / preferences
   "ui:",                      // generic UI prefs (future-proof)
   "page:",                    // per-page prefs (future-proof)
+  "lov:u:",                   // per-user (and per-form-factor) scoped prefs
 ];
 
 function isSyncedKey(k: string): boolean {

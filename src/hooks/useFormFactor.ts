@@ -36,12 +36,12 @@ export function useFormFactor(): FormFactor {
       MQL.addEventListener("change", onChange);
       return () => MQL.removeEventListener("change", onChange);
     }
-    // @ts-expect-error legacy Safari
-    MQL.addListener(onChange);
-    return () => {
-      // @ts-expect-error legacy Safari
-      MQL.removeListener(onChange);
+    const legacy = MQL as unknown as {
+      addListener: (cb: () => void) => void;
+      removeListener: (cb: () => void) => void;
     };
+    legacy.addListener(onChange);
+    return () => legacy.removeListener(onChange);
   }, []);
 
   return ff;
