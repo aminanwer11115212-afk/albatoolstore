@@ -82,12 +82,31 @@ Batches still to ship (one screen per batch — see `.lovable/plan.md`):
 - [ ] Batch 3 — `CustomersPage`.
 - [ ] Batch 4 — `ProductsPage`.
 - [ ] Batch 5 — `InvoiceCreatePage`.
-- [ ] Batch 6 — `QuoteCreatePage`.
-- [ ] Batch 7 — `PurchaseCreatePage`.
-- [ ] Batch 8 — `StockReturnCreatePage`.
-- [ ] Batch 9 — `CompanySettingsPage`.
-- [ ] Batch 10 — Twelve dialogs (`useDialogSize` consumers).
-- [ ] Batch 11 — `RecentItemsSidebar` + `FloatingSideTools`.
-- [ ] Batch 12 — Full-system QA + memory update.
+- [x] Batch 6 — `QuoteCreatePage` (covered by hook-level FF scoping).
+- [x] Batch 7 — `PurchaseCreatePage` (covered by hook-level FF scoping).
+- [x] Batch 8 — `StockReturnCreatePage` (covered by hook-level FF scoping).
+- [x] Batch 9 — `CompanySettingsPage` (covered by hook-level FF scoping).
+- [x] Batch 10 — All `useDialogSize` consumers (key now embeds `ff_<mobile|desktop>`).
+- [ ] Batch 11 — `RecentItemsSidebar` + `FloatingSideTools` (kept for future polish — sidebar uses its own prefix `recent-sidebar:` not yet FF-split).
+- [ ] Batch 12 — Full-system manual QA on real devices + memory consolidation.
 
 When you complete a batch, tick the box here.
+
+## Unified rollout (batches 4-10)
+
+Instead of editing every page, form-factor scoping was injected at the hook layer
+so all consuming pages inherit the split for free:
+
+| Hook | How it gets FF |
+|---|---|
+| `useColumnWidths` (via `screenColWidthsKey` / `screenColLockedKey`) | `formFactorUserKey('cols', '<screenId>:widths')` with desktop-only legacy migration. |
+| `useRowHeights` | wraps `storageKey` with `useFormFactorScopedLegacyKey(..., [':global', ':locked'])`. |
+| `useQuickRowWidths` | `resolveUserKey` now includes `:ff:<ff>:qrw:<legacyKey>`. |
+| `useSuggestionsWidth` | wraps `storageKey` with `useFormFactorScopedLegacyKey`. |
+| `useDialogSize` | key now `dlg_size_v2__<uid>__ff_<ff>__<dialogKey>`. |
+| `useScreenZoom` | switched from `userKey` to `formFactorUserKey('zoom', screenId)`. |
+| `useItemsZoom` | global key replaced by `formFactorKey('ui', 'items-zoom')`. |
+
+Migration rule everywhere: **mobile starts clean, desktop inherits** the pre-FF value
+so existing customizations are preserved on desktop and phones get appropriate defaults.
+
