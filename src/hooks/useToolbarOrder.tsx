@@ -1,44 +1,43 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toolbarStorageKey, useToolbarOwnerToken } from "@/components/toolbar/toolbarOwner";
 
 /**
- * مفاتيح localStorage لترتيب أزرار شريط الأدوات.
+ * ترتيب أزرار شريط الأدوات لكل (مستخدم × صيغة عرض × شاشة).
  *
- * - الترتيب يُحفظ منفصلاً لكل شاشة عبر `screenKey` (مثل: quote-create-row1، invoice-view-row1...).
- * - localStorage بطبيعته خاص بكل جهاز/متصفح، لذا الترتيب لا يُشارَك بين الأجهزة.
- * - نضيف معرّف جهاز (`deviceId`) ضمن المفتاح للحماية من تداخل لو شُورك المتصفح،
- *   ولتسهيل التتبع/الترحيل لاحقاً.
+ * المفتاح يُبنى عبر `toolbarStorageKey` فيصبح:
+ *   `neobilling:toolbar-order:v2:<owner>:<screenKey>`
+ * حيث `<owner>` = `u_<uid>:ff:<mobile|desktop>` للمستخدم المسجَّل،
+ * أو `<deviceId>:ff:<ff>` قبل تسجيل الدخول.
  *
- * صيغة المفتاح: `neobilling:toolbar:v1:<deviceId>:<screenKey>`
- * المفتاح القديم (للتوافق الخلفي): `toolbar-order:<screenKey>`
+ * الترحيل (يحدث صامتاً عند أول قراءة):
+ *   1. مفتاح v1 القديم القائم على deviceId:
+ *      `neobilling:toolbar:v1:<deviceId>:<screenKey>` (سطح المكتب فقط).
+ *   2. أقدم مفتاح: `toolbar-order:<screenKey>`.
  */
 
-const PREFIX = "neobilling:toolbar:v1";
-const LEGACY_PREFIX = "toolbar-order:";
+const PREFIX = "neobilling:toolbar-order:v2";
+const LEGACY_V1_PREFIX = "neobilling:toolbar:v1";
+const LEGACY_FLAT_PREFIX = "toolbar-order:";
 const DEVICE_KEY = "neobilling:device-id";
 
-function getDeviceId(): string {
+function readDeviceId(): string {
   try {
-    let id = localStorage.getItem(DEVICE_KEY);
-    if (!id) {
-      const rand =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-      id = rand;
-      localStorage.setItem(DEVICE_KEY, id);
-    }
-    return id;
+    return localStorage.getItem(DEVICE_KEY) ?? "";
   } catch {
-    return "anon";
+    return "";
   }
 }
 
 function buildKey(screenKey: string): string {
-  return `${PREFIX}:${getDeviceId()}:${screenKey}`;
+  return toolbarStorageKey(PREFIX, screenKey);
 }
 
-function legacyKey(screenKey: string): string {
-  return `${LEGACY_PREFIX}${screenKey}`;
+function legacyV1Key(screenKey: string): string {
+  return `${LEGACY_V1_PREFIX}:${readDeviceId()}:${screenKey}`;
+}
+
+function legacyFlatKey(screenKey: string): string {
+  return `${LEGACY_FLAT_PREFIX}${screenKey}`;
 }
 
 function readOrder(screenKey: string, defaults: string[]): string[] {
@@ -46,18 +45,22 @@ function readOrder(screenKey: string, defaults: string[]): string[] {
     const newKey = buildKey(screenKey);
     let raw = localStorage.getItem(newKey);
 
-    // ترحيل من المفتاح القديم إن وُجد
+    // ترحيل من v1 (deviceId) — فقط إن لم تكن صيغة العرض mobile (راجع toolbarStorageKey).
+    // هنا نحاول استرجاع v1 كاحتياط ثانوي بعد ترحيل toolbarStorageKey الداخلي.
     if (!raw) {
-      const oldKey = legacyKey(screenKey);
-      const legacy = localStorage.getItem(oldKey);
-      if (legacy) {
-        raw = legacy;
-        try {
-          localStorage.setItem(newKey, legacy);
-          localStorage.removeItem(oldKey);
-        } catch {
-          /* noop */
-        }
+      const v1 = readDeviceId() ? localStorage.getItem(legacyV1Key(screenKey)) : null;
+      if (v1) {
+        raw = v1;
+        try { localStorage.setItem(newKey, v1); } catch { /* noop */ }
+      }
+    }
+
+    // ترحيل من أقدم صيغة بدون أي بادئة.
+    if (!raw) {
+      const flat = localStorage.getItem(legacyFlatKey(screenKey));
+      if (flat) {
+        raw = flat;
+        try { localStorage.setItem(newKey, flat); } catch { /* noop */ }
       }
     }
 
@@ -83,7 +86,6 @@ function writeOrder(screenKey: string, order: string[]) {
 function clearOrder(screenKey: string) {
   try {
     localStorage.removeItem(buildKey(screenKey));
-    localStorage.removeItem(legacyKey(screenKey));
   } catch {
     /* noop */
   }
@@ -93,13 +95,30 @@ export function useToolbarOrder(screenKey: string, defaultIds: string[]) {
   const defaultsRef = useRef(defaultIds);
   defaultsRef.current = defaultIds;
 
-  const [order, setOrderState] = useState<string[]>(() => {
-    const saved = readOrder(screenKey, defaultIds);
-    const missing = defaultIds.filter((id) => !saved.includes(id));
-    return [...saved, ...missing];
-  });
+  const ownerToken = useToolbarOwnerToken();
+
+  const computeInitial = useCallback(
+    (defaults: string[]) => {
+      const saved = readOrder(screenKey, defaults);
+      const missing = defaults.filter((id) => !saved.includes(id));
+      return [...saved, ...missing];
+    },
+    [screenKey],
+  );
+
+  const [order, setOrderState] = useState<string[]>(() => computeInitial(defaultIds));
   const [customizing, setCustomizing] = useState(false);
 
+  // إعادة قراءة الترتيب عند تغيُّر المالك (مستخدم/صيغة عرض).
+  useEffect(() => {
+    const next = computeInitial(defaultsRef.current);
+    setOrderState((prev) => {
+      if (prev.length === next.length && prev.every((v, i) => v === next[i])) return prev;
+      return next;
+    });
+  }, [ownerToken, screenKey, computeInitial]);
+
+  // تكميل أي عناصر افتراضية جديدة أُضيفت بعد آخر حفظ.
   useEffect(() => {
     setOrderState((prev) => {
       const missing = defaultIds.filter((id) => !prev.includes(id));
@@ -109,7 +128,7 @@ export function useToolbarOrder(screenKey: string, defaultIds: string[]) {
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultIds.join("|")]);
+  }, [defaultIds.join("|"), ownerToken]);
 
   const setOrder = useCallback(
     (next: string[]) => {
