@@ -1,106 +1,149 @@
-## الوضع الحالي (ما اكتشفته في الكود)
 
-نظام الأتمتة موجود جزئياً وفيه **خلل جوهري**:
+## الوضع الحالي (جرد شامل)
 
-- ملف الـ DB: `supabase/migrations/20260507213710_*.sql` فيه الدالة المركزية `public.advance_invoice_workflow(invoice_id, target, reason)` ودالة الترتيب `workflow_rank(status)` و4 triggers.
-- **العطل الأهم**: `workflow_rank` يعرف 4 حالات فقط (`new=0, preparing=1, in_transit=2, done=3`) ولا يعرف `ready_to_ship` إطلاقاً. لذلك كل استدعاء بهدف `ready_to_ship` لا يفعل شيئاً (rank=0 لا يتقدّم عن preparing).
-- زر حالة التجهيز في `InvoiceCreatePage` يستخدم `WORKFLOW_STATUS_OPTIONS` من `StatusButton.tsx` وفيه **4 حالات فقط** بدون "جاهز للرفع" والاسم "جديد" بدلاً من "مقبول".
-- شارة `WorkflowStatusBadge` تعرض الـ 5 حالات الصحيحة بالأسماء المطلوبة. (مصدران منفصلان للحقيقة → نوحّدهما.)
-- `quoteToInvoice.ts` ينشئ الفاتورة المحوّلة بحالة `new` بدل ما طلبت (`preparing`/"قيد التجهيز").
-- الأتمتات الموجودة وتعمل: `markQuoteAsSent` عند الواتساب/الطباعة لعرض السعر؛ إدراج بند → `preparing`؛ إدراج ترحيل → `in_transit`؛ سداد كامل → `done`؛ رفع إيصال (تبويب receipt) → `done`؛ طباعة كشف ترحيلات الجاهز للرفع → `in_transit`.
-- **مفقود من الأتمتة**: طباعة الفاتورة → `ready_to_ship`، طباعة كشف الجرد → `preparing` (مؤكَّد)، حفظ تغليف → `ready_to_ship` (مكتوب لكن لا يعمل بسبب عطل rank).
+### البنية التحتية الموجودة (جيدة، نبني عليها)
 
-## الحالات الموحّدة (5 حالات نهائية)
+- جدول `user_ui_preferences (user_id, key, value, updated_at)` موجود + RLS لكل مستخدم.
+- `src/hooks/useUiPrefsCloudSync.tsx` مركَّب في App ويعمل: pull عند الدخول، push debounced عند كل تغيير. يلتقط أي مفتاح يبدأ بـ`neobilling:toolbar` أو `colwidths:` أو `recent-sidebar:` أو `albatoul_` أو `ui:` أو `page:`.
+- `src/lib/userScopedKey.ts` يقدّم namespacing لكل مستخدم.
+- `ColumnsResetButton` جاهز ويستخدمه أكثر من صفحة.
 
+### الهوكس المسؤولة عن التخصيص (الموجودة فعلاً)
 
-| القيمة          | التسمية             | اللون   |
-| --------------- | ------------------- | ------- |
-| `new`           | مقبول               | رمادي   |
-| `preparing`     | قيد التجهيز         | أصفر    |
-| `ready_to_ship` | جاهزة للرفع         | برتقالي |
-| `in_transit`    | في الطريق للترحيلات | بنفسجي  |
-| `done`          | تم                  | أخضر    |
+| الهوك | يخصّ |
+|---|---|
+| `useColumnWidths` | عرض الأعمدة + locked + saveAsUserDefault |
+| `useRowHeights`, `useQuickRowWidths` | ارتفاع الصفوف وعرضها السريع |
+| `useDialogSize` | عرض/طول الحوارات المنبثقة |
+| `useSuggestionsWidth` | عرض لوحة الاقتراحات |
+| `useItemsZoom`, `useScreenZoom` | زوم الجدول/الشاشة |
+| `useToolbarOrder` | ترتيب أزرار شريط الأدوات |
+| `useToolbarLock`, `useToolbarLabels`, `useToolbarHidden` | قفل/تسميات/إخفاء الأزرار |
+| `useAppearance` | السمة العامة (لون/خط/وضع) |
 
+### الشاشات التي بها تخصيص
 
-هذا يطابق `WorkflowStatusBadge.WORKFLOW_STATUSES` (المرجع الوحيد بعد التوحيد).
+1. `CustomersPage` — أعمدة + ارتفاع صفوف + شريط أدوات + لوحة هيكلة جغرافية (PanelResizer).
+2. `ProductsPage` — أعمدة + شريط أدوات.
+3. `InvoiceCreatePage`, `QuoteCreatePage`, `PurchaseCreatePage`, `StockReturnCreatePage` — أعمدة بنود + شريط أدوات + زوم.
+4. `CompanySettingsPage` — أعمدة.
+5. الحوارات المنبثقة (12 حواراً): `TransportDialog`, `PackagingDialog`, `ShippingDispatchDialog`, `InvoiceRevisionsDialog`, `InvoiceAttachmentsDialog`, `CustomerFormDialog`, `QuickAddProductDialog`, `MessageImportDialog`, `FloatingSideTools`, `ExchangeRateDialog`, `ChargeBalanceDialog`, `AccountsOpeningBalanceDialog`.
+6. الـ`FloatingSideTools` + `RecentItemsSidebar` (عرض/إخفاء أعمدة).
 
-## خريطة الأتمتة الكاملة (بعد التنفيذ)
+## المشاكل الجذرية (سبب الشكوى)
 
-```text
-حدث المستخدم                          →  الحالة الجديدة         الجهة المسؤولة
-────────────────────────────────────────────────────────────────────────────
-فتح فاتورة جديدة                       →  new (مقبول)            افتراضي
-تحويل عرض سعر إلى فاتورة               →  preparing              quoteToInvoice
-طباعة كشف الجرد (stocktake)            →  preparing              handlePrint           handlePrint
-إضافة/حفظ تغليف                        →  ready_to_ship          PackagingDialog + trigger
-فتح حوار "إضافة ترحيل" وطباعة من داخله →  in_transit             TransportDialog (طباعة)
-إدراج صف في invoice_transports         →  in_transit             trigger
-طباعة كشف الترحيلات في صفحة الترحيلات   →  in_transit (للكل)     ShippingDispatchDialog ✓
-رفع مستند في تبويب "إيصال"             →  done                   InvoiceAttachmentsDialog ✓
-سداد كامل (paid_amount >= total)        →  done                   trigger
-إرسال عرض سعر واتساب/طباعته             →  quote.status='sent'    markQuoteAsSent ✓
-```
+1. **`useToolbarOrder` يستخدم `deviceId` عشوائي** (مفتاح: `neobilling:toolbar:v1:<deviceId>:<screenKey>`)، فيتغير بين المتصفحات ويتشارك بين الهاتف وسطح المكتب على نفس المتصفح. هذا سبب رؤيتك ترتيب الهاتف في سطح المكتب.
+2. **لا فصل بين Mobile و Desktop** في أي مفتاح. `useDialogSize` ينجو لأن الهاتف يذهب fullscreen.
+3. **`useColumnWidths`**: لمعظم الجداول مفتاح موحّد (`SHARED_COLS_WIDTHS_KEY`)، فالعرض الذي يضبطه المستخدم على شاشة هاتف 375px قد يصل عبر السحابة إلى شاشة سطح المكتب 1920px والعكس.
+4. **زر إعادة الافتراضي** غير موجود في كل الشاشات بشكل موحّد، وأحياناً غير ظاهر إلا في وضع التخصيص.
+5. **الحوارات** قابلة للتكبير لكن لا يوجد زر "تثبيت الحجم" مرئي ولا "إعادة افتراضي".
 
-ملاحظة على زر "إضافة ترحيل" داخل الفاتورة: التعليق هو أن الحوار يعرض الفاتورة الحالية فقط مع ترحيلاتها ووجهتها (إن وُجدت من بيانات العميل في `customer_destinations`/`customer_preferred_transporter`)، وفيه زر "طباعة هذا الكشف" يطبع الفاتورة الواحدة، والطباعة هي الحدث الذي ينقل الحالة إلى `in_transit` (وليس مجرد الفتح).
+## الحل المعماري (Form-Factor-Aware Prefs)
 
-## خطة التنفيذ — على 4 دفعات
+### مفهوم محوري
 
-### الدفعة 1 — إصلاح الأساس (DB + توحيد الحالات في الواجهة)
+كل تفضيل = `(userId, formFactor, screenKey, prefKey)` حيث `formFactor ∈ {mobile, desktop}`.
 
-1. Migration واحدة:
-  - تحديث `workflow_rank` ليصبح: `new=0, preparing=1, ready_to_ship=2, in_transit=3, done=4`.
-  - تعديل شرط "لا تتجاوز preparing على فاتورة فارغة" ليشمل `ready_to_ship` أيضاً.
-2. توحيد المصدر: حذف `WORKFLOW_STATUS_OPTIONS` من `StatusButton.tsx` واستيراد قائمة موحّدة مشتقّة من `WORKFLOW_STATUSES` (5 حالات) في `InvoiceCreatePage` و`InvoiceViewPage`.
-3. تغيير `quoteToInvoice.ts` ليفتح الفاتورة المحوّلة بـ `workflow_status: "preparing"` بدل `new`.
+- `mobile` = viewport ≤ 640px CSS px (مطابق للقاعدة الحالية في `useDialogSize`).
+- `desktop` = خلاف ذلك (يشمل tablet — لا حاجة لـ form factor ثالث الآن).
+- المستخدم يعدّل من الهاتف → يُخزن تحت `mobile`. يفتح سطح المكتب → يقرأ من `desktop` (مختلف تماماً).
+- يبقى `userId` هو الذي يتنقل عبر الأجهزة الفيزيائية (لو فتح المتصفح من حاسوب آخر، يجد نفس تخصيص سطح المكتب). أنظف من `deviceId` الحالي.
 
-تحقق الدفعة 1: زر الحالة في إضافة/تعديل فاتورة يعرض 5 حالات بالأسماء الصحيحة؛ فاتورة محوّلة من عرض سعر تظهر "قيد التجهيز".
+### الطبقات الجديدة (utility صغير + ترقية الهوكس تدريجياً)
 
-### الدفعة 2 — أتمتة الطباعة
+1. هوك `useFormFactor()` يرجع `'mobile' | 'desktop'` تفاعلياً.
+2. دالة `formFactorKey(scope, base)` تبني: `lov:u:{uid}:{formFactor}:{scope}:{base}` (تمتد على `userScopedKey` الحالي).
+3. ترحيل ذكي: عند أول قراءة لمستخدم بمفتاحه الجديد الفارغ، نُحاول قراءة المفتاح القديم (legacy / deviceId-based) وننسخه إلى مفتاح `formFactor` الحالي. لا نحذف القديم (للأمان). هذا يضمن صفر فقدان لتخصيصات المستخدمين الحاليين.
+4. `useUiPrefsCloudSync` تتم توسعتها لمزامنة المفاتيح الجديدة (تلقائياً ستلتقطها بفضل البادئات).
 
-4. `InvoiceCreatePage.handlePrint`: بعد فتح صفحة المعاينة، استدعاء `advance_invoice_workflow`:
-  - `variant === "stocktake"` → `preparing` (سبب: "طباعة كشف جرد").
-  - أي variant آخر (`full|no-account|account-only|no-details`) → `ready_to_ship` (سبب: "طباعة فاتورة").
-5. `InvoiceViewPage.handlePrint` نفس المنطق (السطر 230 الحالي يستدعي بالفعل `advance_invoice_workflow` — نراجعه ونضبط الهدف حسب الـ variant).
-6. `TransportDialog`: عند زر "طباعة" داخل الحوار للفاتورة الواحدة، استدعاء `advance_invoice_workflow(_, "in_transit", "طباعة كشف ترحيل من الفاتورة")` قبل/بعد الطباعة.
+### السلوك الموحّد لكل شاشة قابلة للتخصيص
 
-تحقق الدفعة 2: طباعة فاتورة محفوظة في حالة preparing تنقلها إلى ready_to_ship؛ طباعة كشف جرد لفاتورة جديدة تنقلها إلى preparing؛ طباعة من حوار الترحيل تنقلها إلى in_transit.
+- وضع تخصيص (موجود بالفعل عبر `ToolbarCustomizationContext`).
+- زر **"حفظ كافتراضي لي"** (icon-only) — يلتقط الحالة الحالية ويخزنها (هذا هو "زر تم/قفل السجل" الذي طلبته).
+- زر **"إعادة افتراضي"** (الـ`ColumnsResetButton` الموجود) — يمسح تخصيص المستخدم لهذه الشاشة ويعود لـ defaults.
+- زر **"قفل/فتح"** (إن لم يكن موجوداً) — يثبّت العرض ويمنع التغيير العرضي.
+- مؤشر صغير "آخر تحديث محلي/سحابي" اختياري على هامش الـtoolbar.
 
-### الدفعة 3 — Skill مرجعية ثابتة
+## خطة التنفيذ — دفعة أساس + دفعة لكل شاشة
 
-7. إنشاء skill في `.agents/skills/albatool-workflow-automation/` يحوي:
-  - `SKILL.md`: متى يُستخدم (أي طلب يخص حالات الفاتورة، أتمتة، نقل حالة، أحداث طباعة/تحويل/سداد)، القائمة النهائية للحالات الـ5، خريطة الأحداث أعلاه، والقواعد الذهبية (لا تنزّل الحالة تلقائياً، لا تتجاوز preparing لفاتورة فارغة، كل تنقّل أوتوماتيكي يجب أن يسجّل في `invoice_revisions` بـ `action='auto_workflow'`، استخدم RPC `advance_invoice_workflow` لا تحدّث `workflow_status` مباشرة من التطبيق، احترم `workflow_automation_enabled` في `company_settings`).
-  - `references/add-automation-step.md`: وصفة لإضافة قاعدة أتمتة جديدة (3 خطوات: حدّد الحدث → اختر الـ target → استدعِ `advance_invoice_workflow` من نقطة الحدث في الكود أو عبر DB trigger).
-  - `references/db-pattern.sql`: قالب trigger يستدعي `advance_invoice_workflow`.
-  - `references/checklist.md`: ما يجب التحقق منه قبل اعتبار قاعدة الأتمتة جاهزة.
-  - تطبيق الـ skill عبر `skills--apply_draft`.
+> **القاعدة الذهبية**: لا أمسّ أكثر من شاشة واحدة لكل دفعة (بعد دفعة الأساس). كل دفعة تُختبر يدوياً في الـpreview قبل الانتقال للتالية.
 
-### الدفعة 4 — اختبارات يدوية + تحقق ذاتي
+### دفعة 0 — الأساس (Foundation) — لا تغيير مرئي
 
-8. تشغيل سيناريو كامل في الـ preview بدون تدخّل المستخدم:
-  - إنشاء عرض سعر → إرسال واتساب → التحقق من حالة `sent`.
-  - تحويله لفاتورة → التحقق من `preparing`.
-  - طباعة كشف الجرد → preparing (يبقى)؛ طباعة الفاتورة → `ready_to_ship`.
-  - فتح حوار إضافة ترحيل وطباعته → `in_transit`.
-  - رفع إيصال → `done`.
-  - عرض سجل `invoice_revisions` للتأكد من تسجيل كل خطوة بـ `action=auto_workflow`.
-9. لقطة كونسول/شبكة عند أي خلل + إصلاح فوري.
+ملفات جديدة فقط، بدون لمس صفحات:
+- `src/hooks/useFormFactor.ts` — هوك تفاعلي يرجع `mobile|desktop`.
+- `src/lib/formFactorKey.ts` — `formFactorKey(scope, base)` + `useFormFactorScopedKey(legacyKey, scope)` (الترحيل التلقائي من المفتاح القديم).
+- تحديث `useUiPrefsCloudSync` ليضيف بادئة `lov:u:` إلى قائمة المزامنة (إن لم تكن موجودة).
+- اختبارات وحدة لـ `useFormFactor` و `formFactorKey` (Vitest).
+- توثيق `mem://features/ui-personalization` يصف العقد.
 
-## تفاصيل تقنية موجزة
+تحقّق الدفعة 0: تشغيل الـunit tests + التأكد أن النظام لم يتأثر.
 
-- جميع تنقلات الحالة تمر عبر RPC `public.advance_invoice_workflow` (لا `update` مباشر من الواجهة) لضمان: عدم النزول، التسجيل في `invoice_revisions`، احترام مفتاح `workflow_automation_enabled`، ومنع تجاوز preparing على فاتورة فارغة.
-- `invalidateWorkflowAutoCache(invoiceId)` (موجود في `WorkflowStatusBadge.tsx`) يُستدعى بعد كل أتمتة لكسر الكاش وتظهر أيقونة ⚡ مع tooltip السبب.
-- لا تغييرات على Stock deduction (مرتبط بمغادرة الحالة `new` وهو منطق مستقل وآمن).
-- لا حذف ولا تغيير لأي حالة من الـ 5، فقط إضافة `ready_to_ship` للترتيب وللزر.
+### دفعة 1 — Skill ثابتة "user-prefs-architecture"
+
+skill في `.agents/skills/albatool-user-prefs/` تحوي:
+- خريطة الهوكس + متى يُستخدم كل واحد.
+- صيغة المفتاح الموحّدة `lov:u:{uid}:{formFactor}:{scope}:{base}`.
+- وصفة "كيف أضيف تخصيصاً لعنصر جديد" (3 خطوات).
+- قائمة QA لكل شاشة قبل اعتمادها (زر افتراضي، زر تثبيت، يحفظ، يقرأ، لا يتسرّب بين الأجهزة).
+- قائمة بالـ12 حواراً والـ7 صفحات للتتبع.
+
+### دفعة 2 — `useToolbarOrder` (الأخطر، يصلح الشكوى الرئيسية)
+
+استبدال `deviceId` بـ `formFactor` في كل مفاتيح ترتيب الأزرار + ترحيل تلقائي:
+- مفتاح جديد: `neobilling:toolbar:v2:{formFactor}:{screenKey}` (داخل scope `lov:u:{uid}`).
+- عند القراءة الأولى: إن لم يوجد المفتاح الجديد، نقرأ القديم (`v1:{deviceId}:...` ثم `toolbar-order:...`) وننسخ.
+- نفس الترقية لـ `useToolbarLock`, `useToolbarLabels`, `useToolbarHidden`.
+
+تحقّق الدفعة 2: تخصيص أزرار في الهاتف لا يظهر في سطح المكتب والعكس، مع الحفاظ على التخصيص لكل form factor عند تسجيل خروج/دخول.
+
+### دفعات 3..N — شاشة لكل دفعة
+
+ترتيب مقترح (من الأقل خطورة إلى الأكثر):
+
+3. `CustomersPage` (المرجع المعماري — أكثرها كمالاً)
+4. `ProductsPage`
+5. `InvoiceCreatePage`
+6. `QuoteCreatePage`
+7. `PurchaseCreatePage`
+8. `StockReturnCreatePage`
+9. `CompanySettingsPage`
+10. مجموعة الحوارات الـ12 (يمكن دفعة واحدة لأنها متشابهة جداً وكلها تستخدم `useDialogSize` نفسه — نضيف فقط form-factor و"زر تثبيت/إعادة افتراضي").
+11. `RecentItemsSidebar` + `FloatingSideTools` (أعمدة جانبية + ترتيب).
+
+كل دفعة من 3 إلى 11:
+- ترقّي مفاتيح الشاشة لتشمل `formFactor`.
+- تتأكد أن زر **"إعادة افتراضي"** و**"حفظ كافتراضي لي"** و**"قفل/فتح"** موجودة وظاهرة.
+- ترحيل صامت من القيم القديمة لكل مستخدم.
+- اختبار يدوي في الـpreview على هاتف ثم على سطح مكتب.
+
+### دفعة الختام — مراجعة + تثبيت
+
+12. تشغيل سيناريو شامل: مستخدم A على هاتف يخصّص → يفتح سطح مكتب يجد الافتراضي الـDesktop (أو تخصيصه الـDesktop السابق). مستخدم B لا يرى شيئاً من تخصيص A.
+13. تحديث memory `mem://features/architecture` و `mem://index.md`.
 
 ## ما لن أفعله (إلا إذا طلبت)
 
-- لن أغيّر منطق Stock Deduction.
-- لن أمسّ الحالة المالية للفاتورة (`status`: paid/partial/…)، فهي مستقلة عن `workflow_status`.
-- لن أضيف triggers جديدة على الطباعة (الطباعة لا تكتب في DB لذا الـ trigger غير ممكن — الأنسب استدعاء RPC من نقطة الطباعة في الكود، وهذا ما سنفعل).
-- لن أكتب أي skill قبل اعتماد هذه الخطة.
+- لن أمسّ الـDB schema لـ`user_ui_preferences` (الشكل الحالي `(user_id, key, value)` كافٍ — `formFactor` يصبح جزءاً من `key`).
+- لن أحذف أي قيمة قديمة من `localStorage` أو السحابة — الترحيل نسخ فقط.
+- لن أتلامس مع منطق الأتمتة (workflow_status) أو طباعة A4 — موضوع مستقل.
+- لن أضيف form factor ثالث (tablet) الآن — سنفصل مستقبلاً إن احتجنا.
+- لن أبدأ التنفيذ قبل اعتماد هذه الخطة.
 
-&nbsp;
+## ملخص الدفعات (للمتابعة)
 
-&nbsp;
-
-الفي طباعة الفاتورة ان تحول الفاتورة ل جاهزة للرفع بل بعد اضافة تغليف لها
+```text
+دفعة 0  → بنية تحتية (هوك + utility + tests)
+دفعة 1  → Skill مرجعية
+دفعة 2  → useToolbarOrder (يصلح الشكوى الرئيسية)
+دفعة 3  → CustomersPage
+دفعة 4  → ProductsPage
+دفعة 5  → InvoiceCreatePage
+دفعة 6  → QuoteCreatePage
+دفعة 7  → PurchaseCreatePage
+دفعة 8  → StockReturnCreatePage
+دفعة 9  → CompanySettingsPage
+دفعة 10 → كل الحوارات الـ12
+دفعة 11 → RecentItemsSidebar + FloatingSideTools
+دفعة 12 → اختبار شامل + تحديث الذاكرة
+```
