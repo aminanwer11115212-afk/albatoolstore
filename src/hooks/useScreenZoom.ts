@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { userKey, onUserChange } from "@/lib/userScopedKey";
+import { formFactorUserKey } from "@/lib/formFactorKey";
+import { useFormFactor } from "@/hooks/useFormFactor";
 
 const SCOPE = "zoom";
 const MIN = 0.8;
