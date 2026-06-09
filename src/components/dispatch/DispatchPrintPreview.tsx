@@ -18,6 +18,7 @@ const A4_WIDTH = 794;
 const A4_HEIGHT = 1123;
 const PAGE_PADDING = 38; // ~10mm in px
 const USABLE_HEIGHT = A4_HEIGHT - PAGE_PADDING * 2;
+const EMPTY_INVOICES: any[] = [];
 
 const fmtDateAr = (d?: string) => {
   if (!d) return "—";
