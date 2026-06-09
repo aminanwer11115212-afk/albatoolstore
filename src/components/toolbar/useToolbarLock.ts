@@ -9,7 +9,7 @@
 // كل الصفحات.
 
 import { useCallback, useEffect, useState } from "react";
-import { getToolbarOwnerId } from "./toolbarOwner";
+import { getToolbarOwnerId, useToolbarOwnerToken } from "./toolbarOwner";
 
 const LOCK_PREFIX = "neobilling:toolbar-lock:v1";
 const LOCK_EVENT = "neobilling:toolbar-lock-changed";
@@ -91,12 +91,14 @@ function enforceSnapshot(snap: LockSnapshot): boolean {
 }
 
 export function useToolbarLock(screenKey: string) {
+  const ownerToken = useToolbarOwnerToken();
   const [snapshot, setSnapshot] = useState<LockSnapshot | null>(() =>
     typeof window === "undefined" ? null : readLock(screenKey),
   );
 
-  // الإصغاء لتغييرات القفل (من تبويب آخر أو من نفس الصفحة).
+  // الإصغاء لتغييرات القفل + إعادة القراءة عند تبدّل المالك (مستخدم/صيغة عرض).
   useEffect(() => {
+    setSnapshot(readLock(screenKey));
     const onCustom = (e: Event) => {
       const ev = e as CustomEvent<{ screenKey?: string }>;
       if (ev.detail?.screenKey === screenKey) {
@@ -114,7 +116,7 @@ export function useToolbarLock(screenKey: string) {
       window.removeEventListener(LOCK_EVENT, onCustom as EventListener);
       window.removeEventListener("storage", onStorage);
     };
-  }, [screenKey]);
+  }, [screenKey, ownerToken]);
 
   // عند وجود قفل: نُطبّق اللقطة دورياً ونستجيب لأي حدث تخزين.
   useEffect(() => {
