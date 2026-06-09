@@ -420,7 +420,7 @@ export default function CustomersPage() {
   useEffect(() => {
     if (shortcutsOpen) shortcutsPopRef.current?.focus();
   }, [shortcutsOpen]);
-  const CP_SHOW_DASHBOARD = userScopedLegacyKey("customers-page:showDashboard");
+  const CP_SHOW_DASHBOARD = formFactorScopedLegacyKey("customers-page:showDashboard");
   const [showDashboard, setShowDashboard] = useState<boolean>(() => {
     try { return localStorage.getItem(CP_SHOW_DASHBOARD) !== "0"; } catch { return true; }
   });
