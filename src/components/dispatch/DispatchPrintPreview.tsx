@@ -28,7 +28,7 @@ const fmtDateAr = (d?: string) => {
 export default function DispatchPrintPreview({ selectedIds, company }: Props) {
   const ids = useMemo(() => Array.from(selectedIds), [selectedIds]);
 
-  const { data: invoices = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["dispatch-preview-invoices", ids.sort().join(",")],
     enabled: ids.length > 0,
     queryFn: async () => {
@@ -52,6 +52,7 @@ export default function DispatchPrintPreview({ selectedIds, company }: Props) {
       return (data || []) as any[];
     },
   });
+  const invoices = data ?? EMPTY_INVOICES;
 
   // Measure card heights after render → distribute to pages
   const cardRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
