@@ -1,17 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { onUserChange, getCurrentUserIdSync } from "@/lib/userScopedKey";
+import { getFormFactorSync, useFormFactor } from "@/hooks/useFormFactor";
 
 
 const STEP = 60;
 
-/** Build a per-user storage key, migrating from the old shared key on first use. */
+/**
+ * Build a per-(user × form factor) storage key, migrating from older shapes:
+ *   1. legacy un-namespaced key
+ *   2. `lov:u:{uid}:qrw:{legacyKey}` (pre-form-factor)
+ * Mobile starts clean; desktop inherits.
+ */
 function resolveUserKey(legacyKey: string): string {
   const uid = getCurrentUserIdSync() ?? "guest";
-  const newKey = `lov:u:${uid}:qrw:${legacyKey}`;
+  const ff = getFormFactorSync();
+  const newKey = `lov:u:${uid}:ff:${ff}:qrw:${legacyKey}`;
   try {
-    if (typeof window !== "undefined" && localStorage.getItem(newKey) === null) {
-      const old = localStorage.getItem(legacyKey);
-      if (old !== null) localStorage.setItem(newKey, old);
+    if (typeof window !== "undefined" && localStorage.getItem(newKey) === null && ff === "desktop") {
+      const candidates = [
+        `lov:u:${uid}:qrw:${legacyKey}`,
+        legacyKey,
+      ];
+      for (const k of candidates) {
+        const v = localStorage.getItem(k);
+        if (v !== null) { localStorage.setItem(newKey, v); break; }
+      }
     }
   } catch { /* noop */ }
   return newKey;
