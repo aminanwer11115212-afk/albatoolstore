@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { isRetiredToolbarItem } from "./retiredItems";
-import { toolbarStorageKey } from "./toolbarOwner";
+import { toolbarStorageKey, useToolbarOwnerToken } from "./toolbarOwner";
 
 /**
  * تخزين قائمة العناصر المخفية داخل FreePositionToolbar،
@@ -52,9 +52,12 @@ function write(screenKey: string, list: string[]) {
 }
 
 export function useToolbarHidden(screenKey: string) {
+  const ownerToken = useToolbarOwnerToken();
   const [hidden, setHidden] = useState<string[]>(() => read(screenKey));
 
   useEffect(() => {
+    // إعادة قراءة فورية عند تغيُّر المستخدم أو صيغة العرض (mobile/desktop).
+    setHidden(read(screenKey));
     const sync = (e: Event) => {
       const detail = (e as CustomEvent<{ screenKey: string }>).detail;
       if (!detail || detail.screenKey === screenKey) setHidden(read(screenKey));
@@ -68,7 +71,7 @@ export function useToolbarHidden(screenKey: string) {
       window.removeEventListener(EVENT, sync as EventListener);
       window.removeEventListener("storage", onStorage);
     };
-  }, [screenKey]);
+  }, [screenKey, ownerToken]);
 
   const hide = useCallback(
     (id: string) => {

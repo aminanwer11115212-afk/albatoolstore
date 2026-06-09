@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { isRetiredToolbarItem } from "./retiredItems";
-import { toolbarStorageKey } from "./toolbarOwner";
+import { toolbarStorageKey, useToolbarOwnerToken } from "./toolbarOwner";
 
 /**
  * تخزين تسميات قابلة للتعديل للعناصر داخل FreePositionToolbar،
@@ -59,9 +59,11 @@ function write(screenKey: string, map: LabelMap) {
 }
 
 export function useToolbarLabels(screenKey: string) {
+  const ownerToken = useToolbarOwnerToken();
   const [labels, setLabels] = useState<LabelMap>(() => read(screenKey));
 
   useEffect(() => {
+    setLabels(read(screenKey));
     const sync = (e: Event) => {
       const detail = (e as CustomEvent<{ screenKey: string }>).detail;
       if (!detail || detail.screenKey === screenKey) {
@@ -77,7 +79,7 @@ export function useToolbarLabels(screenKey: string) {
       window.removeEventListener(EVENT, sync as EventListener);
       window.removeEventListener("storage", onStorage);
     };
-  }, [screenKey]);
+  }, [screenKey, ownerToken]);
 
   const setLabel = useCallback(
     (id: string, value: string | null) => {
