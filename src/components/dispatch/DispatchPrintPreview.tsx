@@ -18,6 +18,7 @@ const A4_WIDTH = 794;
 const A4_HEIGHT = 1123;
 const PAGE_PADDING = 38; // ~10mm in px
 const USABLE_HEIGHT = A4_HEIGHT - PAGE_PADDING * 2;
+const EMPTY_INVOICES: any[] = [];
 
 const fmtDateAr = (d?: string) => {
   if (!d) return "—";
@@ -28,7 +29,7 @@ const fmtDateAr = (d?: string) => {
 export default function DispatchPrintPreview({ selectedIds, company }: Props) {
   const ids = useMemo(() => Array.from(selectedIds), [selectedIds]);
 
-  const { data: invoices = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["dispatch-preview-invoices", ids.sort().join(",")],
     enabled: ids.length > 0,
     queryFn: async () => {
@@ -52,6 +53,7 @@ export default function DispatchPrintPreview({ selectedIds, company }: Props) {
       return (data || []) as any[];
     },
   });
+  const invoices = data ?? EMPTY_INVOICES;
 
   // Measure card heights after render → distribute to pages
   const cardRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());

@@ -14,6 +14,7 @@ import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
 import { userScopedLegacyKey } from "@/lib/userScopedKey";
+import { formFactorScopedLegacyKey } from "@/lib/formFactorKey";
 import { useRowHeights } from "@/hooks/useRowHeights";
 import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect from "@/components/InlineSearchSelect";
@@ -419,7 +420,7 @@ export default function CustomersPage() {
   useEffect(() => {
     if (shortcutsOpen) shortcutsPopRef.current?.focus();
   }, [shortcutsOpen]);
-  const CP_SHOW_DASHBOARD = userScopedLegacyKey("customers-page:showDashboard");
+  const CP_SHOW_DASHBOARD = formFactorScopedLegacyKey("customers-page:showDashboard");
   const [showDashboard, setShowDashboard] = useState<boolean>(() => {
     try { return localStorage.getItem(CP_SHOW_DASHBOARD) !== "0"; } catch { return true; }
   });
@@ -597,8 +598,8 @@ export default function CustomersPage() {
   };
 
   // أعمدة جدول العملاء قابلة للسحب — مفاتيح وافتراضات مستقلة لهذه الصفحة
-  const CUSTOMERS_COLS_KEY = userScopedLegacyKey("customers-page:colWidths:v2");
-  const CUSTOMERS_LOCK_KEY = userScopedLegacyKey("customers-page:colsLocked:v1");
+  const CUSTOMERS_COLS_KEY = formFactorScopedLegacyKey("customers-page:colWidths:v2");
+  const CUSTOMERS_LOCK_KEY = formFactorScopedLegacyKey("customers-page:colsLocked:v1");
   const CUSTOMERS_DEFAULTS: (number | null)[] = [40, null, null, 110, 130, 130, 110, 130, 130, 130, 140, 160];
   const [colsLocked, setColsLocked] = useSharedColsLocked(() => {
     try { return localStorage.getItem(CUSTOMERS_LOCK_KEY) === "1"; } catch { return false; }
