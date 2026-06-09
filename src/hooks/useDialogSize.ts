@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getFormFactorSync } from "@/hooks/useFormFactor";
 
 /**
  * Reusable hook for persisting dialog/popup dimensions per user.
