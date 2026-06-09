@@ -2688,6 +2688,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_invoice_workflow: {
+        Args: { _invoice_id: string; _reason: string; _target: string }
+        Returns: undefined
+      }
       current_user_login_status: { Args: never; Returns: string }
       delete_invoice_items_silent: {
         Args: { p_invoice_id: string }
@@ -2721,6 +2725,7 @@ export type Database = {
         Args: { _supplier_id: string }
         Returns: undefined
       }
+      workflow_rank: { Args: { _s: string }; Returns: number }
     }
     Enums: {
       app_role: "admin" | "manager" | "staff" | "viewer" | "sales"
