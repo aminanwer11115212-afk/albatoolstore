@@ -78,7 +78,7 @@ Batches still to ship (one screen per batch — see `.lovable/plan.md`):
 
 - [x] Batch 0 — Foundation (`useFormFactor`, `formFactorKey`, tests, sync prefix).
 - [x] Batch 1 — This skill.
-- [ ] Batch 2 — `useToolbarOrder` + lock/labels/hidden (replaces deviceId with formFactor).
+- [x] Batch 2 — `useToolbarOrder` + lock/labels/hidden (owner is now `u_<uid>:ff:<ff>`).
 - [ ] Batch 3 — `CustomersPage`.
 - [ ] Batch 4 — `ProductsPage`.
 - [ ] Batch 5 — `InvoiceCreatePage`.
