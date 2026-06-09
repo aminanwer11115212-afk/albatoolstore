@@ -32,6 +32,21 @@ export function useRowHeights(rawStorageKey: string, defaultHeight = 32) {
   const heightRef = useRef(height);
   heightRef.current = height;
 
+  // Re-read when key changes (user or form factor switches).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(globalKey);
+      if (raw === null) { setHeightState(null); return; }
+      const n = Number(raw);
+      setHeightState(isFinite(n) && n >= MIN && n <= MAX ? n : null);
+    } catch { /* noop */ }
+  }, [globalKey]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(lockKey);
+    setLockedState(raw === null ? true : raw === "1");
+  }, [lockKey]);
+
   useEffect(() => {
     try {
       if (height === null) localStorage.removeItem(globalKey);
