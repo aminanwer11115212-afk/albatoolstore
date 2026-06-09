@@ -1,35 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { userKey } from "@/lib/userScopedKey";
+import { formFactorUserKey } from "@/lib/formFactorKey";
 
 const SHARED_UPDATE_EVENT = "colwidths-shared-update";
 
 /**
- * Per-screen + per-user column-widths keys.
+ * Per-screen + per-user + per-form-factor column-widths keys.
  *
  * Builds keys like:
- *   widths: lov:u:{uid}:cols:{screenId}:widths
- *   lock:   lov:u:{uid}:cols:{screenId}:locked
+ *   widths: lov:u:{uid}:ff:{ff}:cols:{screenId}:widths
+ *   lock:   lov:u:{uid}:ff:{ff}:cols:{screenId}:locked
  *
- * On first read for a screen, silently copies values from the legacy
- * `SHARED_COLS_WIDTHS_KEY` / `SHARED_COLS_LOCKED_KEY` so the user's
- * existing layout is preserved on rollout.
+ * On first read for a screen on desktop, silently copies values from the
+ * pre-form-factor key `lov:u:{uid}:cols:{screenId}:widths` AND from the
+ * legacy `SHARED_COLS_WIDTHS_KEY` so the user's existing layout is preserved.
+ * Mobile starts clean (no inheritance) for a fresh phone experience.
  */
 export function screenColWidthsKey(screenId: string): string {
-  return userKey("cols", `${screenId}:widths`);
+  return formFactorUserKey("cols", `${screenId}:widths`);
 }
 export function screenColLockedKey(screenId: string): string {
-  return userKey("cols", `${screenId}:locked`);
+  return formFactorUserKey("cols", `${screenId}:locked`);
 }
 export function migrateScreenColKeys(screenId: string) {
   if (typeof window === "undefined") return;
   try {
     const wKey = screenColWidthsKey(screenId);
-    if (localStorage.getItem(wKey) === null) {
+    if (localStorage.getItem(wKey) === null && wKey.includes(":ff:desktop:")) {
       const legacy = localStorage.getItem("shared:itemsTable:colWidths:v1");
       if (legacy) localStorage.setItem(wKey, legacy);
     }
     const lKey = screenColLockedKey(screenId);
-    if (localStorage.getItem(lKey) === null) {
+    if (localStorage.getItem(lKey) === null && lKey.includes(":ff:desktop:")) {
       const legacy = localStorage.getItem("shared:itemsTable:colsLocked:v1");
       if (legacy === "true" || legacy === "false") localStorage.setItem(lKey, legacy);
     }
