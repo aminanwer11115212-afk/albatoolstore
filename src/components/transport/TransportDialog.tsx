@@ -320,7 +320,14 @@ ${packagingHTML ? `
       }
       
       const ids = readyToPrint.map((inv: any) => inv.id);
-      await supabase.from("invoices").update({ workflow_status: "in_transit" }).in("id", ids);
+      // Use RPC for consistent automation logging in invoice_revisions
+      await Promise.all(ids.map((id: string) =>
+        supabase.rpc("advance_invoice_workflow" as any, {
+          _invoice_id: id,
+          _target: "in_transit",
+          _reason: "طباعة كشف ترحيل",
+        })
+      ));
       toast.success(`✅ تم طباعة ${ids.length} فاتورة وتحويلها إلى "في الطريق للترحيلات"`);
       setInvoiceRows({});
       await loadAllInvoices();

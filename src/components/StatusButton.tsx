@@ -117,18 +117,20 @@ export const QUOTE_STATUS_OPTIONS: StatusOption[] = [
 
 /** Kept for backward-compat imports; the financial status button is no longer rendered. */
 export const INVOICE_STATUS_OPTIONS: StatusOption[] = [
-  { value: "new",        label: "جديد",                 color: "#6b7280" },
-  { value: "preparing",  label: "قيد التجهيز",          color: "#eab308" },
-  { value: "in_transit", label: "في الطريق للترحيلات", color: "#a855f7" },
-  { value: "done",       label: "تم",                   color: "#16a34a" },
+  { value: "new",           label: "مقبول",                color: "#6b7280" },
+  { value: "preparing",     label: "قيد التجهيز",          color: "#eab308" },
+  { value: "ready_to_ship", label: "جاهزة للرفع",          color: "#f97316" },
+  { value: "in_transit",    label: "في الطريق للترحيلات", color: "#a855f7" },
+  { value: "done",           label: "تم",                  color: "#16a34a" },
 ];
 
-/** Invoice workflow (4 statuses only). */
+/** Invoice workflow — 5 unified statuses (single source of truth with WorkflowStatusBadge). */
 export const WORKFLOW_STATUS_OPTIONS: StatusOption[] = [
-  { value: "new",        label: "جديد",                 color: "#6b7280" },
-  { value: "preparing",  label: "قيد التجهيز",          color: "#eab308" },
-  { value: "in_transit", label: "في الطريق للترحيلات", color: "#a855f7" },
-  { value: "done",       label: "تم",                   color: "#16a34a" },
+  { value: "new",           label: "مقبول",                color: "#6b7280" },
+  { value: "preparing",     label: "قيد التجهيز",          color: "#eab308" },
+  { value: "ready_to_ship", label: "جاهزة للرفع",          color: "#f97316" },
+  { value: "in_transit",    label: "في الطريق للترحيلات", color: "#a855f7" },
+  { value: "done",          label: "تم",                   color: "#16a34a" },
 ];
 
 export const PURCHASE_STATUS_OPTIONS: StatusOption[] = [

@@ -1381,6 +1381,14 @@ export default function InvoiceCreatePage() {
       if (variant !== "full") qs.set("variant", variant);
       if (noHeader) qs.set("noHeader", "1");
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
+      // أتمتة: أي طباعة (فاتورة أو كشف جرد) → الحالة تصبح "قيد التجهيز" على الأقل
+      try {
+        await supabase.rpc("advance_invoice_workflow" as any, {
+          _invoice_id: editId,
+          _target: "preparing",
+          _reason: variant === "stocktake" ? "طباعة كشف جرد" : "طباعة الفاتورة",
+        });
+      } catch {}
       navigate(`/preview/invoice/${editId}${suffix}`);
       return;
     }
