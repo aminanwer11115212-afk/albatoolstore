@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFormFactorScopedLegacyKey } from "@/lib/formFactorKey";
 
 /**
  * Persisted width (in pixels) for the product-search suggestions dropdown.
@@ -6,8 +7,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *
  * Width = 0 means "use natural width" (left:0;right:0). Once the user drags,
  * we set an explicit pixel width.
+ *
+ * المفتاح مفصول لكل (مستخدم × صيغة عرض).
  */
-export function useSuggestionsWidth(storageKey: string, defaultWidth = 0, min = 160, max = 900) {
+export function useSuggestionsWidth(rawStorageKey: string, defaultWidth = 0, min = 160, max = 900) {
+  const storageKey = useFormFactorScopedLegacyKey(rawStorageKey);
   const [width, setWidth] = useState<number>(() => {
     if (typeof window === "undefined") return defaultWidth;
     try {
@@ -24,6 +28,17 @@ export function useSuggestionsWidth(storageKey: string, defaultWidth = 0, min = 
 
   const widthRef = useRef(width);
   widthRef.current = width;
+
+  // Re-read when user or form factor changes.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw === null) { setWidth(defaultWidth); return; }
+      const n = Number(raw);
+      if (!isFinite(n)) { setWidth(defaultWidth); return; }
+      setWidth(n === 0 ? 0 : Math.max(min, Math.min(max, n)));
+    } catch { /* noop */ }
+  }, [storageKey, defaultWidth, min, max]);
 
   useEffect(() => {
     try {

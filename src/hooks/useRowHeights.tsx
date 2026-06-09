@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFormFactorScopedLegacyKey } from "@/lib/formFactorKey";
 
 const MIN = 24;
 const MAX = 240;
@@ -6,8 +7,11 @@ const MAX = 240;
 /**
  * ارتفاع موحّد لكل صفوف الجدول. السحب من أي صف يغيّر ارتفاع كل الصفوف معاً.
  * يحفظ القيمة في localStorage تحت `${storageKey}:global` وحالة القفل تحت `${storageKey}:locked`.
+ *
+ * المفتاح مفصول لكل (مستخدم × صيغة عرض) — تخصيص الهاتف لا يصل إلى سطح المكتب.
  */
-export function useRowHeights(storageKey: string, defaultHeight = 32) {
+export function useRowHeights(rawStorageKey: string, defaultHeight = 32) {
+  const storageKey = useFormFactorScopedLegacyKey(rawStorageKey, [":global", ":locked"]);
   const globalKey = `${storageKey}:global`;
   const lockKey = `${storageKey}:locked`;
 
@@ -27,6 +31,21 @@ export function useRowHeights(storageKey: string, defaultHeight = 32) {
   });
   const heightRef = useRef(height);
   heightRef.current = height;
+
+  // Re-read when key changes (user or form factor switches).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(globalKey);
+      if (raw === null) { setHeightState(null); return; }
+      const n = Number(raw);
+      setHeightState(isFinite(n) && n >= MIN && n <= MAX ? n : null);
+    } catch { /* noop */ }
+  }, [globalKey]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(lockKey);
+    setLockedState(raw === null ? true : raw === "1");
+  }, [lockKey]);
 
   useEffect(() => {
     try {

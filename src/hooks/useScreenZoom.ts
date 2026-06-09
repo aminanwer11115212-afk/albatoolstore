@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
-import { userKey, onUserChange } from "@/lib/userScopedKey";
+import { onUserChange } from "@/lib/userScopedKey";
+import { formFactorUserKey } from "@/lib/formFactorKey";
+import { useFormFactor } from "@/hooks/useFormFactor";
 
 const SCOPE = "zoom";
 const MIN = 0.8;
@@ -38,7 +40,8 @@ export function useScreenZoom(
   target?: React.RefObject<HTMLElement | null>,
   cssVarName: string = "--items-zoom"
 ) {
-  const keyRef = useRef(userKey(SCOPE, screenId));
+  const ff = useFormFactor();
+  const keyRef = useRef(formFactorUserKey(SCOPE, screenId));
 
   const [zoom, setZoom] = useState<number>(() => {
     if (typeof window === "undefined") return 1;
@@ -55,13 +58,16 @@ export function useScreenZoom(
     return readKey(keyRef.current);
   });
 
-  // Re-read when user changes (login/logout).
+  // Re-read when user OR form factor changes.
   useEffect(() => {
+    keyRef.current = formFactorUserKey(SCOPE, screenId);
+    setZoom(readKey(keyRef.current));
     return onUserChange(() => {
-      keyRef.current = userKey(SCOPE, screenId);
+      keyRef.current = formFactorUserKey(SCOPE, screenId);
       setZoom(readKey(keyRef.current));
     });
-  }, [screenId]);
+  }, [screenId, ff]);
+
 
   // Apply CSS var to target (or body as fallback).
   useEffect(() => {

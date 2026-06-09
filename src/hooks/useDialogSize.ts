@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getFormFactorSync } from "@/hooks/useFormFactor";
 
 /**
  * Reusable hook for persisting dialog/popup dimensions per user.
@@ -52,7 +53,18 @@ export function useDialogSize(
   const buildKey = useCallback(
     (uid: string | null) => {
       const scope = uid ? `__${uid}` : "";
-      return `dlg_size_v2${scope}__${dialogKey}`;
+      const ff = getFormFactorSync();
+      const newKey = `dlg_size_v2${scope}__ff_${ff}__${dialogKey}`;
+      // Silent migration: copy desktop-only from the pre-form-factor key.
+      try {
+        if (typeof window !== "undefined" && ff === "desktop" &&
+            localStorage.getItem(newKey) === null) {
+          const oldKey = `dlg_size_v2${scope}__${dialogKey}`;
+          const v = localStorage.getItem(oldKey);
+          if (v !== null) localStorage.setItem(newKey, v);
+        }
+      } catch { /* noop */ }
+      return newKey;
     },
     [dialogKey],
   );
