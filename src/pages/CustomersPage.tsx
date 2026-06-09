@@ -598,8 +598,8 @@ export default function CustomersPage() {
   };
 
   // أعمدة جدول العملاء قابلة للسحب — مفاتيح وافتراضات مستقلة لهذه الصفحة
-  const CUSTOMERS_COLS_KEY = userScopedLegacyKey("customers-page:colWidths:v2");
-  const CUSTOMERS_LOCK_KEY = userScopedLegacyKey("customers-page:colsLocked:v1");
+  const CUSTOMERS_COLS_KEY = formFactorScopedLegacyKey("customers-page:colWidths:v2");
+  const CUSTOMERS_LOCK_KEY = formFactorScopedLegacyKey("customers-page:colsLocked:v1");
   const CUSTOMERS_DEFAULTS: (number | null)[] = [40, null, null, 110, 130, 130, 110, 130, 130, 130, 140, 160];
   const [colsLocked, setColsLocked] = useSharedColsLocked(() => {
     try { return localStorage.getItem(CUSTOMERS_LOCK_KEY) === "1"; } catch { return false; }
