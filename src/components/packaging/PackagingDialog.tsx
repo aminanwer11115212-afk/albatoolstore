@@ -582,7 +582,7 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                       onChange={(e) => setQuantity(e.target.value.slice(0, 2))}
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); typeSearchRef.current?.focus(); } }}
                     />
-                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <div className="pkg-full" style={{ display: "flex", gap: 4, alignItems: "center" }}>
                       <SearchableSelect
                         inputRef={typeSearchRef}
                         value={packagingTypeId}
