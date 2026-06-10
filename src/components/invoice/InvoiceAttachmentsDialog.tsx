@@ -97,8 +97,23 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
             _target: "done",
             _reason: "رفع إيصال الدفع",
           });
+          // تحقق من نجاح الترقية فعلاً
+          const { data: inv } = await supabase
+            .from("invoices")
+            .select("workflow_status")
+            .eq("id", invoiceId)
+            .maybeSingle();
+          if ((inv as any)?.workflow_status === "done") {
+            toast.success("تم تحديث حالة الفاتورة إلى: تم ✅");
+          } else {
+            toast.message("لم تتغير حالة التجهيز — تأكد من وجود بنود ومن أن الإجمالي أكبر من صفر.");
+          }
+          invalidateWorkflowAutoCache(invoiceId);
+          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
           onWorkflowAdvanced?.();
-        } catch {}
+        } catch (err: any) {
+          console.error("advance_invoice_workflow failed", err);
+        }
       }
     } catch (e: any) {
       toast.error(e.message);
