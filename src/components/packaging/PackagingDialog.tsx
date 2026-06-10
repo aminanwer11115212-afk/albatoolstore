@@ -635,6 +635,7 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                       }}
                       onTab={() => { piecesRef.current?.focus(); piecesRef.current?.select(); }}
                     />
+                    </div>
                     <label style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", whiteSpace: "nowrap" }}>قطع/نوع</label>
                     <input
                       ref={piecesRef}
