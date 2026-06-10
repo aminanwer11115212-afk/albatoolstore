@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import { useDialogSize } from "@/hooks/useDialogSize";
+import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 
 type Category = "receipt" | "running" | "details";
 type TabKey = Category | "trash";
