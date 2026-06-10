@@ -197,6 +197,7 @@ export type Database = {
           transaction_prefix: string | null
           updated_at: string
           website: string | null
+          workflow_automation_enabled: boolean
         }
         Insert: {
           address?: string | null
@@ -231,6 +232,7 @@ export type Database = {
           transaction_prefix?: string | null
           updated_at?: string
           website?: string | null
+          workflow_automation_enabled?: boolean
         }
         Update: {
           address?: string | null
@@ -265,6 +267,7 @@ export type Database = {
           transaction_prefix?: string | null
           updated_at?: string
           website?: string | null
+          workflow_automation_enabled?: boolean
         }
         Relationships: []
       }
@@ -2692,6 +2695,7 @@ export type Database = {
         Args: { _invoice_id: string; _reason: string; _target: string }
         Returns: undefined
       }
+      advance_invoke_safe: { Args: { _id: string }; Returns: undefined }
       current_user_login_status: { Args: never; Returns: string }
       delete_invoice_items_silent: {
         Args: { p_invoice_id: string }
@@ -2716,6 +2720,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_workflow_automation_enabled: { Args: never; Returns: boolean }
       mark_overdue_invoices: { Args: never; Returns: number }
       recompute_customer_balance: {
         Args: { _customer_id: string }
