@@ -726,8 +726,8 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                           </td>
                           <td className="text-center">{(showAll ? 0 : (safePage - 1) * perPage) + i + 1}</td>
                           <td className="text-center">{packs}</td>
-                          <td>{it.packaging_types?.name || "—"}</td>
-                          <td>{it.product_name || it.products?.name || "—"}{pieces > 1 ? <> {" — "}<span style={{ color: "hsl(var(--primary))", fontWeight: 700 }}>× {pieces}</span></> : null}</td>
+                           <td>{(packagingTypes as any[] || []).find((t: any) => t.id === it.packaging_type_id)?.name || it.packaging_types?.name || "—"}</td>
+                           <td>{it.product_name || it.products?.name || "—"}{pieces > 1 ? <> {" — "}<span style={{ color: "hsl(var(--primary))", fontWeight: 700 }}>× {pieces}</span></> : null}</td>
                           <td className="text-center">
                             <button onClick={() => handleDelete(it.id)} className="legacy-btn legacy-btn-danger btn-sm" title="حذف">
                               <Trash2 />
