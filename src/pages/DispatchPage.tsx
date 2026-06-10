@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useCompanySettings } from "@/hooks/useData";
 import ReadyToShipPanel from "@/components/dispatch/ReadyToShipPanel";
 import DispatchPrintPreview from "@/components/dispatch/DispatchPrintPreview";
+import DispatchEntitiesBar from "@/components/dispatch/DispatchEntitiesBar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Eye } from "lucide-react";
 
@@ -131,6 +132,8 @@ export default function DispatchPage() {
           .dispatch-page .dp-mobile-trigger { display: none; }
         }
       `}</style>
+
+      <DispatchEntitiesBar />
 
       <div className="dp-grid">
         {/* Main: ready-to-ship list (visually on the RIGHT in RTL) */}
