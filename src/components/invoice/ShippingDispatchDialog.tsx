@@ -172,15 +172,20 @@ export default function ShippingDispatchDialog({ open, onClose }: Props) {
         win.print();
         win.onafterprint = () => win.close();
 
-        // بعد الطباعة: تحديث حالة الفواتير إلى in_transit
+        // بعد الطباعة: ترقية الحالة عبر RPC الموحّد (لا UPDATE مباشر)
         const ids = printRows.map(r => r.invoiceId);
-        const { error } = await supabase
-          .from("invoices")
-          .update({ workflow_status: "in_transit" })
-          .in("id", ids);
-
-        if (error) {
-          toast.error(`فشل تحديث الحالات: ${error.message}`);
+        const results = await Promise.all(
+          ids.map(id =>
+            supabase.rpc("advance_invoice_workflow" as any, {
+              _invoice_id: id,
+              _target: "in_transit",
+              _reason: "طباعة كشف الفواتير الجاهزة",
+            })
+          )
+        );
+        const firstErr = results.find(r => (r as any).error)?.error;
+        if (firstErr) {
+          toast.error(`فشل تحديث الحالات: ${firstErr.message}`);
         } else {
           toast.success(`✅ تم طباعة التقرير وتحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات"`);
           // invalidate queries
