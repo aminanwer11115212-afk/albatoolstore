@@ -141,6 +141,7 @@ export default function InvoicesPage() {
         note: `حالة التجهيز: ${before} → ${newStatus}`,
       });
       toast.success("تم تحديث حالة التجهيز");
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       refetch();
     } catch (e: any) {
       // Rollback
