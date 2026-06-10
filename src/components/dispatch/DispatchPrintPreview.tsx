@@ -119,32 +119,56 @@ function renderTransportsHtml(rows: any[]): string {
 
 function renderPackagingHtml(rows: any[]): string {
   if (!rows.length) return `<span class="d-muted">—</span>`;
-  const lines = rows.map((r) => {
+  // جمع كل الأصناف من كل سجلات التغليف
+  const allItems: any[] = [];
+  rows.forEach((r) => {
+    if (Array.isArray(r.items) && r.items.length) {
+      r.items.forEach((it: any) => allItems.push({ ...it, _type: r.packaging_types?.name || "" }));
+    }
+  });
+
+  const typesBits = rows.map((r) => {
     const type = r.packaging_types?.name || "";
-    const qty = Number(r.quantity || 0);
-    const packs = Number(r.packs_count || 0);
-    const piecesPerPack = Number(r.pieces_per_pack || 0);
     const weight = Number(r.weight || 0);
     const dims = r.dimensions || "";
-    const bits: string[] = [];
-    if (type) bits.push(`<b>${escapeHtml(type)}</b>`);
-    if (qty && !r.items?.length) bits.push(`كمية: ${qty}`);
-    if (packs && !r.items?.length) bits.push(`طرود: ${packs}`);
-    if (piecesPerPack && !r.items?.length) bits.push(`قطع/طرد: ${piecesPerPack}`);
-    if (weight) bits.push(`الوزن: ${weight}`);
-    if (dims) bits.push(`أبعاد: ${escapeHtml(dims)}`);
-    let html = bits.length ? `<div class="d-line">${bits.join(" • ")}</div>` : "";
-    if (Array.isArray(r.items) && r.items.length) {
-      html += `<div class="d-items">` + r.items.map((it: any) => {
-        const name = it.product_name || "—";
-        const ps = Number(it.packs_count || 0);
-        const pp = Number(it.pieces_per_pack || 0);
-        const q = Number(it.quantity || 0);
-        return `<div class="d-item">• ${escapeHtml(name)} — ${ps}×${pp} = <b>${fmtNum(q)}</b></div>`;
-      }).join("") + `</div>`;
+    const parts: string[] = [];
+    if (type) parts.push(`<b>${escapeHtml(type)}</b>`);
+    if (weight) parts.push(`الوزن: ${weight}`);
+    if (dims) parts.push(`أبعاد: ${escapeHtml(dims)}`);
+    // إن لم تكن هناك أصناف تفصيلية، اعرض كميات السجل نفسه
+    if (!(r.items && r.items.length)) {
+      const qty = Number(r.quantity || 0);
+      const packs = Number(r.packs_count || 0);
+      const pp = Number(r.pieces_per_pack || 0);
+      if (packs) parts.push(`طرود: ${packs}`);
+      if (pp) parts.push(`قطع/طرد: ${pp}`);
+      if (qty) parts.push(`كمية: ${qty}`);
     }
-    return html;
-  });
+    return parts.length ? `<span class="d-pk-chip">${parts.join(" • ")}</span>` : "";
+  }).filter(Boolean).join("");
+
+  let table = "";
+  if (allItems.length) {
+    const rowsHtml = allItems.map((it) => {
+      const name = it.product_name || "—";
+      const ps = Number(it.packs_count || 0);
+      const pp = Number(it.pieces_per_pack || 0);
+      const q = Number(it.quantity || 0);
+      return `<tr>
+        <td class="d-pk-name">${escapeHtml(name)}</td>
+        <td class="d-pk-num">${ps}</td>
+        <td class="d-pk-num">${pp}</td>
+        <td class="d-pk-num d-pk-q"><b>${fmtNum(q)}</b></td>
+      </tr>`;
+    }).join("");
+    table = `<table class="d-pk-table">
+      <thead><tr>
+        <th>الصنف</th><th>الطرود</th><th>قطع/طرد</th><th>الإجمالي</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>`;
+  }
+
   const totals = {
     packs: rows.reduce((s, r) => {
       const itemsPacks = (r.items || []).reduce((ss: number, it: any) => ss + Number(it.packs_count || 0), 0);
@@ -157,8 +181,10 @@ function renderPackagingHtml(rows: any[]): string {
   if (totals.packs > 0) parts.push(`إجمالي الطرود: <b>${totals.packs}</b>`);
   if (totals.pieces > 0) parts.push(`إجمالي القطع: <b>${fmtNum(totals.pieces)}</b>`);
   if (totals.weight > 0) parts.push(`إجمالي الوزن: <b>${fmtNum(totals.weight)}</b>`);
-  const summary = parts.length ? `<div class="d-line d-line-sum">${parts.join(" • ")}</div>` : "";
-  return lines.join("") + summary;
+  const summary = parts.length ? `<div class="d-pk-sum">${parts.join(" • ")}</div>` : "";
+
+  const chips = typesBits ? `<div class="d-pk-chips">${typesBits}</div>` : "";
+  return chips + table + summary;
 }
 
 function renderCard(doc: DispatchDoc, idx: number): string {
