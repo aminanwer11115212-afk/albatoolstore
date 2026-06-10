@@ -60,6 +60,29 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
     },
   });
 
+  // Auto-refresh whenever an invoice changes anywhere in the app
+  // (status edits, packaging save, transport save, etc.)
+  useEffect(() => {
+    const onChange = () => {
+      qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
+    };
+    window.addEventListener("invoices:changed", onChange);
+    return () => window.removeEventListener("invoices:changed", onChange);
+  }, [qc]);
+
+  // Realtime: any change to workflow_status (or any invoices row) → refetch
+  useEffect(() => {
+    const channel = (supabase as any)
+      .channel("dispatch-ready-to-ship-rt")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "invoices" },
+        () => qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] }),
+      )
+      .subscribe();
+    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+  }, [qc]);
+
   const invoices = data || [];
 
   const toggle = useCallback((id: string) => {
