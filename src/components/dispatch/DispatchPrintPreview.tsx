@@ -223,11 +223,11 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
 
   const cardsHtml = docs.map((d, i) => renderCard(d, i)).join("");
 
-  const grandTotal = docs.reduce((s, d) => s + Number(d.invoice.total || 0), 0);
   const totalPacks = docs.reduce((s, d) =>
     s + d.packaging.reduce((ss, p: any) => ss + Number(p.packs_count || 0), 0), 0);
   const totalWeight = docs.reduce((s, d) =>
     s + d.packaging.reduce((ss, p: any) => ss + Number(p.weight || 0), 0), 0);
+
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
