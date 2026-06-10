@@ -119,58 +119,49 @@ function renderTransportsHtml(rows: any[]): string {
 
 function renderPackagingHtml(rows: any[]): string {
   if (!rows.length) return `<span class="d-muted">—</span>`;
-  // جمع كل الأصناف من كل سجلات التغليف
-  const allItems: any[] = [];
+
+  // بناء أسطر التغليف بنفس صياغة تقرير تغليف الفاتورة:
+  //   "n) packs — <b>type</b> product — × pieces"
+  type Line = { packs: number; type: string; product: string; pieces: number };
+  const lines: Line[] = [];
+
   rows.forEach((r) => {
+    const typeName = r.packaging_types?.name || "";
     if (Array.isArray(r.items) && r.items.length) {
-      r.items.forEach((it: any) => allItems.push({ ...it, _type: r.packaging_types?.name || "" }));
+      r.items.forEach((it: any) => {
+        lines.push({
+          packs: Number(it.packs_count ?? 1),
+          type: typeName,
+          product: it.product_name || "",
+          pieces: Number(it.pieces_per_pack ?? it.quantity ?? 1),
+        });
+      });
+    } else {
+      // لا توجد بنود تفصيلية → سجل التغليف نفسه كسطر
+      lines.push({
+        packs: Number(r.packs_count ?? 1),
+        type: typeName,
+        product: "",
+        pieces: Number(r.pieces_per_pack ?? r.quantity ?? 1),
+      });
     }
   });
 
-  const typesBits = rows.map((r) => {
-    const type = r.packaging_types?.name || "";
-    const weight = Number(r.weight || 0);
-    const dims = r.dimensions || "";
-    const parts: string[] = [];
-    if (type) parts.push(`<b>${escapeHtml(type)}</b>`);
-    if (weight) parts.push(`الوزن: ${weight}`);
-    if (dims) parts.push(`أبعاد: ${escapeHtml(dims)}`);
-    // إن لم تكن هناك أصناف تفصيلية، اعرض كميات السجل نفسه
-    if (!(r.items && r.items.length)) {
-      const qty = Number(r.quantity || 0);
-      const packs = Number(r.packs_count || 0);
-      const pp = Number(r.pieces_per_pack || 0);
-      if (packs) parts.push(`طرود: ${packs}`);
-      if (pp) parts.push(`قطع/طرد: ${pp}`);
-      if (qty) parts.push(`كمية: ${qty}`);
-    }
-    return parts.length ? `<span class="d-pk-chip">${parts.join(" • ")}</span>` : "";
-  }).filter(Boolean).join("");
+  if (!lines.length) return `<span class="d-muted">—</span>`;
 
-  let table = "";
-  if (allItems.length) {
-    const rowsHtml = allItems.map((it, i) => {
-      const name = it.product_name || "—";
-      const ps = Number(it.packs_count || 0);
-      const pp = Number(it.pieces_per_pack || 0);
-      const q = Number(it.quantity || 0);
-      const desc = (ps && pp) ? `${escapeHtml(name)} - ${ps}×${pp}` : escapeHtml(name);
-      return `<tr>
-        <td class="d-pk-num">${i + 1}</td>
-        <td class="d-pk-num d-pk-q"><b>${fmtNum(q)}</b></td>
-        <td class="d-pk-name">${desc}</td>
-      </tr>`;
-    }).join("");
-    table = `<table class="d-pk-table">
-      <thead><tr>
-        <th class="d-pk-num">#</th><th class="d-pk-num">العدد</th><th>نوع التغليف والصنف</th>
-      </tr></thead>
-      <tbody>${rowsHtml}</tbody>
-    </table>`;
-  }
+  const linesHtml = lines.map((l, i) => {
+    const typePart = l.type ? `<b>${escapeHtml(l.type)}</b>` : "";
+    const productPart = l.product ? ` ${escapeHtml(l.product)}` : "";
+    const piecesPart = l.pieces > 1 ? ` — × ${l.pieces}` : "";
+    return `<div class="d-pk-line">
+      <span class="d-pk-i">${i + 1})</span>
+      <span class="d-pk-p">${l.packs}</span>
+      <span class="d-pk-sep">—</span>
+      <span class="d-pk-t">${typePart}${productPart}${piecesPart}</span>
+    </div>`;
+  }).join("");
 
-  const chips = typesBits ? `<div class="d-pk-chips">${typesBits}</div>` : "";
-  return chips + table;
+  return `<div class="d-pk-lines">${linesHtml}</div>`;
 }
 
 function renderCard(doc: DispatchDoc, idx: number): string {
@@ -277,31 +268,18 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
     .d-line { font-size: 11px; padding: 1px 0; }
     .d-muted { color: #64748b; }
 
-    /* Packaging table */
-    .d-pk-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 3px; }
-    .d-pk-chip {
-      display: inline-block; font-size: 10.5px;
-      padding: 1px 6px; border: 1px solid #cbd5e1; border-radius: 10px;
-      background: #fff;
+    /* Packaging — text lines */
+    .d-pk-lines { display: block; margin-top: 2px; }
+    .d-pk-line {
+      display: flex; align-items: baseline; gap: 4px;
+      font-size: 11px; padding: 1px 0;
+      border-bottom: 1px dotted #e5e7eb;
     }
-    .d-pk-table {
-      width: 100%; border-collapse: collapse; font-size: 11px;
-      margin-top: 2px; background: #fff;
-    }
-    .d-pk-table th, .d-pk-table td {
-      border: 1px solid #d1d5db; padding: 2px 5px; text-align: right;
-    }
-    .d-pk-table thead th {
-      background: #e5e7eb; font-weight: 800; font-size: 10.5px;
-    }
-    .d-pk-name { width: 50%; }
-    .d-pk-num { text-align: center; width: 12%; }
-    .d-pk-q { background: #f8fafc; }
-    .d-pk-sum {
-      margin-top: 3px; padding: 2px 5px;
-      font-weight: 800; font-size: 11px; color: #0f172a;
-      border-top: 1.5px solid #94a3b8; background: #f1f5f9; border-radius: 3px;
-    }
+    .d-pk-line:last-child { border-bottom: none; }
+    .d-pk-i { color: #64748b; font-weight: 800; min-width: 18px; }
+    .d-pk-p { font-weight: 800; color: #0f172a; min-width: 18px; text-align: center; }
+    .d-pk-sep { color: #94a3b8; }
+    .d-pk-t { flex: 1; }
     .d-notes { font-size: 10.5px; background: #fefce8; padding: 2px 5px; border-radius: 3px; }
 
     @media print {
