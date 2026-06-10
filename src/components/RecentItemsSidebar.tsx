@@ -205,7 +205,7 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
     user: "المستخدم",
     note: "ملاحظة",
   };
-  const hiddenStorageKey = `recent-sidebar:hidden:${type}:v1`;
+  const hiddenStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:hidden:${type}:v1`);
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -252,7 +252,7 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
   hiddenColsRef.current = hiddenCols;
 
   // ===== User-customizable font size & density (per-type, persisted) =====
-  const stylePrefsKey = `recent-sidebar:style:${type}:v1`;
+  const stylePrefsKey = useFormFactorScopedLegacyKey(`recent-sidebar:style:${type}:v1`);
   type StylePrefs = { fontPx: number; density: number };
   const defaultStylePrefs: StylePrefs = { fontPx: compact ? 11 : 12, density: 1 };
   const [stylePrefs, setStylePrefsState] = useState<StylePrefs>(() => {
