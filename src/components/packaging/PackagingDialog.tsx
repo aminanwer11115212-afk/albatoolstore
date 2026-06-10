@@ -617,6 +617,7 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                         <Plus style={{ width: 11, height: 11 }} />
                       </button>
                     </div>
+                    <div className="pkg-full" style={{ display: "contents" }}>
                     <SearchableSelect
                       inputRef={productSearchRef}
                       value={productId || productName}
