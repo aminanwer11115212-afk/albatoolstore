@@ -1,20 +1,19 @@
 /**
- * DispatchPrintPreview — لوحة معاينة طباعة A4 للفواتير المختارة في إدارة الترحيلات.
+ * DispatchPrintPreview — معاينة طباعة A4 لإدارة الترحيلات.
  *
- * - تستخدم نفس قالب الطباعة العام للفواتير (generatePrintHTML) كي يكون شكل
- *   المعاينة مطابقاً تماماً لشكل طباعة الفاتورة في باقي الشاشات.
- * - تعرض فاتورة واحدة لكل صفحة A4، مع شريط تنقل بين الفواتير المختارة.
- * - يتم تصغير الترويسة (الشعار + اسم الشركة + العناوين) عبر CSS مُحقَن
- *   فوق القالب لتوفير مساحة لمحتوى الترحيلات/التغليف.
- * - "طباعة الكل" تبني وثيقة واحدة فيها كل الفواتير (page-break بين كلٍ منها).
+ * شكل المعاينة عبارة عن "كشف ترحيلات" مدمج:
+ *   - ترويسة شركة مصغّرة + عنوان "كشف الترحيلات" (مرّة واحدة أعلى الصفحة).
+ *   - بطاقة مدمجة لكل فاتورة تعرض:
+ *       رقم الفاتورة، التاريخ، الزبون، الوجهة، الناقل، بيانات التغليف،
+ *       عدد الأصناف والإجمالي.
+ *   - البطاقات تتدفق على الصفحة بحيث تستوعب الصفحة A4 الواحدة أكثر من فاتورة،
+ *     حسب حجم بيانات التغليف لكل فاتورة (page-break-inside: avoid).
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Printer, ChevronRight, ChevronLeft, Eye, Loader2 } from "lucide-react";
-import { generatePrintHTML } from "@/utils/printTemplate";
-import { loadInvoiceExtras } from "@/utils/printExtras";
+import { Printer, Eye, Loader2 } from "lucide-react";
 
 type Props = {
   selectedIds: Set<string>;
@@ -23,102 +22,268 @@ type Props = {
 
 const EMPTY_IDS: string[] = [];
 
-// CSS مُحقَن فوق قالب الطباعة لتصغير الترويسة فقط (دون المساس بباقي القالب).
-const COMPACT_HEADER_CSS = `
-  body { padding: 14px !important; }
-  .header { padding-bottom: 6px !important; margin-bottom: 6px !important; border-bottom-width: 2px !important; }
-  .header-logos { margin-bottom: 3px !important; }
-  .header-logo img { height: 42px !important; }
-  .header-title { font-size: 14px !important; margin-bottom: 2px !important; }
-  .header-address { font-size: 10px !important; line-height: 1.35 !important; }
-  .header-phones { font-size: 11px !important; margin-top: 1px !important; }
-  .header-manager { font-size: 10px !important; margin-top: 1px !important; }
-  .doc-title { margin: 6px 0 6px !important; }
-  .doc-title h1 { font-size: 16px !important; padding-bottom: 2px !important; border-bottom-width: 2px !important; }
-  .info-row { margin-bottom: 8px !important; font-size: 12px !important; }
-`;
+const escapeHtml = (s: any) => {
+  if (s === null || s === undefined) return "";
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+};
 
-/**
- * يحقن CSS داخل <head> لكتلة HTML المُولّدة من generatePrintHTML.
- */
-function injectCompactHeader(html: string): string {
-  const styleTag = `<style data-dispatch-compact>${COMPACT_HEADER_CSS}</style>`;
-  if (html.includes("</head>")) return html.replace("</head>", `${styleTag}</head>`);
-  return styleTag + html;
-}
+const fmtNum = (n: any) => {
+  const v = Number(n || 0);
+  return v.toLocaleString("en-US", { maximumFractionDigits: 2 });
+};
 
-/**
- * يستخرج محتوى <body>...</body> من وثيقة HTML.
- */
-function extractBody(html: string): string {
-  const m = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  return m ? m[1] : html;
-}
+const fmtDate = (d: any) => {
+  if (!d) return "";
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return String(d);
+    return dt.toLocaleDateString("en-GB");
+  } catch { return String(d); }
+};
 
-/**
- * يستخرج محتوى أول <style> من وثيقة HTML (قالب الطباعة يضع كل CSS هناك).
- */
-function extractStyle(html: string): string {
-  const m = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-  return m ? m[1] : "";
-}
+type DispatchDoc = {
+  invoice: any;
+  itemsCount: number;
+  qtyTotal: number;
+  transports: any[];
+  packaging: any[];
+};
 
-// تحميل فاتورة كاملة (بنود + زبون + رصيد) — مماثل لما يفعله DocumentPreviewPage.
-async function loadFullInvoice(id: string) {
-  const { data: invoice, error } = await supabase
+async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
+  const { data: invoice } = await supabase
     .from("invoices")
-    .select("*, customers(name, phone, address, email, balance)")
+    .select("id, invoice_number, date, total, status, notes, customers(name, phone, address)")
     .eq("id", id)
     .maybeSingle();
-  if (error) throw error;
   if (!invoice) return null;
-  const { data: items } = await supabase
-    .from("invoice_items").select("*").eq("invoice_id", id);
-  return { invoice, items: items || [] };
+  const [{ data: items }, { data: transports }, { data: packaging }] = await Promise.all([
+    supabase.from("invoice_items").select("quantity").eq("invoice_id", id),
+    supabase.from("invoice_transports")
+      .select("vehicle_number, driver_name, transport_date, cost, notes, transporters(name), destinations(name)")
+      .eq("invoice_id", id),
+    supabase.from("invoice_packaging")
+      .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
+      .eq("invoice_id", id),
+  ]);
+  const itemsCount = items?.length || 0;
+  const qtyTotal = (items || []).reduce((s, it: any) => s + Number(it.quantity || 0), 0);
+  return {
+    invoice,
+    itemsCount,
+    qtyTotal,
+    transports: transports || [],
+    packaging: packaging || [],
+  };
 }
 
-function buildInvoiceHTML(payload: any, company: any, extras: any): string {
-  const { invoice, items } = payload;
-  const printItems = items.map((it: any) => ({
-    product_name: it.product_name,
-    quantity: it.quantity,
-    unit_price: it.unit_price,
-    tax_amount:
-      (Number(it.tax_rate || 0) * Number(it.unit_price) * Number(it.quantity)) / 100,
-    discount: it.discount || 0,
-    total: it.total,
-  }));
-  const raw = generatePrintHTML({
-    type: "invoice",
-    isCash: invoice.type === "cash",
-    number: invoice.invoice_number,
-    date: invoice.date,
-    dueDate: invoice.due_date,
-    customer: invoice.customers
-      ? {
-          name: invoice.customers.name,
-          phone: invoice.customers.phone,
-          address: invoice.customers.address,
-          email: invoice.customers.email,
-        }
-      : null,
-    items: printItems,
-    subtotal: Number(invoice.subtotal || 0),
-    taxTotal: Number(invoice.tax_amount || 0),
-    discountTotal: Number(invoice.discount || 0),
-    shipping: Number(invoice.shipping || 0),
-    grandTotal: Number(invoice.total || 0),
-    paidAmount: Number(invoice.paid_amount || 0),
-    dueAmount: Number(invoice.due_amount || 0),
-    notes: invoice.notes,
-    company: company as any,
-    status: invoice.status,
-    paymentMethod: invoice.payment_method,
-    variant: "full",
-    oldBalance: Number(invoice.customers?.balance || 0),
-    ...extras,
+function renderTransportsHtml(rows: any[]): string {
+  if (!rows.length) return `<span class="d-muted">—</span>`;
+  return rows.map((r) => {
+    const transporter = r.transporters?.name || "";
+    const destination = r.destinations?.name || "";
+    const vehicle = r.vehicle_number || "";
+    const driver = r.driver_name || "";
+    const date = fmtDate(r.transport_date);
+    const cost = Number(r.cost || 0);
+    const bits: string[] = [];
+    if (transporter) bits.push(`<b>${escapeHtml(transporter)}</b>`);
+    if (destination) bits.push(`→ ${escapeHtml(destination)}`);
+    if (vehicle) bits.push(`مركبة: ${escapeHtml(vehicle)}`);
+    if (driver) bits.push(`سائق: ${escapeHtml(driver)}`);
+    if (date) bits.push(date);
+    if (cost > 0) bits.push(`التكلفة: ${fmtNum(cost)}`);
+    return `<div class="d-line">${bits.join(" • ")}</div>`;
+  }).join("");
+}
+
+function renderPackagingHtml(rows: any[]): string {
+  if (!rows.length) return `<span class="d-muted">—</span>`;
+  const lines = rows.map((r) => {
+    const type = r.packaging_types?.name || "";
+    const qty = Number(r.quantity || 0);
+    const packs = Number(r.packs_count || 0);
+    const piecesPerPack = Number(r.pieces_per_pack || 0);
+    const weight = Number(r.weight || 0);
+    const dims = r.dimensions || "";
+    const bits: string[] = [];
+    if (type) bits.push(`<b>${escapeHtml(type)}</b>`);
+    if (qty) bits.push(`كمية: ${qty}`);
+    if (packs) bits.push(`طرود: ${packs}`);
+    if (piecesPerPack) bits.push(`قطع/طرد: ${piecesPerPack}`);
+    if (weight) bits.push(`الوزن: ${weight}`);
+    if (dims) bits.push(`أبعاد: ${escapeHtml(dims)}`);
+    return `<div class="d-line">${bits.join(" • ")}</div>`;
   });
-  return injectCompactHeader(raw);
+  const totals = {
+    packs: rows.reduce((s, r) => s + Number(r.packs_count || 0), 0),
+    weight: rows.reduce((s, r) => s + Number(r.weight || 0), 0),
+  };
+  let summary = "";
+  if (totals.packs > 0 || totals.weight > 0) {
+    const parts: string[] = [];
+    if (totals.packs > 0) parts.push(`إجمالي الطرود: <b>${totals.packs}</b>`);
+    if (totals.weight > 0) parts.push(`إجمالي الوزن: <b>${fmtNum(totals.weight)}</b>`);
+    summary = `<div class="d-line d-line-sum">${parts.join(" • ")}</div>`;
+  }
+  return lines.join("") + summary;
+}
+
+function renderCard(doc: DispatchDoc, idx: number): string {
+  const inv = doc.invoice;
+  const cust = inv.customers;
+  return `
+    <section class="d-card">
+      <header class="d-card-head">
+        <div class="d-card-num"><span class="d-idx">${idx + 1}</span> فاتورة #${escapeHtml(inv.invoice_number || "—")}</div>
+        <div class="d-card-date">${fmtDate(inv.date)}</div>
+      </header>
+      <div class="d-card-body">
+        <div class="d-row">
+          <div class="d-cell">
+            <div class="d-label">الزبون</div>
+            <div class="d-value"><b>${escapeHtml(cust?.name || "—")}</b>${cust?.phone ? ` • ${escapeHtml(cust.phone)}` : ""}</div>
+            ${cust?.address ? `<div class="d-value d-muted">${escapeHtml(cust.address)}</div>` : ""}
+          </div>
+          <div class="d-cell d-cell-side">
+            <div class="d-label">الأصناف</div>
+            <div class="d-value"><b>${doc.itemsCount}</b> <span class="d-muted">(كمية: ${fmtNum(doc.qtyTotal)})</span></div>
+            <div class="d-label">الإجمالي</div>
+            <div class="d-value d-total">${fmtNum(inv.total)}</div>
+          </div>
+        </div>
+        <div class="d-section">
+          <div class="d-label">الناقل والوجهة</div>
+          ${renderTransportsHtml(doc.transports)}
+        </div>
+        <div class="d-section">
+          <div class="d-label">بيانات التغليف</div>
+          ${renderPackagingHtml(doc.packaging)}
+        </div>
+        ${inv.notes ? `<div class="d-section d-notes"><div class="d-label">ملاحظات</div><div class="d-value">${escapeHtml(inv.notes)}</div></div>` : ""}
+      </div>
+    </section>
+  `;
+}
+
+function buildFullHTML(docs: DispatchDoc[], company: any): string {
+  const companyName = company?.company_name || "";
+  const address = company?.address || "";
+  const phone = company?.phone || "";
+  const logo = company?.logo_url || "";
+  const today = new Date().toLocaleDateString("en-GB");
+
+  const cardsHtml = docs.map((d, i) => renderCard(d, i)).join("");
+
+  const grandTotal = docs.reduce((s, d) => s + Number(d.invoice.total || 0), 0);
+  const totalPacks = docs.reduce((s, d) =>
+    s + d.packaging.reduce((ss, p: any) => ss + Number(p.packs_count || 0), 0), 0);
+  const totalWeight = docs.reduce((s, d) =>
+    s + d.packaging.reduce((ss, p: any) => ss + Number(p.weight || 0), 0), 0);
+
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8" />
+  <title>كشف الترحيلات</title>
+  <style>
+    @page { size: A4; margin: 10mm 8mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Cairo', 'Tajawal', Arial, sans-serif;
+      color: #111; background: #fff;
+      font-size: 12px; line-height: 1.45;
+    }
+    .d-page-header {
+      display: flex; align-items: center; gap: 10px;
+      padding-bottom: 6px; margin-bottom: 8px;
+      border-bottom: 2px solid #111;
+    }
+    .d-logo { height: 44px; width: auto; object-fit: contain; }
+    .d-company { flex: 1; }
+    .d-company-name { font-size: 16px; font-weight: 800; }
+    .d-company-meta { font-size: 10.5px; color: #444; }
+    .d-doc-title {
+      text-align: center; font-size: 15px; font-weight: 800;
+      padding: 4px 10px; border: 1.5px solid #111; border-radius: 6px;
+      background: #f3f4f6;
+    }
+    .d-summary {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 10px; font-size: 11.5px; margin-bottom: 8px;
+      padding: 4px 8px; background: #f8fafc;
+      border: 1px solid #cbd5e1; border-radius: 4px;
+    }
+    .d-summary b { font-weight: 800; }
+
+    .d-card {
+      border: 1.2px solid #111; border-radius: 6px;
+      margin-bottom: 6px; overflow: hidden;
+      page-break-inside: avoid; break-inside: avoid;
+    }
+    .d-card-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 4px 8px; background: #1f2937; color: #fff;
+      font-size: 12px; font-weight: 800;
+    }
+    .d-idx {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 18px; height: 18px; padding: 0 5px;
+      border-radius: 4px; background: #fff; color: #1f2937;
+      font-size: 11px; margin-left: 4px;
+    }
+    .d-card-date { font-weight: 700; font-size: 11.5px; }
+    .d-card-body { padding: 5px 8px; }
+    .d-row { display: flex; gap: 8px; align-items: stretch; margin-bottom: 4px; }
+    .d-cell { flex: 1; min-width: 0; }
+    .d-cell-side {
+      flex: 0 0 38%; text-align: left; direction: ltr;
+      border-right: 1px dashed #cbd5e1; padding-right: 8px;
+    }
+    .d-cell-side .d-label, .d-cell-side .d-value { direction: rtl; text-align: right; }
+    .d-section {
+      margin-top: 3px; padding-top: 3px;
+      border-top: 1px dashed #d1d5db;
+    }
+    .d-label {
+      font-size: 10px; font-weight: 800; color: #475569;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .d-value { font-size: 12px; }
+    .d-line { font-size: 11.5px; padding: 1px 0; }
+    .d-line-sum { font-weight: 800; color: #0f172a; margin-top: 2px; }
+    .d-muted { color: #64748b; }
+    .d-total { font-weight: 800; font-size: 13px; color: #b91c1c; }
+    .d-notes .d-value { background: #fefce8; padding: 2px 6px; border-radius: 3px; }
+
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="d-page-header">
+    ${logo ? `<img class="d-logo" src="${escapeHtml(logo)}" />` : ""}
+    <div class="d-company">
+      <div class="d-company-name">${escapeHtml(companyName)}</div>
+      <div class="d-company-meta">${escapeHtml(address)}${phone ? ` • ${escapeHtml(phone)}` : ""}</div>
+    </div>
+    <div class="d-doc-title">كشف الترحيلات</div>
+  </div>
+
+  <div class="d-summary">
+    <div>التاريخ: <b>${today}</b></div>
+    <div>عدد الفواتير: <b>${docs.length}</b></div>
+    <div>إجمالي الطرود: <b>${totalPacks}</b></div>
+    <div>إجمالي الوزن: <b>${fmtNum(totalWeight)}</b></div>
+    <div>إجمالي القيمة: <b>${fmtNum(grandTotal)}</b></div>
+  </div>
+
+  ${cardsHtml}
+</body>
+</html>`;
 }
 
 export default function DispatchPrintPreview({ selectedIds, company }: Props) {
@@ -127,45 +292,22 @@ export default function DispatchPrintPreview({ selectedIds, company }: Props) {
     return arr.length ? arr : EMPTY_IDS;
   }, [selectedIds]);
 
-  const [currentIdx, setCurrentIdx] = useState(0);
-
-  // إعادة الضبط عند تغيُّر الاختيار
-  useEffect(() => {
-    setCurrentIdx((i) => Math.min(i, Math.max(0, ids.length - 1)));
-  }, [ids.length, ids.join(",")]);
-
-  // تحميل بيانات كل الفواتير المختارة (للمعاينة وللطباعة الجماعية)
   const { data: docs, isLoading } = useQuery({
-    queryKey: ["dispatch-preview-full", ids.sort().join(",")],
+    queryKey: ["dispatch-preview-sheet", ids.sort().join(",")],
     enabled: ids.length > 0,
     queryFn: async () => {
-      const results = await Promise.all(
-        ids.map(async (id) => {
-          const payload = await loadFullInvoice(id);
-          if (!payload) return null;
-          const extras = await loadInvoiceExtras(id).catch(() => ({}));
-          return { id, payload, extras };
-        })
-      );
-      return results.filter(Boolean) as Array<{
-        id: string;
-        payload: any;
-        extras: any;
-      }>;
+      const results = await Promise.all(ids.map((id) => loadDispatchDoc(id).catch(() => null)));
+      return results.filter(Boolean) as DispatchDoc[];
     },
   });
 
-  const total = ids.length;
-  const currentDoc = docs?.[currentIdx];
+  const html = useMemo(() => {
+    if (!docs || docs.length === 0) return "";
+    return buildFullHTML(docs, company);
+  }, [docs, company]);
 
-  // HTML للمعاينة (الفاتورة الحالية)
-  const previewHtml = useMemo(() => {
-    if (!currentDoc) return "";
-    return buildInvoiceHTML(currentDoc.payload, company, currentDoc.extras);
-  }, [currentDoc, company]);
-
-  // ── Print handlers ────────────────────────────────────────────────────────
-  const openPrintWindow = (html: string) => {
+  const handlePrint = () => {
+    if (!html) return;
     const win = window.open("", "_blank", "width=900,height=1000");
     if (!win) return;
     win.document.write(html);
@@ -176,26 +318,6 @@ export default function DispatchPrintPreview({ selectedIds, company }: Props) {
     };
   };
 
-  const handlePrintCurrent = () => {
-    if (!previewHtml) return;
-    openPrintWindow(previewHtml);
-  };
-
-  const handlePrintAll = () => {
-    if (!docs || docs.length === 0) return;
-    // نبني وثيقة موحَّدة: نأخذ CSS من أول فاتورة + body لكل فاتورة بـ page-break.
-    const first = buildInvoiceHTML(docs[0].payload, company, docs[0].extras);
-    const css = extractStyle(first) + "\n" + COMPACT_HEADER_CSS +
-      "\n.page { page-break-after: always; } .page:last-child { page-break-after: auto; }";
-    const bodies = docs.map((d) => {
-      const html = buildInvoiceHTML(d.payload, company, d.extras);
-      return extractBody(html);
-    }).join("\n");
-    const out = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8" /><title>طباعة الترحيلات</title><style>${css}</style></head><body>${bodies}</body></html>`;
-    openPrintWindow(out);
-  };
-
-  // ── Empty state ───────────────────────────────────────────────────────────
   if (ids.length === 0) {
     return (
       <div className="dpp-shell" dir="rtl">
@@ -206,7 +328,7 @@ export default function DispatchPrintPreview({ selectedIds, company }: Props) {
         <div className="dpp-empty">
           <Eye size={36} className="dpp-empty-ic" />
           <div className="dpp-empty-title">لا توجد فواتير مختارة</div>
-          <div className="dpp-empty-sub">اختر فاتورة أو أكثر من القائمة لعرض معاينة الطباعة هنا</div>
+          <div className="dpp-empty-sub">اختر فاتورة أو أكثر من القائمة لعرض كشف الترحيلات</div>
         </div>
       </div>
     );
@@ -216,68 +338,33 @@ export default function DispatchPrintPreview({ selectedIds, company }: Props) {
     <div className="dpp-shell" dir="rtl">
       <PreviewStyles />
 
-      {/* Header + Nav */}
       <div className="dpp-header">
-        <h3><Eye size={15} /> معاينة الطباعة</h3>
-        <div className="dpp-nav">
-          <button
-            type="button"
-            className="dpp-nav-btn"
-            onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
-            disabled={currentIdx === 0}
-            title="السابقة"
-          >
-            <ChevronRight size={14} />
-          </button>
-          <span className="dpp-pageinfo">
-            فاتورة <b>{currentIdx + 1}</b> من <b>{total}</b>
-          </span>
-          <button
-            type="button"
-            className="dpp-nav-btn"
-            onClick={() => setCurrentIdx((i) => Math.min(total - 1, i + 1))}
-            disabled={currentIdx >= total - 1}
-            title="التالية"
-          >
-            <ChevronLeft size={14} />
-          </button>
-        </div>
+        <h3><Eye size={15} /> كشف الترحيلات</h3>
+        <span className="dpp-pageinfo">{ids.length} فاتورة</span>
       </div>
 
-      {/* Actions */}
       <div className="dpp-actions">
         <button
           type="button"
           className="dpp-btn dpp-btn-primary"
-          onClick={handlePrintCurrent}
-          disabled={isLoading || !previewHtml}
+          onClick={handlePrint}
+          disabled={isLoading || !html}
         >
           <Printer size={13} />
-          طباعة الفاتورة الحالية
-        </button>
-        <button
-          type="button"
-          className="dpp-btn dpp-btn-ghost"
-          onClick={handlePrintAll}
-          disabled={isLoading || !docs || docs.length === 0}
-        >
-          <Printer size={13} />
-          طباعة الكل ({total})
+          طباعة الكشف
         </button>
       </div>
 
-      {/* Preview iframe */}
       <div className="dpp-viewport">
-        {isLoading || !previewHtml ? (
+        {isLoading || !html ? (
           <div className="dpp-empty">
             <Loader2 className="animate-spin" size={18} />
             <div className="dpp-empty-title">جارٍ تحميل المعاينة…</div>
           </div>
         ) : (
           <iframe
-            key={currentDoc?.id}
-            title="معاينة طباعة الترحيل"
-            srcDoc={previewHtml}
+            title="معاينة كشف الترحيلات"
+            srcDoc={html}
             className="dpp-iframe"
           />
         )}
@@ -286,7 +373,6 @@ export default function DispatchPrintPreview({ selectedIds, company }: Props) {
   );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
 function PreviewStyles() {
   return (
     <style>{`
@@ -305,17 +391,7 @@ function PreviewStyles() {
         color: hsl(var(--primary-foreground));
       }
       .dpp-header h3 { font-size:13px; font-weight:800; margin:0; display:flex; align-items:center; gap:6px; }
-      .dpp-nav { display:inline-flex; align-items:center; gap:4px; background: rgba(255,255,255,0.18); border-radius:6px; padding:2px 4px; }
-      .dpp-nav-btn {
-        background: transparent; border:none; color:inherit; cursor:pointer;
-        padding: 2px 4px; border-radius:4px;
-        display:inline-flex; align-items:center; justify-content:center;
-      }
-      .dpp-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.25); }
-      .dpp-nav-btn:disabled { opacity:0.4; cursor:not-allowed; }
-      .dpp-pageinfo { font-size:11px; font-weight:700; padding: 0 4px; }
-      .dpp-pageinfo b { font-weight:800; }
-
+      .dpp-pageinfo { font-size:11px; font-weight:700; background: rgba(255,255,255,0.18); padding: 3px 8px; border-radius: 6px; }
       .dpp-actions {
         display:flex; gap:6px; padding: 8px 10px;
         border-bottom: 1px solid hsl(var(--border));
@@ -328,8 +404,6 @@ function PreviewStyles() {
       }
       .dpp-btn:disabled { opacity:0.5; cursor:not-allowed; }
       .dpp-btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); flex:1; justify-content:center; }
-      .dpp-btn-ghost { background: hsl(var(--card)); color: hsl(var(--foreground)); border:1px solid hsl(var(--border)); }
-
       .dpp-viewport {
         flex:1; min-height: 360px;
         background: hsl(var(--muted) / 0.4);
