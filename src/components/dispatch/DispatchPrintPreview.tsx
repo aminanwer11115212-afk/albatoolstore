@@ -292,6 +292,8 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
     .d-value { font-size: 12px; }
     .d-line { font-size: 11.5px; padding: 1px 0; }
     .d-line-sum { font-weight: 800; color: #0f172a; margin-top: 2px; }
+    .d-items { margin: 2px 0 2px 8px; padding-right: 6px; border-right: 2px solid #e5e7eb; }
+    .d-item { font-size: 11px; padding: 1px 0; color: #1f2937; }
     .d-muted { color: #64748b; }
     .d-total { font-weight: 800; font-size: 13px; color: #b91c1c; }
     .d-notes .d-value { background: #fefce8; padding: 2px 6px; border-radius: 3px; }
