@@ -58,23 +58,39 @@ async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
     .eq("id", id)
     .maybeSingle();
   if (!invoice) return null;
-  const [{ data: items }, { data: transports }, { data: packaging }] = await Promise.all([
+  const [{ data: items }, { data: transports }, { data: packaging }, { data: packagingItems }, { data: transportItems }] = await Promise.all([
     supabase.from("invoice_items").select("quantity").eq("invoice_id", id),
     supabase.from("invoice_transports")
-      .select("vehicle_number, driver_name, transport_date, cost, notes, transporters(name), destinations(name)")
+      .select("id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name), destinations(name)")
       .eq("invoice_id", id),
     supabase.from("invoice_packaging")
-      .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
+      .select("id, quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
+      .eq("invoice_id", id),
+    supabase.from("invoices_packaging_items")
+      .select("product_name, packs_count, pieces_per_pack, quantity, price, total, invoice_packaging_id")
+      .eq("invoice_id", id),
+    (supabase as any).from("invoices_transports_items")
+      .select("product_name, packs_count, pieces_per_pack, quantity, price, total, invoice_transport_id")
       .eq("invoice_id", id),
   ]);
   const itemsCount = items?.length || 0;
   const qtyTotal = (items || []).reduce((s, it: any) => s + Number(it.quantity || 0), 0);
+
+  const packagingWithItems = (packaging || []).map((p: any) => ({
+    ...p,
+    items: (packagingItems || []).filter((it: any) => it.invoice_packaging_id === p.id),
+  }));
+  const transportsWithItems = (transports || []).map((t: any) => ({
+    ...t,
+    items: (transportItems || []).filter((it: any) => it.invoice_transport_id === t.id),
+  }));
+
   return {
     invoice,
     itemsCount,
     qtyTotal,
-    transports: transports || [],
-    packaging: packaging || [],
+    transports: transportsWithItems,
+    packaging: packagingWithItems,
   };
 }
 
@@ -94,7 +110,17 @@ function renderTransportsHtml(rows: any[]): string {
     if (driver) bits.push(`سائق: ${escapeHtml(driver)}`);
     if (date) bits.push(date);
     if (cost > 0) bits.push(`التكلفة: ${fmtNum(cost)}`);
-    return `<div class="d-line">${bits.join(" • ")}</div>`;
+    let html = bits.length ? `<div class="d-line">${bits.join(" • ")}</div>` : "";
+    if (Array.isArray(r.items) && r.items.length) {
+      html += `<div class="d-items">` + r.items.map((it: any) => {
+        const name = it.product_name || "—";
+        const ps = Number(it.packs_count || 0);
+        const pp = Number(it.pieces_per_pack || 0);
+        const q = Number(it.quantity || 0);
+        return `<div class="d-item">• ${escapeHtml(name)} — ${ps}×${pp} = <b>${fmtNum(q)}</b></div>`;
+      }).join("") + `</div>`;
+    }
+    return html;
   }).join("");
 }
 
@@ -109,24 +135,36 @@ function renderPackagingHtml(rows: any[]): string {
     const dims = r.dimensions || "";
     const bits: string[] = [];
     if (type) bits.push(`<b>${escapeHtml(type)}</b>`);
-    if (qty) bits.push(`كمية: ${qty}`);
-    if (packs) bits.push(`طرود: ${packs}`);
-    if (piecesPerPack) bits.push(`قطع/طرد: ${piecesPerPack}`);
+    if (qty && !r.items?.length) bits.push(`كمية: ${qty}`);
+    if (packs && !r.items?.length) bits.push(`طرود: ${packs}`);
+    if (piecesPerPack && !r.items?.length) bits.push(`قطع/طرد: ${piecesPerPack}`);
     if (weight) bits.push(`الوزن: ${weight}`);
     if (dims) bits.push(`أبعاد: ${escapeHtml(dims)}`);
-    return `<div class="d-line">${bits.join(" • ")}</div>`;
+    let html = bits.length ? `<div class="d-line">${bits.join(" • ")}</div>` : "";
+    if (Array.isArray(r.items) && r.items.length) {
+      html += `<div class="d-items">` + r.items.map((it: any) => {
+        const name = it.product_name || "—";
+        const ps = Number(it.packs_count || 0);
+        const pp = Number(it.pieces_per_pack || 0);
+        const q = Number(it.quantity || 0);
+        return `<div class="d-item">• ${escapeHtml(name)} — ${ps}×${pp} = <b>${fmtNum(q)}</b></div>`;
+      }).join("") + `</div>`;
+    }
+    return html;
   });
   const totals = {
-    packs: rows.reduce((s, r) => s + Number(r.packs_count || 0), 0),
+    packs: rows.reduce((s, r) => {
+      const itemsPacks = (r.items || []).reduce((ss: number, it: any) => ss + Number(it.packs_count || 0), 0);
+      return s + (itemsPacks || Number(r.packs_count || 0));
+    }, 0),
+    pieces: rows.reduce((s, r) => s + (r.items || []).reduce((ss: number, it: any) => ss + Number(it.quantity || 0), 0), 0),
     weight: rows.reduce((s, r) => s + Number(r.weight || 0), 0),
   };
-  let summary = "";
-  if (totals.packs > 0 || totals.weight > 0) {
-    const parts: string[] = [];
-    if (totals.packs > 0) parts.push(`إجمالي الطرود: <b>${totals.packs}</b>`);
-    if (totals.weight > 0) parts.push(`إجمالي الوزن: <b>${fmtNum(totals.weight)}</b>`);
-    summary = `<div class="d-line d-line-sum">${parts.join(" • ")}</div>`;
-  }
+  const parts: string[] = [];
+  if (totals.packs > 0) parts.push(`إجمالي الطرود: <b>${totals.packs}</b>`);
+  if (totals.pieces > 0) parts.push(`إجمالي القطع: <b>${fmtNum(totals.pieces)}</b>`);
+  if (totals.weight > 0) parts.push(`إجمالي الوزن: <b>${fmtNum(totals.weight)}</b>`);
+  const summary = parts.length ? `<div class="d-line d-line-sum">${parts.join(" • ")}</div>` : "";
   return lines.join("") + summary;
 }
 
@@ -254,6 +292,8 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
     .d-value { font-size: 12px; }
     .d-line { font-size: 11.5px; padding: 1px 0; }
     .d-line-sum { font-weight: 800; color: #0f172a; margin-top: 2px; }
+    .d-items { margin: 2px 0 2px 8px; padding-right: 6px; border-right: 2px solid #e5e7eb; }
+    .d-item { font-size: 11px; padding: 1px 0; color: #1f2937; }
     .d-muted { color: #64748b; }
     .d-total { font-weight: 800; font-size: 13px; color: #b91c1c; }
     .d-notes .d-value { background: #fefce8; padding: 2px 6px; border-radius: 3px; }
