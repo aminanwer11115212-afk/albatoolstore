@@ -282,30 +282,44 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
       font-size: 11px; margin-left: 4px;
     }
     .d-card-date { font-weight: 700; font-size: 11.5px; }
-    .d-card-body { padding: 5px 8px; }
-    .d-row { display: flex; gap: 8px; align-items: stretch; margin-bottom: 4px; }
-    .d-cell { flex: 1; min-width: 0; }
-    .d-cell-side {
-      flex: 0 0 38%; text-align: left; direction: ltr;
-      border-right: 1px dashed #cbd5e1; padding-right: 8px;
-    }
-    .d-cell-side .d-label, .d-cell-side .d-value { direction: rtl; text-align: right; }
-    .d-section {
-      margin-top: 3px; padding-top: 3px;
-      border-top: 1px dashed #d1d5db;
-    }
-    .d-label {
-      font-size: 10px; font-weight: 800; color: #475569;
-      text-transform: uppercase; letter-spacing: 0.3px;
-    }
-    .d-value { font-size: 12px; }
-    .d-line { font-size: 11.5px; padding: 1px 0; }
-    .d-line-sum { font-weight: 800; color: #0f172a; margin-top: 2px; }
-    .d-items { margin: 2px 0 2px 8px; padding-right: 6px; border-right: 2px solid #e5e7eb; }
-    .d-item { font-size: 11px; padding: 1px 0; color: #1f2937; }
+    .d-card-body { padding: 4px 6px; font-size: 11px; }
+    .d-cust { font-size: 11.5px; padding: 2px 0 3px; }
+    .d-label-inline { font-size: 10px; font-weight: 800; color: #475569; margin-left: 3px; }
+    .d-section { margin-top: 2px; padding-top: 2px; border-top: 1px dashed #d1d5db; }
+    .d-section-tn { font-size: 11px; }
+    .d-section-pk { background: #fafafa; padding: 4px 6px; border-radius: 4px; border-top: 1.5px solid #cbd5e1; }
+    .d-label { font-size: 10px; font-weight: 800; color: #475569; letter-spacing: 0.3px; }
+    .d-label-pk { font-size: 11px; color: #0f172a; margin-bottom: 2px; }
+    .d-value { font-size: 11.5px; }
+    .d-line { font-size: 11px; padding: 1px 0; }
     .d-muted { color: #64748b; }
-    .d-total { font-weight: 800; font-size: 13px; color: #b91c1c; }
-    .d-notes .d-value { background: #fefce8; padding: 2px 6px; border-radius: 3px; }
+
+    /* Packaging table */
+    .d-pk-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 3px; }
+    .d-pk-chip {
+      display: inline-block; font-size: 10.5px;
+      padding: 1px 6px; border: 1px solid #cbd5e1; border-radius: 10px;
+      background: #fff;
+    }
+    .d-pk-table {
+      width: 100%; border-collapse: collapse; font-size: 11px;
+      margin-top: 2px; background: #fff;
+    }
+    .d-pk-table th, .d-pk-table td {
+      border: 1px solid #d1d5db; padding: 2px 5px; text-align: right;
+    }
+    .d-pk-table thead th {
+      background: #e5e7eb; font-weight: 800; font-size: 10.5px;
+    }
+    .d-pk-name { width: 50%; }
+    .d-pk-num { text-align: center; width: 12%; }
+    .d-pk-q { background: #f8fafc; }
+    .d-pk-sum {
+      margin-top: 3px; padding: 2px 5px;
+      font-weight: 800; font-size: 11px; color: #0f172a;
+      border-top: 1.5px solid #94a3b8; background: #f1f5f9; border-radius: 3px;
+    }
+    .d-notes { font-size: 10.5px; background: #fefce8; padding: 2px 5px; border-radius: 3px; }
 
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
