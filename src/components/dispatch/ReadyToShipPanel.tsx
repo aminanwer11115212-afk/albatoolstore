@@ -48,7 +48,7 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
         .from("invoices")
         .select(
           `id, invoice_number, date, total, currency_code, workflow_status,
-           paid_amount, customer_id, packaging_total_pieces,
+           paid_amount, customer_id,
            customers(id, name, phone),
            invoice_items(id, product_name, quantity, products(name)),
            invoice_transports(id, transporter_id, transporters(id, name))`
