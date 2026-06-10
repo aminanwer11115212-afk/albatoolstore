@@ -9,7 +9,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { filterSelectColumns } from "@/lib/tableColumns";
 import { toast } from "sonner";
-import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft } from "lucide-react";
+import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2 } from "lucide-react";
+import {
+  useTransporters, useDestinations,
+  useCustomerTransporters, useCustomerDestinations, useCustomerPreferredTransporter,
+} from "@/hooks/useData";
 
 type Props = {
   buildPrintHTML: (invoices: any[], company: any, mode: "all" | "collected") => string;
