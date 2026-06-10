@@ -49,19 +49,36 @@ export default function PackagingReportPreviewPage({ docType }: Props) {
         if (dErr) throw dErr;
         if (!doc) throw new Error(isInvoice ? "الفاتورة غير موجودة" : "عرض السعر غير موجود");
 
-        // Headers (سجلات التغليف الرئيسية)
+        // Headers (سجلات التغليف الرئيسية) — نقرأ نوع التغليف من الرؤوس
         const { data: headers } = await (supabase as any)
-          .from(tableHeader).select("id").eq(fkHeader, id);
+          .from(tableHeader)
+          .select("id, packaging_type_id, packaging_types(name)")
+          .eq(fkHeader, id);
         const headerIds = (headers || []).map((h: any) => h.id);
+        const headerTypeById: Record<string, string> = {};
+        (headers || []).forEach((h: any) => {
+          headerTypeById[h.id] = h.packaging_types?.name || "";
+        });
 
-        // Items (بنود التغليف الحقيقية)
+        // Items (بنود التغليف الحقيقية) — بدون embed على packaging_types (لا يوجد FK)
         let items: any[] = [];
         if (headerIds.length) {
           const { data: rows } = await (supabase as any)
             .from(tableItems)
-            .select("*, packaging_types(name)")
+            .select("*")
             .in(fkItem, headerIds);
           items = rows || [];
+        }
+
+        // أسماء أنواع التغليف للبنود التي عندها packaging_type_id مباشر
+        const directTypeIds = Array.from(new Set(
+          items.map((r: any) => r.packaging_type_id).filter(Boolean)
+        ));
+        const directTypeNameById: Record<string, string> = {};
+        if (directTypeIds.length) {
+          const { data: types } = await (supabase as any)
+            .from("packaging_types").select("id, name").in("id", directTypeIds);
+          (types || []).forEach((t: any) => { directTypeNameById[t.id] = t.name; });
         }
 
         const docInfo = {
@@ -78,7 +95,7 @@ export default function PackagingReportPreviewPage({ docType }: Props) {
           doc: docInfo,
           company,
           rows: items.map((r: any) => ({
-            type: r.packaging_types?.name,
+            type: directTypeNameById[r.packaging_type_id] || headerTypeById[r[fkItem]] || "",
             product: r.product_name,
             quantity: r.quantity,
             packs_count: r.packs_count,
