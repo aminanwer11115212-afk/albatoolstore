@@ -19,6 +19,7 @@ import { useRowHeights } from "@/hooks/useRowHeights";
 import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect from "@/components/InlineSearchSelect";
 import GeoStructurePanel from "@/components/customers/GeoStructurePanel";
+import CustomerLogisticsTable from "@/components/customers/CustomerLogisticsTable";
 
 const emptyForm = { name: "", phone: "", address: "", notes: "", city: "", region_id: "" as string | null | "", state_id: "" as string | null | "", locality_id: "" as string | null | "", city_id: "" as string | null | "" };
 
@@ -39,6 +40,7 @@ export default function CustomersPage() {
   const [perPage, setPerPage] = useState(10);
   const [duplicates, setDuplicates] = useState<any[]>([]);
   const [showGeo, setShowGeo] = useState(false);
+  const [showLogistics, setShowLogistics] = useState(false);
   const { data: customers, isLoading, insert, update, remove } = useCustomers();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -761,6 +763,10 @@ export default function CustomersPage() {
           <button onClick={() => setShowGeo(true)}
             className="flex items-center gap-2 bg-muted text-foreground border border-border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors">
             🗺️ الهيكل الجغرافي
+          </button>
+          <button onClick={() => setShowLogistics(true)}
+            className="flex items-center gap-2 bg-muted text-foreground border border-border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors">
+            🚚 اللوجستيات
           </button>
           <button onClick={() => { setDialogInitial(null); setDialogOpen(true); }}
             className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
@@ -1767,6 +1773,16 @@ export default function CustomersPage() {
         cities={cities}
         customers={customers || []}
       />
+      <Sheet open={showLogistics} onOpenChange={setShowLogistics}>
+        <SheetContent side="left" className="w-[98vw] sm:max-w-4xl p-0" dir="rtl">
+          <SheetHeader className="px-4 py-3 border-b border-border">
+            <SheetTitle className="text-base">🚚 لوجستيات العملاء — الناقلون والوجهات</SheetTitle>
+          </SheetHeader>
+          <div className="p-3" style={{ height: "calc(100vh - 64px)" }}>
+            <CustomerLogisticsTable customers={customers || []} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
