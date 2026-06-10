@@ -49,15 +49,18 @@ export default function PackagingReportPreviewPage({ docType }: Props) {
         if (dErr) throw dErr;
         if (!doc) throw new Error(isInvoice ? "الفاتورة غير موجودة" : "عرض السعر غير موجود");
 
-        // Headers (سجلات التغليف الرئيسية) — نقرأ نوع التغليف من الرؤوس
+        // Headers (سجلات التغليف الرئيسية) — بدون embed (لا يوجد FK على packaging_types)
         const { data: headers } = await (supabase as any)
           .from(tableHeader)
-          .select("id, packaging_type_id, packaging_types(name)")
+          .select("id, packaging_type_id")
           .eq(fkHeader, id);
         const headerIds = (headers || []).map((h: any) => h.id);
-        const headerTypeById: Record<string, string> = {};
+        const headerTypeIds = Array.from(new Set(
+          (headers || []).map((h: any) => h.packaging_type_id).filter(Boolean)
+        ));
+        const headerTypeIdById: Record<string, string> = {};
         (headers || []).forEach((h: any) => {
-          headerTypeById[h.id] = h.packaging_types?.name || "";
+          if (h.packaging_type_id) headerTypeIdById[h.id] = h.packaging_type_id;
         });
 
         // Items (بنود التغليف الحقيقية) — بدون embed على packaging_types (لا يوجد FK)
