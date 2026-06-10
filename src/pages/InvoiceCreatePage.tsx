@@ -2550,6 +2550,21 @@ export default function InvoiceCreatePage() {
               invoiceId={effectiveId}
               open={attachmentsDialogOpen}
               onClose={() => setAttachmentsDialogOpen(false)}
+              onWorkflowAdvanced={async () => {
+                if (!effectiveId) return;
+                const { data: inv } = await supabase
+                  .from("invoices")
+                  .select("workflow_status,status,paid_amount,due_amount,total")
+                  .eq("id", effectiveId)
+                  .maybeSingle();
+                if (inv) {
+                  setWorkflowStatus((inv as any).workflow_status || "new");
+                  setInvoiceStatus((inv as any).status || "pending");
+                  setSavedPaid(Number((inv as any).paid_amount) || 0);
+                  setSavedDue(Number((inv as any).due_amount) || 0);
+                  setSavedTotal(Number((inv as any).total) || 0);
+                }
+              }}
             />
           </>
         );
