@@ -49,17 +49,35 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
       // لتفادي فشل الاستعلام بصمت عند إضافة/حذف عمود في القاعدة.
       const wanted = "id, invoice_number, date, total, currency_code, workflow_status, paid_amount, customer_id, packaging_total_pieces";
       const safeCols = await filterSelectColumns("invoices", wanted);
+      // ملاحظة: لا نستخدم embed لـ invoice_transports لأنه لا توجد FK مُعرّفة بينه
+      // وبين invoices في القاعدة (PostgREST PGRST200). نجلبه بطلب منفصل ونُدمجه يدوياً.
       const selectExpr = `${safeCols},
            customers(id, name, phone),
-           invoice_items(id, product_name, quantity, products(name)),
-           invoice_transports(id, transporter_id, transporters(id, name))`;
+           invoice_items(id, product_name, quantity, products(name))`;
       const { data, error } = await (supabase as any)
         .from("invoices")
         .select(selectExpr)
         .eq("workflow_status", "ready_to_ship")
         .order("date", { ascending: false });
       if (error) throw error;
-      return (data || []) as any[];
+      const rows = (data || []) as any[];
+      const ids = rows.map((r) => r.id);
+      if (ids.length > 0) {
+        const { data: trs } = await (supabase as any)
+          .from("invoice_transports")
+          .select("id, invoice_id, transporter_id, transporters(id, name)")
+          .in("invoice_id", ids);
+        const byInv = new Map<string, any[]>();
+        for (const t of (trs || [])) {
+          const arr = byInv.get(t.invoice_id) || [];
+          arr.push(t);
+          byInv.set(t.invoice_id, arr);
+        }
+        for (const r of rows) r.invoice_transports = byInv.get(r.id) || [];
+      } else {
+        for (const r of rows) r.invoice_transports = [];
+      }
+      return rows;
     },
   });
 
