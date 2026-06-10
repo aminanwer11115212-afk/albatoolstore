@@ -98,29 +98,22 @@ function renderTransportsHtml(rows: any[]): string {
   if (!rows.length) return `<span class="d-muted">—</span>`;
   return rows.map((r) => {
     const transporter = r.transporters?.name || "";
+    const transporterPhone = r.transporters?.phone || "";
     const destination = r.destinations?.name || "";
     const vehicle = r.vehicle_number || "";
     const driver = r.driver_name || "";
     const date = fmtDate(r.transport_date);
-    const cost = Number(r.cost || 0);
     const bits: string[] = [];
-    if (transporter) bits.push(`<b>${escapeHtml(transporter)}</b>`);
-    if (destination) bits.push(`→ ${escapeHtml(destination)}`);
+    if (transporter) {
+      let t = `الناقل: <b>${escapeHtml(transporter)}</b>`;
+      if (transporterPhone) t += ` • ☎ ${escapeHtml(transporterPhone)}`;
+      bits.push(t);
+    }
+    if (destination) bits.push(`الوجهة: <b>${escapeHtml(destination)}</b>`);
     if (vehicle) bits.push(`مركبة: ${escapeHtml(vehicle)}`);
     if (driver) bits.push(`سائق: ${escapeHtml(driver)}`);
     if (date) bits.push(date);
-    if (cost > 0) bits.push(`التكلفة: ${fmtNum(cost)}`);
-    let html = bits.length ? `<div class="d-line">${bits.join(" • ")}</div>` : "";
-    if (Array.isArray(r.items) && r.items.length) {
-      html += `<div class="d-items">` + r.items.map((it: any) => {
-        const name = it.product_name || "—";
-        const ps = Number(it.packs_count || 0);
-        const pp = Number(it.pieces_per_pack || 0);
-        const q = Number(it.quantity || 0);
-        return `<div class="d-item">• ${escapeHtml(name)} — ${ps}×${pp} = <b>${fmtNum(q)}</b></div>`;
-      }).join("") + `</div>`;
-    }
-    return html;
+    return bits.length ? `<div class="d-line">${bits.join(" • ")}</div>` : "";
   }).join("");
 }
 
