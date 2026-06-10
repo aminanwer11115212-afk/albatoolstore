@@ -47,6 +47,8 @@ export default function CustomerLogisticsTable({ customers }: Props) {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["table", "customer_transporters"] });
     qc.invalidateQueries({ queryKey: ["table", "customer_destinations"] });
+    // إشعار شاشات الترحيلات لتُحدِّث القوائم فوراً
+    try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
   };
 
   const addTransporter = async (customerId: string) => {

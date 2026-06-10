@@ -107,16 +107,31 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
   }, [qc]);
 
   // Realtime: any change to workflow_status (or any invoices row) → refetch
+  // وأيضاً مزامنة لوجيستيات العميل (روابط الناقلين/الوجهات) لتظهر فوراً في القوائم.
   useEffect(() => {
+    const invalidateLogistics = () => {
+      qc.invalidateQueries({ queryKey: ["table", "customer_transporters"] });
+      qc.invalidateQueries({ queryKey: ["table", "customer_destinations"] });
+      qc.invalidateQueries({ queryKey: ["table", "customer_preferred_transporter"] });
+      qc.invalidateQueries({ queryKey: ["table", "transporters"] });
+      qc.invalidateQueries({ queryKey: ["table", "destinations"] });
+    };
     const channel = (supabase as any)
       .channel("dispatch-ready-to-ship-rt")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "invoices" },
-        () => qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] }),
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "invoices" },
+        () => qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "customer_transporters" }, invalidateLogistics)
+      .on("postgres_changes", { event: "*", schema: "public", table: "customer_destinations" }, invalidateLogistics)
+      .on("postgres_changes", { event: "*", schema: "public", table: "customer_preferred_transporter" }, invalidateLogistics)
+      .on("postgres_changes", { event: "*", schema: "public", table: "transporters" }, invalidateLogistics)
+      .on("postgres_changes", { event: "*", schema: "public", table: "destinations" }, invalidateLogistics)
       .subscribe();
-    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+    const onLogisticsEvent = () => invalidateLogistics();
+    window.addEventListener("customer-logistics:changed", onLogisticsEvent);
+    return () => {
+      try { (supabase as any).removeChannel(channel); } catch {}
+      window.removeEventListener("customer-logistics:changed", onLogisticsEvent);
+    };
   }, [qc]);
 
   const invoices = data || [];
