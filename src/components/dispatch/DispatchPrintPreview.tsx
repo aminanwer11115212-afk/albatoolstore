@@ -268,31 +268,18 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
     .d-line { font-size: 11px; padding: 1px 0; }
     .d-muted { color: #64748b; }
 
-    /* Packaging table */
-    .d-pk-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 3px; }
-    .d-pk-chip {
-      display: inline-block; font-size: 10.5px;
-      padding: 1px 6px; border: 1px solid #cbd5e1; border-radius: 10px;
-      background: #fff;
+    /* Packaging — text lines */
+    .d-pk-lines { display: block; margin-top: 2px; }
+    .d-pk-line {
+      display: flex; align-items: baseline; gap: 4px;
+      font-size: 11px; padding: 1px 0;
+      border-bottom: 1px dotted #e5e7eb;
     }
-    .d-pk-table {
-      width: 100%; border-collapse: collapse; font-size: 11px;
-      margin-top: 2px; background: #fff;
-    }
-    .d-pk-table th, .d-pk-table td {
-      border: 1px solid #d1d5db; padding: 2px 5px; text-align: right;
-    }
-    .d-pk-table thead th {
-      background: #e5e7eb; font-weight: 800; font-size: 10.5px;
-    }
-    .d-pk-name { width: 50%; }
-    .d-pk-num { text-align: center; width: 12%; }
-    .d-pk-q { background: #f8fafc; }
-    .d-pk-sum {
-      margin-top: 3px; padding: 2px 5px;
-      font-weight: 800; font-size: 11px; color: #0f172a;
-      border-top: 1.5px solid #94a3b8; background: #f1f5f9; border-radius: 3px;
-    }
+    .d-pk-line:last-child { border-bottom: none; }
+    .d-pk-i { color: #64748b; font-weight: 800; min-width: 18px; }
+    .d-pk-p { font-weight: 800; color: #0f172a; min-width: 18px; text-align: center; }
+    .d-pk-sep { color: #94a3b8; }
+    .d-pk-t { flex: 1; }
     .d-notes { font-size: 10.5px; background: #fefce8; padding: 2px 5px; border-radius: 3px; }
 
     @media print {
