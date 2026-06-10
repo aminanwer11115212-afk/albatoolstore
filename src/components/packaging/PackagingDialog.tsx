@@ -303,12 +303,17 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
     }
     setHeaderId(header!.id);
 
-    // packaging items
-    const { data: rows } = await (supabase as any)
+    // packaging items — لا توجد FK في الجدول لذا نتجنب joins ونعتمد على
+    // الأعمدة المباشرة (product_name) ونبحث اسم النوع من cache في الواجهة.
+    const { data: rows, error: rowsErr } = await (supabase as any)
       .from(itemsTable)
-      .select("*, packaging_types(name), products(name)")
+      .select("*")
       .eq(parentFkColumn, header!.id)
       .order("created_at", { ascending: true });
+    if (rowsErr) {
+      console.error("packaging items load error", rowsErr);
+      toast.error("تعذر تحميل بنود التغليف");
+    }
     setItems(rows || []);
 
     // parent document products + quantities
