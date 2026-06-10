@@ -26,7 +26,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useColumnWidths, ColumnResizeHandle } from "@/hooks/useColumnWidths";
-import { userScopedLegacyKey } from "@/lib/userScopedKey";
+import { useFormFactorScopedLegacyKey } from "@/lib/formFactorKey";
 
 const LIMIT_OPTIONS = [10, 25, 50, 75, 100];
 const RECENT_FETCH_WINDOW = 500;
@@ -101,7 +101,7 @@ interface RecentItemsSidebarProps {
 }
 
 function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: RecentItemsSidebarProps) {
-  const limitStorageKey = userScopedLegacyKey(`recent-sidebar:limit:${type}:v1`);
+  const limitStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:limit:${type}:v1`);
   const [limit, setLimitState] = useState<number>(() => {
     if (typeof window === "undefined") return 50;
     try {
@@ -142,8 +142,8 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
         : [null, 80, 78, 90, 36]),
     [isInvoicesType, isQuotesSide]
   );
-  const colsStorageKey = userScopedLegacyKey(`recent-sidebar:cols:${type}:v1`);
-  const lockStorageKey = userScopedLegacyKey(`recent-sidebar:cols-locked:${type}:v1`);
+  const colsStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:cols:${type}:v1`);
+  const lockStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:cols-locked:${type}:v1`);
   const [colsLocked, setColsLockedState] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     try { return localStorage.getItem(lockStorageKey) !== "0"; } catch { return true; }
@@ -161,7 +161,7 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
   // We use localStorage (not sessionStorage) so the position survives full
   // page reloads and tab restarts; key is per-type so each sidebar keeps its
   // own anchor independently.
-  const scrollStorageKey = userScopedLegacyKey(`recent-sidebar:scroll:${type}:v1`);
+  const scrollStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:scroll:${type}:v1`);
   // Initialize synchronously so the first useLayoutEffect after data load
   // can restore to the correct position (avoids a brief jump to top).
   const savedScrollRef = useRef<number>((() => {
@@ -205,7 +205,7 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
     user: "المستخدم",
     note: "ملاحظة",
   };
-  const hiddenStorageKey = `recent-sidebar:hidden:${type}:v1`;
+  const hiddenStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:hidden:${type}:v1`);
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -252,7 +252,7 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
   hiddenColsRef.current = hiddenCols;
 
   // ===== User-customizable font size & density (per-type, persisted) =====
-  const stylePrefsKey = `recent-sidebar:style:${type}:v1`;
+  const stylePrefsKey = useFormFactorScopedLegacyKey(`recent-sidebar:style:${type}:v1`);
   type StylePrefs = { fontPx: number; density: number };
   const defaultStylePrefs: StylePrefs = { fontPx: compact ? 11 : 12, density: 1 };
   const [stylePrefs, setStylePrefsState] = useState<StylePrefs>(() => {

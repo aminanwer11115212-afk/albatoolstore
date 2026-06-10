@@ -87,7 +87,7 @@ Batches still to ship (one screen per batch — see `.lovable/plan.md`):
 - [x] Batch 8 — `StockReturnCreatePage` (covered by hook-level FF scoping).
 - [x] Batch 9 — `CompanySettingsPage` (covered by hook-level FF scoping).
 - [x] Batch 10 — All `useDialogSize` consumers (key now embeds `ff_<mobile|desktop>`).
-- [ ] Batch 11 — `RecentItemsSidebar` + `FloatingSideTools` (kept for future polish — sidebar uses its own prefix `recent-sidebar:` not yet FF-split).
+- [x] Batch 11 — `RecentItemsSidebar` (5 keys via `useFormFactorScopedLegacyKey`). `FloatingSideTools` has no persisted state — N/A.
 - [ ] Batch 12 — Full-system manual QA on real devices + memory consolidation.
 
 When you complete a batch, tick the box here.
