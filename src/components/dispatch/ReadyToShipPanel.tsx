@@ -181,11 +181,17 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
       };
 
       const ids = selected.map((i) => i.id);
-      const { error } = await (supabase as any)
-        .from("invoices")
-        .update({ workflow_status: "in_transit" })
-        .in("id", ids);
-      if (error) throw error;
+      const results = await Promise.all(
+        ids.map((id) =>
+          supabase.rpc("advance_invoice_workflow" as any, {
+            _invoice_id: id,
+            _target: "in_transit",
+            _reason: "ترحيل الفواتير الجاهزة من شاشة الترحيلات",
+          })
+        )
+      );
+      const firstErr = results.find((r) => (r as any).error)?.error;
+      if (firstErr) throw firstErr;
 
       toast.success(`تم تحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات"`);
       setChecked(new Set());
