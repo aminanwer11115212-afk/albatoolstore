@@ -197,28 +197,18 @@ function renderCard(doc: DispatchDoc, idx: number): string {
         <div class="d-card-date">${fmtDate(inv.date)}</div>
       </header>
       <div class="d-card-body">
-        <div class="d-row">
-          <div class="d-cell">
-            <div class="d-label">الزبون</div>
-            <div class="d-value"><b>${escapeHtml(cust?.name || "—")}</b>${cust?.phone ? ` • ${escapeHtml(cust.phone)}` : ""}</div>
-            ${cust?.address ? `<div class="d-value d-muted">${escapeHtml(cust.address)}</div>` : ""}
-          </div>
-          <div class="d-cell d-cell-side">
-            <div class="d-label">الأصناف</div>
-            <div class="d-value"><b>${doc.itemsCount}</b> <span class="d-muted">(كمية: ${fmtNum(doc.qtyTotal)})</span></div>
-            <div class="d-label">الإجمالي</div>
-            <div class="d-value d-total">${fmtNum(inv.total)}</div>
-          </div>
+        <div class="d-line d-cust">
+          <span class="d-label-inline">الزبون:</span>
+          <b>${escapeHtml(cust?.name || "—")}</b>${cust?.phone ? ` • ${escapeHtml(cust.phone)}` : ""}${cust?.address ? ` <span class="d-muted">— ${escapeHtml(cust.address)}</span>` : ""}
         </div>
-        <div class="d-section">
-          <div class="d-label">الناقل والوجهة</div>
+        <div class="d-section d-section-tn">
           ${renderTransportsHtml(doc.transports)}
         </div>
-        <div class="d-section">
-          <div class="d-label">بيانات التغليف</div>
+        <div class="d-section d-section-pk">
+          <div class="d-label d-label-pk">بيانات التغليف</div>
           ${renderPackagingHtml(doc.packaging)}
         </div>
-        ${inv.notes ? `<div class="d-section d-notes"><div class="d-label">ملاحظات</div><div class="d-value">${escapeHtml(inv.notes)}</div></div>` : ""}
+        ${inv.notes ? `<div class="d-section d-notes"><span class="d-label-inline">ملاحظات:</span> ${escapeHtml(inv.notes)}</div>` : ""}
       </div>
     </section>
   `;
