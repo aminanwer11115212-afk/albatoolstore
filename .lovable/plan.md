@@ -1,17 +1,20 @@
-## السبب
-خطأ "Bucket not found" يظهر لأن مشروع التخزين لا يحتوي أي bucket. الكود يحاول الرفع إلى `invoice-attachments` (والمماثلين للعروض والمشتريات) لكنها غير موجودة.
+## الوضع الحالي
+الكود في `InvoiceAttachmentsDialog.tsx` ينادي بالفعل RPC `advance_invoice_workflow(target='done', reason='رفع إيصال الدفع')` بعد رفع ملف في تبويب **"صور الإيصال"**. لكن:
+
+1. **`InvoiceCreatePage`** لا تمرّر `onWorkflowAdvanced`، فلا تتحدّث الشارة في الصفحة بعد الرفع.
+2. لا يوجد `window.dispatchEvent("invoices:changed")` ولا إبطال لـ workflow cache، فالقوائم الأخرى (قائمة الفواتير / الترحيلات) لا ترى التغيير فوراً.
+3. شرط الـ RPC `done` يتطلب أن تحتوي الفاتورة على بنود و `total > 0` — إن لم يتحقق سيتم تجاهل الترقية بصمت.
 
 ## الخطة
 
-1. **إنشاء 3 buckets خاصة (private):**
-   - `invoice-attachments`
-   - `quote-attachments`
-   - `purchase-attachments`
+1. في `src/components/invoice/InvoiceAttachmentsDialog.tsx` بعد نجاح RPC للإيصال:
+   - استيراد `invalidateWorkflowAutoCache` من `WorkflowStatusBadge` واستدعاؤها.
+   - `window.dispatchEvent(new Event("invoices:changed"))`.
+   - عرض toast "تم تحديث حالة الفاتورة إلى: تم" عند نجاح الترقية فقط، وtoast تحذيري لطيف إذا لم تتحقق (لا بنود/المبلغ صفر).
+   - لتأكيد الترقية فعلاً، قراءة `workflow_status` بعد الـ RPC والمقارنة.
 
-2. **إضافة سياسات RLS على `storage.objects`** للسماح للمستخدمين المسجلين بـ:
-   - قراءة / رفع / تحديث / حذف الملفات داخل هذه الـ buckets الثلاثة.
-   - الإبقاء عليها private (نستخدم Signed URLs الموجود في `signedAttachmentUrl.ts`).
+2. في `src/pages/InvoiceCreatePage.tsx`: تمرير `onWorkflowAdvanced={() => { /* reload invoice header */ }}` كما هو مفعّل في `InvoiceViewPage`.
 
-3. **عدم تغيير أي كود تطبيق** — الكود الحالي للرفع/المعاينة/الحذف صحيح ويستخدم Signed URLs بالفعل.
+3. لا تغييرات على قاعدة البيانات — الـ RPC والمنطق صحيحان حسب skill workflow-automation.
 
-بعد التنفيذ ستعمل شاشة إرفاق الفواتير، والعروض، والمشتريات مباشرة.
+النتيجة: عند رفع صورة الإيصال، تنتقل الحالة فوراً إلى **"تم"** وتنعكس في كل الشاشات (إنشاء/عرض/قائمة/ترحيلات) دون الحاجة لإعادة تحميل.
