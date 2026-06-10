@@ -26,7 +26,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useColumnWidths, ColumnResizeHandle } from "@/hooks/useColumnWidths";
-import { userScopedLegacyKey } from "@/lib/userScopedKey";
+import { useFormFactorScopedLegacyKey } from "@/lib/formFactorKey";
 
 const LIMIT_OPTIONS = [10, 25, 50, 75, 100];
 const RECENT_FETCH_WINDOW = 500;
