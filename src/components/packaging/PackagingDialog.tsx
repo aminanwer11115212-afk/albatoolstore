@@ -303,12 +303,17 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
     }
     setHeaderId(header!.id);
 
-    // packaging items
-    const { data: rows } = await (supabase as any)
+    // packaging items — لا توجد FK في الجدول لذا نتجنب joins ونعتمد على
+    // الأعمدة المباشرة (product_name) ونبحث اسم النوع من cache في الواجهة.
+    const { data: rows, error: rowsErr } = await (supabase as any)
       .from(itemsTable)
-      .select("*, packaging_types(name), products(name)")
+      .select("*")
       .eq(parentFkColumn, header!.id)
       .order("created_at", { ascending: true });
+    if (rowsErr) {
+      console.error("packaging items load error", rowsErr);
+      toast.error("تعذر تحميل بنود التغليف");
+    }
     setItems(rows || []);
 
     // parent document products + quantities
@@ -546,9 +551,26 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                   <span><span style={{ color: "hsl(var(--muted-foreground))" }}>الإجمالي: </span><strong>{Number(parent?.total || 0).toLocaleString()} {parent?.currency_code || "SDG"}</strong></span>
                 </div>
 
-                {/* Add form — شريط مضغوط */}
-                <div className="legacy-form-horizontal" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4, padding: "4px 8px", marginBottom: "6px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "auto 40px 2.2fr 1.8fr auto 50px auto", gap: "0.4rem", alignItems: "center" }}>
+                {/* Add form — شريط مضغوط (responsive: متعدد الأسطر على الموبايل) */}
+                <div className="legacy-form-horizontal pkg-add-form" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4, padding: "6px 8px", marginBottom: "6px" }}>
+                  <style>{`
+                    .pkg-add-form .pkg-add-grid {
+                      display: grid;
+                      grid-template-columns: auto 40px 2.2fr 1.8fr auto 50px auto;
+                      gap: 0.4rem;
+                      align-items: center;
+                    }
+                    @media (max-width: 720px) {
+                      .pkg-add-form .pkg-add-grid {
+                        grid-template-columns: 60px 1fr;
+                        gap: 6px 8px;
+                        align-items: center;
+                      }
+                      .pkg-add-form .pkg-add-grid > .pkg-full { grid-column: 1 / -1; }
+                      .pkg-add-form .pkg-add-grid .legacy-control { width: 100%; }
+                    }
+                  `}</style>
+                  <div className="pkg-add-grid">
                     <label style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", whiteSpace: "nowrap" }}>العدد</label>
                     <input
                       ref={qtyRef}
@@ -560,7 +582,7 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                       onChange={(e) => setQuantity(e.target.value.slice(0, 2))}
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); typeSearchRef.current?.focus(); } }}
                     />
-                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <div className="pkg-full" style={{ display: "flex", gap: 4, alignItems: "center" }}>
                       <SearchableSelect
                         inputRef={typeSearchRef}
                         value={packagingTypeId}
@@ -595,6 +617,7 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                         <Plus style={{ width: 11, height: 11 }} />
                       </button>
                     </div>
+                    <div className="pkg-full">
                     <SearchableSelect
                       inputRef={productSearchRef}
                       value={productId || productName}
@@ -612,6 +635,7 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                       }}
                       onTab={() => { piecesRef.current?.focus(); piecesRef.current?.select(); }}
                     />
+                    </div>
                     <label style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", whiteSpace: "nowrap" }}>قطع/نوع</label>
                     <input
                       ref={piecesRef}
@@ -721,8 +745,8 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                           </td>
                           <td className="text-center">{(showAll ? 0 : (safePage - 1) * perPage) + i + 1}</td>
                           <td className="text-center">{packs}</td>
-                          <td>{it.packaging_types?.name || "—"}</td>
-                          <td>{it.product_name || it.products?.name || "—"}{pieces > 1 ? <> {" — "}<span style={{ color: "hsl(var(--primary))", fontWeight: 700 }}>× {pieces}</span></> : null}</td>
+                           <td>{(packagingTypes as any[] || []).find((t: any) => t.id === it.packaging_type_id)?.name || it.packaging_types?.name || "—"}</td>
+                           <td>{it.product_name || it.products?.name || "—"}{pieces > 1 ? <> {" — "}<span style={{ color: "hsl(var(--primary))", fontWeight: 700 }}>× {pieces}</span></> : null}</td>
                           <td className="text-center">
                             <button onClick={() => handleDelete(it.id)} className="legacy-btn legacy-btn-danger btn-sm" title="حذف">
                               <Trash2 />
