@@ -61,7 +61,7 @@ async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
   const [{ data: items }, { data: transports }, { data: packaging }, { data: packagingItems }, { data: transportItems }] = await Promise.all([
     supabase.from("invoice_items").select("quantity").eq("invoice_id", id),
     supabase.from("invoice_transports")
-      .select("id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name), destinations(name)")
+      .select("id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name, phone), destinations(name)")
       .eq("invoice_id", id),
     supabase.from("invoice_packaging")
       .select("id, quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
@@ -98,60 +98,77 @@ function renderTransportsHtml(rows: any[]): string {
   if (!rows.length) return `<span class="d-muted">—</span>`;
   return rows.map((r) => {
     const transporter = r.transporters?.name || "";
+    const transporterPhone = r.transporters?.phone || "";
     const destination = r.destinations?.name || "";
     const vehicle = r.vehicle_number || "";
     const driver = r.driver_name || "";
     const date = fmtDate(r.transport_date);
-    const cost = Number(r.cost || 0);
     const bits: string[] = [];
-    if (transporter) bits.push(`<b>${escapeHtml(transporter)}</b>`);
-    if (destination) bits.push(`→ ${escapeHtml(destination)}`);
+    if (transporter) {
+      let t = `الناقل: <b>${escapeHtml(transporter)}</b>`;
+      if (transporterPhone) t += ` • ☎ ${escapeHtml(transporterPhone)}`;
+      bits.push(t);
+    }
+    if (destination) bits.push(`الوجهة: <b>${escapeHtml(destination)}</b>`);
     if (vehicle) bits.push(`مركبة: ${escapeHtml(vehicle)}`);
     if (driver) bits.push(`سائق: ${escapeHtml(driver)}`);
     if (date) bits.push(date);
-    if (cost > 0) bits.push(`التكلفة: ${fmtNum(cost)}`);
-    let html = bits.length ? `<div class="d-line">${bits.join(" • ")}</div>` : "";
-    if (Array.isArray(r.items) && r.items.length) {
-      html += `<div class="d-items">` + r.items.map((it: any) => {
-        const name = it.product_name || "—";
-        const ps = Number(it.packs_count || 0);
-        const pp = Number(it.pieces_per_pack || 0);
-        const q = Number(it.quantity || 0);
-        return `<div class="d-item">• ${escapeHtml(name)} — ${ps}×${pp} = <b>${fmtNum(q)}</b></div>`;
-      }).join("") + `</div>`;
-    }
-    return html;
+    return bits.length ? `<div class="d-line">${bits.join(" • ")}</div>` : "";
   }).join("");
 }
 
 function renderPackagingHtml(rows: any[]): string {
   if (!rows.length) return `<span class="d-muted">—</span>`;
-  const lines = rows.map((r) => {
+  // جمع كل الأصناف من كل سجلات التغليف
+  const allItems: any[] = [];
+  rows.forEach((r) => {
+    if (Array.isArray(r.items) && r.items.length) {
+      r.items.forEach((it: any) => allItems.push({ ...it, _type: r.packaging_types?.name || "" }));
+    }
+  });
+
+  const typesBits = rows.map((r) => {
     const type = r.packaging_types?.name || "";
-    const qty = Number(r.quantity || 0);
-    const packs = Number(r.packs_count || 0);
-    const piecesPerPack = Number(r.pieces_per_pack || 0);
     const weight = Number(r.weight || 0);
     const dims = r.dimensions || "";
-    const bits: string[] = [];
-    if (type) bits.push(`<b>${escapeHtml(type)}</b>`);
-    if (qty && !r.items?.length) bits.push(`كمية: ${qty}`);
-    if (packs && !r.items?.length) bits.push(`طرود: ${packs}`);
-    if (piecesPerPack && !r.items?.length) bits.push(`قطع/طرد: ${piecesPerPack}`);
-    if (weight) bits.push(`الوزن: ${weight}`);
-    if (dims) bits.push(`أبعاد: ${escapeHtml(dims)}`);
-    let html = bits.length ? `<div class="d-line">${bits.join(" • ")}</div>` : "";
-    if (Array.isArray(r.items) && r.items.length) {
-      html += `<div class="d-items">` + r.items.map((it: any) => {
-        const name = it.product_name || "—";
-        const ps = Number(it.packs_count || 0);
-        const pp = Number(it.pieces_per_pack || 0);
-        const q = Number(it.quantity || 0);
-        return `<div class="d-item">• ${escapeHtml(name)} — ${ps}×${pp} = <b>${fmtNum(q)}</b></div>`;
-      }).join("") + `</div>`;
+    const parts: string[] = [];
+    if (type) parts.push(`<b>${escapeHtml(type)}</b>`);
+    if (weight) parts.push(`الوزن: ${weight}`);
+    if (dims) parts.push(`أبعاد: ${escapeHtml(dims)}`);
+    // إن لم تكن هناك أصناف تفصيلية، اعرض كميات السجل نفسه
+    if (!(r.items && r.items.length)) {
+      const qty = Number(r.quantity || 0);
+      const packs = Number(r.packs_count || 0);
+      const pp = Number(r.pieces_per_pack || 0);
+      if (packs) parts.push(`طرود: ${packs}`);
+      if (pp) parts.push(`قطع/طرد: ${pp}`);
+      if (qty) parts.push(`كمية: ${qty}`);
     }
-    return html;
-  });
+    return parts.length ? `<span class="d-pk-chip">${parts.join(" • ")}</span>` : "";
+  }).filter(Boolean).join("");
+
+  let table = "";
+  if (allItems.length) {
+    const rowsHtml = allItems.map((it) => {
+      const name = it.product_name || "—";
+      const ps = Number(it.packs_count || 0);
+      const pp = Number(it.pieces_per_pack || 0);
+      const q = Number(it.quantity || 0);
+      return `<tr>
+        <td class="d-pk-name">${escapeHtml(name)}</td>
+        <td class="d-pk-num">${ps}</td>
+        <td class="d-pk-num">${pp}</td>
+        <td class="d-pk-num d-pk-q"><b>${fmtNum(q)}</b></td>
+      </tr>`;
+    }).join("");
+    table = `<table class="d-pk-table">
+      <thead><tr>
+        <th>الصنف</th><th>الطرود</th><th>قطع/طرد</th><th>الإجمالي</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>`;
+  }
+
   const totals = {
     packs: rows.reduce((s, r) => {
       const itemsPacks = (r.items || []).reduce((ss: number, it: any) => ss + Number(it.packs_count || 0), 0);
@@ -164,8 +181,10 @@ function renderPackagingHtml(rows: any[]): string {
   if (totals.packs > 0) parts.push(`إجمالي الطرود: <b>${totals.packs}</b>`);
   if (totals.pieces > 0) parts.push(`إجمالي القطع: <b>${fmtNum(totals.pieces)}</b>`);
   if (totals.weight > 0) parts.push(`إجمالي الوزن: <b>${fmtNum(totals.weight)}</b>`);
-  const summary = parts.length ? `<div class="d-line d-line-sum">${parts.join(" • ")}</div>` : "";
-  return lines.join("") + summary;
+  const summary = parts.length ? `<div class="d-pk-sum">${parts.join(" • ")}</div>` : "";
+
+  const chips = typesBits ? `<div class="d-pk-chips">${typesBits}</div>` : "";
+  return chips + table + summary;
 }
 
 function renderCard(doc: DispatchDoc, idx: number): string {
@@ -178,28 +197,18 @@ function renderCard(doc: DispatchDoc, idx: number): string {
         <div class="d-card-date">${fmtDate(inv.date)}</div>
       </header>
       <div class="d-card-body">
-        <div class="d-row">
-          <div class="d-cell">
-            <div class="d-label">الزبون</div>
-            <div class="d-value"><b>${escapeHtml(cust?.name || "—")}</b>${cust?.phone ? ` • ${escapeHtml(cust.phone)}` : ""}</div>
-            ${cust?.address ? `<div class="d-value d-muted">${escapeHtml(cust.address)}</div>` : ""}
-          </div>
-          <div class="d-cell d-cell-side">
-            <div class="d-label">الأصناف</div>
-            <div class="d-value"><b>${doc.itemsCount}</b> <span class="d-muted">(كمية: ${fmtNum(doc.qtyTotal)})</span></div>
-            <div class="d-label">الإجمالي</div>
-            <div class="d-value d-total">${fmtNum(inv.total)}</div>
-          </div>
+        <div class="d-line d-cust">
+          <span class="d-label-inline">الزبون:</span>
+          <b>${escapeHtml(cust?.name || "—")}</b>${cust?.phone ? ` • ${escapeHtml(cust.phone)}` : ""}${cust?.address ? ` <span class="d-muted">— ${escapeHtml(cust.address)}</span>` : ""}
         </div>
-        <div class="d-section">
-          <div class="d-label">الناقل والوجهة</div>
+        <div class="d-section d-section-tn">
           ${renderTransportsHtml(doc.transports)}
         </div>
-        <div class="d-section">
-          <div class="d-label">بيانات التغليف</div>
+        <div class="d-section d-section-pk">
+          <div class="d-label d-label-pk">بيانات التغليف</div>
           ${renderPackagingHtml(doc.packaging)}
         </div>
-        ${inv.notes ? `<div class="d-section d-notes"><div class="d-label">ملاحظات</div><div class="d-value">${escapeHtml(inv.notes)}</div></div>` : ""}
+        ${inv.notes ? `<div class="d-section d-notes"><span class="d-label-inline">ملاحظات:</span> ${escapeHtml(inv.notes)}</div>` : ""}
       </div>
     </section>
   `;
@@ -214,11 +223,11 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
 
   const cardsHtml = docs.map((d, i) => renderCard(d, i)).join("");
 
-  const grandTotal = docs.reduce((s, d) => s + Number(d.invoice.total || 0), 0);
   const totalPacks = docs.reduce((s, d) =>
     s + d.packaging.reduce((ss, p: any) => ss + Number(p.packs_count || 0), 0), 0);
   const totalWeight = docs.reduce((s, d) =>
     s + d.packaging.reduce((ss, p: any) => ss + Number(p.weight || 0), 0), 0);
+
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -273,30 +282,44 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
       font-size: 11px; margin-left: 4px;
     }
     .d-card-date { font-weight: 700; font-size: 11.5px; }
-    .d-card-body { padding: 5px 8px; }
-    .d-row { display: flex; gap: 8px; align-items: stretch; margin-bottom: 4px; }
-    .d-cell { flex: 1; min-width: 0; }
-    .d-cell-side {
-      flex: 0 0 38%; text-align: left; direction: ltr;
-      border-right: 1px dashed #cbd5e1; padding-right: 8px;
-    }
-    .d-cell-side .d-label, .d-cell-side .d-value { direction: rtl; text-align: right; }
-    .d-section {
-      margin-top: 3px; padding-top: 3px;
-      border-top: 1px dashed #d1d5db;
-    }
-    .d-label {
-      font-size: 10px; font-weight: 800; color: #475569;
-      text-transform: uppercase; letter-spacing: 0.3px;
-    }
-    .d-value { font-size: 12px; }
-    .d-line { font-size: 11.5px; padding: 1px 0; }
-    .d-line-sum { font-weight: 800; color: #0f172a; margin-top: 2px; }
-    .d-items { margin: 2px 0 2px 8px; padding-right: 6px; border-right: 2px solid #e5e7eb; }
-    .d-item { font-size: 11px; padding: 1px 0; color: #1f2937; }
+    .d-card-body { padding: 4px 6px; font-size: 11px; }
+    .d-cust { font-size: 11.5px; padding: 2px 0 3px; }
+    .d-label-inline { font-size: 10px; font-weight: 800; color: #475569; margin-left: 3px; }
+    .d-section { margin-top: 2px; padding-top: 2px; border-top: 1px dashed #d1d5db; }
+    .d-section-tn { font-size: 11px; }
+    .d-section-pk { background: #fafafa; padding: 4px 6px; border-radius: 4px; border-top: 1.5px solid #cbd5e1; }
+    .d-label { font-size: 10px; font-weight: 800; color: #475569; letter-spacing: 0.3px; }
+    .d-label-pk { font-size: 11px; color: #0f172a; margin-bottom: 2px; }
+    .d-value { font-size: 11.5px; }
+    .d-line { font-size: 11px; padding: 1px 0; }
     .d-muted { color: #64748b; }
-    .d-total { font-weight: 800; font-size: 13px; color: #b91c1c; }
-    .d-notes .d-value { background: #fefce8; padding: 2px 6px; border-radius: 3px; }
+
+    /* Packaging table */
+    .d-pk-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 3px; }
+    .d-pk-chip {
+      display: inline-block; font-size: 10.5px;
+      padding: 1px 6px; border: 1px solid #cbd5e1; border-radius: 10px;
+      background: #fff;
+    }
+    .d-pk-table {
+      width: 100%; border-collapse: collapse; font-size: 11px;
+      margin-top: 2px; background: #fff;
+    }
+    .d-pk-table th, .d-pk-table td {
+      border: 1px solid #d1d5db; padding: 2px 5px; text-align: right;
+    }
+    .d-pk-table thead th {
+      background: #e5e7eb; font-weight: 800; font-size: 10.5px;
+    }
+    .d-pk-name { width: 50%; }
+    .d-pk-num { text-align: center; width: 12%; }
+    .d-pk-q { background: #f8fafc; }
+    .d-pk-sum {
+      margin-top: 3px; padding: 2px 5px;
+      font-weight: 800; font-size: 11px; color: #0f172a;
+      border-top: 1.5px solid #94a3b8; background: #f1f5f9; border-radius: 3px;
+    }
+    .d-notes { font-size: 10.5px; background: #fefce8; padding: 2px 5px; border-radius: 3px; }
 
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -318,7 +341,7 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
     <div>عدد الفواتير: <b>${docs.length}</b></div>
     <div>إجمالي الطرود: <b>${totalPacks}</b></div>
     <div>إجمالي الوزن: <b>${fmtNum(totalWeight)}</b></div>
-    <div>إجمالي القيمة: <b>${fmtNum(grandTotal)}</b></div>
+
   </div>
 
   ${cardsHtml}
