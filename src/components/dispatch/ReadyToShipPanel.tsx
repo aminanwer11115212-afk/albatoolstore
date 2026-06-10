@@ -232,8 +232,59 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
     </button>
   );
 
+  // قوائم مفلتَرة لكل فاتورة بناءً على ربط العميل (إن وجد)
+  const optionsForInvoice = useCallback((inv: any) => {
+    const cid = inv.customer_id;
+    const allT = (allTransporters as any[]) || [];
+    const allD = (allDestinations as any[]) || [];
+    const linkedT = ((custTransporters as any[]) || []).filter((x) => x.customer_id === cid).map((x) => x.transporter_id);
+    const linkedD = ((custDestinations as any[]) || []).filter((x) => x.customer_id === cid);
+    const transporters = cid && linkedT.length > 0 ? allT.filter((t) => linkedT.includes(t.id)) : allT;
+    const destinations = cid && linkedD.length > 0 ? allD.filter((d) => linkedD.some((ld) => ld.destination_id === d.id)) : allD;
+    const preferred = ((prefTransporters as any[]) || []).find((p) => p.customer_id === cid)?.transporter_id;
+    const defaultDest = linkedD.find((ld) => ld.is_default)?.destination_id;
+    return { transporters, destinations, preferred, defaultDest };
+  }, [allTransporters, allDestinations, custTransporters, custDestinations, prefTransporters]);
+
+  const getChoice = (inv: any) => {
+    const c = rowChoice[inv.id] || {};
+    const { preferred, defaultDest, transporters, destinations } = optionsForInvoice(inv);
+    const existing = inv.invoice_transports?.[0];
+    return {
+      transporterId: c.transporterId ?? existing?.transporter_id ?? preferred ?? transporters[0]?.id ?? "",
+      destinationId: c.destinationId ?? existing?.destination_id ?? defaultDest ?? destinations[0]?.id ?? "",
+    };
+  };
+
+  const dispatchRow = async (inv: any) => {
+    const choice = getChoice(inv);
+    if (!choice.transporterId) { toast.error("اختر ناقلاً"); return; }
+    setSavingRow(inv.id);
+    try {
+      const { error } = await (supabase as any).from("invoice_transports").insert({
+        invoice_id: inv.id,
+        transporter_id: choice.transporterId,
+        destination_id: choice.destinationId || null,
+        transport_date: new Date().toISOString().slice(0, 10),
+      });
+      if (error) throw error;
+      toast.success("تم تثبيت الترحيل — انتقلت الفاتورة إلى «في الطريق»");
+      qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
+      qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+    } catch (e: any) {
+      toast.error(e.message || "تعذّر تثبيت الترحيل");
+    } finally {
+      setSavingRow(null);
+    }
+  };
+
   const renderRow = (inv: any, idx: number) => {
     const isChecked = checked.has(inv.id);
+    const { transporters, destinations } = optionsForInvoice(inv);
+    const choice = getChoice(inv);
+    const hasTransport = (inv.invoice_transports?.length ?? 0) > 0;
+    const isSaving = savingRow === inv.id;
     return (
       <tr
         key={inv.id}
@@ -251,6 +302,45 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
         <td className="cell-num">{inv.invoice_number}</td>
         <td className="cell-name">{inv.customers?.name || "كاش"}</td>
         <td className="cell-date">{fmtDateAr(inv.date)}</td>
+        <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
+          <select
+            className="rts-select"
+            value={choice.transporterId}
+            onChange={(e) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: e.target.value } }))}
+          >
+            <option value="">— اختر ناقل —</option>
+            {transporters.map((t: any) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </td>
+        <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
+          <select
+            className="rts-select"
+            value={choice.destinationId}
+            onChange={(e) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: e.target.value } }))}
+          >
+            <option value="">— بدون وجهة —</option>
+            {destinations.map((d: any) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+        </td>
+        <td className="cell-act" onClick={(e) => e.stopPropagation()}>
+          {hasTransport ? (
+            <span className="rts-pill"><CheckCircle2 size={12} /> مُرحَّلة</span>
+          ) : (
+            <button
+              type="button"
+              className="rts-btn rts-btn-primary rts-btn-sm"
+              onClick={() => dispatchRow(inv)}
+              disabled={isSaving || !choice.transporterId}
+            >
+              <Send size={12} />
+              {isSaving ? "…" : "تثبيت"}
+            </button>
+          )}
+        </td>
       </tr>
     );
   };
