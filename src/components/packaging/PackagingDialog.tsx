@@ -551,9 +551,26 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
                   <span><span style={{ color: "hsl(var(--muted-foreground))" }}>الإجمالي: </span><strong>{Number(parent?.total || 0).toLocaleString()} {parent?.currency_code || "SDG"}</strong></span>
                 </div>
 
-                {/* Add form — شريط مضغوط */}
-                <div className="legacy-form-horizontal" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4, padding: "4px 8px", marginBottom: "6px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "auto 40px 2.2fr 1.8fr auto 50px auto", gap: "0.4rem", alignItems: "center" }}>
+                {/* Add form — شريط مضغوط (responsive: متعدد الأسطر على الموبايل) */}
+                <div className="legacy-form-horizontal pkg-add-form" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4, padding: "6px 8px", marginBottom: "6px" }}>
+                  <style>{`
+                    .pkg-add-form .pkg-add-grid {
+                      display: grid;
+                      grid-template-columns: auto 40px 2.2fr 1.8fr auto 50px auto;
+                      gap: 0.4rem;
+                      align-items: center;
+                    }
+                    @media (max-width: 720px) {
+                      .pkg-add-form .pkg-add-grid {
+                        grid-template-columns: 60px 1fr;
+                        gap: 6px 8px;
+                        align-items: center;
+                      }
+                      .pkg-add-form .pkg-add-grid > .pkg-full { grid-column: 1 / -1; }
+                      .pkg-add-form .pkg-add-grid .legacy-control { width: 100%; }
+                    }
+                  `}</style>
+                  <div className="pkg-add-grid">
                     <label style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", whiteSpace: "nowrap" }}>العدد</label>
                     <input
                       ref={qtyRef}
