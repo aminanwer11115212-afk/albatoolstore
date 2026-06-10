@@ -149,42 +149,28 @@ function renderPackagingHtml(rows: any[]): string {
 
   let table = "";
   if (allItems.length) {
-    const rowsHtml = allItems.map((it) => {
+    const rowsHtml = allItems.map((it, i) => {
       const name = it.product_name || "—";
       const ps = Number(it.packs_count || 0);
       const pp = Number(it.pieces_per_pack || 0);
       const q = Number(it.quantity || 0);
+      const desc = (ps && pp) ? `${escapeHtml(name)} - ${ps}×${pp}` : escapeHtml(name);
       return `<tr>
-        <td class="d-pk-name">${escapeHtml(name)}</td>
-        <td class="d-pk-num">${ps}</td>
-        <td class="d-pk-num">${pp}</td>
+        <td class="d-pk-num">${i + 1}</td>
         <td class="d-pk-num d-pk-q"><b>${fmtNum(q)}</b></td>
+        <td class="d-pk-name">${desc}</td>
       </tr>`;
     }).join("");
     table = `<table class="d-pk-table">
       <thead><tr>
-        <th>الصنف</th><th>الطرود</th><th>قطع/طرد</th><th>الإجمالي</th>
+        <th class="d-pk-num">#</th><th class="d-pk-num">العدد</th><th>نوع التغليف والصنف</th>
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>`;
   }
 
-  const totals = {
-    packs: rows.reduce((s, r) => {
-      const itemsPacks = (r.items || []).reduce((ss: number, it: any) => ss + Number(it.packs_count || 0), 0);
-      return s + (itemsPacks || Number(r.packs_count || 0));
-    }, 0),
-    pieces: rows.reduce((s, r) => s + (r.items || []).reduce((ss: number, it: any) => ss + Number(it.quantity || 0), 0), 0),
-    weight: rows.reduce((s, r) => s + Number(r.weight || 0), 0),
-  };
-  const parts: string[] = [];
-  if (totals.packs > 0) parts.push(`إجمالي الطرود: <b>${totals.packs}</b>`);
-  if (totals.pieces > 0) parts.push(`إجمالي القطع: <b>${fmtNum(totals.pieces)}</b>`);
-  if (totals.weight > 0) parts.push(`إجمالي الوزن: <b>${fmtNum(totals.weight)}</b>`);
-  const summary = parts.length ? `<div class="d-pk-sum">${parts.join(" • ")}</div>` : "";
-
   const chips = typesBits ? `<div class="d-pk-chips">${typesBits}</div>` : "";
-  return chips + table + summary;
+  return chips + table;
 }
 
 function renderCard(doc: DispatchDoc, idx: number): string {
@@ -223,10 +209,7 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
 
   const cardsHtml = docs.map((d, i) => renderCard(d, i)).join("");
 
-  const totalPacks = docs.reduce((s, d) =>
-    s + d.packaging.reduce((ss, p: any) => ss + Number(p.packs_count || 0), 0), 0);
-  const totalWeight = docs.reduce((s, d) =>
-    s + d.packaging.reduce((ss, p: any) => ss + Number(p.weight || 0), 0), 0);
+
 
 
   return `<!DOCTYPE html>
@@ -339,8 +322,8 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
   <div class="d-summary">
     <div>التاريخ: <b>${today}</b></div>
     <div>عدد الفواتير: <b>${docs.length}</b></div>
-    <div>إجمالي الطرود: <b>${totalPacks}</b></div>
-    <div>إجمالي الوزن: <b>${fmtNum(totalWeight)}</b></div>
+
+
 
   </div>
 
