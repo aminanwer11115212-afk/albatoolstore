@@ -44,15 +44,17 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dispatch-ready-to-ship"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("invoices")
-        .select(
-          `id, invoice_number, date, total, currency_code, workflow_status,
-           paid_amount, customer_id,
+      // الأعمدة المُحتملة في جدول invoices — نُصفّيها حسب ما هو موجود فعلاً
+      // لتفادي فشل الاستعلام بصمت عند إضافة/حذف عمود في القاعدة.
+      const wanted = "id, invoice_number, date, total, currency_code, workflow_status, paid_amount, customer_id, packaging_total_pieces";
+      const safeCols = await filterSelectColumns("invoices", wanted);
+      const selectExpr = `${safeCols},
            customers(id, name, phone),
            invoice_items(id, product_name, quantity, products(name)),
-           invoice_transports(id, transporter_id, transporters(id, name))`
-        )
+           invoice_transports(id, transporter_id, transporters(id, name))`;
+      const { data, error } = await (supabase as any)
+        .from("invoices")
+        .select(selectExpr)
         .eq("workflow_status", "ready_to_ship")
         .order("date", { ascending: false });
       if (error) throw error;
