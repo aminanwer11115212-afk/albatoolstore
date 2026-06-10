@@ -4,7 +4,7 @@
  * ذات الحالة "جاهز للرفع" (workflow_status = ready_to_ship).
  * بعد الطباعة → تحويل الحالة إلى in_transit.
  */
-import { useMemo, useState, useCallback, Fragment } from "react";
+import { useMemo, useState, useCallback, Fragment, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -59,6 +59,29 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
       return (data || []) as any[];
     },
   });
+
+  // Auto-refresh whenever an invoice changes anywhere in the app
+  // (status edits, packaging save, transport save, etc.)
+  useEffect(() => {
+    const onChange = () => {
+      qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
+    };
+    window.addEventListener("invoices:changed", onChange);
+    return () => window.removeEventListener("invoices:changed", onChange);
+  }, [qc]);
+
+  // Realtime: any change to workflow_status (or any invoices row) → refetch
+  useEffect(() => {
+    const channel = (supabase as any)
+      .channel("dispatch-ready-to-ship-rt")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "invoices" },
+        () => qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] }),
+      )
+      .subscribe();
+    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+  }, [qc]);
 
   const invoices = data || [];
 
@@ -148,6 +171,7 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
       qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
     } catch (e: any) {
       toast.error(e.message || "تعذّر إتمام العملية");
     } finally {
