@@ -469,6 +469,32 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
         .rts-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .rts-btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); width: 100%; justify-content: center; height: 36px; font-size: 12px; }
         .rts-btn-ghost { background: transparent; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
+        .rts-btn-sm { height: 26px; width: auto; padding: 0 8px; font-size: 10.5px; }
+
+        .rts-table thead th.cell-sel { width: 130px; text-align: center; }
+        .rts-table thead th.cell-act { width: 92px; text-align: center; }
+        .rts-table td.cell-sel { padding: 3px 4px; }
+        .rts-table td.cell-act { text-align: center; padding: 3px 4px; }
+        .rts-select {
+          width: 100%; min-height: 28px; padding: 2px 6px;
+          background: hsl(var(--background));
+          color: hsl(var(--foreground));
+          border: 1px solid hsl(var(--border));
+          border-radius: 6px; font-size: 11px; font-weight: 600;
+        }
+        .rts-select:focus { outline: 2px solid hsl(var(--primary) / 0.35); outline-offset: 0; border-color: hsl(var(--primary)); }
+        .rts-pill {
+          display: inline-flex; align-items: center; gap: 3px;
+          padding: 3px 8px; border-radius: 999px;
+          background: hsl(var(--primary) / 0.12);
+          color: hsl(var(--primary));
+          font-size: 10px; font-weight: 800;
+        }
+        @media (max-width: 640px) {
+          .rts-table thead th.cell-sel { width: 110px; }
+          .rts-select { font-size: 16px; min-height: 40px; }
+          .rts-btn-sm { height: 40px; padding: 0 10px; font-size: 12px; }
+        }
       `}</style>
 
       {/* Header */}
