@@ -101,7 +101,7 @@ interface RecentItemsSidebarProps {
 }
 
 function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: RecentItemsSidebarProps) {
-  const limitStorageKey = userScopedLegacyKey(`recent-sidebar:limit:${type}:v1`);
+  const limitStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:limit:${type}:v1`);
   const [limit, setLimitState] = useState<number>(() => {
     if (typeof window === "undefined") return 50;
     try {
@@ -142,8 +142,8 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
         : [null, 80, 78, 90, 36]),
     [isInvoicesType, isQuotesSide]
   );
-  const colsStorageKey = userScopedLegacyKey(`recent-sidebar:cols:${type}:v1`);
-  const lockStorageKey = userScopedLegacyKey(`recent-sidebar:cols-locked:${type}:v1`);
+  const colsStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:cols:${type}:v1`);
+  const lockStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:cols-locked:${type}:v1`);
   const [colsLocked, setColsLockedState] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     try { return localStorage.getItem(lockStorageKey) !== "0"; } catch { return true; }
@@ -161,7 +161,7 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
   // We use localStorage (not sessionStorage) so the position survives full
   // page reloads and tab restarts; key is per-type so each sidebar keeps its
   // own anchor independently.
-  const scrollStorageKey = userScopedLegacyKey(`recent-sidebar:scroll:${type}:v1`);
+  const scrollStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:scroll:${type}:v1`);
   // Initialize synchronously so the first useLayoutEffect after data load
   // can restore to the correct position (avoids a brief jump to top).
   const savedScrollRef = useRef<number>((() => {
