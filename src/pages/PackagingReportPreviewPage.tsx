@@ -73,15 +73,16 @@ export default function PackagingReportPreviewPage({ docType }: Props) {
           items = rows || [];
         }
 
-        // أسماء أنواع التغليف للبنود التي عندها packaging_type_id مباشر
-        const directTypeIds = Array.from(new Set(
-          items.map((r: any) => r.packaging_type_id).filter(Boolean)
-        ));
-        const directTypeNameById: Record<string, string> = {};
-        if (directTypeIds.length) {
+        // اجمع جميع packaging_type_id (من البنود والرؤوس) واستعلم عن أسمائها دفعة واحدة
+        const allTypeIds = Array.from(new Set([
+          ...items.map((r: any) => r.packaging_type_id).filter(Boolean),
+          ...headerTypeIds,
+        ]));
+        const typeNameById: Record<string, string> = {};
+        if (allTypeIds.length) {
           const { data: types } = await (supabase as any)
-            .from("packaging_types").select("id, name").in("id", directTypeIds);
-          (types || []).forEach((t: any) => { directTypeNameById[t.id] = t.name; });
+            .from("packaging_types").select("id, name").in("id", allTypeIds);
+          (types || []).forEach((t: any) => { typeNameById[t.id] = t.name; });
         }
 
         const docInfo = {
