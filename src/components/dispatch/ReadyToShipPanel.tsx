@@ -514,7 +514,10 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
                 </th>
                 <th className="cell-num">رقم الفاتورة</th>
                 <th>اسم الزبون</th>
-                <th className="cell-date">تاريخ الفاتورة</th>
+                <th className="cell-date">التاريخ</th>
+                <th className="cell-sel">الناقل</th>
+                <th className="cell-sel">الوجهة</th>
+                <th className="cell-act">إجراء</th>
               </tr>
             </thead>
             <tbody>{invoices.map(renderRow)}</tbody>
@@ -526,7 +529,10 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
                 <th className="cell-check">#</th>
                 <th className="cell-num">رقم الفاتورة</th>
                 <th>اسم الزبون</th>
-                <th className="cell-date">تاريخ الفاتورة</th>
+                <th className="cell-date">التاريخ</th>
+                <th className="cell-sel">الناقل</th>
+                <th className="cell-sel">الوجهة</th>
+                <th className="cell-act">إجراء</th>
               </tr>
             </thead>
             <tbody>
@@ -536,7 +542,7 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
                 return (
                   <Fragment key={`g-${g.key}`}>
                     <tr>
-                      <td colSpan={4} style={{ padding: 0 }}>
+                      <td colSpan={7} style={{ padding: 0 }}>
                         <div
                           className="rts-group-head"
                           onClick={() => toggleGroup(g.key)}
