@@ -99,7 +99,7 @@ export default function PackagingReportPreviewPage({ docType }: Props) {
           doc: docInfo,
           company,
           rows: items.map((r: any) => ({
-            type: directTypeNameById[r.packaging_type_id] || headerTypeById[r[fkItem]] || "",
+            type: typeNameById[r.packaging_type_id] || typeNameById[headerTypeIdById[r[fkItem]]] || "",
             product: r.product_name,
             quantity: r.quantity,
             packs_count: r.packs_count,
