@@ -49,19 +49,40 @@ export default function PackagingReportPreviewPage({ docType }: Props) {
         if (dErr) throw dErr;
         if (!doc) throw new Error(isInvoice ? "الفاتورة غير موجودة" : "عرض السعر غير موجود");
 
-        // Headers (سجلات التغليف الرئيسية)
+        // Headers (سجلات التغليف الرئيسية) — بدون embed (لا يوجد FK على packaging_types)
         const { data: headers } = await (supabase as any)
-          .from(tableHeader).select("id").eq(fkHeader, id);
+          .from(tableHeader)
+          .select("id, packaging_type_id")
+          .eq(fkHeader, id);
         const headerIds = (headers || []).map((h: any) => h.id);
+        const headerTypeIds = Array.from(new Set(
+          (headers || []).map((h: any) => h.packaging_type_id).filter(Boolean)
+        ));
+        const headerTypeIdById: Record<string, string> = {};
+        (headers || []).forEach((h: any) => {
+          if (h.packaging_type_id) headerTypeIdById[h.id] = h.packaging_type_id;
+        });
 
-        // Items (بنود التغليف الحقيقية)
+        // Items (بنود التغليف الحقيقية) — بدون embed على packaging_types (لا يوجد FK)
         let items: any[] = [];
         if (headerIds.length) {
           const { data: rows } = await (supabase as any)
             .from(tableItems)
-            .select("*, packaging_types(name)")
+            .select("*")
             .in(fkItem, headerIds);
           items = rows || [];
+        }
+
+        // اجمع جميع packaging_type_id (من البنود والرؤوس) واستعلم عن أسمائها دفعة واحدة
+        const allTypeIds = Array.from(new Set([
+          ...items.map((r: any) => r.packaging_type_id).filter(Boolean),
+          ...headerTypeIds,
+        ]));
+        const typeNameById: Record<string, string> = {};
+        if (allTypeIds.length) {
+          const { data: types } = await (supabase as any)
+            .from("packaging_types").select("id, name").in("id", allTypeIds);
+          (types || []).forEach((t: any) => { typeNameById[t.id] = t.name; });
         }
 
         const docInfo = {
@@ -78,7 +99,7 @@ export default function PackagingReportPreviewPage({ docType }: Props) {
           doc: docInfo,
           company,
           rows: items.map((r: any) => ({
-            type: r.packaging_types?.name,
+            type: typeNameById[r.packaging_type_id] || typeNameById[headerTypeIdById[r[fkItem]]] || "",
             product: r.product_name,
             quantity: r.quantity,
             packs_count: r.packs_count,
