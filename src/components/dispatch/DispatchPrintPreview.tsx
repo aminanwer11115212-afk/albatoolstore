@@ -322,8 +322,8 @@ function buildFullHTML(docs: DispatchDoc[], company: any): string {
   <div class="d-summary">
     <div>التاريخ: <b>${today}</b></div>
     <div>عدد الفواتير: <b>${docs.length}</b></div>
-    <div>إجمالي الطرود: <b>${totalPacks}</b></div>
-    <div>إجمالي الوزن: <b>${fmtNum(totalWeight)}</b></div>
+
+
 
   </div>
 
