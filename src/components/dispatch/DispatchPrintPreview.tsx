@@ -61,7 +61,7 @@ async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
   const [{ data: items }, { data: transports }, { data: packaging }, { data: packagingItems }, { data: transportItems }] = await Promise.all([
     supabase.from("invoice_items").select("quantity").eq("invoice_id", id),
     supabase.from("invoice_transports")
-      .select("id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name), destinations(name)")
+      .select("id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name, phone), destinations(name)")
       .eq("invoice_id", id),
     supabase.from("invoice_packaging")
       .select("id, quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
