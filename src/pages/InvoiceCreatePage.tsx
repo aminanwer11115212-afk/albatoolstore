@@ -2231,6 +2231,7 @@ export default function InvoiceCreatePage() {
                             }
                           } catch (stockErr) { console.error("[InvoiceCreatePage] stock deduction failed", stockErr); }
                         }
+                        try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
                         toast.success("تم تحديث الحالة");
                       }}
                     />
