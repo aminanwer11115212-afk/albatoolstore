@@ -171,6 +171,7 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
       qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
     } catch (e: any) {
       toast.error(e.message || "تعذّر إتمام العملية");
     } finally {
