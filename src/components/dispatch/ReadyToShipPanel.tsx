@@ -46,6 +46,17 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
   const [busy, setBusy] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
+  // قوائم الناقلين والوجهات + روابط العميل
+  const { data: allTransporters } = useTransporters();
+  const { data: allDestinations } = useDestinations();
+  const { data: custTransporters } = useCustomerTransporters();
+  const { data: custDestinations } = useCustomerDestinations();
+  const { data: prefTransporters } = useCustomerPreferredTransporter();
+
+  // اختيار المستخدم لكل فاتورة (قبل التثبيت)
+  const [rowChoice, setRowChoice] = useState<Record<string, { transporterId?: string; destinationId?: string }>>({});
+  const [savingRow, setSavingRow] = useState<string | null>(null);
+
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dispatch-ready-to-ship"],
     queryFn: async () => {
