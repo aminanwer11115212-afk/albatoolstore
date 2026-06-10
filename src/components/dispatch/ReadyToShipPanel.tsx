@@ -7,6 +7,7 @@
 import { useMemo, useState, useCallback, Fragment, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { filterSelectColumns } from "@/lib/tableColumns";
 import { toast } from "sonner";
 import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft } from "lucide-react";
 
