@@ -631,6 +631,7 @@ export default function InvoiceViewPage() {
                   note: `حالة التجهيز: ${getWorkflowStatus(before).label} → ${getWorkflowStatus(newStatus).label}`,
                 });
                 toast.success("تم تحديث حالة التجهيز");
+                try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
                 loadInvoice();
               } catch (err: any) { toast.error(err.message); }
             }}
