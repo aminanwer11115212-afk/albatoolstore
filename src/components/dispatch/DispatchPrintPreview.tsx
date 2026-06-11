@@ -200,7 +200,7 @@ function renderCard(doc: DispatchDoc, idx: number): string {
         </div>
         <div class="d-section d-section-pk">
           <div class="d-label d-label-pk">بيانات التغليف</div>
-          ${renderPackagingHtml(doc.packaging)}
+          ${renderPackagingHtml(doc)}
         </div>
         ${inv.notes ? `<div class="d-section d-notes"><span class="d-label-inline">ملاحظات:</span> ${escapeHtml(inv.notes)}</div>` : ""}
       </div>
