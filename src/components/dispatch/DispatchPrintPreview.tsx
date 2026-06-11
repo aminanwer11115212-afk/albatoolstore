@@ -145,35 +145,24 @@ function renderTransportsHtml(rows: any[]): string {
   }).join("");
 }
 
-function renderPackagingHtml(rows: any[]): string {
-  if (!rows.length) return `<span class="d-muted">—</span>`;
-
-  // بناء أسطر التغليف بنفس صياغة تقرير تغليف الفاتورة:
-  //   "n) packs — <b>type</b> product — × pieces"
+function renderPackagingHtml(doc: DispatchDoc): string {
+  // نفس مصدر وترتيب بيانات معاينة تقرير التغليف (invoices_packaging_items).
   type Line = { packs: number; type: string; product: string; pieces: number };
-  const lines: Line[] = [];
+  const flat = doc.packagingItemsFlat || [];
 
-  rows.forEach((r) => {
-    const typeName = r.packaging_types?.name || "";
-    if (Array.isArray(r.items) && r.items.length) {
-      r.items.forEach((it: any) => {
-        lines.push({
-          packs: Number(it.packs_count ?? 1),
-          type: typeName,
-          product: it.product_name || "",
-          pieces: Number(it.pieces_per_pack ?? it.quantity ?? 1),
-        });
-      });
-    } else {
-      // لا توجد بنود تفصيلية → سجل التغليف نفسه كسطر
-      lines.push({
+  const lines: Line[] = flat.length
+    ? flat.map((it: any) => ({
+        packs: Number(it.packs_count ?? 1),
+        type: it.type || "",
+        product: it.product || "",
+        pieces: Number(it.pieces_per_pack ?? it.quantity ?? 1),
+      }))
+    : (doc.packaging || []).map((r: any) => ({
         packs: Number(r.packs_count ?? 1),
-        type: typeName,
+        type: r.packaging_types?.name || "",
         product: "",
         pieces: Number(r.pieces_per_pack ?? r.quantity ?? 1),
-      });
-    }
-  });
+      }));
 
   if (!lines.length) return `<span class="d-muted">—</span>`;
 
