@@ -61,13 +61,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // ──── DEV_BYPASS: تعطيل مؤقت لتجربة النظام بدون تسجيل دخول ────
-  // لإعادة التفعيل: أزل التعليق من الكتلة أدناه واحذف كتلة DEV_BYPASS
-  // if (!user) {
-  //   setTimeout(() => navigate("/login", { replace: true }), 0);
-  //   return null;
-  // }
-  // ──── نهاية DEV_BYPASS ────
+  // حماية المسارات الداخلية: إعادة توجيه غير المسجلين إلى صفحة الدخول
+  if (!user) {
+    setTimeout(() => navigate("/login", { replace: true }), 0);
+    return null;
+  }
 
   const toggleSidebar = () => {
     if (isMobile) {

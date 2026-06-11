@@ -187,19 +187,26 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
       </tr>
     `).join("");
     
-    // جلب بيانات التغليف
-    const { data: packaging } = await (supabase as any).from("invoice_packaging").select("*, packaging_items(*, products(name))").eq("invoice_id", invoiceId).order("created_at", { ascending: false });
-    
+    // جلب بيانات التغليف من الجدول الصحيح invoices_packaging_items
+    const { data: packagingItems } = await (supabase as any)
+      .from("invoices_packaging_items")
+      .select("packs_count, pieces_per_pack, quantity, products(name), packaging_types(name)")
+      .eq("invoice_id", invoiceId)
+      .order("created_at", { ascending: true });
+
     let packagingHTML = "";
-    if (packaging && packaging.length > 0) {
+    if (packagingItems && packagingItems.length > 0) {
+      const lines = packagingItems.map((pi: any, i: number) => {
+        const packs = Number(pi.packs_count || 0);
+        const pieces = Number(pi.pieces_per_pack || 0);
+        const typeName = pi.packaging_types?.name || "—";
+        const prodName = pi.products?.name || "—";
+        const piecesPart = pieces > 1 ? ` × ${pieces}` : "";
+        return `<div style="padding:3px 0;font-size:10px">${i + 1}) ${packs} — <b>${typeName}</b> ${prodName}${piecesPart}</div>`;
+      }).join("");
       packagingHTML = `
         <tr><td colSpan="5" style="background:#e8f5e9;padding:8px;font-weight:bold;border-bottom:2px solid #4caf50">📦 بيانات التغليف</td></tr>
-        ${packaging.map((p: any) => `
-          <tr>
-            <td colSpan="2" style="padding:4px 8px;border-bottom:1px solid #ddd;font-size:10px">${p.packaging_items?.map((pi: any) => `${pi.products?.name || "—"} (${pi.quantity})`).join("، ") || "—"}</td>
-            <td colSpan="3" style="padding:4px 8px;border-bottom:1px solid #ddd;font-size:10px">${p.notes || "—"}</td>
-          </tr>
-        `).join("")}
+        <tr><td colSpan="5" style="padding:6px 10px">${lines}</td></tr>
       `;
     }
     
@@ -304,11 +311,12 @@ ${packagingHTML ? `
     if (readyToPrint.length === 0) { toast.error("حدد ناقلاً لفاتورة واحدة على الأقل"); return; }
     setPrinting(true);
     try {
+      const today = new Date().toISOString().slice(0, 10);
       for (const inv of readyToPrint) {
         const transporterId = invoiceRows[inv.id]?.transporterId || "";
         const destinationId = invoiceRows[inv.id]?.destinationId || "";
         const notes = invoiceRows[inv.id]?.notes || "";
-        
+
         const html = await buildSingleInvoiceHTML(inv.id, inv, transporterId, destinationId, notes);
         const win = window.open("", "_blank", "width=800,height=600");
         if (win) {
@@ -316,9 +324,25 @@ ${packagingHTML ? `
           win.document.close();
           win.onload = () => { win.print(); };
         }
+
+        // حفظ سجل الترحيل في invoice_transports حتى لا يضيع الناقل والوجهة
+        try {
+          await (supabase as any).from("invoice_transports").insert({
+            invoice_id: inv.id,
+            transporter_id: transporterId || null,
+            destination_id: destinationId || null,
+            notes: notes || null,
+            transport_date: today,
+            status: "in_transit",
+            shipped_at: new Date().toISOString(),
+          });
+        } catch (insErr) {
+          console.error("insert invoice_transports failed", insErr);
+        }
+
         await new Promise(r => setTimeout(r, 500));
       }
-      
+
       const ids = readyToPrint.map((inv: any) => inv.id);
       // Use RPC for consistent automation logging in invoice_revisions
       await Promise.all(ids.map((id: string) =>
