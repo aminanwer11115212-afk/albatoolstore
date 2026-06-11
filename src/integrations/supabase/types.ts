@@ -2722,6 +2722,10 @@ export type Database = {
       }
       is_workflow_automation_enabled: { Args: never; Returns: boolean }
       mark_overdue_invoices: { Args: never; Returns: number }
+      recompute_account_balance: {
+        Args: { _account_id: string }
+        Returns: undefined
+      }
       recompute_customer_balance: {
         Args: { _customer_id: string }
         Returns: undefined
