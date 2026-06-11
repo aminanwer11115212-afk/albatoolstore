@@ -678,7 +678,7 @@ export default function StockReturnCreatePage() {
       date: returnDate,
       total: totals.total,
       reason,
-      status: "pending",
+      status: returnStatus || "pending",
     };
 
     // ── لقطة البنود القديمة قبل أي تعديل (لحساب فرق المخزون بدقة) ──
