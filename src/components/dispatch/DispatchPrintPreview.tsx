@@ -49,6 +49,7 @@ type DispatchDoc = {
   qtyTotal: number;
   transports: any[];
   packaging: any[];
+  packagingItemsFlat: any[];
 };
 
 async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
@@ -64,10 +65,10 @@ async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
       .select("id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name, phone), destinations(name)")
       .eq("invoice_id", id),
     supabase.from("invoice_packaging")
-      .select("id, quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
+      .select("id, packaging_type_id, quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
       .eq("invoice_id", id),
     supabase.from("invoices_packaging_items")
-      .select("product_name, packs_count, pieces_per_pack, quantity, price, total, invoice_packaging_id")
+      .select("product_name, packs_count, pieces_per_pack, quantity, price, total, invoice_packaging_id, packaging_type_id")
       .eq("invoice_id", id),
     (supabase as any).from("invoices_transports_items")
       .select("product_name, packs_count, pieces_per_pack, quantity, price, total, invoice_transport_id")
@@ -76,10 +77,36 @@ async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
   const itemsCount = items?.length || 0;
   const qtyTotal = (items || []).reduce((s, it: any) => s + Number(it.quantity || 0), 0);
 
-  const packagingWithItems = (packaging || []).map((p: any) => ({
-    ...p,
-    items: (packagingItems || []).filter((it: any) => it.invoice_packaging_id === p.id),
+  // اسم نوع التغليف عبر رأس التغليف (نفس منطق صفحة معاينة تقرير التغليف)
+  const typeNameByHeaderId: Record<string, string> = {};
+  const typeIdByHeaderId: Record<string, string> = {};
+  (packaging || []).forEach((p: any) => {
+    typeNameByHeaderId[p.id] = p.packaging_types?.name || "";
+    if (p.packaging_type_id) typeIdByHeaderId[p.id] = p.packaging_type_id;
+  });
+
+  // جلب أسماء أنواع التغليف الإضافية (لو البند يحمل packaging_type_id مختلف)
+  const extraTypeIds = Array.from(new Set(
+    (packagingItems || []).map((r: any) => r.packaging_type_id).filter(Boolean)
+  ));
+  const typeNameById: Record<string, string> = {};
+  if (extraTypeIds.length) {
+    const { data: types } = await supabase
+      .from("packaging_types").select("id, name").in("id", extraTypeIds as string[]);
+    (types || []).forEach((t: any) => { typeNameById[t.id] = t.name; });
+  }
+
+  const packagingItemsFlat = (packagingItems || []).map((r: any) => ({
+    type:
+      typeNameById[r.packaging_type_id] ||
+      typeNameByHeaderId[r.invoice_packaging_id] ||
+      "",
+    product: r.product_name,
+    packs_count: r.packs_count,
+    pieces_per_pack: r.pieces_per_pack,
+    quantity: r.quantity,
   }));
+
   const transportsWithItems = (transports || []).map((t: any) => ({
     ...t,
     items: (transportItems || []).filter((it: any) => it.invoice_transport_id === t.id),
@@ -90,7 +117,8 @@ async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
     itemsCount,
     qtyTotal,
     transports: transportsWithItems,
-    packaging: packagingWithItems,
+    packaging: packaging || [],
+    packagingItemsFlat,
   };
 }
 
