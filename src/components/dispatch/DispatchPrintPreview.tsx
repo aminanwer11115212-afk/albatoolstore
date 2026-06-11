@@ -49,6 +49,7 @@ type DispatchDoc = {
   qtyTotal: number;
   transports: any[];
   packaging: any[];
+  packagingItemsFlat: any[];
 };
 
 async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
@@ -64,10 +65,10 @@ async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
       .select("id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name, phone), destinations(name)")
       .eq("invoice_id", id),
     supabase.from("invoice_packaging")
-      .select("id, quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
+      .select("id, packaging_type_id, quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
       .eq("invoice_id", id),
     supabase.from("invoices_packaging_items")
-      .select("product_name, packs_count, pieces_per_pack, quantity, price, total, invoice_packaging_id")
+      .select("product_name, packs_count, pieces_per_pack, quantity, price, total, invoice_packaging_id, packaging_type_id")
       .eq("invoice_id", id),
     (supabase as any).from("invoices_transports_items")
       .select("product_name, packs_count, pieces_per_pack, quantity, price, total, invoice_transport_id")
@@ -76,10 +77,36 @@ async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
   const itemsCount = items?.length || 0;
   const qtyTotal = (items || []).reduce((s, it: any) => s + Number(it.quantity || 0), 0);
 
-  const packagingWithItems = (packaging || []).map((p: any) => ({
-    ...p,
-    items: (packagingItems || []).filter((it: any) => it.invoice_packaging_id === p.id),
+  // اسم نوع التغليف عبر رأس التغليف (نفس منطق صفحة معاينة تقرير التغليف)
+  const typeNameByHeaderId: Record<string, string> = {};
+  const typeIdByHeaderId: Record<string, string> = {};
+  (packaging || []).forEach((p: any) => {
+    typeNameByHeaderId[p.id] = p.packaging_types?.name || "";
+    if (p.packaging_type_id) typeIdByHeaderId[p.id] = p.packaging_type_id;
+  });
+
+  // جلب أسماء أنواع التغليف الإضافية (لو البند يحمل packaging_type_id مختلف)
+  const extraTypeIds = Array.from(new Set(
+    (packagingItems || []).map((r: any) => r.packaging_type_id).filter(Boolean)
+  ));
+  const typeNameById: Record<string, string> = {};
+  if (extraTypeIds.length) {
+    const { data: types } = await supabase
+      .from("packaging_types").select("id, name").in("id", extraTypeIds as string[]);
+    (types || []).forEach((t: any) => { typeNameById[t.id] = t.name; });
+  }
+
+  const packagingItemsFlat = (packagingItems || []).map((r: any) => ({
+    type:
+      typeNameById[r.packaging_type_id] ||
+      typeNameByHeaderId[r.invoice_packaging_id] ||
+      "",
+    product: r.product_name,
+    packs_count: r.packs_count,
+    pieces_per_pack: r.pieces_per_pack,
+    quantity: r.quantity,
   }));
+
   const transportsWithItems = (transports || []).map((t: any) => ({
     ...t,
     items: (transportItems || []).filter((it: any) => it.invoice_transport_id === t.id),
@@ -90,7 +117,8 @@ async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
     itemsCount,
     qtyTotal,
     transports: transportsWithItems,
-    packaging: packagingWithItems,
+    packaging: packaging || [],
+    packagingItemsFlat,
   };
 }
 
@@ -117,35 +145,24 @@ function renderTransportsHtml(rows: any[]): string {
   }).join("");
 }
 
-function renderPackagingHtml(rows: any[]): string {
-  if (!rows.length) return `<span class="d-muted">—</span>`;
-
-  // بناء أسطر التغليف بنفس صياغة تقرير تغليف الفاتورة:
-  //   "n) packs — <b>type</b> product — × pieces"
+function renderPackagingHtml(doc: DispatchDoc): string {
+  // نفس مصدر وترتيب بيانات معاينة تقرير التغليف (invoices_packaging_items).
   type Line = { packs: number; type: string; product: string; pieces: number };
-  const lines: Line[] = [];
+  const flat = doc.packagingItemsFlat || [];
 
-  rows.forEach((r) => {
-    const typeName = r.packaging_types?.name || "";
-    if (Array.isArray(r.items) && r.items.length) {
-      r.items.forEach((it: any) => {
-        lines.push({
-          packs: Number(it.packs_count ?? 1),
-          type: typeName,
-          product: it.product_name || "",
-          pieces: Number(it.pieces_per_pack ?? it.quantity ?? 1),
-        });
-      });
-    } else {
-      // لا توجد بنود تفصيلية → سجل التغليف نفسه كسطر
-      lines.push({
+  const lines: Line[] = flat.length
+    ? flat.map((it: any) => ({
+        packs: Number(it.packs_count ?? 1),
+        type: it.type || "",
+        product: it.product || "",
+        pieces: Number(it.pieces_per_pack ?? it.quantity ?? 1),
+      }))
+    : (doc.packaging || []).map((r: any) => ({
         packs: Number(r.packs_count ?? 1),
-        type: typeName,
+        type: r.packaging_types?.name || "",
         product: "",
         pieces: Number(r.pieces_per_pack ?? r.quantity ?? 1),
-      });
-    }
-  });
+      }));
 
   if (!lines.length) return `<span class="d-muted">—</span>`;
 
@@ -183,7 +200,7 @@ function renderCard(doc: DispatchDoc, idx: number): string {
         </div>
         <div class="d-section d-section-pk">
           <div class="d-label d-label-pk">بيانات التغليف</div>
-          ${renderPackagingHtml(doc.packaging)}
+          ${renderPackagingHtml(doc)}
         </div>
         ${inv.notes ? `<div class="d-section d-notes"><span class="d-label-inline">ملاحظات:</span> ${escapeHtml(inv.notes)}</div>` : ""}
       </div>
