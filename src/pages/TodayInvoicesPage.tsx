@@ -20,8 +20,8 @@ export default function TodayInvoicesPage() {
     },
   });
 
-  const statusLabels: Record<string, string> = { pending: "معلقة", paid: "مدفوعة", partial: "جزئي", cancelled: "ملغاة" };
-  const statusColors: Record<string, string> = { pending: "bg-warning/10 text-warning", paid: "bg-success/10 text-success", partial: "bg-info/10 text-info", cancelled: "bg-destructive/10 text-destructive" };
+  const statusLabels: Record<string, string> = { pending: "معلقة", paid: "مدفوعة", partial: "مدفوعة جزئياً", overdue: "متأخرة", cancelled: "ملغاة" };
+  const statusColors: Record<string, string> = { pending: "bg-warning/10 text-warning", paid: "bg-success/10 text-success", partial: "bg-info/10 text-info", overdue: "bg-destructive/10 text-destructive", cancelled: "bg-muted text-muted-foreground" };
 
   const totalAmount = (invoices || []).reduce((s: number, inv: any) => s + Number(inv.total || 0), 0);
   const paidAmount = (invoices || []).reduce((s: number, inv: any) => s + Number(inv.paid_amount || 0), 0);
@@ -69,7 +69,7 @@ export default function TodayInvoicesPage() {
                     <span className={`text-xs px-2 py-1 rounded-full ${statusColors[inv.status] || ""}`}>{statusLabels[inv.status] || inv.status}</span>
                   </td>
                   <td className="px-5 py-3">
-                    <button onClick={() => navigate("/invoices")} className="p-1.5 text-primary hover:bg-primary/10 rounded"><Eye size={15} /></button>
+                    <button onClick={() => navigate(`/invoices/view/${inv.id}`)} className="p-1.5 text-primary hover:bg-primary/10 rounded"><Eye size={15} /></button>
                   </td>
                 </tr>
               ))}

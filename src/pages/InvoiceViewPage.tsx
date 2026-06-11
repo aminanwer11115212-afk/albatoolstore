@@ -534,7 +534,7 @@ export default function InvoiceViewPage() {
             </Button>
           )},
           { id: "deleted-products", node: (
-            <Button variant="outline" className="gap-1.5 text-xs h-9">
+            <Button onClick={() => navigate(`/deleted-items?invoice=${id}`)} variant="outline" className="gap-1.5 text-xs h-9">
               <Trash2 size={14} /> المنتجات المحذوفة
             </Button>
           )},
