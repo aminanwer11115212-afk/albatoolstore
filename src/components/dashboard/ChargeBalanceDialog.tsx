@@ -154,10 +154,8 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
         remaining -= applied;
       }
 
-      // 3) Update customer balance (subtract amount they owed)
-      const cust = customers.find((c) => c.id === customerId);
-      const newBalance = Number(cust?.balance || 0) - amt;
-      await supabase.from("customers").update({ balance: newBalance }).eq("id", customerId);
+      // 3) رصيد العميل يُعاد حسابه تلقائياً عبر trigger trg_invoices_recompute_cust_balance
+      //    بعد تحديث paid_amount على الفواتير أعلاه — لا تحديث يدوي.
 
       toast.success("تم شحن الرصيد بنجاح");
       reset();

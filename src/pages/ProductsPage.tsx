@@ -636,7 +636,9 @@ export default function ProductsPage() {
 
 
   const handleSubmit = async () => {
-    if (!form.name) { toast.error("اسم المنتج مطلوب"); return; }
+    if (!form.name?.trim()) { toast.error("اسم المنتج مطلوب"); return; }
+    if (!form.sale_price || parseFloat(form.sale_price) <= 0) { toast.error("سعر البيع مطلوب ويجب أن يكون أكبر من صفر"); return; }
+    if (!form.warehouse_id) { toast.error("المخزن مطلوب"); return; }
     // أول ماركة محفوظة كـ company_id للحفاظ على التكامل الخلفي مع باقي النظام
     const primaryBrandId = selectedBrandIds[0] || null;
     const payload: any = {
