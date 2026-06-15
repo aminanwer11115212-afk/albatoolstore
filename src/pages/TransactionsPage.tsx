@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Plus, Eye, Trash2, Printer, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTransactionsWithAccounts, useAccounts, useTransactions, useCustomers, useSuppliers } from "@/hooks/useData";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank } from "@/lib/bankTransferValidation";
