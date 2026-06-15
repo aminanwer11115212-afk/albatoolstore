@@ -37,6 +37,7 @@ const statusLabels: Record<string, { label: string; bg: string }> = {
 export default function QuoteViewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data: companyArr } = useCompanySettings();
   const { data: accounts } = useAccounts();
   const company = (companyArr as any)?.[0] || null;

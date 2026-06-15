@@ -33,6 +33,7 @@ import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus } from "@/com
 export default function InvoiceViewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data: companyArr } = useCompanySettings();
   const { data: accounts } = useAccounts();
   const company = (companyArr as any)?.[0] || null;
