@@ -242,11 +242,12 @@ export default function InvoicesPage() {
                 type="button"
                 id="btn-open-dispatch"
                 onClick={() => navigate("/dispatch")}
+                className="bg-primary text-primary-foreground hover:opacity-90"
                 style={{
-                  background: "linear-gradient(135deg,#3b5bdb,#1c3faa)",
-                  color: "#fff", border: "none", borderRadius: 6,
-                  padding: "3px 10px", fontSize: 11, fontWeight: 700,
+                  border: "none", borderRadius: 6,
+                  padding: "6px 12px", fontSize: 11, fontWeight: 700,
                   cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
+                  minHeight: 32,
                 }}
                 title="فتح شاشة تقرير الترحيلات"
               >

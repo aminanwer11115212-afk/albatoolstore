@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanySettings, useAccounts } from "@/hooks/useData";
@@ -36,6 +37,7 @@ const statusLabels: Record<string, { label: string; bg: string }> = {
 export default function QuoteViewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data: companyArr } = useCompanySettings();
   const { data: accounts } = useAccounts();
   const company = (companyArr as any)?.[0] || null;
@@ -177,15 +179,21 @@ export default function QuoteViewPage() {
       toast.success("تم تغيير الوضع");
       setShowStatusChange(false);
       loadQuote();
+      qc.invalidateQueries({ queryKey: ["quotes-full"] });
+      qc.invalidateQueries({ queryKey: ["quotes-with-customers"] });
     } catch (e: any) { toast.error(e.message); }
   };
 
   const handleConvertToInvoice = async () => {
-    if (!quote || !confirm("تحويل عرض السعر إلى فاتورة؟ سيتم حذف عرض السعر بعد التحويل.")) return;
+    if (!quote || !confirm("تحويل عرض السعر إلى فاتورة؟ سيتم الإبقاء على عرض السعر بحالة \"مقبول\".")) return;
     try {
       const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
       const { invoiceId, invoiceNumber } = await convertQuoteToInvoice(quote.id);
       toast.success(`تم تحويل العرض إلى فاتورة ${invoiceNumber} — العرض محفوظ كمقبول`);
+      qc.invalidateQueries({ queryKey: ["quotes-full"] });
+      qc.invalidateQueries({ queryKey: ["quotes-with-customers"] });
+      qc.invalidateQueries({ queryKey: ["invoices-full"] });
+      qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       navigate(`/invoices/edit/${invoiceId}`);
     } catch (e: any) { toast.error(e.message); }
   };

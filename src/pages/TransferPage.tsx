@@ -11,6 +11,13 @@ export default function TransferPage() {
     if (!form.from_account || !form.to_account || !form.amount) { toast.error("جميع الحقول مطلوبة"); return; }
     if (form.from_account === form.to_account) { toast.error("لا يمكن التحويل لنفس الحساب"); return; }
     const amount = parseFloat(form.amount);
+    if (!amount || amount <= 0) { toast.error("الرجاء إدخال مبلغ صحيح"); return; }
+    const fromAcc = (accounts as any[] | undefined)?.find((a: any) => a.id === form.from_account);
+    const fromBalance = Number(fromAcc?.balance || 0);
+    if (fromBalance < amount) {
+      toast.error(`الرصيد غير كافٍ — المتاح: ${fromBalance.toLocaleString()}`);
+      return;
+    }
     try {
       await insert.mutateAsync({ type: "transfer", amount, description: form.description || "تحويل بين حسابات", account_id: form.from_account, to_account_id: form.to_account, date: form.date, debit: amount, credit: 0 });
       toast.success("تم التحويل بنجاح");

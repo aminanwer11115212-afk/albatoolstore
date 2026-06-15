@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Plus, Eye, Trash2, Printer, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTransactionsWithAccounts, useAccounts, useTransactions, useCustomers, useSuppliers } from "@/hooks/useData";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank } from "@/lib/bankTransferValidation";
@@ -200,10 +200,8 @@ export default function TransactionsPage() {
                     <td className="px-4 py-3 text-foreground">{methodMap[t.method] || t.method || "-"}</td>
                     <td className="px-4 py-3 print:hidden">
                       <div className="flex items-center gap-1">
-                        <button className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 flex items-center gap-1"><Eye size={12} /> عرض</button>
-                        <button className="px-2 py-1 bg-blue-500/10 text-blue-600 rounded text-xs hover:bg-blue-500/20"><Printer size={12} /></button>
-                        <button onClick={async () => { try { await remove.mutateAsync(t.id); toast.success("تم الحذف"); } catch (e: any) { toast.error(e.message); } }}
-                          className="px-2 py-1 bg-destructive/10 text-destructive rounded text-xs hover:bg-destructive/20"><Trash2 size={12} /></button>
+                        <button onClick={async () => { if (!confirm("حذف هذه المعاملة؟")) return; try { await remove.mutateAsync(t.id); toast.success("تم الحذف"); } catch (e: any) { toast.error(e.message); } }}
+                          className="px-2 py-1 bg-destructive/10 text-destructive rounded text-xs hover:bg-destructive/20 inline-flex items-center gap-1 min-h-[40px]"><Trash2 size={12} /> حذف</button>
                       </div>
                     </td>
                   </tr>

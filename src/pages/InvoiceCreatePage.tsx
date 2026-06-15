@@ -258,10 +258,10 @@ function calcTotal(r: InvRow): number {
 }
 
 const btnStyle = (bg: string): React.CSSProperties => ({
-  display: "inline-flex", alignItems: "center", gap: 4,
+  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4,
   background: bg, color: "#fff", border: "none",
-  borderRadius: 4, padding: "8px 12px", fontSize: 13, fontWeight: 600,
-  cursor: "pointer", minHeight: 36, lineHeight: 1.6, whiteSpace: "nowrap",
+  borderRadius: 4, padding: "10px 14px", fontSize: 13, fontWeight: 600,
+  cursor: "pointer", minHeight: 44, lineHeight: 1.4, whiteSpace: "nowrap",
   boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
 });
 
