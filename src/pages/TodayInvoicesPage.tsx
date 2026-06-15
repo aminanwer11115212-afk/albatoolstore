@@ -27,7 +27,7 @@ export default function TodayInvoicesPage() {
   const paidAmount = (invoices || []).reduce((s: number, inv: any) => s + Number(inv.paid_amount || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       <h1 className="text-2xl font-bold text-foreground">فواتير اليوم - {today}</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
