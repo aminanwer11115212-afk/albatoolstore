@@ -85,7 +85,7 @@ export default function QuotesPage() {
     }
     const { markQuoteAsSent } = await import("@/utils/quoteSentStatus");
     await markQuoteAsSent(q.id);
-    qc.invalidateQueries({ queryKey: ["quotes"] });
+    qc.invalidateQueries({ queryKey: ["quotes-full"] });
   };
 
   const handleConvertToInvoice = async (q: any) => {
@@ -94,7 +94,9 @@ export default function QuotesPage() {
       const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
       const { invoiceId, invoiceNumber } = await convertQuoteToInvoice(q.id);
       toast.success(`تم تحويل العرض إلى فاتورة ${invoiceNumber} — العرض محفوظ كمقبول`);
-      qc.invalidateQueries({ queryKey: ["quotes"] });
+      qc.invalidateQueries({ queryKey: ["quotes-full"] });
+      qc.invalidateQueries({ queryKey: ["invoices-full"] });
+      qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       navigate(`/invoices/edit/${invoiceId}`);
     } catch (e: any) { toast.error(e.message); }
   };
@@ -108,7 +110,7 @@ export default function QuotesPage() {
     navigate(`/preview/quote/${q.id}${suffix}`);
     const { markQuoteAsSent } = await import("@/utils/quoteSentStatus");
     await markQuoteAsSent(q.id);
-    qc.invalidateQueries({ queryKey: ["quotes"] });
+    qc.invalidateQueries({ queryKey: ["quotes-full"] });
   };
 
   const filtered = useMemo(() => (quotes || []).filter((q: any) => {
@@ -230,7 +232,7 @@ export default function QuotesPage() {
 
           <div className="desktop-table-wrap" style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>
           <table className="legacy-table" cellSpacing={0} width="100%">
-            <thead style={{ position: "sticky", top: 0, zIndex: 5, background: "#3b82f6", color: "#ffffff" }}>
+            <thead style={{ position: "sticky", top: 0, zIndex: 5, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}>
               <tr>
                 <th style={{ width: 40 }}>رقم</th>
                 <th style={{ width: 80 }}># عرض</th>

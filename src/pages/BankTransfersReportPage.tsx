@@ -62,8 +62,8 @@ export default function BankTransfersReportPage() {
         if (a.date !== b.date) return a.date < b.date ? 1 : -1;
         return (a.created_at ?? "") < (b.created_at ?? "") ? 1 : -1;
       });
-      // cap each bank to last 100
-      groups[k] = groups[k].slice(0, 100);
+      // cap each bank to last 500
+      groups[k] = groups[k].slice(0, 500);
     }
     return groups;
   }, [transactions, search, from, to]);

@@ -144,7 +144,7 @@ export default function IncomeReportPage() {
             <tbody>
               {isLoading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               : filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد معاملات</td></tr>
-              : filtered.slice(0, 50).map((t: any, i: number) => (
+              : filtered.slice(0, 500).map((t: any, i: number) => (
                 <tr key={t.id} className="border-b border-border hover:bg-muted/50">
                   <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                   <td className="px-4 py-3 text-foreground">{t.date}</td>

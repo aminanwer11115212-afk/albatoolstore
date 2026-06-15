@@ -69,7 +69,7 @@ export default function TodayInvoicesPage() {
                     <span className={`text-xs px-2 py-1 rounded-full ${statusColors[inv.status] || ""}`}>{statusLabels[inv.status] || inv.status}</span>
                   </td>
                   <td className="px-5 py-3">
-                    <button onClick={() => navigate(`/invoices/view/${inv.id}`)} className="p-1.5 text-primary hover:bg-primary/10 rounded"><Eye size={15} /></button>
+                    <button onClick={() => navigate(`/invoices/view/${inv.id}`)} className="p-2 text-primary hover:bg-primary/10 rounded min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="عرض الفاتورة"><Eye size={15} /></button>
                   </td>
                 </tr>
               ))}

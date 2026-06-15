@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanySettings, useAccounts } from "@/hooks/useData";
@@ -224,6 +225,8 @@ export default function InvoiceViewPage() {
       toast.success("تم تغيير الوضع");
       setShowStatusChange(false);
       loadInvoice();
+      qc.invalidateQueries({ queryKey: ["invoices-full"] });
+      qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
     } catch (e: any) { toast.error(e.message); }
   };
 
