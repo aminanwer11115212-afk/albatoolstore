@@ -258,10 +258,10 @@ function calcTotal(r: InvRow): number {
 }
 
 const btnStyle = (bg: string): React.CSSProperties => ({
-  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4,
+  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3,
   background: bg, color: "#fff", border: "none",
-  borderRadius: 4, padding: "4px 9px", fontSize: 12, fontWeight: 600,
-  cursor: "pointer", height: 28, lineHeight: 1.2, whiteSpace: "nowrap",
+  borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600,
+  cursor: "pointer", height: 26, lineHeight: 1.1, whiteSpace: "nowrap",
   boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
 });
 
@@ -1967,10 +1967,10 @@ export default function InvoiceCreatePage() {
           </div>
 
           {/* ============ Bottom action bar (summary + buttons، كل عنصر قابل للسحب والتخصيص) ============ */}
-          <ToolbarCustomizationProvider storageKey="invoice-create">
+          <ToolbarCustomizationProvider storageKey={isEdit ? "invoice-edit" : "invoice-create"}>
           <div dir="rtl" style={{ marginTop: 6, flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>
             <FreePositionToolbar
-              screenKey="invoice-create-toolbar"
+              screenKey={isEdit ? "invoice-edit-toolbar" : "invoice-create-toolbar"}
               withCustomizeButtons
               zoom={{ value: itemsZoom, inc: itemsZoomInc, dec: itemsZoomDec }}
               items={[
@@ -1982,7 +1982,7 @@ export default function InvoiceCreatePage() {
                   defaultLabel: "المجموع",
                   node: (
                     <SummaryChip
-                      screenKey="invoice-create-toolbar"
+                      screenKey={isEdit ? "invoice-edit-toolbar" : "invoice-create-toolbar"}
                       id="sum-total"
                       defaultLabel="المجموع"
                       value={`${totals.total.toLocaleString()} ${currencyCode}`}
@@ -2071,28 +2071,7 @@ export default function InvoiceCreatePage() {
                     </button>
                   ),
                 },
-                {
-                  id: "transport-report",
-                  group: "2-files",
-                  node: (
-                    <button
-                      onClick={() => saveThen((id) => navigate(`/invoices/${id}/transport-report`))}
-                      title="تقرير الترحيل" style={btnStyle("#15803d")}>
-                      <FileText size={14} /> تقرير الترحيل
-                    </button>
-                  ),
-                },
-                {
-                  id: "packaging-report",
-                  group: "2-files",
-                  node: (
-                    <button
-                      onClick={() => saveThen((id) => navigate(`/preview/invoice/${id}/packaging`))}
-                      title="تقرير التغليف" style={btnStyle("#0d9488")}>
-                      <FileText size={14} /> تقرير التغليف
-                    </button>
-                  ),
-                },
+                // (تم حذف زرّي "تقرير الترحيل" و"تقرير التغليف" بناءً على طلب المالك)
                 {
                   id: "dispatch-page",
                   group: "2-files",

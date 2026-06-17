@@ -44,11 +44,11 @@ interface Props {
 // v2: bumped to reset legacy messy positions and adopt new tidy auto-layout.
 const POS_PREFIX = "neobilling:toolbar-positions:v2";
 
-const ITEM_HEIGHT = 34;
-const GAP = 8;
-const PADDING = 6;
+const ITEM_HEIGHT = 28;
+const GAP = 6;
+const PADDING = 4;
 const GROUP_DIVIDER_W = 1;
-const GROUP_DIVIDER_GAP = 6; // extra space around the divider
+const GROUP_DIVIDER_GAP = 5; // extra space around the divider
 
 type Pos = { x: number; y: number };
 type PosMap = Record<string, Pos>;
@@ -310,7 +310,54 @@ export default function FreePositionToolbar({ screenKey, items: rawItems, classN
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    const draggedId = d.id;
     dragRef.current = null;
+
+    // محاذاة بعد الإفلات: إن تداخل العنصر مع آخر، انقله لأقرب موقع حر بدون تداخل.
+    const container = containerRef.current;
+    const draggedEl = itemRefs.current.get(draggedId);
+    if (!container || !draggedEl) return;
+    const cw = container.clientWidth || 800;
+    const dw = draggedEl.offsetWidth || 80;
+    const dh = Math.max(draggedEl.offsetHeight || ITEM_HEIGHT, ITEM_HEIGHT);
+
+    setPositions((prev) => {
+      const cur = prev[draggedId];
+      if (!cur) return prev;
+      const others: { x: number; y: number; w: number; h: number }[] = [];
+      for (const it of items) {
+        if (it.id === draggedId) continue;
+        const p = prev[it.id];
+        if (!p) continue;
+        const el = itemRefs.current.get(it.id);
+        const w = el?.offsetWidth || 80;
+        const h = Math.max(el?.offsetHeight || ITEM_HEIGHT, ITEM_HEIGHT);
+        others.push({ x: p.x, y: p.y, w, h });
+      }
+      const overlapsAt = (ax: number, ay: number) =>
+        others.some((b) =>
+          ax < b.x + b.w + 2 &&
+          ax + dw + 2 > b.x &&
+          ay < b.y + b.h + 2 &&
+          ay + dh + 2 > b.y
+        );
+      if (!overlapsAt(cur.x, cur.y)) return prev;
+      // Search nearest free slot in expanding rings (snap to GAP grid)
+      const step = GAP + 2;
+      for (let r = step; r < Math.max(cw, 600); r += step) {
+        for (let dy = -r; dy <= r; dy += step) {
+          for (let dx = -r; dx <= r; dx += step) {
+            if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+            const nx = Math.max(0, Math.min(cur.x + dx, cw - dw));
+            const ny = Math.max(0, cur.y + dy);
+            if (!overlapsAt(nx, ny)) {
+              return { ...prev, [draggedId]: { x: nx, y: ny } };
+            }
+          }
+        }
+      }
+      return prev;
+    });
   };
 
   return (
@@ -357,8 +404,10 @@ export default function FreePositionToolbar({ screenKey, items: rawItems, classN
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
+          gap: 4px;
           box-sizing: border-box;
+          font-size: 11px;
+          padding-inline: 7px;
         }
       `}</style>
 

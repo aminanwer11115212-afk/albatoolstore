@@ -272,10 +272,10 @@ function calcTotal(r: QuoteItem): number {
 }
 
 const btnStyle = (bg: string): React.CSSProperties => ({
-  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4,
+  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3,
   background: bg, color: "#fff", border: "none",
-  borderRadius: 4, padding: "4px 9px", fontSize: 12, fontWeight: 600,
-  cursor: "pointer", height: 28, lineHeight: 1.2, whiteSpace: "nowrap",
+  borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600,
+  cursor: "pointer", height: 26, lineHeight: 1.1, whiteSpace: "nowrap",
   boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
 });
 
