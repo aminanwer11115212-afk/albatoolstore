@@ -2071,28 +2071,7 @@ export default function InvoiceCreatePage() {
                     </button>
                   ),
                 },
-                {
-                  id: "transport-report",
-                  group: "2-files",
-                  node: (
-                    <button
-                      onClick={() => saveThen((id) => navigate(`/invoices/${id}/transport-report`))}
-                      title="تقرير الترحيل" style={btnStyle("#15803d")}>
-                      <FileText size={14} /> تقرير الترحيل
-                    </button>
-                  ),
-                },
-                {
-                  id: "packaging-report",
-                  group: "2-files",
-                  node: (
-                    <button
-                      onClick={() => saveThen((id) => navigate(`/preview/invoice/${id}/packaging`))}
-                      title="تقرير التغليف" style={btnStyle("#0d9488")}>
-                      <FileText size={14} /> تقرير التغليف
-                    </button>
-                  ),
-                },
+                // (تم حذف زرّي "تقرير الترحيل" و"تقرير التغليف" بناءً على طلب المالك)
                 {
                   id: "dispatch-page",
                   group: "2-files",
