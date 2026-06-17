@@ -307,7 +307,7 @@ export default function QuoteCreatePage() {
   // Unified item-table columns: [action, product(flex), qty, foreign$, price, total, dup, trailing]
   if (typeof window !== "undefined") migrateScreenColKeys(colsScreenId);
   const [colsLocked, setColsLocked] = useScreenColsLocked(colsScreenId);
-  const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, tableProps, clampWidthsToContainer } = useColumnWidths(
+  const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, reset: resetColWidths, saveAsUserDefault: saveColsAsDefault, tableProps, clampWidthsToContainer } = useColumnWidths(
     screenColWidthsKey(colsScreenId),
     [36, null, 80, 100, 100, 100, 36, 40],
     colsLocked,
@@ -1543,17 +1543,29 @@ export default function QuoteCreatePage() {
                   <th style={{ position: "relative" }}>الإجمالي<ColumnResizeHandle onMouseDown={(e) => startColDrag(5, e)} hidden={colsLocked} /></th>
                   <th colSpan={2} style={{ position: "relative", padding: 0, height: 10, minWidth: 40 }}>
                     {!colsLocked ? (
-                      <button
-                        type="button"
-                        title={COLS_BTN_SAVE_TITLE}
-                        onClick={() => {
-                          try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); }
-                          catch { toast.error(COLS_TOAST_SAVE_FAILED); }
-                        }}
-                        style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", boxSizing: "border-box", userSelect: "none" }}
-                      >
-                        {COLS_BTN_SAVE_LABEL}
-                      </button>
+                      <div style={{ position: "absolute", inset: 0, display: "flex", height: "100%", width: "100%" }}>
+                        <button
+                          type="button"
+                          title="تعيين عرض الأعمدة الحالي كافتراضي شخصي — يُستعاد عند الضغط على إعادة الضبط"
+                          onClick={() => { saveColsAsDefault(); toast.success("تم تعيين عرض الأعمدة كافتراضي"); }}
+                          style={{ flex: 1, fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))", cursor: "pointer", whiteSpace: "nowrap", userSelect: "none" }}
+                        >★ افتراضي</button>
+                        <button
+                          type="button"
+                          title="إعادة الأعمدة إلى الافتراضي"
+                          onClick={() => { resetColWidths(); toast.success("تم إعادة عرض الأعمدة"); }}
+                          style={{ flex: 1, fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", borderInlineStart: "1px solid hsl(var(--border))", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", userSelect: "none" }}
+                        >↺ إعادة</button>
+                        <button
+                          type="button"
+                          title={COLS_BTN_SAVE_TITLE}
+                          onClick={() => {
+                            try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); }
+                            catch { toast.error(COLS_TOAST_SAVE_FAILED); }
+                          }}
+                          style={{ flex: 1, fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", borderInlineStart: "1px solid hsl(var(--border))", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", userSelect: "none" }}
+                        >{COLS_BTN_SAVE_LABEL}</button>
+                      </div>
                     ) : (
                       <button
                         type="button"
