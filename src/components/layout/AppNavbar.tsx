@@ -339,10 +339,12 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
   }, [showNotifications, loadCurrentTab]);
 
   const visibleItems = notifTab === "today" ? todayItems : notifTab === "stock" ? stockItems : logItems;
-  const unreadCount =
-    todayItems.filter(n => !n.read).length +
-    stockItems.filter(n => !n.read).length +
-    logItems.filter(n => !n.read).length;
+  const allItemsUnique = useMemo(() => {
+    const map = new Map<string, NotificationItem>();
+    [...todayItems, ...stockItems, ...logItems].forEach(n => { if (!map.has(n.id)) map.set(n.id, n); });
+    return Array.from(map.values());
+  }, [todayItems, stockItems, logItems]);
+  const unreadCount = allItemsUnique.filter(n => !n.read).length;
   const outCount = stockItems.filter(n => n.severity === "out").length;
   const lowCount = stockItems.filter(n => n.severity === "low").length;
   const hasUnreadOut =
