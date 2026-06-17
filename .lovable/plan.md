@@ -1,85 +1,61 @@
-# فحص شامل لجميع شاشات الموبايل والديسكتوب
 
-نستخدم مهارة `albatool-ui-audit` (موجودة بالفعل) مع توسعتين هذه المرة:
-1. فحص **بصري runtime** فعلي عبر `browser--view_preview` بمقاسي 375×812 و 1366×768 لعيّنة من الصفحات الحرجة.
-2. مقارنة النتائج مع قائمة القضايا المعروفة سابقاً (12 قضية تمّت معالجتها) لضمان عدم العودة.
+# خطة: صفحة "تتبع المخزون" (Stock Tracking)
 
-## المرحلة 1 — فحص ساكن متوازي (Static Audit)
+صفحة جديدة داخل قسم **مدير المنتجات** تعرض جميع حركات المخزون (بيع/مرتجع/شراء/تحويل) في خط زمني واحد قابل للبحث والفلترة.
 
-تشغيل 6 وكلاء فرعيين بالتوازي عبر `acp_subagent--spawn_agent`، كل واحد مسؤول عن قطاع:
+## 1) الموقع والمسار
+- ملف جديد: `src/pages/StockTrackingPage.tsx`
+- المسار: `/stock-tracking` — يُسجَّل في `src/App.tsx` بـ `lazyEl(...)`
+- رابط في الشريط الجانبي ضمن قسم "مدير المنتجات / المخزون" بعد صفحة المنتجات.
 
-| القطاع | الصفحات (مختصر) |
-|---|---|
-| **A. Sales** | Quotes, QuoteCreate, QuoteView, Invoices, InvoiceCreate, InvoiceView, TodayInvoices, SideQuotes |
-| **B. Inventory** | Products, ImportProducts, StockTransfer, StockReturns, ProductCompanies, PackagingTypes |
-| **C. Parties** | Customers, Suppliers, Employees, CustomerLogistics, CustomerStatement, SupplierStatement, Staff portal |
-| **D. Logistics** | InvoicePackaging, InvoiceTransport, QuotePackaging, QuoteTransport, Dispatch, TransportPackagingReport |
-| **E. Finance** | Accounts, Transactions, Transfer, BalanceSheet, TrialBalance, IncomeReport, ExpenseStatement, BankTransfers, AccountStatement, FilteredTransactions, CustomerDebt, TaxReport, FinancialReportPreview, StatementPreview |
-| **F. System** | Dashboard, Settings (Company/Currency/Recaptcha/Twilio/Payment), Backup, ActivityLog, DataHealth, SystemStatus, Notifications, Goals, Calendar, Todo, Projects, Layout (Sidebar/Navbar), Auth |
+## 2) مصادر البيانات (قراءة فقط — لا تعديل للمخططات)
+- `invoice_items` + `invoices(date, invoice_number, customer_id, status)` → خصم بيع
+- `stock_return_items` + `stock_returns(date, return_number, customer_id)` → إرجاع (إضافة للمخزون)
+- `purchase_order_items` + `purchase_orders(date, order_number, supplier_id, status)` → شراء (إضافة للمخزون)
+- `stock_transfers` → تحويل بين المخازن
+- `products(id, name, stock_quantity, min_stock, unit, sku)` للحالة الحالية
 
-كل وكيل يفحص لكل صفحة:
-1. **التوجيه** — مسجّلة في `App.tsx`، lazy import صحيح.
-2. **الأزرار** — كل `onClick` له handler حقيقي يستدعي mutation/navigate موجود + toast.
-3. **النماذج** — validation قبل insert/update، الحقول المطلوبة محمية.
-4. **الـ Dialogs** — تفتح/تغلق/تحفظ مع `invalidateQueries` صحيح المفاتيح.
-5. **مفاتيح cache** — تطابق ما هو فعلاً مستخدم في `useData.ts` (مثال: `quotes-full` لا `quotes`).
-6. **موبايل ≤640px** — touch ≥44px، input ≥16px، لا overflow أفقي، تحويل الجداول إلى `MobileDocList` حيث ينطبق.
-7. **RTL** — `dir="rtl"` على الصفحة، لا `text-left`/`mr-*` خاطئة، Cairo bold محفوظة.
-8. **Design tokens** — لا hardcoded colors (`#xxxxxx`, `rgb(...)`, gradients ثابتة)، فقط `hsl(var(--*))`.
-9. **التخصيص** — مفاتيح `lov:u:{uid}:ff:{mobile|desktop}:{scope}:{base}` صحيحة.
-10. **عدم العودة** — تأكيد أن القضايا المُصلَحة لم ترجع (مفاتيح `["quotes"]` خام، `minHeight:30/36`، الأزرار اليتيمة، الألوان `#3b82f6`).
-
-كل وكيل يُرجع JSON:
-```json
-{
-  "sector": "Sales",
-  "pages_checked": [...],
-  "ok": [...],
-  "issues": [
-    { "severity": "high|med|low", "file": "src/...:LINE",
-      "what": "...", "form_factor": "mobile|desktop|both", "fix_hint": "..." }
-  ],
-  "needs_runtime_check": [...]
-}
+يُجلب الكل بـ React Query (`useQuery`) ويُدمج محلياً في مصفوفة موحّدة:
+```
+{ id, date, type: 'sale'|'return'|'purchase'|'transfer',
+  product_id, product_name, qty (موقّعة: - بيع/+ شراء وإرجاع),
+  doc_number, party_name (عميل/مورد), warehouse, current_stock }
 ```
 
-## المرحلة 2 — فحص runtime بصري
+## 3) واجهة الصفحة (RTL، Arabic-first، Cairo، Bold)
+- عنوان `<h1>تتبع المخزون</h1>` + شارة "اليوم: 17 يونيو 2026" تعرض التاريخ الحالي ديناميكياً (`new Date()` بصيغة عربية).
+- صف فلاتر علوي:
+  - بحث منتج (`InlineSearchSelect` أو `startsWithMatch`)
+  - نوع الحركة (الكل/بيع/إرجاع/شراء/تحويل) — `Select` shadcn
+  - مدى التاريخ: أزرار سريعة (اليوم، أمس، آخر 7 أيام، الشهر) + تقويم مخصص (من/إلى)
+  - المخزن (إن وُجد)
+- بطاقات ملخّص (4): إجمالي المبيعات (كمية)، إجمالي المرتجعات، إجمالي المشتريات، صافي الحركة — للفترة المحدّدة.
+- جدول shadcn رئيسي بأعمدة:
+  - التاريخ • النوع (Badge ملوّن من tokens) • المنتج • الكمية (± مع لون) • رقم المستند (رابط) • العميل/المورد • المخزون الحالي
+- ترتيب افتراضي: الأحدث أولاً. صفحات (Pagination) 50/صفحة.
+- حالة فارغة عربية: "لا توجد حركات في هذه الفترة".
 
-لكل صفحة في قائمة `needs_runtime_check` (أو الحرجة دائماً): فاتورة جديدة، عرض سعر جديد، الفواتير، العملاء، المنتجات، الترحيلات، التقارير:
+## 4) سلوك
+- الافتراضي عند الفتح: فلتر "اليوم" = 2026-06-17 لإظهار آخر المنتجات المخصومة فوراً.
+- النقر على رقم المستند يفتح صفحة عرض الفاتورة/المرتجع/الشراء المناسبة.
+- النقر على اسم المنتج يفلتر الصفحة على هذا المنتج فقط (لعرض كل حركاته).
+- تحديث تلقائي عند `products:changed` / `customers:changed` (الموجودة فعلاً في `useData.ts`).
 
-- `browser--view_preview` بـ **375×812 (Moto/iPhone)** ثم **1366×768 (Desktop)**.
-- التقاط الـ console logs و network errors عبر `browser--read_console_logs`.
-- فتح كل dialog أساسي والتأكد من ظهور الأزرار كاملة بدون overflow.
+## 5) قيود/التزام بمعايير المشروع
+- بدون أي تعديل DB — قراءة فقط من جداول قائمة.
+- ألوان من tokens فقط (`bg-primary`, `text-destructive`, `bg-muted`...).
+- موبايل ≤640: touch ≥44px، خط الحقول ≥16px، لا overflow أفقي (الجدول يتحوّل إلى بطاقات على الموبايل عبر `MobileDocList` نمط).
+- RTL: `dir="rtl"`، استخدام `ms-*/me-*` لا `ml/mr`.
+- التواريخ تُنسّق عبر دالة موحّدة `formatArabicDate(new Date())` — يومياً تعرض التاريخ الحالي تلقائياً (17/06/2026 اليوم).
 
-## المرحلة 3 — تجميع التقرير
+## تفاصيل تقنية مختصرة
+- لا حاجة لـ migration.
+- يمكن إعادة استخدام `useInvoicesWithCustomers`, `usePurchaseOrders`, `useStockReturns`, `useProducts` الموجودة.
+- البحث: `startsWithMatch` من `@/utils/searchMatch`.
+- التواريخ: `Intl.DateTimeFormat('ar-EG-u-nu-latn', { dateStyle: 'long' })`.
 
-ادمج كل `issues` في جدول واحد:
-- 🔴 **High**: يكسر بيانات/يمنع إنجاز عملية.
-- 🟡 **Med**: UX خاطئ لكن العملية تكتمل.
-- 🟢 **Low**: تنظيف/تجانس.
+## ما لن يتم في هذه الجولة
+- لا تصدير CSV/PDF (يمكن إضافته لاحقاً).
+- لا تعديل أرصدة أو خصم يدوي — الصفحة عرض فقط.
 
-لكل قضية: الملف:السطر — الوصف — التأثير (mobile/desktop/both) — الإصلاح المقترح.
-
-في نهاية التقرير: قائمة "✅ قطاعات نظيفة" و "⚠️ يحتاج إصلاح".
-
-## المرحلة 4 — موافقة المستخدم
-
-أعرض الجدول وأنتظر اختيارك:
-- (أ) إصلاح كل الحمراء فوراً.
-- (ب) حمراء + متوسطة معاً.
-- (ج) قضية محددة بالرقم.
-- (د) إصدار التقرير فقط دون إصلاح.
-
-## القيود
-
-- الوكلاء **قراءة فقط** — لا تعديلات قبل موافقتك.
-- حد أقصى 6 وكلاء بالتوازي.
-- لا تغيير على schema قاعدة البيانات أو `client.ts`/`types.ts` أو قواعد `index.css` العامة للموبايل.
-- التقارير بالعربية، استجابات الوكلاء بالإنجليزية (أسرع وأدق).
-
-## المخرجات المتوقعة
-
-1. تقرير شامل مرتّب بالأولويات.
-2. قائمة pages_checked كاملة (~60 صفحة).
-3. قائمة `needs_runtime_check` بعد المرحلة 2 محسومة (نعم/لا).
-4. اقتراح إصلاحات قابلة للتطبيق مباشرة.
+هل أنفّذ الخطة كما هي؟

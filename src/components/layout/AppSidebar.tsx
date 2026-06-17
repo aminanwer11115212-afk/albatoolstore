@@ -61,6 +61,7 @@ const menuSections: MenuSection[] = [
           { label: "إدارة جميع المنتجات", path: "/products" },
           { label: "المستودعات", path: "/warehouses" },
           { label: "تحويل مخزون", path: "/stock-transfer" },
+          { label: "تتبع المخزون", path: "/stock-tracking" },
         ],
       },
       {

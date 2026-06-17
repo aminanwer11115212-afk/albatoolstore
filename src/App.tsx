@@ -60,6 +60,7 @@ const StockReturnViewPage = lazy(() => import("./pages/StockReturnViewPage"));
 const CompanySettingsPage = lazy(() => import("./pages/CompanySettingsPage"));
 const ProductCompaniesPage = lazy(() => import("./pages/ProductCompaniesPage"));
 const StockTransferPage = lazy(() => import("./pages/StockTransferPage"));
+const StockTrackingPage = lazy(() => import("./pages/StockTrackingPage"));
 const DailyInvoicesReportPage = lazy(() => import("./pages/DailyInvoicesReportPage"));
 const IncomeReportPage = lazy(() => import("./pages/IncomeReportPage"));
 const TaxReportPage = lazy(() => import("./pages/TaxReportPage"));
@@ -241,6 +242,7 @@ const App = () => {
             <Route path="/companies" element={lazyEl(<ProductCompaniesPage />, "ماركات المنتجات")} />
             <Route path="/warehouses" element={lazyEl(<WarehousesPage />, "المستودعات")} />
             <Route path="/stock-transfer" element={lazyEl(<StockTransferPage />, "تحويل مخزون")} />
+            <Route path="/stock-tracking" element={lazyEl(<StockTrackingPage />, "تتبع المخزون")} />
             <Route path="/purchase" element={lazyEl(<PurchasePage />, "أوامر الشراء")} />
             <Route path="/purchase/create" element={lazyEl(<PurchaseCreatePage />, "أمر شراء جديد")} />
             <Route path="/purchase/edit/:id" element={lazyEl(<PurchaseEditWrapper />, "تعديل أمر الشراء")} />
