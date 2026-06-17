@@ -136,10 +136,10 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
   const isQuotesSide = sideOnly && type === "quotes";
   const colDefaults = useMemo<(number | null)[]>(
     () => (isInvoicesType
-      ? [null, 78, 90, 78, 90, 36]
+      ? [null, 62, 74, 62, 74, 30]
       : isQuotesSide
-        ? [null, 80, 78, 90, 90, 36]
-        : [null, 80, 78, 90, 36]),
+        ? [null, 68, 62, 74, 74, 30]
+        : [null, 68, 62, 74, 30]),
     [isInvoicesType, isQuotesSide]
   );
   const colsStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:cols:${type}:v1`);
