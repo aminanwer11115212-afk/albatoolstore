@@ -597,8 +597,8 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
     : (compact ? "border-border" : "border-primary");
   const cellBorder = compact ? "border-border" : "border-border";
   const badgeCls = compact
-    ? "text-[9px] px-1.5 py-0 leading-tight"
-    : "text-[11px] px-2.5 py-1";
+    ? "text-[8.5px] px-1 py-0 leading-tight max-w-full overflow-hidden text-ellipsis"
+    : "text-[10px] px-1.5 py-0.5 leading-tight max-w-full overflow-hidden text-ellipsis";
   const containerCls = compact
     ? "bg-card rounded-sm border border-border overflow-hidden flex flex-col h-full min-h-0"
     : "bg-card rounded-lg border border-border shadow-sm overflow-hidden flex flex-col h-full min-h-0";
