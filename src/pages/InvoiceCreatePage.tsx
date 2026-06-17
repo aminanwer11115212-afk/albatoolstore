@@ -290,7 +290,7 @@ export default function InvoiceCreatePage() {
   const colsScreenId = "invoice-create";
   if (typeof window !== "undefined") migrateScreenColKeys(colsScreenId);
   const [colsLocked, setColsLocked] = useScreenColsLocked(colsScreenId);
-  const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, tableProps, clampWidthsToContainer } = useColumnWidths(
+  const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, reset: resetColWidths, saveAsUserDefault: saveColsAsDefault, tableProps, clampWidthsToContainer } = useColumnWidths(
     screenColWidthsKey(colsScreenId),
     [36, null, 80, 100, 100, 100, 36, 40],
     colsLocked,
