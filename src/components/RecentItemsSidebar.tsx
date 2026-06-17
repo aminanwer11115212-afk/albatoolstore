@@ -634,11 +634,11 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
   // per-type density preference (stylePrefs.density). Both multiply.
   const densityVar = `calc(var(--recent-density, 1) * ${stylePrefs.density})`;
   const cellPadStyle: React.CSSProperties = compact
-    ? { padding: `calc(2px * ${densityVar}) calc(3px * ${densityVar})` }
-    : { padding: `calc(8px * ${densityVar}) calc(4px * ${densityVar})` };
+    ? { padding: `calc(2px * ${densityVar}) calc(2px * ${densityVar})` }
+    : { padding: `calc(6px * ${densityVar}) calc(3px * ${densityVar})` };
   const headPadStyle: React.CSSProperties = compact
-    ? { padding: `calc(3px * ${densityVar}) calc(4px * ${densityVar})` }
-    : { padding: `calc(10px * ${densityVar}) calc(4px * ${densityVar})` };
+    ? { padding: `calc(3px * ${densityVar}) calc(2px * ${densityVar})` }
+    : { padding: `calc(8px * ${densityVar}) calc(3px * ${densityVar})` };
   const tableFontStyle: React.CSSProperties = {
     fontSize: `calc(${stylePrefs.fontPx}px * var(--recent-density, 1))`,
   };
