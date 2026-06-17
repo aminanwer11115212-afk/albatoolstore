@@ -1540,7 +1540,16 @@ export default function InvoiceCreatePage() {
           {/* ============ Header bar ============ */}
           <div className="header-bar" style={{ flexShrink: 0, height: "auto" }}>
             <div className="field product-search-container" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
-              <label>{isCash ? "عميل (اختياري)" : "العميل"}</label>
+              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                <span>{isCash ? "عميل (اختياري)" : "العميل"}</span>
+                <input
+                  type="date"
+                  value={invoiceDate}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
+                  title="تاريخ الفاتورة"
+                  style={{ fontSize: 10, height: 18, padding: "0 4px", border: "1px solid hsl(var(--border))", borderRadius: 3, background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontWeight: 600 }}
+                />
+              </label>
               {!colsLocked && <ExpandFieldButton currentExtra={custExtras[0] || 0} onDrag={(v) => custSetExtra(0, v)} onReset={() => custReset(0)} title="اسحب لتغيير عرض حقل العميل · نقرة مزدوجة لإعادة الضبط" />}
               <input
                 ref={customerInputRef}
