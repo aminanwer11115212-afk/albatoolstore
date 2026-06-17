@@ -122,21 +122,44 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const sinceIso = startOfDay.toISOString();
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const [invRes, payRes] = await Promise.all([
+    const [invRes, payRes, overdueRes, quoteDueRes, todoRes] = await Promise.all([
       supabase
         .from("invoices")
         .select("id, invoice_number, total, created_at, customers(name)")
         .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
-        .limit(10),
+        .limit(200),
       supabase
         .from("invoices")
         .select("id, invoice_number, paid_amount, total, updated_at, customers(name)")
         .gt("paid_amount", 0)
         .gte("updated_at", sinceIso)
         .order("updated_at", { ascending: false })
-        .limit(10),
+        .limit(200),
+      supabase
+        .from("invoices")
+        .select("id, invoice_number, total, paid_amount, due_amount, due_date, status, customers(name)")
+        .not("due_date", "is", null)
+        .lt("due_date", todayIso)
+        .order("due_date", { ascending: true })
+        .limit(500),
+      supabase
+        .from("quotes")
+        .select("id, quote_number, total, valid_until, status, customers(name)")
+        .not("valid_until", "is", null)
+        .lte("valid_until", in7Days)
+        .order("valid_until", { ascending: true })
+        .limit(500),
+      (supabase as any)
+        .from("todos")
+        .select("id, title, due_date, status, priority, updated_at")
+        .not("due_date", "is", null)
+        .lte("due_date", in7Days)
+        .order("due_date", { ascending: true })
+        .limit(500),
     ]);
 
     const items: NotificationItem[] = [];
@@ -164,8 +187,66 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
         path: `/invoices/edit/${r.id}`,
       });
     });
+    (overdueRes.data || [])
+      .filter((r: any) => {
+        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        return due > 0 && r.status !== "cancelled" && r.status !== "paid";
+      })
+      .forEach((r: any) => {
+        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        const daysLate = Math.max(1, Math.floor((Date.now() - new Date(r.due_date).getTime()) / 86400000));
+        const id = `overdue:${r.id}:${r.due_date}`;
+        items.push({
+          id, kind: "invoice",
+          title: `فاتورة متأخرة ${r.invoice_number || ""}`.trim(),
+          desc: `${r.customers?.name ? r.customers.name + " — " : ""}مستحق ${fmtMoney(due)} • متأخر ${daysLate} يوم`,
+          time: "",
+          ts: new Date(r.due_date).getTime(),
+          read: readIds.has(id),
+          path: `/invoices/edit/${r.id}`,
+          severity: "out",
+        });
+      });
+    (quoteDueRes.data || [])
+      .filter((r: any) => {
+        const s = String(r.status || "").toLowerCase();
+        return s !== "converted" && s !== "accepted" && s !== "rejected" && s !== "cancelled";
+      })
+      .forEach((r: any) => {
+        const id = `qdue:${r.id}:${r.valid_until}`;
+        const expired = new Date(r.valid_until).getTime() < Date.now();
+        items.push({
+          id, kind: "invoice",
+          title: expired ? `عرض سعر منتهي ${r.quote_number || ""}`.trim() : `عرض سعر يقترب انتهاؤه ${r.quote_number || ""}`.trim(),
+          desc: `${r.customers?.name ? r.customers.name + " — " : ""}بقيمة ${fmtMoney(r.total)}`,
+          time: "",
+          ts: new Date(r.valid_until).getTime(),
+          read: readIds.has(id),
+          path: `/quotes/edit/${r.id}`,
+          severity: expired ? "out" : "low",
+        });
+      });
+    (todoRes.data || [])
+      .filter((r: any) => {
+        const s = String(r.status || "").toLowerCase();
+        return s !== "done" && s !== "completed" && s !== "cancelled";
+      })
+      .forEach((r: any) => {
+        const id = `todo:${r.id}:${r.due_date}`;
+        const overdue = new Date(r.due_date).getTime() < Date.now() - 86400000;
+        items.push({
+          id, kind: "invoice",
+          title: overdue ? `مهمة متأخرة: ${r.title}` : `مهمة قادمة: ${r.title}`,
+          desc: `${r.priority ? `[${r.priority}] ` : ""}موعد ${r.due_date}`,
+          time: "",
+          ts: new Date(r.due_date).getTime(),
+          read: readIds.has(id),
+          path: "/todos",
+          severity: overdue ? "out" : "low",
+        });
+      });
     items.sort((a, b) => b.ts - a.ts);
-    setTodayItems(items.slice(0, 20));
+    setTodayItems(items);
   }, [readIds]);
 
   const loadStock = useCallback(async () => {
