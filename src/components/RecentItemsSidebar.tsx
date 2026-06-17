@@ -136,10 +136,10 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
   const isQuotesSide = sideOnly && type === "quotes";
   const colDefaults = useMemo<(number | null)[]>(
     () => (isInvoicesType
-      ? [null, 78, 90, 78, 90, 36]
+      ? [null, 62, 74, 62, 74, 30]
       : isQuotesSide
-        ? [null, 80, 78, 90, 90, 36]
-        : [null, 80, 78, 90, 36]),
+        ? [null, 68, 62, 74, 74, 30]
+        : [null, 68, 62, 74, 30]),
     [isInvoicesType, isQuotesSide]
   );
   const colsStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:cols:${type}:v1`);
@@ -597,8 +597,8 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
     : (compact ? "border-border" : "border-primary");
   const cellBorder = compact ? "border-border" : "border-border";
   const badgeCls = compact
-    ? "text-[9px] px-1.5 py-0 leading-tight"
-    : "text-[11px] px-2.5 py-1";
+    ? "text-[8.5px] px-1 py-0 leading-tight max-w-full overflow-hidden text-ellipsis"
+    : "text-[10px] px-1.5 py-0.5 leading-tight max-w-full overflow-hidden text-ellipsis";
   const containerCls = compact
     ? "bg-card rounded-sm border border-border overflow-hidden flex flex-col h-full min-h-0"
     : "bg-card rounded-lg border border-border shadow-sm overflow-hidden flex flex-col h-full min-h-0";
@@ -634,11 +634,11 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
   // per-type density preference (stylePrefs.density). Both multiply.
   const densityVar = `calc(var(--recent-density, 1) * ${stylePrefs.density})`;
   const cellPadStyle: React.CSSProperties = compact
-    ? { padding: `calc(2px * ${densityVar}) calc(3px * ${densityVar})` }
-    : { padding: `calc(8px * ${densityVar}) calc(4px * ${densityVar})` };
+    ? { padding: `calc(2px * ${densityVar}) calc(2px * ${densityVar})` }
+    : { padding: `calc(6px * ${densityVar}) calc(3px * ${densityVar})` };
   const headPadStyle: React.CSSProperties = compact
-    ? { padding: `calc(3px * ${densityVar}) calc(4px * ${densityVar})` }
-    : { padding: `calc(10px * ${densityVar}) calc(4px * ${densityVar})` };
+    ? { padding: `calc(3px * ${densityVar}) calc(2px * ${densityVar})` }
+    : { padding: `calc(8px * ${densityVar}) calc(3px * ${densityVar})` };
   const tableFontStyle: React.CSSProperties = {
     fontSize: `calc(${stylePrefs.fontPx}px * var(--recent-density, 1))`,
   };
