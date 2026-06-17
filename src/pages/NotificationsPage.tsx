@@ -462,9 +462,14 @@ export default function NotificationsPage() {
       return true;
     });
     const rank = (n: NotificationItem) => {
-      if (n.kind === "stock" && n.severity === "out") return 0;
-      if (n.kind === "stock" && n.severity === "low") return 1;
-      return 2;
+      if (n.kind === "overdue") return 0;
+      if (n.kind === "stock" && n.severity === "out") return 1;
+      if (n.kind === "quote_due" && n.severity === "out") return 2;
+      if (n.kind === "todo" && n.severity === "out") return 3;
+      if (n.kind === "stock" && n.severity === "low") return 4;
+      if (n.kind === "quote_due") return 5;
+      if (n.kind === "todo") return 6;
+      return 7;
     };
     return [...list].sort((a, b) => {
       const r = rank(a) - rank(b);
@@ -484,6 +489,9 @@ export default function NotificationsPage() {
     payment: items.filter(i => i.kind === "payment").length,
     stock: items.filter(i => i.kind === "stock").length,
     log: items.filter(i => i.kind === "log").length,
+    overdue: items.filter(i => i.kind === "overdue").length,
+    quote_due: items.filter(i => i.kind === "quote_due").length,
+    todo: items.filter(i => i.kind === "todo").length,
     unread: items.filter(i => !i.read).length,
   }), [items]);
 
