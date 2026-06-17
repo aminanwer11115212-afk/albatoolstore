@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Bell, AlertTriangle, FileText, Wallet, Activity, Search, RefreshCw, Pin, EyeOff, RotateCcw } from "lucide-react";
+import { Bell, AlertTriangle, FileText, Wallet, Activity, Search, RefreshCw, Pin, EyeOff, RotateCcw, Clock, CheckSquare, FileClock } from "lucide-react";
 import { useUserScopedLegacyKey } from "@/lib/userScopedKey";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 
 type Severity = "out" | "low";
-type Kind = "invoice" | "payment" | "stock" | "log";
+type Kind = "invoice" | "payment" | "stock" | "log" | "overdue" | "quote_due" | "todo";
 
 type NotificationItem = {
   id: string;
