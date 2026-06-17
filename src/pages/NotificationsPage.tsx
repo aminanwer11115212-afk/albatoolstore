@@ -568,6 +568,9 @@ export default function NotificationsPage() {
                 <option value="invoice">فواتير ({counts.invoice})</option>
                 <option value="payment">دفعات ({counts.payment})</option>
                 <option value="stock">مخزون ({counts.stock})</option>
+                <option value="overdue">فواتير متأخرة ({counts.overdue})</option>
+                <option value="quote_due">عروض أسعار منتهية ({counts.quote_due})</option>
+                <option value="todo">مهام ({counts.todo})</option>
                 <option value="log">سجل النشاط ({counts.log})</option>
               </select>
             </div>
