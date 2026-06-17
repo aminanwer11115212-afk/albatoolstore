@@ -338,6 +338,67 @@ export default function NotificationsPage() {
       });
     });
 
+    (overdueRes.data || [])
+      .filter((r: any) => {
+        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        return due > 0 && r.status !== "cancelled" && r.status !== "paid";
+      })
+      .forEach((r: any) => {
+        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        const daysLate = Math.max(1, Math.floor((Date.now() - new Date(r.due_date).getTime()) / 86400000));
+        const id = `overdue:${r.id}:${r.due_date}`;
+        acc.push({
+          id, kind: "overdue",
+          title: `فاتورة متأخرة ${r.invoice_number || ""}`.trim(),
+          desc: `${r.customers?.name ? r.customers.name + " — " : ""}مستحق ${fmtMoney(due)} • متأخر ${daysLate} يوم`,
+          time: `تاريخ الاستحقاق ${fmtDate(r.due_date)}`,
+          ts: new Date(r.due_date).getTime(),
+          read: readIds.has(id),
+          path: `/invoices/edit/${r.id}`,
+          severity: "out",
+        });
+      });
+
+    (quoteDueRes.data || [])
+      .filter((r: any) => {
+        const s = String(r.status || "").toLowerCase();
+        return s !== "converted" && s !== "accepted" && s !== "rejected" && s !== "cancelled";
+      })
+      .forEach((r: any) => {
+        const id = `qdue:${r.id}:${r.valid_until}`;
+        const expired = new Date(r.valid_until).getTime() < Date.now();
+        acc.push({
+          id, kind: "quote_due",
+          title: expired ? `عرض سعر منتهي ${r.quote_number || ""}`.trim() : `عرض سعر يقترب انتهاؤه ${r.quote_number || ""}`.trim(),
+          desc: `${r.customers?.name ? r.customers.name + " — " : ""}بقيمة ${fmtMoney(r.total)} • صلاحية حتى ${fmtDate(r.valid_until)}`,
+          time: expired ? `منتهي منذ ${fmtDate(r.valid_until)}` : `ينتهي ${fmtDate(r.valid_until)}`,
+          ts: new Date(r.valid_until).getTime(),
+          read: readIds.has(id),
+          path: `/quotes/edit/${r.id}`,
+          severity: expired ? "out" : "low",
+        });
+      });
+
+    (todoRes.data || [])
+      .filter((r: any) => {
+        const s = String(r.status || "").toLowerCase();
+        return s !== "done" && s !== "completed" && s !== "cancelled";
+      })
+      .forEach((r: any) => {
+        const id = `todo:${r.id}:${r.due_date}`;
+        const overdue = new Date(r.due_date).getTime() < Date.now() - 86400000;
+        acc.push({
+          id, kind: "todo",
+          title: overdue ? `مهمة متأخرة: ${r.title}` : `مهمة قادمة: ${r.title}`,
+          desc: `${r.priority ? `[${r.priority}] ` : ""}موعد الاستحقاق ${fmtDate(r.due_date)}${r.description ? ` • ${r.description}` : ""}`,
+          time: r.updated_at ? timeAgo(r.updated_at) : "",
+          ts: new Date(r.due_date).getTime(),
+          read: readIds.has(id),
+          path: "/todos",
+          severity: overdue ? "out" : "low",
+        });
+      });
+
     acc.sort((a, b) => b.ts - a.ts);
     setItems(acc);
     setLoading(false);
