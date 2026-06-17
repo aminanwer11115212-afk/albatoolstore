@@ -176,7 +176,7 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
                   const st = statusStyles[inv.status] || statusStyles.pending;
                   const note = inv.user_note || inv.notes || "";
                   const cellBase =
-                    "px-3 py-2 text-xs text-foreground whitespace-nowrap overflow-hidden text-ellipsis";
+                    "px-1.5 py-1 text-[10.5px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis";
                   return (
                     <tr
                       key={inv.id}
@@ -189,14 +189,14 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
                       <td className={cellBase} title={inv.customers?.name || ""}>
                         {inv.customers?.name || "-"}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap overflow-hidden text-ellipsis">
+                      <td className="px-1.5 py-1 whitespace-nowrap overflow-hidden text-ellipsis">
                         <span
-                          className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium whitespace-nowrap ${st.className}`}
+                          className={`inline-block px-1.5 py-0 rounded text-[9.5px] font-medium whitespace-nowrap ${st.className}`}
                         >
                           {st.label}
                         </span>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap overflow-hidden text-ellipsis">
+                      <td className="px-1.5 py-1 whitespace-nowrap overflow-hidden text-ellipsis">
                         <WorkflowStatusBadge status={inv.workflow_status} invoiceId={inv.id} />
                       </td>
                       <td className={cellBase}>{formatDate(inv.date)}</td>
