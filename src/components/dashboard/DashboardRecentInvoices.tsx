@@ -103,7 +103,7 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
       <CardContent className="p-0 flex-1 overflow-hidden">
         <div ref={scrollRef} className="overflow-auto h-full">
           <table
-            className="w-full text-sm"
+            className="w-full text-[10.5px]"
             style={{ tableLayout: "fixed", borderCollapse: "collapse" }}
             {...tableProps}
           >
@@ -138,7 +138,7 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
                 ].map((label, i) => (
                   <th
                     key={i}
-                    className="text-right px-3 py-2 font-semibold text-muted-foreground text-xs whitespace-nowrap"
+                    className="text-right px-1.5 py-1 font-semibold text-muted-foreground text-[10px] whitespace-nowrap"
                     style={{ position: "relative", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
                     {label}
