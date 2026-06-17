@@ -1967,10 +1967,10 @@ export default function InvoiceCreatePage() {
           </div>
 
           {/* ============ Bottom action bar (summary + buttons، كل عنصر قابل للسحب والتخصيص) ============ */}
-          <ToolbarCustomizationProvider storageKey="invoice-create">
+          <ToolbarCustomizationProvider storageKey={isEdit ? "invoice-edit" : "invoice-create"}>
           <div dir="rtl" style={{ marginTop: 6, flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>
             <FreePositionToolbar
-              screenKey="invoice-create-toolbar"
+              screenKey={isEdit ? "invoice-edit-toolbar" : "invoice-create-toolbar"}
               withCustomizeButtons
               zoom={{ value: itemsZoom, inc: itemsZoomInc, dec: itemsZoomDec }}
               items={[
@@ -1982,7 +1982,7 @@ export default function InvoiceCreatePage() {
                   defaultLabel: "المجموع",
                   node: (
                     <SummaryChip
-                      screenKey="invoice-create-toolbar"
+                      screenKey={isEdit ? "invoice-edit-toolbar" : "invoice-create-toolbar"}
                       id="sum-total"
                       defaultLabel="المجموع"
                       value={`${totals.total.toLocaleString()} ${currencyCode}`}
