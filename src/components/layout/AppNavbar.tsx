@@ -131,35 +131,35 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
         .select("id, invoice_number, total, created_at, customers(name)")
         .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
-        .limit(200),
+        .limit(2000),
       supabase
         .from("invoices")
         .select("id, invoice_number, paid_amount, total, updated_at, customers(name)")
         .gt("paid_amount", 0)
         .gte("updated_at", sinceIso)
         .order("updated_at", { ascending: false })
-        .limit(200),
+        .limit(2000),
       supabase
         .from("invoices")
         .select("id, invoice_number, total, paid_amount, due_amount, due_date, status, customers(name)")
         .not("due_date", "is", null)
         .lt("due_date", todayIso)
         .order("due_date", { ascending: true })
-        .limit(500),
+        .limit(5000),
       supabase
         .from("quotes")
         .select("id, quote_number, total, valid_until, status, customers(name)")
         .not("valid_until", "is", null)
         .lte("valid_until", in7Days)
         .order("valid_until", { ascending: true })
-        .limit(500),
+        .limit(5000),
       (supabase as any)
         .from("todos")
         .select("id, title, due_date, status, priority, updated_at")
         .not("due_date", "is", null)
         .lte("due_date", in7Days)
         .order("due_date", { ascending: true })
-        .limit(500),
+        .limit(5000),
     ]);
 
     const items: NotificationItem[] = [];
@@ -255,7 +255,7 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
       .from("products")
       .select("id, name, stock_quantity, min_stock, updated_at")
       .order("stock_quantity", { ascending: true })
-      .limit(500);
+      .limit(5000);
 
     const items: NotificationItem[] = (data || [])
       .filter((p: any) => (p.stock_quantity ?? 0) <= (p.min_stock ?? 0))
@@ -284,7 +284,7 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
       .from("activity_log")
       .select("id, table_name, action, record_id, created_at, changed_by")
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(5000);
 
     const tableLabels: Record<string, string> = {
       invoices: "فاتورة",
@@ -339,10 +339,12 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
   }, [showNotifications, loadCurrentTab]);
 
   const visibleItems = notifTab === "today" ? todayItems : notifTab === "stock" ? stockItems : logItems;
-  const unreadCount =
-    todayItems.filter(n => !n.read).length +
-    stockItems.filter(n => !n.read).length +
-    logItems.filter(n => !n.read).length;
+  const allItemsUnique = useMemo(() => {
+    const map = new Map<string, NotificationItem>();
+    [...todayItems, ...stockItems, ...logItems].forEach(n => { if (!map.has(n.id)) map.set(n.id, n); });
+    return Array.from(map.values());
+  }, [todayItems, stockItems, logItems]);
+  const unreadCount = allItemsUnique.filter(n => !n.read).length;
   const outCount = stockItems.filter(n => n.severity === "out").length;
   const lowCount = stockItems.filter(n => n.severity === "low").length;
   const hasUnreadOut =

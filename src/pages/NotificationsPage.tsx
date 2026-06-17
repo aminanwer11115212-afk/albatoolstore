@@ -233,46 +233,46 @@ export default function NotificationsPage() {
         .select("id, invoice_number, total, created_at, customers(name)")
         .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(5000),
       supabase
         .from("invoices")
         .select("id, invoice_number, paid_amount, total, updated_at, customers(name)")
         .gt("paid_amount", 0)
         .gte("updated_at", sinceIso)
         .order("updated_at", { ascending: false })
-        .limit(500),
+        .limit(5000),
       supabase
         .from("products")
         .select("id, name, stock_quantity, min_stock, updated_at")
         .order("stock_quantity", { ascending: true })
-        .limit(200),
+        .limit(2000),
       (supabase as any)
         .from("activity_log")
         .select("id, table_name, action, record_id, created_at, changed_by, new_data, old_data, changed_fields")
         .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(5000),
       supabase
         .from("invoices")
         .select("id, invoice_number, total, paid_amount, due_amount, due_date, status, customers(name)")
         .not("due_date", "is", null)
         .lt("due_date", todayIso)
         .order("due_date", { ascending: true })
-        .limit(500),
+        .limit(5000),
       supabase
         .from("quotes")
         .select("id, quote_number, total, valid_until, status, customers(name)")
         .not("valid_until", "is", null)
         .lte("valid_until", in7Days)
         .order("valid_until", { ascending: true })
-        .limit(500),
+        .limit(5000),
       (supabase as any)
         .from("todos")
         .select("id, title, description, due_date, status, priority, updated_at")
         .not("due_date", "is", null)
         .lte("due_date", in7Days)
         .order("due_date", { ascending: true })
-        .limit(500),
+        .limit(5000),
     ]);
 
     const acc: NotificationItem[] = [];
