@@ -224,7 +224,10 @@ export default function NotificationsPage() {
     since.setHours(0, 0, 0, 0);
     const sinceIso = since.toISOString();
 
-    const [invRes, payRes, stockRes, logRes] = await Promise.all([
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const [invRes, payRes, stockRes, logRes, overdueRes, quoteDueRes, todoRes] = await Promise.all([
       supabase
         .from("invoices")
         .select("id, invoice_number, total, created_at, customers(name)")
@@ -248,6 +251,27 @@ export default function NotificationsPage() {
         .select("id, table_name, action, record_id, created_at, changed_by, new_data, old_data, changed_fields")
         .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
+        .limit(500),
+      supabase
+        .from("invoices")
+        .select("id, invoice_number, total, paid_amount, due_amount, due_date, status, customers(name)")
+        .not("due_date", "is", null)
+        .lt("due_date", todayIso)
+        .order("due_date", { ascending: true })
+        .limit(500),
+      supabase
+        .from("quotes")
+        .select("id, quote_number, total, valid_until, status, customers(name)")
+        .not("valid_until", "is", null)
+        .lte("valid_until", in7Days)
+        .order("valid_until", { ascending: true })
+        .limit(500),
+      (supabase as any)
+        .from("todos")
+        .select("id, title, description, due_date, status, priority, updated_at")
+        .not("due_date", "is", null)
+        .lte("due_date", in7Days)
+        .order("due_date", { ascending: true })
         .limit(500),
     ]);
 
