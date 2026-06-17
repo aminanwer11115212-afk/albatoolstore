@@ -32,7 +32,7 @@ const statusStyles: Record<string, { label: string; className: string }> = {
 };
 
 // Default column widths (px) for: الفاتورة#، العميل، حالة الدفع، التجهيز، التاريخ، المبلغ، الملاحظة
-const DEFAULT_COL_WIDTHS: (number | null)[] = [80, 140, 90, 110, 90, 110, 200];
+const DEFAULT_COL_WIDTHS: (number | null)[] = [56, 110, 64, 78, 64, 80, 130];
 const STORAGE_KEY = userScopedLegacyKey("dashboard:recentInvoices:colWidths:v1");
 const LOCK_KEY = userScopedLegacyKey("dashboard:recentInvoices:colsLocked:v1");
 
