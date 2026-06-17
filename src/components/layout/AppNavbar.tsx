@@ -255,11 +255,10 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
       .from("products")
       .select("id, name, stock_quantity, min_stock, updated_at")
       .order("stock_quantity", { ascending: true })
-      .limit(50);
+      .limit(500);
 
     const items: NotificationItem[] = (data || [])
       .filter((p: any) => (p.stock_quantity ?? 0) <= (p.min_stock ?? 0))
-      .slice(0, 20)
       .map((p: any) => {
         const q = Number(p.stock_quantity ?? 0);
         const m = Number(p.min_stock ?? 0);
