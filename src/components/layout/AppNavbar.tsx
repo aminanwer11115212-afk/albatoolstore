@@ -341,10 +341,13 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
   const visibleItems = notifTab === "today" ? todayItems : notifTab === "stock" ? stockItems : logItems;
   const unreadCount =
     todayItems.filter(n => !n.read).length +
-    stockItems.filter(n => !n.read).length;
+    stockItems.filter(n => !n.read).length +
+    logItems.filter(n => !n.read).length;
   const outCount = stockItems.filter(n => n.severity === "out").length;
   const lowCount = stockItems.filter(n => n.severity === "low").length;
-  const hasUnreadOut = stockItems.some(n => n.severity === "out" && !n.read);
+  const hasUnreadOut =
+    stockItems.some(n => n.severity === "out" && !n.read) ||
+    todayItems.some(n => n.severity === "out" && !n.read);
 
   const markAllRead = useCallback(() => {
     const next = new Set(readIds);
