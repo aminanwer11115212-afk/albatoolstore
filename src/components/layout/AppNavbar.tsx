@@ -284,7 +284,7 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
       .from("activity_log")
       .select("id, table_name, action, record_id, created_at, changed_by")
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(500);
 
     const tableLabels: Record<string, string> = {
       invoices: "فاتورة",
