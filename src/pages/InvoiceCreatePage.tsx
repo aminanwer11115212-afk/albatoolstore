@@ -1603,11 +1603,6 @@ export default function InvoiceCreatePage() {
 
 
 
-            <div className="field" style={{ width: HEADER_FIELD_BASES[0] + (hdrExtras[0] || 0) }}>
-              <label>التاريخ</label>
-              <input type="date" className="form-control" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} style={{ width: "100%" }} />
-              {!colsLocked && <ExpandFieldButton currentExtra={hdrExtras[0] || 0} onDrag={(v) => hdrSetExtra(0, v)} onReset={() => hdrReset(0)} />}
-            </div>
 
             <div className="field" style={{ width: HEADER_FIELD_BASES[1] + (hdrExtras[1] || 0) }}>
               <label>المستودع</label>
