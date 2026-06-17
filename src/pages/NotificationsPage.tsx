@@ -516,6 +516,9 @@ export default function NotificationsPage() {
     if (n.kind === "stock") return <AlertTriangle size={16} className={n.severity === "out" ? "text-destructive" : "text-orange-500"} />;
     if (n.kind === "invoice") return <FileText size={16} className="text-primary" />;
     if (n.kind === "payment") return <Wallet size={16} className="text-emerald-600" />;
+    if (n.kind === "overdue") return <Clock size={16} className="text-destructive" />;
+    if (n.kind === "quote_due") return <FileClock size={16} className={n.severity === "out" ? "text-destructive" : "text-orange-500"} />;
+    if (n.kind === "todo") return <CheckSquare size={16} className={n.severity === "out" ? "text-destructive" : "text-blue-500"} />;
     return <Activity size={16} className="text-muted-foreground" />;
   };
 
