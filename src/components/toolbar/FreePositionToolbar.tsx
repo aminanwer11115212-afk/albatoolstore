@@ -44,11 +44,11 @@ interface Props {
 // v2: bumped to reset legacy messy positions and adopt new tidy auto-layout.
 const POS_PREFIX = "neobilling:toolbar-positions:v2";
 
-const ITEM_HEIGHT = 34;
-const GAP = 8;
-const PADDING = 6;
+const ITEM_HEIGHT = 28;
+const GAP = 6;
+const PADDING = 4;
 const GROUP_DIVIDER_W = 1;
-const GROUP_DIVIDER_GAP = 6; // extra space around the divider
+const GROUP_DIVIDER_GAP = 5; // extra space around the divider
 
 type Pos = { x: number; y: number };
 type PosMap = Record<string, Pos>;
