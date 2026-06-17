@@ -326,12 +326,13 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
   }, [notifTab, loadToday, loadStock, loadLog]);
 
   useEffect(() => {
-    // حمّل تبويب اليوم والمخزون دائماً عند التحميل (لإظهار العدّاد)
+    // حمّل كل التبويبات عند التحميل ليعكس العدّاد كل الإشعارات الحقيقية
     loadToday();
     loadStock();
-    const t = setInterval(() => { loadToday(); loadStock(); }, 60_000);
+    loadLog();
+    const t = setInterval(() => { loadToday(); loadStock(); loadLog(); }, 60_000);
     return () => clearInterval(t);
-  }, [loadToday, loadStock]);
+  }, [loadToday, loadStock, loadLog]);
 
   useEffect(() => {
     if (showNotifications) loadCurrentTab();
