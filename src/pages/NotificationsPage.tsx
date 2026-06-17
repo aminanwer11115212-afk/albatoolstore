@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Bell, AlertTriangle, FileText, Wallet, Activity, Search, RefreshCw, Pin, EyeOff, RotateCcw } from "lucide-react";
+import { Bell, AlertTriangle, FileText, Wallet, Activity, Search, RefreshCw, Pin, EyeOff, RotateCcw, Clock, CheckSquare, FileClock } from "lucide-react";
 import { useUserScopedLegacyKey } from "@/lib/userScopedKey";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 
 type Severity = "out" | "low";
-type Kind = "invoice" | "payment" | "stock" | "log";
+type Kind = "invoice" | "payment" | "stock" | "log" | "overdue" | "quote_due" | "todo";
 
 type NotificationItem = {
   id: string;
@@ -224,7 +224,10 @@ export default function NotificationsPage() {
     since.setHours(0, 0, 0, 0);
     const sinceIso = since.toISOString();
 
-    const [invRes, payRes, stockRes, logRes] = await Promise.all([
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const [invRes, payRes, stockRes, logRes, overdueRes, quoteDueRes, todoRes] = await Promise.all([
       supabase
         .from("invoices")
         .select("id, invoice_number, total, created_at, customers(name)")
@@ -248,6 +251,27 @@ export default function NotificationsPage() {
         .select("id, table_name, action, record_id, created_at, changed_by, new_data, old_data, changed_fields")
         .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
+        .limit(500),
+      supabase
+        .from("invoices")
+        .select("id, invoice_number, total, paid_amount, due_amount, due_date, status, customers(name)")
+        .not("due_date", "is", null)
+        .lt("due_date", todayIso)
+        .order("due_date", { ascending: true })
+        .limit(500),
+      supabase
+        .from("quotes")
+        .select("id, quote_number, total, valid_until, status, customers(name)")
+        .not("valid_until", "is", null)
+        .lte("valid_until", in7Days)
+        .order("valid_until", { ascending: true })
+        .limit(500),
+      (supabase as any)
+        .from("todos")
+        .select("id, title, description, due_date, status, priority, updated_at")
+        .not("due_date", "is", null)
+        .lte("due_date", in7Days)
+        .order("due_date", { ascending: true })
         .limit(500),
     ]);
 
@@ -314,6 +338,67 @@ export default function NotificationsPage() {
       });
     });
 
+    (overdueRes.data || [])
+      .filter((r: any) => {
+        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        return due > 0 && r.status !== "cancelled" && r.status !== "paid";
+      })
+      .forEach((r: any) => {
+        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        const daysLate = Math.max(1, Math.floor((Date.now() - new Date(r.due_date).getTime()) / 86400000));
+        const id = `overdue:${r.id}:${r.due_date}`;
+        acc.push({
+          id, kind: "overdue",
+          title: `فاتورة متأخرة ${r.invoice_number || ""}`.trim(),
+          desc: `${r.customers?.name ? r.customers.name + " — " : ""}مستحق ${fmtMoney(due)} • متأخر ${daysLate} يوم`,
+          time: `تاريخ الاستحقاق ${fmtDate(r.due_date)}`,
+          ts: new Date(r.due_date).getTime(),
+          read: readIds.has(id),
+          path: `/invoices/edit/${r.id}`,
+          severity: "out",
+        });
+      });
+
+    (quoteDueRes.data || [])
+      .filter((r: any) => {
+        const s = String(r.status || "").toLowerCase();
+        return s !== "converted" && s !== "accepted" && s !== "rejected" && s !== "cancelled";
+      })
+      .forEach((r: any) => {
+        const id = `qdue:${r.id}:${r.valid_until}`;
+        const expired = new Date(r.valid_until).getTime() < Date.now();
+        acc.push({
+          id, kind: "quote_due",
+          title: expired ? `عرض سعر منتهي ${r.quote_number || ""}`.trim() : `عرض سعر يقترب انتهاؤه ${r.quote_number || ""}`.trim(),
+          desc: `${r.customers?.name ? r.customers.name + " — " : ""}بقيمة ${fmtMoney(r.total)} • صلاحية حتى ${fmtDate(r.valid_until)}`,
+          time: expired ? `منتهي منذ ${fmtDate(r.valid_until)}` : `ينتهي ${fmtDate(r.valid_until)}`,
+          ts: new Date(r.valid_until).getTime(),
+          read: readIds.has(id),
+          path: `/quotes/edit/${r.id}`,
+          severity: expired ? "out" : "low",
+        });
+      });
+
+    (todoRes.data || [])
+      .filter((r: any) => {
+        const s = String(r.status || "").toLowerCase();
+        return s !== "done" && s !== "completed" && s !== "cancelled";
+      })
+      .forEach((r: any) => {
+        const id = `todo:${r.id}:${r.due_date}`;
+        const overdue = new Date(r.due_date).getTime() < Date.now() - 86400000;
+        acc.push({
+          id, kind: "todo",
+          title: overdue ? `مهمة متأخرة: ${r.title}` : `مهمة قادمة: ${r.title}`,
+          desc: `${r.priority ? `[${r.priority}] ` : ""}موعد الاستحقاق ${fmtDate(r.due_date)}${r.description ? ` • ${r.description}` : ""}`,
+          time: r.updated_at ? timeAgo(r.updated_at) : "",
+          ts: new Date(r.due_date).getTime(),
+          read: readIds.has(id),
+          path: "/todos",
+          severity: overdue ? "out" : "low",
+        });
+      });
+
     acc.sort((a, b) => b.ts - a.ts);
     setItems(acc);
     setLoading(false);
@@ -377,9 +462,14 @@ export default function NotificationsPage() {
       return true;
     });
     const rank = (n: NotificationItem) => {
-      if (n.kind === "stock" && n.severity === "out") return 0;
-      if (n.kind === "stock" && n.severity === "low") return 1;
-      return 2;
+      if (n.kind === "overdue") return 0;
+      if (n.kind === "stock" && n.severity === "out") return 1;
+      if (n.kind === "quote_due" && n.severity === "out") return 2;
+      if (n.kind === "todo" && n.severity === "out") return 3;
+      if (n.kind === "stock" && n.severity === "low") return 4;
+      if (n.kind === "quote_due") return 5;
+      if (n.kind === "todo") return 6;
+      return 7;
     };
     return [...list].sort((a, b) => {
       const r = rank(a) - rank(b);
@@ -399,6 +489,9 @@ export default function NotificationsPage() {
     payment: items.filter(i => i.kind === "payment").length,
     stock: items.filter(i => i.kind === "stock").length,
     log: items.filter(i => i.kind === "log").length,
+    overdue: items.filter(i => i.kind === "overdue").length,
+    quote_due: items.filter(i => i.kind === "quote_due").length,
+    todo: items.filter(i => i.kind === "todo").length,
     unread: items.filter(i => !i.read).length,
   }), [items]);
 
@@ -423,6 +516,9 @@ export default function NotificationsPage() {
     if (n.kind === "stock") return <AlertTriangle size={16} className={n.severity === "out" ? "text-destructive" : "text-orange-500"} />;
     if (n.kind === "invoice") return <FileText size={16} className="text-primary" />;
     if (n.kind === "payment") return <Wallet size={16} className="text-emerald-600" />;
+    if (n.kind === "overdue") return <Clock size={16} className="text-destructive" />;
+    if (n.kind === "quote_due") return <FileClock size={16} className={n.severity === "out" ? "text-destructive" : "text-orange-500"} />;
+    if (n.kind === "todo") return <CheckSquare size={16} className={n.severity === "out" ? "text-destructive" : "text-blue-500"} />;
     return <Activity size={16} className="text-muted-foreground" />;
   };
 
@@ -472,6 +568,9 @@ export default function NotificationsPage() {
                 <option value="invoice">فواتير ({counts.invoice})</option>
                 <option value="payment">دفعات ({counts.payment})</option>
                 <option value="stock">مخزون ({counts.stock})</option>
+                <option value="overdue">فواتير متأخرة ({counts.overdue})</option>
+                <option value="quote_due">عروض أسعار منتهية ({counts.quote_due})</option>
+                <option value="todo">مهام ({counts.todo})</option>
                 <option value="log">سجل النشاط ({counts.log})</option>
               </select>
             </div>
