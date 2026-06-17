@@ -1136,7 +1136,16 @@ export default function QuoteCreatePage() {
             </div>
             {/* Customer search */}
             <div className="field product-search-container" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
-              <label>العميل</label>
+              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                <span>العميل</span>
+                <input
+                  type="date"
+                  value={quoteDate}
+                  onChange={(e) => setQuoteDate(e.target.value)}
+                  title="تاريخ عرض السعر"
+                  style={{ fontSize: 10, height: 18, padding: "0 4px", border: "1px solid hsl(var(--border))", borderRadius: 3, background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontWeight: 600 }}
+                />
+              </label>
               {!colsLocked && <ExpandFieldButton currentExtra={custExtras[0] || 0} onDrag={(v) => custSetExtra(0, v)} onReset={() => custReset(0)} title="اسحب لتغيير عرض حقل العميل · نقرة مزدوجة لإعادة الضبط" />}
               <input
                 ref={customerInputRef}
@@ -1211,18 +1220,6 @@ export default function QuoteCreatePage() {
             </div>
 
 
-            {/* Date */}
-            <div className="field" style={{ width: HEADER_FIELD_BASES[0] + (hdrExtras[0] || 0) }}>
-              <label>التاريخ</label>
-              <input
-                type="date"
-                className="form-control"
-                value={quoteDate}
-                onChange={(e) => setQuoteDate(e.target.value)}
-                style={{ minWidth: 0, width: "100%" }}
-              />
-              {!colsLocked && <ExpandFieldButton currentExtra={hdrExtras[0] || 0} onDrag={(v) => hdrSetExtra(0, v)} onReset={() => hdrReset(0)} />}
-            </div>
 
             {/* Warehouse */}
             <div className="field" style={{ width: HEADER_FIELD_BASES[1] + (hdrExtras[1] || 0) }}>
