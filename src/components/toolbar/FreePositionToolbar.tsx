@@ -404,8 +404,10 @@ export default function FreePositionToolbar({ screenKey, items: rawItems, classN
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
+          gap: 4px;
           box-sizing: border-box;
+          font-size: 11px;
+          padding-inline: 7px;
         }
       `}</style>
 
