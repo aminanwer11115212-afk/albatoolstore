@@ -2235,3 +2235,18 @@ input[type="number"] {
 
 
 
+
+/* ── Compact toolbar buttons in create/edit screens ────────────────────────
+ * Desktop uses the tight inline styles defined in each create page (h=28).
+ * On mobile (≤640px) bump button height/padding back up to ≥44px tap targets.
+ * Targets buttons inside FreePositionToolbar / CustomizableToolbar containers. */
+@media (max-width: 640px) {
+  [data-toolbar-bar-key] button,
+  [data-toolbar-bar-key] .btn,
+  [data-toolbar-free] button {
+    min-height: 44px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    font-size: 13px !important;
+  }
+}
