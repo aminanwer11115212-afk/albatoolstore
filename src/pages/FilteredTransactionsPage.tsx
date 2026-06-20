@@ -126,7 +126,7 @@ export default function FilteredTransactionsPage({ type }: FilteredTransactionsP
               <tbody>
                 {isLoading ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
                 : !filtered.length ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا توجد {title}</td></tr>
-                : filtered.map((t: any) => (
+                : paginated.map((t: any) => (
                   <tr key={t.id} className="border-b border-border hover:bg-muted/50 transition-colors">
                     <td className="px-5 py-3 text-foreground">{t.date}</td>
                     <td className={`px-5 py-3 font-medium ${type === "income" ? "text-success" : "text-destructive"}`}>{Number(t.amount).toLocaleString()}</td>
@@ -139,6 +139,30 @@ export default function FilteredTransactionsPage({ type }: FilteredTransactionsP
               </tbody>
             </table>
           </div>
+          {truncated && (
+            <div className="px-4 py-2 text-xs text-warning bg-warning/10 border-t border-border">
+              ⚠️ تم تحميل أول {MAX_ROWS} سجل فقط. ضيّق الفترة الزمنية للوصول لباقي السجلات.
+            </div>
+          )}
+          {totalPages > 1 && (
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between text-sm flex-wrap gap-2">
+              <span className="text-muted-foreground">
+                صفحة {page} من {totalPages} • إجمالي {filtered.length} سجل
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded bg-muted hover:bg-muted/70 disabled:opacity-50 min-h-[36px]"
+                >السابق</button>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 rounded bg-muted hover:bg-muted/70 disabled:opacity-50 min-h-[36px]"
+                >التالي</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
