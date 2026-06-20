@@ -150,7 +150,7 @@ export default function DispatchPage() {
         </div>
 
         {/* Preview pane (visually on the LEFT in RTL) — desktop only */}
-        <aside className="dp-preview hidden lg:flex">
+        <aside className="dp-preview">
           <DispatchPrintPreview
             selectedIds={selectedIds}
             company={company}
