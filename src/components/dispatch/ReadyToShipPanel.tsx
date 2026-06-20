@@ -333,28 +333,22 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
         <td className="cell-name">{inv.customers?.name || "كاش"}</td>
         <td className="cell-date">{fmtDateAr(inv.date)}</td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <select
-            className="rts-select"
+          <SearchableSelect
+            options={transporters as any}
             value={choice.transporterId}
-            onChange={(e) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: e.target.value } }))}
-          >
-            <option value="">— اختر ناقل —</option>
-            {transporters.map((t: any) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: val } }))}
+            placeholder="— اختر ناقل —"
+            className="rts-select"
+          />
         </td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <select
-            className="rts-select"
+          <SearchableSelect
+            options={destinations as any}
             value={choice.destinationId}
-            onChange={(e) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: e.target.value } }))}
-          >
-            <option value="">— بدون وجهة —</option>
-            {destinations.map((d: any) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
+            placeholder="— بدون وجهة —"
+            className="rts-select"
+          />
         </td>
         <td className="cell-act" onClick={(e) => e.stopPropagation()}>
           {hasTransport ? (
