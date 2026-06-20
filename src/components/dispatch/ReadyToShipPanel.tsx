@@ -46,6 +46,7 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
   };
   const [busy, setBusy] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
 
   // قوائم الناقلين والوجهات + روابط العميل
   const { data: allTransporters } = useTransporters();
