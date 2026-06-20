@@ -17,29 +17,38 @@ export default function FilteredTransactionsPage({ type }: FilteredTransactionsP
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
 
+  const [page, setPage] = useState(1);
+  const perPage = 50;
+  const MAX_ROWS = 1000;
+
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ["filtered-transactions", type],
+    queryKey: ["filtered-transactions", type, dateFrom, dateTo],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("transactions")
         .select("*, accounts:account_id(name), customers(name), suppliers(name)")
         .eq("type", type)
-        .order("date", { ascending: false });
+        .order("date", { ascending: false })
+        .limit(MAX_ROWS);
+      if (dateFrom) q = q.gte("date", dateFrom);
+      if (dateTo) q = q.lte("date", dateTo);
+      const { data, error } = await q;
       if (error) throw error;
       return data;
     },
   });
 
   const filtered = (transactions || []).filter((t: any) => {
-    if (dateFrom && t.date < dateFrom) return false;
-    if (dateTo && t.date > dateTo) return false;
     if (search) {
       if (!startsWithAny([t.description, t.category, t.accounts?.name], search)) return false;
     }
     return true;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
   const total = filtered.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+  const truncated = (transactions?.length || 0) >= MAX_ROWS;
 
   const periodText = dateFrom || dateTo
     ? `${dateFrom ? `من ${dateFrom}` : ""}${dateTo ? ` إلى ${dateTo}` : ""}`.trim()
@@ -117,7 +126,7 @@ export default function FilteredTransactionsPage({ type }: FilteredTransactionsP
               <tbody>
                 {isLoading ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
                 : !filtered.length ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا توجد {title}</td></tr>
-                : filtered.map((t: any) => (
+                : paginated.map((t: any) => (
                   <tr key={t.id} className="border-b border-border hover:bg-muted/50 transition-colors">
                     <td className="px-5 py-3 text-foreground">{t.date}</td>
                     <td className={`px-5 py-3 font-medium ${type === "income" ? "text-success" : "text-destructive"}`}>{Number(t.amount).toLocaleString()}</td>
@@ -130,6 +139,30 @@ export default function FilteredTransactionsPage({ type }: FilteredTransactionsP
               </tbody>
             </table>
           </div>
+          {truncated && (
+            <div className="px-4 py-2 text-xs text-warning bg-warning/10 border-t border-border">
+              ⚠️ تم تحميل أول {MAX_ROWS} سجل فقط. ضيّق الفترة الزمنية للوصول لباقي السجلات.
+            </div>
+          )}
+          {totalPages > 1 && (
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between text-sm flex-wrap gap-2">
+              <span className="text-muted-foreground">
+                صفحة {page} من {totalPages} • إجمالي {filtered.length} سجل
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded bg-muted hover:bg-muted/70 disabled:opacity-50 min-h-[36px]"
+                >السابق</button>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 rounded bg-muted hover:bg-muted/70 disabled:opacity-50 min-h-[36px]"
+                >التالي</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

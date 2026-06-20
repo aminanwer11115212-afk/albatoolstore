@@ -52,12 +52,18 @@ export default function CustomerLogisticsPage() {
   };
 
   const setDefaultDest = async (destLinkId: string) => {
-    // unset all then set this one
-    for (const d of customerDests) {
-      if (d.is_default) await cd.update.mutateAsync({ id: d.id, is_default: false });
+    try {
+      // unset all (parallel) ثم set this one — استبدل await-in-loop بـ Promise.all
+      await Promise.all(
+        customerDests
+          .filter((d: any) => d.is_default && d.id !== destLinkId)
+          .map((d: any) => cd.update.mutateAsync({ id: d.id, is_default: false })),
+      );
+      await cd.update.mutateAsync({ id: destLinkId, is_default: true });
+      toast.success("تم تعيين الوجهة الافتراضية");
+    } catch (e: any) {
+      toast.error(e.message || "فشل تعيين الوجهة الافتراضية");
     }
-    await cd.update.mutateAsync({ id: destLinkId, is_default: true });
-    toast.success("تم تعيين الوجهة الافتراضية");
   };
 
   const addTransporter = async () => {

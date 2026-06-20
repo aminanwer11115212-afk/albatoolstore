@@ -175,7 +175,8 @@ export default function QuoteViewPage() {
   const handleStatusChange = async () => {
     if (!quote) return;
     try {
-      await supabase.from("quotes").update({ status: newStatus }).eq("id", quote.id);
+      const { error } = await supabase.from("quotes").update({ status: newStatus }).eq("id", quote.id);
+      if (error) throw error;
       toast.success("تم تغيير الوضع");
       setShowStatusChange(false);
       loadQuote();
@@ -413,7 +414,7 @@ export default function QuoteViewPage() {
             </Button>
           )},
           { id: "deleted-products", node: (
-            <Button variant="outline" className="gap-1.5 text-xs h-9">
+            <Button onClick={() => navigate(`/deleted-items?quote=${id}`)} variant="outline" className="gap-1.5 text-xs h-9">
               <Trash2 size={14} /> المنتجات المحذوفة
             </Button>
           )},
