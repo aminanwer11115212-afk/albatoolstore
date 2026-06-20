@@ -2154,30 +2154,33 @@ export default function InvoiceCreatePage() {
                   group: "3-share",
                   node: (
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (!customer?.phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
-                        const msg = `مرحباً ${customer.name}،\nفاتورة رقم: ${invoiceNumber}\nالإجمالي: ${totals.total.toLocaleString()} ${currencyCode}`;
-                        openWhatsApp(customer.phone, msg);
+                        if (!editId) { toast.error("احفظ الفاتورة أولاً لإرسال رابطها"); return; }
+                        const tId = toast.loading("جاري إنشاء رابط المشاركة...");
+                        try {
+                          const { data: sess } = await supabase.auth.getSession();
+                          const accessToken = sess?.session?.access_token;
+                          if (!accessToken) throw new Error("يجب تسجيل الدخول");
+                          const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+                          const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+                          const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-document-share-token`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}`, apikey: ANON },
+                            body: JSON.stringify({ doc_type: "invoice", doc_id: editId, ttl_hours: 168 }),
+                          });
+                          const json = await resp.json();
+                          if (!resp.ok) throw new Error(json.error || "فشل إنشاء الرابط");
+                          toast.dismiss(tId);
+                          const msg = `مرحباً ${customer.name} 👋\n📄 فاتورة رقم: ${invoiceNumber}\n💰 الإجمالي: ${totals.total.toLocaleString()} ${currencyCode}\n\nرابط الفاتورة:\n${json.url}`;
+                          openWhatsApp(customer.phone, msg);
+                        } catch (err: any) {
+                          toast.dismiss(tId);
+                          toast.error(err?.message || "فشل إنشاء رابط المشاركة");
+                        }
                       }}
-                      title="إرسال واتساب" style={btnStyle("#10b981")}>
+                      title="إرسال واتساب مع رابط الفاتورة" style={btnStyle("#10b981")}>
                       <MessageCircle size={14} /> واتساب
-                    </button>
-                  ),
-                },
-                {
-                  id: "share",
-                  group: "3-share",
-                  node: (
-                    <button
-                      onClick={() => {
-                        const url = window.location.href;
-                        navigator.clipboard?.writeText(url).then(
-                          () => toast.success("تم نسخ الرابط"),
-                          () => toast.error("فشل النسخ"),
-                        );
-                      }}
-                      title="مشاركة" style={btnStyle("#0ea5e9")}>
-                      <Share2 size={14} />
                     </button>
                   ),
                 },
