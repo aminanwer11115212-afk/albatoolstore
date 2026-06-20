@@ -54,9 +54,17 @@ export const ItemsScroll = forwardRef<HTMLDivElement, ItemsScrollProps>(
       if (!el) return;
 
       const update = () => {
-        // نقارن scrollHeight بـ clientHeight مع هامش 1px لمنع اهتزاز sub-pixel.
-        const overflowing = el.scrollHeight > el.clientHeight + 1;
+        // هامش 4px لمنع ظهور scrollbar بسبب فروق sub-pixel / حدود thead/tfoot.
+        const overflowing = el.scrollHeight > el.clientHeight + 4;
         el.classList.toggle("is-overflowing", overflowing);
+        // اجعل scrollIntoView يحترم ارتفاع الـ sticky header/footer
+        // حتى لا تختفي الصفوف خلفهما عند التمرير التلقائي.
+        const thead = el.querySelector("thead") as HTMLElement | null;
+        const tfoot = el.querySelector("tfoot") as HTMLElement | null;
+        const headH = thead?.getBoundingClientRect().height || 0;
+        const footH = tfoot?.getBoundingClientRect().height || 0;
+        el.style.scrollPaddingTop = `${Math.ceil(headH)}px`;
+        el.style.scrollPaddingBottom = `${Math.ceil(footH)}px`;
       };
 
       update();
