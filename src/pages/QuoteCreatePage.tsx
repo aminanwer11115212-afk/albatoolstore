@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { startsWithAny } from "@/utils/searchMatch";
 import { toast } from "sonner";
-import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, Share2, FileText, StickyNote, Package, Truck } from "lucide-react";
+import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck } from "lucide-react";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
 import PanelResizer from "@/components/PanelResizer";
