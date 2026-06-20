@@ -9,11 +9,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { filterSelectColumns } from "@/lib/tableColumns";
 import { toast } from "sonner";
-import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2 } from "lucide-react";
+import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2, Search } from "lucide-react";
 import {
   useTransporters, useDestinations,
   useCustomerTransporters, useCustomerDestinations, useCustomerPreferredTransporter,
 } from "@/hooks/useData";
+import SearchableSelect from "@/components/transport/SearchableSelect";
 
 type Props = {
   buildPrintHTML: (invoices: any[], company: any, mode: "all" | "collected") => string;
@@ -45,6 +46,7 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
   };
   const [busy, setBusy] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
 
   // قوائم الناقلين والوجهات + روابط العميل
   const { data: allTransporters } = useTransporters();
@@ -134,7 +136,20 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
     };
   }, [qc]);
 
-  const invoices = data || [];
+  const invoicesAll = (data || []) as any[];
+  const invoices = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return invoicesAll;
+    return invoicesAll.filter((inv) => {
+      const fields = [
+        inv.invoice_number,
+        inv.customers?.name,
+        inv.customers?.phone,
+        ...(inv.invoice_transports || []).map((t: any) => t.transporters?.name),
+      ];
+      return fields.some((f) => String(f || "").toLowerCase().includes(q));
+    });
+  }, [invoicesAll, search]);
 
   const toggle = useCallback((id: string) => {
     setChecked((p) => {
@@ -318,28 +333,22 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
         <td className="cell-name">{inv.customers?.name || "كاش"}</td>
         <td className="cell-date">{fmtDateAr(inv.date)}</td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <select
-            className="rts-select"
+          <SearchableSelect
+            options={transporters as any}
             value={choice.transporterId}
-            onChange={(e) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: e.target.value } }))}
-          >
-            <option value="">— اختر ناقل —</option>
-            {transporters.map((t: any) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: val } }))}
+            placeholder="— اختر ناقل —"
+            className="rts-select"
+          />
         </td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <select
-            className="rts-select"
+          <SearchableSelect
+            options={destinations as any}
             value={choice.destinationId}
-            onChange={(e) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: e.target.value } }))}
-          >
-            <option value="">— بدون وجهة —</option>
-            {destinations.map((d: any) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
+            placeholder="— بدون وجهة —"
+            className="rts-select"
+          />
         </td>
         <td className="cell-act" onClick={(e) => e.stopPropagation()}>
           {hasTransport ? (
@@ -405,6 +414,33 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
           color: hsl(var(--primary));
           border-bottom-color: hsl(var(--primary));
         }
+
+        .rts-search {
+          display: flex; align-items: center; gap: 6px;
+          padding: 8px 10px;
+          background: hsl(var(--background));
+          border-bottom: 1px solid hsl(var(--border));
+          position: relative;
+        }
+        .rts-search-icon { color: hsl(var(--muted-foreground)); flex-shrink: 0; }
+        .rts-search-input {
+          flex: 1; min-width: 0;
+          background: hsl(var(--muted) / 0.4);
+          border: 1px solid hsl(var(--border));
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 12px; font-weight: 600;
+          color: hsl(var(--foreground));
+          min-height: 32px;
+        }
+        .rts-search-input:focus { outline: 2px solid hsl(var(--primary) / 0.35); border-color: hsl(var(--primary)); }
+        .rts-search-clear {
+          background: hsl(var(--muted)); color: hsl(var(--muted-foreground));
+          border: none; border-radius: 999px; padding: 4px; cursor: pointer;
+          display: inline-flex; align-items: center; justify-content: center;
+        }
+        .rts-search-clear:hover { background: hsl(var(--destructive) / 0.15); color: hsl(var(--destructive)); }
+        @media (max-width: 640px) { .rts-search-input { font-size: 16px; min-height: 40px; } }
 
         .rts-hint {
           padding: 6px 12px; font-size: 10.5px;
@@ -529,8 +565,23 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
       </div>
 
       {/* Hint */}
+      {/* Search */}
+      <div className="rts-search">
+        <Search size={13} className="rts-search-icon" />
+        <input
+          type="text"
+          className="rts-search-input"
+          placeholder="ابحث برقم الفاتورة، اسم الزبون، أو الناقل…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search && (
+          <button type="button" className="rts-search-clear" onClick={() => setSearch("")} title="مسح">
+            <X size={12} />
+          </button>
+        )}
+      </div>
       <div className="rts-hint">الرجاء اختيار زبون أو مجموعة من الزبائن</div>
-      <div className="rts-dragbar">Drag a column header here to group by that column</div>
 
       {/* Body */}
       <div className="rts-body">
