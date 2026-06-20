@@ -538,8 +538,23 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
       </div>
 
       {/* Hint */}
+      {/* Search */}
+      <div className="rts-search">
+        <Search size={13} className="rts-search-icon" />
+        <input
+          type="text"
+          className="rts-search-input"
+          placeholder="ابحث برقم الفاتورة، اسم الزبون، أو الناقل…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search && (
+          <button type="button" className="rts-search-clear" onClick={() => setSearch("")} title="مسح">
+            <X size={12} />
+          </button>
+        )}
+      </div>
       <div className="rts-hint">الرجاء اختيار زبون أو مجموعة من الزبائن</div>
-      <div className="rts-dragbar">Drag a column header here to group by that column</div>
 
       {/* Body */}
       <div className="rts-body">
