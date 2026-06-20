@@ -415,6 +415,33 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
           border-bottom-color: hsl(var(--primary));
         }
 
+        .rts-search {
+          display: flex; align-items: center; gap: 6px;
+          padding: 8px 10px;
+          background: hsl(var(--background));
+          border-bottom: 1px solid hsl(var(--border));
+          position: relative;
+        }
+        .rts-search-icon { color: hsl(var(--muted-foreground)); flex-shrink: 0; }
+        .rts-search-input {
+          flex: 1; min-width: 0;
+          background: hsl(var(--muted) / 0.4);
+          border: 1px solid hsl(var(--border));
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 12px; font-weight: 600;
+          color: hsl(var(--foreground));
+          min-height: 32px;
+        }
+        .rts-search-input:focus { outline: 2px solid hsl(var(--primary) / 0.35); border-color: hsl(var(--primary)); }
+        .rts-search-clear {
+          background: hsl(var(--muted)); color: hsl(var(--muted-foreground));
+          border: none; border-radius: 999px; padding: 4px; cursor: pointer;
+          display: inline-flex; align-items: center; justify-content: center;
+        }
+        .rts-search-clear:hover { background: hsl(var(--destructive) / 0.15); color: hsl(var(--destructive)); }
+        @media (max-width: 640px) { .rts-search-input { font-size: 16px; min-height: 40px; } }
+
         .rts-hint {
           padding: 6px 12px; font-size: 10.5px;
           color: hsl(var(--muted-foreground));
