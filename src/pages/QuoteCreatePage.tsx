@@ -1851,14 +1851,32 @@ export default function QuoteCreatePage() {
                     <button
                       onClick={async () => {
                         if (!customer?.phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
-                        const msg = `مرحباً ${customer.name}،\nعرض سعر رقم: ${quoteNumber}\nالإجمالي: ${totals.total.toLocaleString()} ${companyCurrency}`;
-                        openWhatsApp(customer.phone, msg);
-                        if (editId) {
+                        if (!editId) { toast.error("احفظ عرض السعر أولاً لإرسال رابطه"); return; }
+                        const tId = toast.loading("جاري إنشاء رابط المشاركة...");
+                        try {
+                          const { data: sess } = await supabase.auth.getSession();
+                          const accessToken = sess?.session?.access_token;
+                          if (!accessToken) throw new Error("يجب تسجيل الدخول");
+                          const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+                          const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+                          const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-document-share-token`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}`, apikey: ANON },
+                            body: JSON.stringify({ doc_type: "quote", doc_id: editId, ttl_hours: 168 }),
+                          });
+                          const json = await resp.json();
+                          if (!resp.ok) throw new Error(json.error || "فشل إنشاء الرابط");
+                          toast.dismiss(tId);
+                          const msg = `مرحباً ${customer.name} 👋\n📄 عرض سعر رقم: ${quoteNumber}\n💰 الإجمالي: ${totals.total.toLocaleString()} ${companyCurrency}\n\nرابط عرض السعر:\n${json.url}`;
+                          openWhatsApp(customer.phone, msg);
                           const { markQuoteAsSent } = await import("@/utils/quoteSentStatus");
                           await markQuoteAsSent(editId);
+                        } catch (err: any) {
+                          toast.dismiss(tId);
+                          toast.error(err?.message || "فشل إنشاء رابط المشاركة");
                         }
                       }}
-                      title="إرسال واتساب"
+                      title="إرسال واتساب مع رابط عرض السعر"
                       style={btnStyle("#10b981")}
                     >
                       <MessageCircle size={14} /> واتساب
