@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useInvoicesWithCustomers } from "@/hooks/useData";
 import { Search, ChevronLeft, ChevronRight, Eye, FileText } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
@@ -6,6 +7,7 @@ import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
 export default function DailyInvoicesReportPage() {
+  const navigate = useNavigate();
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -104,7 +106,14 @@ export default function DailyInvoicesReportPage() {
                     <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span></td>
                     <td className="px-4 py-3 text-foreground text-xs">{new Date(inv.created_at).toLocaleTimeString("ar-SA")}</td>
                     <td className="px-4 py-3">
-                      <button className="px-2 py-1 bg-primary/10 text-primary rounded text-xs"><Eye size={12} /></button>
+                      <button
+                        onClick={() => navigate(`/invoices/${inv.id}`)}
+                        className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 transition-colors min-h-[32px] min-w-[32px] inline-flex items-center justify-center"
+                        title="عرض الفاتورة"
+                        aria-label="عرض الفاتورة"
+                      >
+                        <Eye size={12} />
+                      </button>
                     </td>
                   </tr>
                 );

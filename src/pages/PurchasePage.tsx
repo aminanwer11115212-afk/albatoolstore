@@ -63,19 +63,18 @@ export default function PurchasePage() {
           .select("product_id, quantity")
           .eq("purchase_order_id", id);
         if (items && items.length > 0) {
-          for (const it of items as any[]) {
-            if (!it.product_id) continue;
-            const { data: prod } = await supabase
-              .from("products")
-              .select("stock_quantity")
-              .eq("id", it.product_id)
-              .maybeSingle();
-            if (prod) {
-              await supabase.from("products").update({
-                stock_quantity: Math.max(0, Number(prod.stock_quantity || 0) - Number(it.quantity || 0)),
-              }).eq("id", it.product_id);
-            }
-          }
+          // ذرّي + متوازٍ: استخدم RPC decrement_product_stock عبر Promise.all
+          // بدل قراءة + كتابة يدوية (race condition).
+          await Promise.all(
+            (items as any[])
+              .filter((it) => it.product_id)
+              .map((it) =>
+                (supabase as any).rpc("decrement_product_stock", {
+                  _product_id: it.product_id,
+                  _qty: Number(it.quantity || 0),
+                }),
+              ),
+          );
         }
       }
       // حذف بنود الأمر أولاً لتجنب مشاكل FK

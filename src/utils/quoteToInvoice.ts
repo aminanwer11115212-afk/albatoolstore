@@ -94,7 +94,28 @@ export async function convertQuoteToInvoice(
     .single();
   if (insErr || !inv) throw insErr || new Error("Failed to create invoice");
 
-  // 5. Copy items
+  // 5. CRITICAL: Mark quote as converted IMMEDIATELY after invoice creation.
+  // This guarantees idempotency: if any subsequent step (items copy) fails
+  // and the user retries, we won't create a duplicate invoice — the converted_to_invoice_id
+  // check at the top will return the existing one.
+  const { data: userData } = await supabase.auth.getUser();
+  const { error: upErr } = await supabase
+    .from("quotes")
+    .update({
+      status: "accepted",
+      workflow_status: "converted",
+      converted_to_invoice_id: inv.id,
+      converted_at: new Date().toISOString(),
+      converted_by: userData?.user?.id || null,
+    } as any)
+    .eq("id", quoteId);
+  if (upErr) {
+    // Rollback: delete the orphan invoice we just created so retry works cleanly.
+    await supabase.from("invoices").delete().eq("id", inv.id);
+    throw upErr;
+  }
+
+  // 6. Copy items (after the quote is safely marked converted)
   if (items && items.length > 0) {
     const payload = items.map((it: any) => ({
       invoice_id: inv.id,
@@ -113,20 +134,6 @@ export async function convertQuoteToInvoice(
     const { error: itErr } = await supabase.from("invoice_items").insert(payload);
     if (itErr) throw itErr;
   }
-
-  // 6. Mark quote as accepted + linked + who converted
-  const { data: userData } = await supabase.auth.getUser();
-  const { error: upErr } = await supabase
-    .from("quotes")
-    .update({
-      status: "accepted",
-      workflow_status: "converted",
-      converted_to_invoice_id: inv.id,
-      converted_at: new Date().toISOString(),
-      converted_by: userData?.user?.id || null,
-    } as any)
-    .eq("id", quoteId);
-  if (upErr) throw upErr;
 
   return { invoiceId: inv.id, invoiceNumber: invNum, alreadyConverted: false };
 }

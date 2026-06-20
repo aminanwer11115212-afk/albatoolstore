@@ -2697,6 +2697,10 @@ export type Database = {
       }
       advance_invoke_safe: { Args: { _id: string }; Returns: undefined }
       current_user_login_status: { Args: never; Returns: string }
+      decrement_product_stock: {
+        Args: { _product_id: string; _qty: number }
+        Returns: undefined
+      }
       delete_invoice_items_silent: {
         Args: { p_invoice_id: string }
         Returns: undefined
