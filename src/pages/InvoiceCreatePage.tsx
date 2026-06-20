@@ -7,7 +7,7 @@ import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
-import { Plus, Edit, Printer, MessageCircle, Share2, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet } from "lucide-react";
+import { Plus, Edit, Printer, MessageCircle, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet } from "lucide-react";
 import StatusButton, { WORKFLOW_STATUS_OPTIONS, INVOICE_STATUS_OPTIONS } from "@/components/StatusButton";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
 import PanelResizer from "@/components/PanelResizer";
