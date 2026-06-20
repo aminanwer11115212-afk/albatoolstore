@@ -111,8 +111,8 @@ export default function DispatchPage() {
         .dispatch-page .dp-preview { display: none; }
         @media (min-width: 860px) {
           .dispatch-page .dp-grid { grid-template-columns: 1fr 360px; align-items: start; }
-          .dispatch-page .dp-preview { position: sticky; top: 10px; max-height: calc(100vh - 20px); overflow: hidden; display:flex; }
-          .dispatch-page .dp-preview > * { flex: 1; min-height: 0; }
+          .dispatch-page .dp-preview { position: sticky; top: 10px; height: calc(100vh - 20px); max-height: calc(100vh - 20px); overflow: hidden; display:flex; }
+          .dispatch-page .dp-preview > * { flex: 1; min-height: 0; height: 100%; }
         }
         @media (min-width: 1280px) {
           .dispatch-page .dp-grid { grid-template-columns: 1fr 480px; }
