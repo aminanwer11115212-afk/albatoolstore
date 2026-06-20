@@ -108,6 +108,7 @@ export default function DispatchPage() {
           display: grid; gap: 12px;
           grid-template-columns: 1fr;
         }
+        .dispatch-page .dp-preview { display: none; }
         @media (min-width: 860px) {
           .dispatch-page .dp-grid { grid-template-columns: 1fr 360px; align-items: start; }
           .dispatch-page .dp-preview { position: sticky; top: 10px; max-height: calc(100vh - 20px); overflow: hidden; display:flex; }
