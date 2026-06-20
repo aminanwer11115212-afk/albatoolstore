@@ -136,7 +136,20 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
     };
   }, [qc]);
 
-  const invoices = data || [];
+  const invoicesAll = (data || []) as any[];
+  const invoices = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return invoicesAll;
+    return invoicesAll.filter((inv) => {
+      const fields = [
+        inv.invoice_number,
+        inv.customers?.name,
+        inv.customers?.phone,
+        ...(inv.invoice_transports || []).map((t: any) => t.transporters?.name),
+      ];
+      return fields.some((f) => String(f || "").toLowerCase().includes(q));
+    });
+  }, [invoicesAll, search]);
 
   const toggle = useCallback((id: string) => {
     setChecked((p) => {
