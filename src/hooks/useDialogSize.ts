@@ -130,8 +130,8 @@ export function useDialogSize(
         borderRadius: 0,
       }
     : {
-        width: dlgSize ? `${dlgSize.w}px` : (defaults?.w ?? "min(1400px, 96vw)"),
-        height: dlgSize ? `${dlgSize.h}px` : (defaults?.h ?? "92vh"),
+        width: dlgSize ? `${dlgSize.w}px` : (defaults?.w ?? "min(960px, 96vw)"),
+        height: dlgSize ? `${dlgSize.h}px` : (defaults?.h ?? "min(880px, 92vh)"),
         maxWidth: "98vw",
         maxHeight: "98vh",
         minWidth: 480,
