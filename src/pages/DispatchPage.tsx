@@ -109,18 +109,24 @@ export default function DispatchPage() {
           grid-template-columns: 1fr;
         }
         .dispatch-page .dp-preview { display: none; }
+        /* عند الشاشات الضيقة: معاينة طباعة مصغّرة على الشمال
+           حتى يحصل جدول الترحيلات على مساحة أكبر، مع السماح بـ
+           horizontal scroll داخل dp-main إن لم تكفِ مساحة الأعمدة. */
         @media (min-width: 860px) {
-          .dispatch-page .dp-grid { grid-template-columns: 1fr 360px; align-items: start; }
+          .dispatch-page .dp-grid { grid-template-columns: 1fr 220px; align-items: start; }
           .dispatch-page .dp-preview { position: sticky; top: 10px; height: calc(100vh - 20px); max-height: calc(100vh - 20px); overflow: hidden; display:flex; }
           .dispatch-page .dp-preview > * { flex: 1; min-height: 0; height: 100%; }
         }
+        @media (min-width: 1100px) {
+          .dispatch-page .dp-grid { grid-template-columns: 1fr 320px; }
+        }
         @media (min-width: 1280px) {
-          .dispatch-page .dp-grid { grid-template-columns: 1fr 480px; }
+          .dispatch-page .dp-grid { grid-template-columns: 1fr 440px; }
         }
         @media (min-width: 1536px) {
-          .dispatch-page .dp-grid { grid-template-columns: 1fr 640px; }
+          .dispatch-page .dp-grid { grid-template-columns: 1fr 600px; }
         }
-        .dispatch-page .dp-main { min-width: 0; }
+        .dispatch-page .dp-main { min-width: 0; overflow-x: auto; }
         .dispatch-page .dp-main > * { height: 100%; min-height: 500px; }
 
         /* Mobile floating trigger */
