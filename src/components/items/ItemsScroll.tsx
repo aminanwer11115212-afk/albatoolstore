@@ -65,8 +65,9 @@ export const ItemsScroll = forwardRef<HTMLDivElement, ItemsScrollProps>(
       if (!el) return;
 
       const update = () => {
-        // هامش 4px لمنع ظهور scrollbar بسبب فروق sub-pixel / حدود thead/tfoot.
-        const overflowing = el.scrollHeight > el.clientHeight + 4;
+        // هامش 8px لمنع ظهور scrollbar بسبب فروق sub-pixel، حدود thead/tfoot،
+        // واختلاف ارتفاع الصف بعد تطبيق --items-zoom عند 100%.
+        const overflowing = el.scrollHeight > el.clientHeight + 8;
         el.classList.toggle("is-overflowing", overflowing);
         // اجعل scrollIntoView يحترم ارتفاع الـ sticky header/footer
         // حتى لا تختفي الصفوف خلفهما عند التمرير التلقائي.
@@ -74,8 +75,9 @@ export const ItemsScroll = forwardRef<HTMLDivElement, ItemsScrollProps>(
         const tfoot = el.querySelector("tfoot") as HTMLElement | null;
         const headH = thead?.getBoundingClientRect().height || 0;
         const footH = tfoot?.getBoundingClientRect().height || 0;
-        el.style.scrollPaddingTop = `${Math.ceil(headH)}px`;
-        el.style.scrollPaddingBottom = `${Math.ceil(footH)}px`;
+        // نضيف 2px احتياطي حتى لا يلتصق الصف الجديد بحافة الهيدر تماماً.
+        el.style.scrollPaddingTop = `${Math.ceil(headH) + 2}px`;
+        el.style.scrollPaddingBottom = `${Math.ceil(footH) + 2}px`;
       };
 
       update();
@@ -86,6 +88,8 @@ export const ItemsScroll = forwardRef<HTMLDivElement, ItemsScrollProps>(
       if (ro) {
         ro.observe(el);
         Array.from(el.children).forEach((c) => ro.observe(c));
+        const tbody = el.querySelector("tbody");
+        if (tbody) ro.observe(tbody);
       }
 
       const mo = MOType
@@ -94,6 +98,8 @@ export const ItemsScroll = forwardRef<HTMLDivElement, ItemsScrollProps>(
               ro.disconnect();
               ro.observe(el);
               Array.from(el.children).forEach((c) => ro.observe(c));
+              const tbody = el.querySelector("tbody");
+              if (tbody) ro.observe(tbody);
             }
             requestAnimationFrame(update);
           })
