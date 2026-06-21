@@ -47,6 +47,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isPublicShare = location.pathname.startsWith("/share/");
   const isStaffPortal = location.pathname.startsWith("/staff");
 
+  const toggleSidebar = useCallback(() => {
+    if (isMobile) {
+      setMobileOpen((v) => !v);
+    } else {
+      setCollapsed((v) => !v);
+    }
+  }, [isMobile]);
+
+  const mainClass = useMemo(
+    () =>
+      `transition-all duration-300 pt-11 min-h-screen overflow-x-hidden max-w-full ${
+        isMobile ? "mr-0" : collapsed ? "mr-14" : "mr-44"
+      }`,
+    [isMobile, collapsed],
+  );
+
   // Don't show admin layout on auth pages, public share pages, or staff portal
   if (isAuthPage || isPublicShare || isStaffPortal) {
     return <>{children}</>;
@@ -67,21 +83,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  const toggleSidebar = useCallback(() => {
-    if (isMobile) {
-      setMobileOpen((v) => !v);
-    } else {
-      setCollapsed((v) => !v);
-    }
-  }, [isMobile]);
-
-  const mainClass = useMemo(
-    () =>
-      `transition-all duration-300 pt-11 min-h-screen overflow-x-hidden max-w-full ${
-        isMobile ? "mr-0" : collapsed ? "mr-14" : "mr-44"
-      }`,
-    [isMobile, collapsed],
-  );
 
   return (
     <div className="min-h-screen bg-background font-cairo">
