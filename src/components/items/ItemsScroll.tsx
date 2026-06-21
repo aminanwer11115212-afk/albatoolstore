@@ -29,13 +29,24 @@ const BASE_STYLE: CSSProperties = {
 // نضبط overflowY عبر JS مباشرةً (style prop)، فيعمل الـ toggle فعليًا.
 const STICKY_CSS = `
 .items-scroll { overflow-y: hidden; }
-.items-scroll thead { position: sticky; top: 0; z-index: 30; background: hsl(var(--background)); }
-.items-scroll thead tr { background: hsl(var(--background)); }
-.items-scroll thead th { position: sticky; top: 0; z-index: 30; background: hsl(var(--background)); }
+/* الخلفية على thead/tr لا تُطبع بثقة مع border-collapse — نضعها على th نفسه */
+.items-scroll thead { position: sticky; top: 0; z-index: 40; }
+.items-scroll thead tr { background: transparent; }
+.items-scroll thead th {
+  position: sticky; top: 0; z-index: 40;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 1px 0 hsl(var(--border));
+}
 .items-scroll tbody tr { position: relative; z-index: 0; }
 .items-scroll tfoot { position: sticky; bottom: 0; z-index: 20; background: hsl(var(--background)); }
 .items-scroll tfoot td, .items-scroll tfoot th { position: sticky; bottom: 0; z-index: 20; background: hsl(var(--background)); }
 .items-scroll.is-overflowing { overflow-y: auto !important; }
+/* scrollbar نحيف بصرياً دون تعطيل وظيفته (لا يأخذ مساحة كبيرة عند zoom 100%) */
+.items-scroll { scrollbar-width: thin; scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent; }
+.items-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.items-scroll::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.4); border-radius: 3px; }
+.items-scroll::-webkit-scrollbar-track { background: transparent; }
 `;
 
 interface ItemsScrollProps {
