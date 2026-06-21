@@ -1,23 +1,19 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { markNavStart, markNavEnd } from "@/lib/perfMonitor";
 
 /**
- * يتتبّع كل تغيير في المسار ويُسجّل المدة بين بداية الانتقال ونهايته
- * (نهاية الانتقال = بعد render الصفحة الجديدة).
+ * يتتبّع كل تغيير في المسار ويُسجّل المدة بين بداية الانتقال ونهايته.
+ * تم نقل كل التأثيرات الجانبية خارج جسم render (كانت تُنفَّذ مرتين في
+ * StrictMode وتُسبّب قياسات خاطئة وعملاً زائداً).
  */
 export default function NavigationPerfTracker() {
   const { pathname } = useLocation();
   const prevPath = useRef(pathname);
 
-  // قبل الـ commit: نُعلِم المراقب أن انتقالاً بدأ
-  if (prevPath.current !== pathname) {
-    markNavStart(pathname);
-  }
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (prevPath.current !== pathname) {
-      // بعد render: نسجّل المدة
+      markNavStart(pathname);
       requestAnimationFrame(() => markNavEnd(pathname));
       prevPath.current = pathname;
     }

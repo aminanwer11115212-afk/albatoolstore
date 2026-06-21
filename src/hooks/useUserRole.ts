@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
@@ -12,37 +12,45 @@ export interface StaffPermissions {
   view_products?: boolean;
 }
 
+/**
+ * Cached user role lookup. Was previously fetched on every component mount
+ * (>1700 DB calls per session) — now cached via React Query with a long
+ * staleTime since roles rarely change within a session.
+ */
 export function useUserRole() {
   const { user, loading: authLoading } = useAuth();
-  const [role, setRole] = useState<AppRole | null>(null);
-  const [permissions, setPermissions] = useState<StaffPermissions>({});
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) { setRole(null); setPermissions({}); setLoading(false); return; }
-    (async () => {
+  const { data, isLoading } = useQuery({
+    queryKey: ["user-role", user?.id],
+    enabled: !!user && !authLoading,
+    staleTime: 5 * 60 * 1000, // 5 دقائق — الأدوار نادراً ما تتغير في الجلسة
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    queryFn: async () => {
       const { data } = await supabase
         .from("user_roles")
         .select("role, permissions")
-        .eq("user_id", user.id)
+        .eq("user_id", user!.id)
         .order("role", { ascending: true })
         .limit(1)
         .maybeSingle();
-      if (data) {
-        setRole(data.role as AppRole);
-        setPermissions((data.permissions || {}) as StaffPermissions);
-      } else {
-        setRole(null);
-      }
-      setLoading(false);
-    })();
-  }, [user, authLoading]);
+      return data
+        ? {
+            role: data.role as AppRole,
+            permissions: (data.permissions || {}) as StaffPermissions,
+          }
+        : { role: null as AppRole | null, permissions: {} as StaffPermissions };
+    },
+  });
+
+  const role = data?.role ?? null;
+  const permissions = data?.permissions ?? {};
 
   return {
     role,
     permissions,
-    loading: loading || authLoading,
+    loading: (isLoading && !!user) || authLoading,
     isAdmin: role === "admin",
     isStaff: role === "sales" || role === "viewer",
   };

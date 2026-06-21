@@ -41,8 +41,9 @@ function useTable<T extends keyof Tables<any>>(table: string) {
     onError: (_err, _vars, context: any) => {
       if (context?.previous) queryClient.setQueryData([table], context.previous);
     },
+    // Optimistic insert يضمن دقة الكاش — لا داعي لإعادة جلب فوري بعد كل إدراج.
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [table] });
+      queryClient.invalidateQueries({ queryKey: [table], refetchType: "none" });
       if (table === "products") {
         window.dispatchEvent(new Event("products:changed"));
       } else if (table === "customers") {
@@ -147,8 +148,9 @@ function useTable<T extends keyof Tables<any>>(table: string) {
     onError: (_err, _vars, context: any) => {
       if (context?.previous) queryClient.setQueryData([table], context.previous);
     },
+    // Optimistic remove يضمن دقة الكاش — نُعلِّم الاستعلام stale فقط.
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [table] });
+      queryClient.invalidateQueries({ queryKey: [table], refetchType: "none" });
       if (table === "products") {
         window.dispatchEvent(new Event("products:changed"));
       } else if (table === "customers") {
@@ -268,9 +270,9 @@ export function useTransactionsWithAccounts() {
 export function useProductsWithDetails() {
   return useQuery({
     queryKey: ["products-with-details"],
-    staleTime: 5_000,
+    staleTime: 60_000,
     gcTime: 5 * 60_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       // نجلب كل المنتجات مقسّمة دفعات (تجاوز حدّ Supabase الافتراضي 1000 صف).
       const productsData = await fetchAllProducts<any>(
@@ -395,6 +397,10 @@ export function useDashboardStats() {
 export function useLowStockProducts() {
   return useQuery({
     queryKey: ["low-stock-products"],
+    // المخزون لا يتغيّر لحظياً — staleTime يقلّل إعادة الجلب عند تنقّل الصفحات.
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")

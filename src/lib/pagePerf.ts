@@ -109,13 +109,33 @@ export function initPagePerf() {
   }
 }
 
-/** يُستدعى من كل re-render في الصفحة لزيادة العدّاد. */
+/**
+ * يُستدعى من كل re-render في الصفحة لزيادة العدّاد.
+ * تحسين الأداء: العدّاد يُحفظ في الذاكرة فقط ويُكتب إلى localStorage
+ * عبر مؤقت debounced (مرة كل ثانية) لتفادي JSON.parse+stringify على
+ * كل render — كان يُسبّب طول-tasks على الصفحات المعقّدة.
+ */
+const _pendingRenders: Record<string, number> = {};
+let _flushTimer: number | undefined;
+function _scheduleFlush() {
+  if (_flushTimer != null || typeof window === "undefined") return;
+  _flushTimer = window.setTimeout(() => {
+    _flushTimer = undefined;
+    const keys = Object.keys(_pendingRenders);
+    if (!keys.length) return;
+    const m = readStats();
+    for (const path of keys) {
+      const s = ensure(path, m);
+      s.renders += _pendingRenders[path];
+      s.lastSeen = Date.now();
+      delete _pendingRenders[path];
+    }
+    writeStats(m);
+  }, 1000);
+}
 export function bumpPageRender(path: string) {
-  const m = readStats();
-  const s = ensure(path, m);
-  s.renders += 1;
-  s.lastSeen = Date.now();
-  writeStats(m);
+  _pendingRenders[path] = (_pendingRenders[path] || 0) + 1;
+  _scheduleFlush();
 }
 
 export function getPageStats(): PageStats[] {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,13 +67,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  const toggleSidebar = () => {
+  const toggleSidebar = useCallback(() => {
     if (isMobile) {
-      setMobileOpen(!mobileOpen);
+      setMobileOpen((v) => !v);
     } else {
-      setCollapsed(!collapsed);
+      setCollapsed((v) => !v);
     }
-  };
+  }, [isMobile]);
+
+  const mainClass = useMemo(
+    () =>
+      `transition-all duration-300 pt-11 min-h-screen overflow-x-hidden max-w-full ${
+        isMobile ? "mr-0" : collapsed ? "mr-14" : "mr-44"
+      }`,
+    [isMobile, collapsed],
+  );
 
   return (
     <div className="min-h-screen bg-background font-cairo">
@@ -91,11 +99,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       />
       <FloatingSideTools />
       <CloudUsageWatcher />
-      <main
-        className={`transition-all duration-300 pt-11 min-h-screen overflow-x-hidden max-w-full ${
-          isMobile ? "mr-0" : collapsed ? "mr-14" : "mr-44"
-        }`}
-      >
+      <main className={mainClass}>
         <div className="px-2 md:px-6 pb-4 pt-1 max-w-full overflow-x-hidden">{children}</div>
       </main>
     </div>
