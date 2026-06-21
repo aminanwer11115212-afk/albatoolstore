@@ -152,14 +152,16 @@ export default function InvoicesPage() {
 
   // حالة الدفع المحسوبة من المبلغ المدفوع والإجمالي
   // هامش تسامح 0.01 لمنع أخطاء التقريب (مثلاً 99.999 vs 100)
+  // ملاحظة: pure function بلا اعتماد على state — مُثبَّتة بـ useCallback
+  // لتفادي تعطيل الـ useMemos التي تستخدمها.
   const PAY_EPS = 0.01;
-  const getPaymentStatus = (inv: any): "unpaid" | "partial" | "paid" => {
+  const getPaymentStatus = useCallback((inv: any): "unpaid" | "partial" | "paid" => {
     const total = Number(inv.total || 0);
     const paid = Number(inv.paid_amount || 0);
     if (paid <= PAY_EPS) return "unpaid";
     if (total > 0 && paid >= total - PAY_EPS) return "paid";
     return "partial";
-  };
+  }, []);
 
   const PAYMENT_META: Record<string, { label: string; cls: string; chipCls: string }> = {
     unpaid:  { label: "غير مدفوع", cls: "bg-red-100 text-red-700 border-red-200",       chipCls: "bg-red-50 text-red-700 border-red-200" },
@@ -182,7 +184,7 @@ export default function InvoicesPage() {
     }
     if (!search) return true;
     return startsWithAny([inv.invoice_number, inv.customers?.name], search);
-  }), [invoices, workflowFilter, paymentFilter, customerSearch, dateFrom, dateTo, minAmount, search]);
+  }), [invoices, workflowFilter, paymentFilter, customerSearch, dateFrom, dateTo, minAmount, search, getPaymentStatus]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const start = (page - 1) * perPage;
   const paginated = useMemo(() => filtered.slice(start, start + perPage), [filtered, start, perPage]);
@@ -199,7 +201,7 @@ export default function InvoicesPage() {
     const k = getPaymentStatus(inv);
     acc[k] = (acc[k] || 0) + 1;
     return acc;
-  }, {}), [invoices]);
+  }, {}), [invoices, getPaymentStatus]);
 
   // Format date as dd-mm-yyyy (like old system)
   const fmtDate = (d?: string) => {
