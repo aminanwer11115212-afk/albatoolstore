@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { notifyDuplicateItem } from "@/utils/duplicateItemToast";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -686,7 +687,7 @@ export default function InvoiceCreatePage() {
   function pickProductIntoRow(rowUid: string, p: Product) {
     const exists = rows.some((r) => r.product_id === p.id && r.uid !== rowUid);
     if (exists) {
-      toast.error(`الصنف "${p.name}" مُضاف مسبقاً`);
+      notifyDuplicateItem(p.name);
       setRows((prev) => prev.map((r) => (r.uid === rowUid ? { ...r, productSearch: "", showSuggestions: false } : r)));
       focusRowSearch(rowUid);
       return;
@@ -713,7 +714,7 @@ export default function InvoiceCreatePage() {
   function pickProductIntoQuick(p: Product) {
     const exists = rows.some((r) => r.product_id === p.id);
     if (exists) {
-      toast.error(`الصنف "${p.name}" مُضاف مسبقاً`);
+      notifyDuplicateItem(p.name);
       setQuickRow((r) => ({ ...r, productSearch: "", showSuggestions: false }));
       setTimeout(() => quickProductRef.current?.focus(), 50);
       return;
@@ -2575,7 +2576,7 @@ export default function InvoiceCreatePage() {
         onCreated={(p: any) => {
           const exists = rows.some((r) => r.product_id === p.id);
           if (exists) {
-            toast.error(`الصنف "${p.name}" مُضاف مسبقاً`);
+            notifyDuplicateItem(p.name);
             return;
           }
           const fp = Number(p.foreign_price) || Number(p.sale_price) || 0;

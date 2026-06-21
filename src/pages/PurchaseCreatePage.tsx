@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { notifyDuplicateItem } from "@/utils/duplicateItemToast";
 import { useNavigate, useParams } from "react-router-dom";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { Plus, Image as ImageIcon, StickyNote, Printer, Save, ArrowRight } from "lucide-react";
@@ -401,7 +402,7 @@ export default function PurchaseCreatePage() {
   function pickProductIntoRow(rowUid: string, p: any) {
     const exists = rows.some((r) => r.product_id === p.id && r.uid !== rowUid);
     if (exists) {
-      toast.error(`الصنف "${p.name}" مُضاف مسبقاً`);
+      notifyDuplicateItem(p.name);
       setRows((prev) => prev.map((r) => (r.uid === rowUid ? { ...r, productSearch: "", showSuggestions: false } : r)));
       focusRowSearch(rowUid);
       return;
@@ -430,7 +431,7 @@ export default function PurchaseCreatePage() {
   function pickProductIntoQuick(p: any) {
     const exists = rows.some((r) => r.product_id === p.id);
     if (exists) {
-      toast.error(`الصنف "${p.name}" مُضاف مسبقاً`);
+      notifyDuplicateItem(p.name);
       setQuickRow((r) => ({ ...r, productSearch: "", showSuggestions: false }));
       setTimeout(() => quickProductRef.current?.focus(), 50);
       return;
@@ -1371,7 +1372,7 @@ export default function PurchaseCreatePage() {
         onCreated={(p: any) => {
           const exists = rows.some((r) => r.product_id === p.id);
           if (exists) {
-            toast.error(`الصنف "${p.name}" مُضاف مسبقاً`);
+            notifyDuplicateItem(p.name);
             return;
           }
           const fp = Number(p.foreign_price || 0);

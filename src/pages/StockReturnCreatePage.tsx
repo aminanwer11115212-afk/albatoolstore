@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { notifyDuplicateItem } from "@/utils/duplicateItemToast";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
@@ -524,7 +525,7 @@ export default function StockReturnCreatePage() {
     const checkId = p.id;
     const exists = rows.some((r) => r.product_id === checkId && r.uid !== rowUid);
     if (exists) {
-      toast.error(`الصنف "${p.name}" مُضاف مسبقاً`);
+      notifyDuplicateItem(p.name);
       setRows((prev) => prev.map((r) => (r.uid === rowUid ? { ...r, productSearch: "", showSuggestions: false } : r)));
       focusRowSearch(rowUid);
       return;
@@ -556,7 +557,7 @@ export default function StockReturnCreatePage() {
   function pickProductIntoQuick(p: Product) {
     const exists = rows.some((r) => r.product_id === p.id);
     if (exists) {
-      toast.error(`الصنف "${p.name}" مُضاف مسبقاً`);
+      notifyDuplicateItem(p.name);
       setQuickRow((r) => ({ ...r, productSearch: "", showSuggestions: false }));
       setTimeout(() => quickProductRef.current?.focus(), 50);
       return;
