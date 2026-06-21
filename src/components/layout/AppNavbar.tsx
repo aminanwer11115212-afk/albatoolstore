@@ -250,12 +250,16 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
   }, [readIds]);
 
   const loadStock = useCallback(async () => {
-    // نفس منطق DashboardStockAlert: stock_quantity ≤ min_stock
+    // كان يجلب 5000 منتج ويفلتر في الواجهة. الآن نطلب فقط الصفوف التي
+    // فيها min_stock>0 ومرتّبة بالكمية الأقل، ثم نفلتر <= min_stock محلياً
+    // (Supabase لا يدعم المقارنة بين عمودين في filter). limit صغير يكفي
+    // لجرس التنبيهات.
     const { data } = await supabase
       .from("products")
       .select("id, name, stock_quantity, min_stock, updated_at")
+      .gt("min_stock", 0)
       .order("stock_quantity", { ascending: true })
-      .limit(5000);
+      .limit(200);
 
     const items: NotificationItem[] = (data || [])
       .filter((p: any) => (p.stock_quantity ?? 0) <= (p.min_stock ?? 0))
