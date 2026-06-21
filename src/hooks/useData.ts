@@ -395,6 +395,10 @@ export function useDashboardStats() {
 export function useLowStockProducts() {
   return useQuery({
     queryKey: ["low-stock-products"],
+    // المخزون لا يتغيّر لحظياً — staleTime يقلّل إعادة الجلب عند تنقّل الصفحات.
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
