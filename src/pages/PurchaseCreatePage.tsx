@@ -1001,7 +1001,7 @@ export default function PurchaseCreatePage() {
                     <col key={i} style={w != null ? { width: w } : (colMinWidths[i] != null ? { minWidth: colMinWidths[i]! } : undefined)} />
                   ))}
                 </colgroup>
-                <thead style={{ position: "sticky", top: 0, zIndex: 5, background: "hsl(var(--primary))" }}>
+                <thead>
                   <tr className="item_header">
                     <th style={{ position: "relative" }}>
                       <input type="checkbox" checked={rows.length > 0 && rows.every((r) => r.selected)} onChange={(e) => toggleSelectAll(e.target.checked)} />

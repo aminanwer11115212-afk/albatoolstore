@@ -1493,7 +1493,7 @@ export default function QuoteCreatePage() {
                   <col key={i} style={w != null ? { width: w } : (colMinWidths[i] != null ? { minWidth: colMinWidths[i]! } : undefined)} />
                 ))}
               </colgroup>
-              <thead style={{ position: "sticky", top: 0, zIndex: 5, background: "#2563eb", color: "#ffffff" }}>
+              <thead>
                 <tr className="item_header">
                   <th style={{ position: "relative" }}>
                     <input
