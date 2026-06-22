@@ -419,8 +419,20 @@ export default function InvoicesPage() {
                 return (
                   <tr key={inv.id} className={rowCls}>
                     <td>{start + idx + 1}</td>
-                    <td>{inv.invoice_number}</td>
-                    <td>{inv.customers?.name || "كاش"}</td>
+                    <td>
+                      <span className="inline-flex items-center gap-1">
+                        {inv.invoice_number}
+                        {(inv.source || "regular") === "pos" && (
+                          <span
+                            className="inline-block px-1.5 py-0 rounded text-[9px] font-bold bg-primary/15 text-primary border border-primary/30"
+                            title="مبيعات كاش (نقطة بيع)"
+                          >
+                            POS
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td>{inv.customers?.name || inv.walk_in_customer_name || "كاش"}</td>
                     <td>{fmtDate(inv.date)}</td>
                     <td>{fmtMoney(inv.total)} {inv.currency_code || currency}</td>
                     <td>
@@ -536,7 +548,7 @@ export default function InvoicesPage() {
                   key={inv.id}
                   index={start + idx + 1}
                   number={inv.invoice_number}
-                  party={inv.customers?.name || "كاش"}
+                  party={inv.customers?.name || inv.walk_in_customer_name || "كاش"}
                   date={fmtDate(inv.date)}
                   amount={`${fmtMoney(inv.total)} ${inv.currency_code || currency}`}
                   status={
