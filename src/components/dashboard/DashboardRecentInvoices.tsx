@@ -186,8 +186,8 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
                       }`}
                     >
                       <td className={`${cellBase} font-medium`}>{inv.invoice_number}</td>
-                      <td className={cellBase} title={inv.customers?.name || ""}>
-                        {inv.customers?.name || "-"}
+                      <td className={cellBase} title={inv.customers?.name || inv.walk_in_customer_name || ""}>
+                        {inv.customers?.name || inv.walk_in_customer_name || "-"}
                       </td>
                       <td className="px-1.5 py-1 whitespace-nowrap overflow-hidden text-ellipsis">
                         <span
