@@ -37,6 +37,7 @@ export default function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [workflowFilter, setWorkflowFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "regular" | "pos">("all");
   const { data: invoices, isLoading, refetch } = useInvoicesWithCustomers();
   const { remove } = useInvoices();
   const { data: companyArr } = useCompanySettings();
@@ -173,8 +174,10 @@ export default function InvoicesPage() {
   const filtered = useMemo(() => (invoices || []).filter((inv: any) => {
     if (workflowFilter !== "all" && (inv.workflow_status || "new") !== workflowFilter) return false;
     if (paymentFilter !== "all" && getPaymentStatus(inv) !== paymentFilter) return false;
+    if (sourceFilter !== "all" && (inv.source || "regular") !== sourceFilter) return false;
     if (customerSearch.trim()) {
-      if (!startsWithMatch(inv.customers?.name, customerSearch)) return false;
+      const partyName = inv.customers?.name || inv.walk_in_customer_name || "";
+      if (!startsWithMatch(partyName, customerSearch)) return false;
     }
     if (dateFrom && (inv.date || "") < dateFrom) return false;
     if (dateTo && (inv.date || "") > dateTo) return false;
@@ -183,8 +186,8 @@ export default function InvoicesPage() {
       if (Number(inv.total || 0) < min) return false;
     }
     if (!search) return true;
-    return startsWithAny([inv.invoice_number, inv.customers?.name], search);
-  }), [invoices, workflowFilter, paymentFilter, customerSearch, dateFrom, dateTo, minAmount, search, getPaymentStatus]);
+    return startsWithAny([inv.invoice_number, inv.customers?.name, inv.walk_in_customer_name], search);
+  }), [invoices, workflowFilter, paymentFilter, sourceFilter, customerSearch, dateFrom, dateTo, minAmount, search, getPaymentStatus]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const start = (page - 1) * perPage;
   const paginated = useMemo(() => filtered.slice(start, start + perPage), [filtered, start, perPage]);
