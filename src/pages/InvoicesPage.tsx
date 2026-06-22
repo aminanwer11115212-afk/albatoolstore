@@ -306,6 +306,32 @@ export default function InvoicesPage() {
             ))}
           </div>
 
+          {/* Source filter chips (POS vs regular) */}
+          <div className="flex flex-wrap gap-2 mb-3" dir="rtl">
+            <span className="text-xs text-muted-foreground self-center ml-1">النوع:</span>
+            {(["all", "regular", "pos"] as const).map((k) => {
+              const label = k === "all" ? "الكل" : k === "regular" ? "فواتير حسابات" : "🛒 مبيعات كاش";
+              const count =
+                k === "all"
+                  ? (invoices || []).length
+                  : (invoices || []).filter((i: any) => (i.source || "regular") === k).length;
+              const activeCls =
+                k === "pos"
+                  ? "bg-primary/15 text-primary border-primary/40"
+                  : "bg-primary text-primary-foreground border-primary";
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => { setSourceFilter(k); setPage(1); }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition ${sourceFilter === k ? activeCls : "bg-background border-border hover:bg-muted"}`}
+                >
+                  {label} ({count})
+                </button>
+              );
+            })}
+          </div>
+
           {/* Mobile toolbar */}
           <div className="mobile-toolbar">
             <input
