@@ -37,6 +37,7 @@ export default function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [workflowFilter, setWorkflowFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "regular" | "pos">("all");
   const { data: invoices, isLoading, refetch } = useInvoicesWithCustomers();
   const { remove } = useInvoices();
   const { data: companyArr } = useCompanySettings();
@@ -173,8 +174,10 @@ export default function InvoicesPage() {
   const filtered = useMemo(() => (invoices || []).filter((inv: any) => {
     if (workflowFilter !== "all" && (inv.workflow_status || "new") !== workflowFilter) return false;
     if (paymentFilter !== "all" && getPaymentStatus(inv) !== paymentFilter) return false;
+    if (sourceFilter !== "all" && (inv.source || "regular") !== sourceFilter) return false;
     if (customerSearch.trim()) {
-      if (!startsWithMatch(inv.customers?.name, customerSearch)) return false;
+      const partyName = inv.customers?.name || inv.walk_in_customer_name || "";
+      if (!startsWithMatch(partyName, customerSearch)) return false;
     }
     if (dateFrom && (inv.date || "") < dateFrom) return false;
     if (dateTo && (inv.date || "") > dateTo) return false;
@@ -183,8 +186,8 @@ export default function InvoicesPage() {
       if (Number(inv.total || 0) < min) return false;
     }
     if (!search) return true;
-    return startsWithAny([inv.invoice_number, inv.customers?.name], search);
-  }), [invoices, workflowFilter, paymentFilter, customerSearch, dateFrom, dateTo, minAmount, search, getPaymentStatus]);
+    return startsWithAny([inv.invoice_number, inv.customers?.name, inv.walk_in_customer_name], search);
+  }), [invoices, workflowFilter, paymentFilter, sourceFilter, customerSearch, dateFrom, dateTo, minAmount, search, getPaymentStatus]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const start = (page - 1) * perPage;
   const paginated = useMemo(() => filtered.slice(start, start + perPage), [filtered, start, perPage]);
@@ -303,6 +306,32 @@ export default function InvoicesPage() {
             ))}
           </div>
 
+          {/* Source filter chips (POS vs regular) */}
+          <div className="flex flex-wrap gap-2 mb-3" dir="rtl">
+            <span className="text-xs text-muted-foreground self-center ml-1">النوع:</span>
+            {(["all", "regular", "pos"] as const).map((k) => {
+              const label = k === "all" ? "الكل" : k === "regular" ? "فواتير حسابات" : "🛒 مبيعات كاش";
+              const count =
+                k === "all"
+                  ? (invoices || []).length
+                  : (invoices || []).filter((i: any) => (i.source || "regular") === k).length;
+              const activeCls =
+                k === "pos"
+                  ? "bg-primary/15 text-primary border-primary/40"
+                  : "bg-primary text-primary-foreground border-primary";
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => { setSourceFilter(k); setPage(1); }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition ${sourceFilter === k ? activeCls : "bg-background border-border hover:bg-muted"}`}
+                >
+                  {label} ({count})
+                </button>
+              );
+            })}
+          </div>
+
           {/* Mobile toolbar */}
           <div className="mobile-toolbar">
             <input
@@ -390,8 +419,20 @@ export default function InvoicesPage() {
                 return (
                   <tr key={inv.id} className={rowCls}>
                     <td>{start + idx + 1}</td>
-                    <td>{inv.invoice_number}</td>
-                    <td>{inv.customers?.name || "كاش"}</td>
+                    <td>
+                      <span className="inline-flex items-center gap-1">
+                        {inv.invoice_number}
+                        {(inv.source || "regular") === "pos" && (
+                          <span
+                            className="inline-block px-1.5 py-0 rounded text-[9px] font-bold bg-primary/15 text-primary border border-primary/30"
+                            title="مبيعات كاش (نقطة بيع)"
+                          >
+                            POS
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td>{inv.customers?.name || inv.walk_in_customer_name || "كاش"}</td>
                     <td>{fmtDate(inv.date)}</td>
                     <td>{fmtMoney(inv.total)} {inv.currency_code || currency}</td>
                     <td>
@@ -507,7 +548,7 @@ export default function InvoicesPage() {
                   key={inv.id}
                   index={start + idx + 1}
                   number={inv.invoice_number}
-                  party={inv.customers?.name || "كاش"}
+                  party={inv.customers?.name || inv.walk_in_customer_name || "كاش"}
                   date={fmtDate(inv.date)}
                   amount={`${fmtMoney(inv.total)} ${inv.currency_code || currency}`}
                   status={

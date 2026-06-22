@@ -1130,6 +1130,7 @@ export type Database = {
           paid_amount: number | null
           payment_method: string | null
           shipping: number | null
+          source: string
           status: string | null
           stock_deducted_at: string | null
           stock_deduction_id: string | null
@@ -1139,6 +1140,7 @@ export type Database = {
           type: string | null
           updated_at: string
           user_note: string | null
+          walk_in_customer_name: string | null
           warehouse_id: string | null
           workflow_status: string | null
         }
@@ -1161,6 +1163,7 @@ export type Database = {
           paid_amount?: number | null
           payment_method?: string | null
           shipping?: number | null
+          source?: string
           status?: string | null
           stock_deducted_at?: string | null
           stock_deduction_id?: string | null
@@ -1170,6 +1173,7 @@ export type Database = {
           type?: string | null
           updated_at?: string
           user_note?: string | null
+          walk_in_customer_name?: string | null
           warehouse_id?: string | null
           workflow_status?: string | null
         }
@@ -1192,6 +1196,7 @@ export type Database = {
           paid_amount?: number | null
           payment_method?: string | null
           shipping?: number | null
+          source?: string
           status?: string | null
           stock_deducted_at?: string | null
           stock_deduction_id?: string | null
@@ -1201,6 +1206,7 @@ export type Database = {
           type?: string | null
           updated_at?: string
           user_note?: string | null
+          walk_in_customer_name?: string | null
           warehouse_id?: string | null
           workflow_status?: string | null
         }
