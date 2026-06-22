@@ -2042,8 +2042,8 @@ export default function InvoiceCreatePage() {
                   id: "edit-save",
                   group: "1-primary",
                   node: (
-                    <button onClick={() => saveInvoice()} title="حفظ التعديلات" style={btnStyle("#f97316")}>
-                      <Edit size={14} /> تعديل
+                    <button onClick={() => saveInvoice({ andNew: true })} disabled={saving} title="حفظ التعديلات وفتح فاتورة جديدة" style={btnStyle("#f97316")}>
+                      <Plus size={14} /> حفظ وجديد
                     </button>
                   ),
                 }] : []),
