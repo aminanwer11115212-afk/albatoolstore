@@ -127,12 +127,16 @@ export default function DocumentPreviewPage({ docType }: Props) {
             number: invoice.invoice_number,
             date: invoice.date,
             dueDate: invoice.due_date,
-            customer: invoice.customers ? {
-              name: (invoice.customers as any).name,
-              phone: (invoice.customers as any).phone,
-              address: (invoice.customers as any).address,
-              email: (invoice.customers as any).email,
-            } : null,
+            customer: invoice.customers
+              ? {
+                  name: (invoice.customers as any).name,
+                  phone: (invoice.customers as any).phone,
+                  address: (invoice.customers as any).address,
+                  email: (invoice.customers as any).email,
+                }
+              : (invoice as any).walk_in_customer_name
+                ? { name: (invoice as any).walk_in_customer_name }
+                : null,
             items: sortItems(printItems),
             subtotal: Number(invoice.subtotal || 0),
             taxTotal: Number((invoice as any).tax_amount || 0),
