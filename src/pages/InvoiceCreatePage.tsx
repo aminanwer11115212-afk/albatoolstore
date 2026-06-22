@@ -2042,8 +2042,8 @@ export default function InvoiceCreatePage() {
                   id: "edit-save",
                   group: "1-primary",
                   node: (
-                    <button onClick={() => saveInvoice()} title="حفظ التعديلات" style={btnStyle("#f97316")}>
-                      <Edit size={14} /> تعديل
+                    <button onClick={() => saveInvoice({ andNew: true })} disabled={saving} title="حفظ التعديلات وفتح فاتورة جديدة" style={btnStyle("#f97316")}>
+                      <Plus size={14} /> حفظ وجديد
                     </button>
                   ),
                 }] : []),
@@ -2237,15 +2237,6 @@ export default function InvoiceCreatePage() {
                   ),
                 },
                 // Financial invoice status button removed — invoices now use workflow_status only.
-                ...(!editId ? [{
-                  id: "new",
-                  group: "4-meta",
-                  node: (
-                    <button onClick={() => saveInvoice({ andNew: true })} disabled={saving} title="حفظ وفتح فاتورة جديدة" style={btnStyle("#22c55e")}>
-                      <Plus size={14} /> جديد
-                    </button>
-                  ),
-                }] : []),
                 {
                   id: "clear",
                   group: "4-meta",
