@@ -155,7 +155,7 @@ export default function StockReturnViewPage() {
             </div>
           </div>
           <div className="text-left">
-            {company?.logo_url && <img src={company.logo_url} alt="Logo" className="h-16 mb-2" />}
+            <img src={resolveLogoUrl(company?.logo_url)} alt="Logo" className="h-16 mb-2" />
             <div className="text-sm text-muted-foreground mt-4">
               <p className="font-medium text-foreground">مرتجع من</p>
               <p className="text-primary font-semibold text-base">{ret.customers?.name || "عميل"}</p>

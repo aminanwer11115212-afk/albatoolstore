@@ -173,7 +173,8 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
     // جلب بيانات الشركة
     const { data: companyArr } = await supabase.from("company_settings").select("*").limit(1);
     const company: any = companyArr?.[0] || {};
-    const logoURL = company.logo_url || "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png";
+    const { resolveLogoUrl } = await import("@/utils/albatoolLogo");
+    const logoURL = resolveLogoUrl(company.logo_url);
     
     // جلب البنود
     const { data: items } = await supabase.from("invoice_items").select("*, products(name)").eq("invoice_id", invoiceId);

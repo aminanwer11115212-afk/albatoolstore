@@ -62,8 +62,7 @@ export interface StatementData {
   notes?: string;
 }
 
-const LOGO_FALLBACK =
-  "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 function fmt(n: number | undefined | null): string {
   return Number(n || 0).toLocaleString();
@@ -77,7 +76,7 @@ export function generateStatementHTML(data: StatementData): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
   const { kind, party, company, fromDate, toDate, invoices = [], orders = [], transactions = [], totals, notes } = data;
-  const logoURL = company?.logo_url || LOGO_FALLBACK;
+  const logoURL = resolveLogoUrl(company?.logo_url);
   const title = kind === "customer" ? "كشف حساب عميل" : "كشف حساب مورد";
   const partyLabel = kind === "customer" ? "العميل" : "المورد";
 

@@ -12,8 +12,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-const LOGO_FALLBACK =
-  "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 const ACCENT = "#16a34a";
 
@@ -299,7 +298,7 @@ function renderCard(doc: DispatchDoc, idx: number): string {
 }
 
 function headerHTML(company: any): string {
-  const logo = company?.logo_url || LOGO_FALLBACK;
+  const logo = resolveLogoUrl(company?.logo_url);
   const name =
     company?.company_name || "اولاد جابر لاسبيرات المواتر والتكاتك";
   const address = company?.address || "";
