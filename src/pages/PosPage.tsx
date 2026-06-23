@@ -385,7 +385,7 @@ export default function PosPage() {
         <CardContent className="p-0">
           <div className="overflow-auto">
             <table className="w-full text-sm">
-              <thead className="bg-muted/50 sticky top-0">
+              <thead className="bg-warning text-warning-foreground sticky top-0">
                 <tr className="text-xs">
                   <th className="text-right px-2 py-2 w-10">#</th>
                   <th className="text-right px-2 py-2">المنتج</th>
