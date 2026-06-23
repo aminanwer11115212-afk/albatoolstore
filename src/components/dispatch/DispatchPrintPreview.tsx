@@ -17,16 +17,19 @@ import {
   loadDispatchDoc,
   buildDispatchSheetHTML,
   type DispatchDoc,
+  type LiveOverlayEntry,
 } from "@/utils/dispatchReportPrint";
 
 type Props = {
   selectedIds: Set<string>;
   company: any;
+  /** Optional overlay of unsaved row choices (per invoice id) */
+  liveOverlay?: Record<string, LiveOverlayEntry>;
 };
 
 const EMPTY_IDS: string[] = [];
 
-export default function DispatchPrintPreview({ selectedIds, company }: Props) {
+export default function DispatchPrintPreview({ selectedIds, company, liveOverlay }: Props) {
   const ids = useMemo(() => {
     const arr = Array.from(selectedIds);
     return arr.length ? arr : EMPTY_IDS;
@@ -43,8 +46,8 @@ export default function DispatchPrintPreview({ selectedIds, company }: Props) {
 
   const html = useMemo(() => {
     if (!docs || docs.length === 0) return "";
-    return buildDispatchSheetHTML(docs, company);
-  }, [docs, company]);
+    return buildDispatchSheetHTML(docs, company, liveOverlay);
+  }, [docs, company, liveOverlay]);
 
   const handlePrint = () => {
     if (!html) return;

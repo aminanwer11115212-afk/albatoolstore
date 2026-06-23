@@ -4,16 +4,21 @@
  * - الجدول الرئيسي (يمين): الفواتير الجاهزة للرفع، حسب الكل/الترحيلات/الزبون.
  * - لوحة المعاينة (يسار): معاينة طباعة A4 للفواتير المختارة، مع تنقّل بين الصفحات.
  * - الموبايل: المعاينة في Sheet ينفتح بزر عائم.
+ *
+ * يربط `rowChoice` (اختيار الناقل/الوجهة لكل صف قبل الضغط على «تثبيت»)
+ * بين اللوحة اليمنى ومعاينة الطباعة على اليسار، بحيث يظهر الاختيار
+ * فورًا في كشف المعاينة (مع وسم «معاينة — لم يُثبَّت بعد»).
  */
 
-import { useState } from "react";
-import { useCompanySettings } from "@/hooks/useData";
+import { useState, useMemo } from "react";
+import { useCompanySettings, useTransporters, useDestinations } from "@/hooks/useData";
 import ReadyToShipPanel from "@/components/dispatch/ReadyToShipPanel";
 import DispatchPrintPreview from "@/components/dispatch/DispatchPrintPreview";
 import DispatchEntitiesBar from "@/components/dispatch/DispatchEntitiesBar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Eye } from "lucide-react";
 import { buildDispatchSheetForInvoiceIds } from "@/utils/dispatchReportPrint";
+import type { LiveOverlayEntry } from "@/utils/dispatchReportPrint";
 
 // Build the unified dispatch sheet HTML for the selected invoices.
 // Shared identical template with the left-side preview pane.
@@ -24,7 +29,29 @@ async function buildDispatchReportHTML(invoices: any[], company: any) {
 
 export default function DispatchPage() {
   const { data: company } = useCompanySettings();
+  const { data: allTransporters } = useTransporters();
+  const { data: allDestinations } = useDestinations();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [rowChoice, setRowChoice] = useState<Record<string, { transporterId?: string; destinationId?: string }>>({});
+
+  // Build the live overlay map: invoice_id → { transporterName, destinationName }
+  // so the preview can render the chosen-but-not-yet-pinned transport.
+  const liveOverlay = useMemo(() => {
+    const transporters = (allTransporters as any[]) || [];
+    const destinations = (allDestinations as any[]) || [];
+    const out: Record<string, LiveOverlayEntry> = {};
+    for (const [invId, c] of Object.entries(rowChoice)) {
+      const t = c.transporterId ? transporters.find((x) => x.id === c.transporterId) : null;
+      const d = c.destinationId ? destinations.find((x) => x.id === c.destinationId) : null;
+      if (!t && !d) continue;
+      out[invId] = {
+        transporterName: t?.name,
+        transporterPhone: t?.phone,
+        destinationName: d?.name,
+      };
+    }
+    return out;
+  }, [rowChoice, allTransporters, allDestinations]);
 
   return (
     <article className="dispatch-page" dir="rtl">
@@ -35,9 +62,6 @@ export default function DispatchPage() {
           grid-template-columns: 1fr;
         }
         .dispatch-page .dp-preview { display: none; }
-        /* عند الشاشات الضيقة: معاينة طباعة مصغّرة على الشمال
-           حتى يحصل جدول الترحيلات على مساحة أكبر، مع السماح بـ
-           horizontal scroll داخل dp-main إن لم تكفِ مساحة الأعمدة. */
         @media (min-width: 860px) {
           .dispatch-page .dp-grid { grid-template-columns: 1fr 220px; align-items: start; }
           .dispatch-page .dp-preview { position: sticky; top: 10px; height: calc(100vh - 20px); max-height: calc(100vh - 20px); overflow: hidden; display:flex; }
@@ -55,7 +79,6 @@ export default function DispatchPage() {
         .dispatch-page .dp-main { min-width: 0; overflow-x: auto; }
         .dispatch-page .dp-main > * { height: 100%; min-height: 500px; }
 
-        /* Mobile floating trigger */
         .dispatch-page .dp-mobile-trigger {
           position: fixed; bottom: 16px; right: 16px; z-index: 50;
           background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
@@ -72,26 +95,26 @@ export default function DispatchPage() {
       <DispatchEntitiesBar />
 
       <div className="dp-grid">
-        {/* Main: ready-to-ship list (visually on the RIGHT in RTL) */}
         <div className="dp-main">
           <ReadyToShipPanel
             buildPrintHTML={buildDispatchReportHTML}
             company={company}
             checked={selectedIds}
             onCheckedChange={setSelectedIds}
+            rowChoice={rowChoice}
+            onRowChoiceChange={setRowChoice}
           />
         </div>
 
-        {/* Preview pane (visually on the LEFT in RTL) — desktop only */}
         <aside className="dp-preview">
           <DispatchPrintPreview
             selectedIds={selectedIds}
             company={company}
+            liveOverlay={liveOverlay}
           />
         </aside>
       </div>
 
-      {/* Mobile floating trigger + sheet */}
       <Sheet>
         <SheetTrigger asChild>
           <button className="dp-mobile-trigger" type="button">
@@ -101,7 +124,7 @@ export default function DispatchPage() {
         </SheetTrigger>
         <SheetContent side="left" className="w-[95vw] sm:w-[600px] p-0">
           <div style={{ height: "100%", padding: 8 }}>
-            <DispatchPrintPreview selectedIds={selectedIds} company={company} />
+            <DispatchPrintPreview selectedIds={selectedIds} company={company} liveOverlay={liveOverlay} />
           </div>
         </SheetContent>
       </Sheet>
