@@ -317,10 +317,68 @@ export default function ReadyToShipPanel({
         transport_date: new Date().toISOString().slice(0, 10),
       });
       if (error) throw error;
-      toast.success("تم تثبيت الترحيل — انتقلت الفاتورة إلى «في الطريق»");
+
+      // ثبّت الناقل/الوجهة كمعتاد لهذا العميل (إن كان العميل حقيقيًا والخيار مفعّل).
+      const customerId = inv.customer_id || null;
+      if (customerId && isPinAsDefault(inv.id)) {
+        try {
+          // 1) ناقل العميل المُفضّل
+          await (supabase as any)
+            .from("customer_preferred_transporter")
+            .upsert(
+              { customer_id: customerId, transporter_id: choice.transporterId },
+              { onConflict: "customer_id" }
+            );
+          // 2) ربط ناقل بالعميل (لقائمته)
+          await (supabase as any)
+            .from("customer_transporters")
+            .upsert(
+              { customer_id: customerId, transporter_id: choice.transporterId },
+              { onConflict: "customer_id,transporter_id", ignoreDuplicates: true }
+            );
+          // 3) وجهة افتراضية للعميل
+          if (choice.destinationId) {
+            // ضمان وجود الربط
+            const { data: existing } = await (supabase as any)
+              .from("customer_destinations")
+              .select("id")
+              .eq("customer_id", customerId)
+              .eq("destination_id", choice.destinationId)
+              .maybeSingle();
+            if (!existing) {
+              await (supabase as any)
+                .from("customer_destinations")
+                .insert({ customer_id: customerId, destination_id: choice.destinationId, is_default: true });
+            }
+            // تصفير is_default على باقي وجهات العميل، ثم ضبطه على المختار
+            await (supabase as any)
+              .from("customer_destinations")
+              .update({ is_default: false })
+              .eq("customer_id", customerId)
+              .neq("destination_id", choice.destinationId);
+            await (supabase as any)
+              .from("customer_destinations")
+              .update({ is_default: true })
+              .eq("customer_id", customerId)
+              .eq("destination_id", choice.destinationId);
+          }
+          toast.success("تم تثبيت الترحيل وحفظه كمعتاد للعميل");
+        } catch (pinErr: any) {
+          // لا نوقف العملية الأساسية لو فشل التثبيت كمعتاد
+          console.error("pin-as-default error:", pinErr);
+          toast.success("تم تثبيت الترحيل (لم يُحفظ كمعتاد)");
+        }
+      } else {
+        toast.success("تم تثبيت الترحيل — انتقلت الفاتورة إلى «في الطريق»");
+      }
+
       qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      qc.invalidateQueries({ queryKey: ["table", "customer_preferred_transporter"] });
+      qc.invalidateQueries({ queryKey: ["table", "customer_destinations"] });
+      qc.invalidateQueries({ queryKey: ["table", "customer_transporters"] });
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
     } catch (e: any) {
       toast.error(e.message || "تعذّر تثبيت الترحيل");
     } finally {
