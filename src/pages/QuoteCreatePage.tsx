@@ -46,6 +46,7 @@ import { ToolbarCustomizationProvider } from "@/components/toolbar/ToolbarCustom
 import { productMatches as sharedProductMatches } from "@/utils/productMatches";
 import MessageImportDialog, { MessageImportButton } from "@/components/MessageImportDialog";
 import type { ParsedLine } from "@/hooks/useMessageImport";
+import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { CustomerInfoStrip } from "@/utils/balanceDisplay";
 
@@ -1540,40 +1541,14 @@ export default function QuoteCreatePage() {
                   <th style={{ position: "relative" }}>السعر الأجنبي $<ColumnResizeHandle onMouseDown={(e) => startColDrag(4, e)} hidden={colsLocked} /></th>
                   <th style={{ position: "relative" }}>الإجمالي<ColumnResizeHandle onMouseDown={(e) => startColDrag(5, e)} hidden={colsLocked} /></th>
                   <th colSpan={2} style={{ position: "relative", padding: 0, height: 10, minWidth: 40 }}>
-                    {!colsLocked ? (
-                      <div style={{ position: "absolute", inset: 0, display: "flex", height: "100%", width: "100%" }}>
-                        <button
-                          type="button"
-                          title="تعيين عرض الأعمدة الحالي كافتراضي شخصي — يُستعاد عند الضغط على إعادة الضبط"
-                          onClick={() => { saveColsAsDefault(); toast.success("تم تعيين عرض الأعمدة كافتراضي"); }}
-                          style={{ flex: 1, fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))", cursor: "pointer", whiteSpace: "nowrap", userSelect: "none" }}
-                        >★ افتراضي</button>
-                        <button
-                          type="button"
-                          title="إعادة الأعمدة إلى الافتراضي"
-                          onClick={() => { resetColWidths(); toast.success("تم إعادة عرض الأعمدة"); }}
-                          style={{ flex: 1, fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", borderInlineStart: "1px solid hsl(var(--border))", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", userSelect: "none" }}
-                        >↺ إعادة</button>
-                        <button
-                          type="button"
-                          title={COLS_BTN_SAVE_TITLE}
-                          onClick={() => {
-                            try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); }
-                            catch { toast.error(COLS_TOAST_SAVE_FAILED); }
-                          }}
-                          style={{ flex: 1, fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", borderInlineStart: "1px solid hsl(var(--border))", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", userSelect: "none" }}
-                        >{COLS_BTN_SAVE_LABEL}</button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        title={COLS_BTN_EDIT_TITLE}
-                        onClick={() => { setColsLocked(false); toast(COLS_TOAST_EDIT_MODE); }}
-                        style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", boxSizing: "border-box", userSelect: "none" }}
-                      >
-                        {COLS_BTN_EDIT_LABEL}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      title={COLS_BTN_EDIT_TITLE}
+                      onClick={() => { setColsLocked(false); toast(COLS_TOAST_EDIT_MODE); }}
+                      style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", boxSizing: "border-box", userSelect: "none" }}
+                    >
+                      {COLS_BTN_EDIT_LABEL}
+                    </button>
                     <ColumnResizeHandle onMouseDown={(e) => startColDrag(6, e)} hidden={colsLocked} />
                   </th>
                 </tr>
@@ -2355,6 +2330,13 @@ export default function QuoteCreatePage() {
           });
           toast.success(`تم استيراد ${lines.filter((l) => l.matched).length} منتج من الرسالة`);
         }}
+      />
+      <ColumnsEditFloatingPanel
+        open={!colsLocked}
+        pageKey="quote-create"
+        onSaveDefault={() => { saveColsAsDefault(); toast.success("تم تعيين عرض الأعمدة كافتراضي"); }}
+        onReset={() => { resetColWidths(); toast.success("تم إعادة عرض الأعمدة"); }}
+        onSave={() => { try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); } catch { toast.error(COLS_TOAST_SAVE_FAILED); } }}
       />
     </div>
   );

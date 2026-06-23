@@ -28,6 +28,7 @@ import { makeRowNavHandler } from "@/utils/itemTableNav";
 import { useCreatePageNav } from "@/utils/createPageNav";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 import { useQuickRowWidths, ExpandFieldButton } from "@/hooks/useQuickRowWidths";
+import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
 import { CustomerInfoStrip } from "@/utils/balanceDisplay";
 import FreePositionToolbar from "@/components/toolbar/FreePositionToolbar";
 import SummaryChip from "@/components/toolbar/SummaryChip";
@@ -220,7 +221,7 @@ export default function PurchaseCreatePage() {
   const colsScreenId = "purchase-create";
   if (typeof window !== "undefined") migrateScreenColKeys(colsScreenId);
   const [colsLocked, setColsLocked] = useScreenColsLocked(colsScreenId);
-  const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, tableProps, clampWidthsToContainer } = useColumnWidths(
+  const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, reset: resetColWidths, saveAsUserDefault: saveColsAsDefault, tableProps, clampWidthsToContainer } = useColumnWidths(
     screenColWidthsKey(colsScreenId),
     [36, null, 80, 100, 100, 100, 36, 40],
     colsLocked,
@@ -1043,28 +1044,14 @@ export default function PurchaseCreatePage() {
                     <th style={{ position: "relative" }}>السعر الأجنبي $<ColumnResizeHandle onMouseDown={(e) => startColDrag(4, e)} hidden={colsLocked} /></th>
                     <th style={{ position: "relative" }}>الإجمالي<ColumnResizeHandle onMouseDown={(e) => startColDrag(5, e)} hidden={colsLocked} /></th>
                     <th colSpan={2} style={{ position: "relative", padding: 0, height: 10, minWidth: 40 }}>
-                      {!colsLocked ? (
-                        <button
-                          type="button"
-                          title={COLS_BTN_SAVE_TITLE}
-                          onClick={() => {
-                            try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); }
-                            catch { toast.error(COLS_TOAST_SAVE_FAILED); }
-                          }}
-                          style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", boxSizing: "border-box", userSelect: "none" }}
-                        >
-                          {COLS_BTN_SAVE_LABEL}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          title={COLS_BTN_EDIT_TITLE}
-                          onClick={() => { setColsLocked(false); toast(COLS_TOAST_EDIT_MODE); }}
-                          style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", boxSizing: "border-box", userSelect: "none" }}
-                        >
-                          {COLS_BTN_EDIT_LABEL}
-                        </button>
-                      )}
+                    <button
+                      type="button"
+                      title={COLS_BTN_EDIT_TITLE}
+                      onClick={() => { setColsLocked(false); toast(COLS_TOAST_EDIT_MODE); }}
+                      style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", boxSizing: "border-box", userSelect: "none" }}
+                    >
+                      {COLS_BTN_EDIT_LABEL}
+                    </button>
                       <ColumnResizeHandle onMouseDown={(e) => startColDrag(6, e)} hidden={colsLocked} />
                     </th>
                   </tr>
@@ -1430,6 +1417,13 @@ export default function PurchaseCreatePage() {
           });
           toast.success(`تم استيراد ${lines.filter((l) => l.matched).length} منتج من الرسالة`);
         }}
+      />
+      <ColumnsEditFloatingPanel
+        open={!colsLocked}
+        pageKey="purchase-create"
+        onSaveDefault={() => { saveColsAsDefault(); toast.success("تم تعيين عرض الأعمدة كافتراضي"); }}
+        onReset={() => { resetColWidths(); toast.success("تم إعادة عرض الأعمدة"); }}
+        onSave={() => { try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); } catch { toast.error(COLS_TOAST_SAVE_FAILED); } }}
       />
     </div>
   );
