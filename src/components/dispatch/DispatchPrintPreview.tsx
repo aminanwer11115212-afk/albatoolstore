@@ -43,7 +43,7 @@ export default function DispatchPrintPreview({ selectedIds, company }: Props) {
 
   const html = useMemo(() => {
     if (!docs || docs.length === 0) return "";
-    return buildFullHTML(docs, company);
+    return buildDispatchSheetHTML(docs, company);
   }, [docs, company]);
 
   const handlePrint = () => {
