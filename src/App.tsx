@@ -57,7 +57,6 @@ const PurchaseCreatePage = lazy(() => import("./pages/PurchaseCreatePage"));
 const StockReturnPage = lazy(() => import("./pages/StockReturnPage"));
 const StockReturnCreatePage = lazy(() => import("./pages/StockReturnCreatePage"));
 const StockReturnViewPage = lazy(() => import("./pages/StockReturnViewPage"));
-const PosPage = lazy(() => import("./pages/PosPage"));
 const CompanySettingsPage = lazy(() => import("./pages/CompanySettingsPage"));
 const ProductCompaniesPage = lazy(() => import("./pages/ProductCompaniesPage"));
 const StockTransferPage = lazy(() => import("./pages/StockTransferPage"));
@@ -204,7 +203,7 @@ const App = () => {
             <Route path="/invoices/create" element={lazyEl(<InvoiceCreatePage />, "فاتورة جديدة")} />
             <Route path="/invoices/view/:id" element={lazyEl(<InvoiceViewPage />, "عرض الفاتورة")} />
             <Route path="/invoices/edit/:id" element={lazyEl(<InvoiceEditWrapper />, "تعديل الفاتورة")} />
-            <Route path="/invoices/cash" element={lazyEl(<PosPage />, "مبيعات كاش")} />
+            <Route path="/invoices/cash" element={lazyEl(<InvoiceCreatePage pos />, "مبيعات كاش (نقطة بيع)")} />
             <Route path="/invoices/:id/packaging" element={lazyEl(<InvoicePackagingPage />, "تغليف الفاتورة")} />
             <Route path="/invoices/:id/transport" element={lazyEl(<InvoiceTransportPage />, "ترحيل الفاتورة")} />
             <Route path="/invoices/:id/transport-report" element={lazyEl(<TransportPackagingReportPage docType="invoice" mode="transport" />, "تقرير الترحيل")} />

@@ -98,9 +98,10 @@ interface RecentItemsSidebarProps {
   type: "invoices" | "quotes" | "purchases" | "returns";
   compact?: boolean;
   sideOnly?: boolean;
+  sourceFilter?: "pos" | "regular";
 }
 
-function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: RecentItemsSidebarProps) {
+function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourceFilter }: RecentItemsSidebarProps) {
   const limitStorageKey = useFormFactorScopedLegacyKey(`recent-sidebar:limit:${type}:v1`);
   const [limit, setLimitState] = useState<number>(() => {
     if (typeof window === "undefined") return 50;
@@ -449,6 +450,10 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false }: Rec
       }
       if (isQuotesSide && userFilter !== "all") {
         if ((it.created_by_uid || "") !== userFilter) return false;
+      }
+      if (isInvoices && sourceFilter) {
+        if (sourceFilter === "pos" && it.source !== "pos") return false;
+        if (sourceFilter === "regular" && it.source === "pos") return false;
       }
       if (term) {
         const partyName = String(it[partyKey]?.name || "").toLowerCase();

@@ -281,7 +281,7 @@ function invoiceItemsHash(items: Array<{ product_id?: string | null; quantity?: 
     .join("§");
 }
 
-export default function InvoiceCreatePage() {
+export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {}) {
   usePageRenderCount("/invoices/create");
   const navigate = useNavigate();
   const location = useLocation();
@@ -348,6 +348,7 @@ export default function InvoiceCreatePage() {
   const [notesDraft, setNotesDraft] = useState("");
   const [itemNoteEditing, setItemNoteEditing] = useState<{ uid: string; productName?: string; value: string } | null>(null);
   const [packagingDialogOpen, setPackagingDialogOpen] = useState(false);
+  const [walkInName, setWalkInName] = useState("");
   const [attachmentsDialogOpen, setAttachmentsDialogOpen] = useState(false);
   const [transportDialogOpen, setTransportDialogOpen] = useState(false);
 
@@ -1080,22 +1081,23 @@ export default function InvoiceCreatePage() {
 
       const payload: any = {
         invoice_number: invoiceNumber,
-        customer_id: activeCustomer ? activeCustomer.id : null,
-        type: isCash ? "cash" : "sale",
+        customer_id: pos ? null : (activeCustomer ? activeCustomer.id : null),
+        type: (isCash || pos) ? "cash" : "sale",
         date: invoiceDate,
         due_date: dueDate || null,
         subtotal: totals.subtotal,
         discount: generalDiscount + totals.itemDiscounts,
         shipping,
         total: totals.total,
-        due_amount: computedDue,
-        paid_amount: computedPaid,
-        status: computedStatus,
-        payment_method: paymentMethod,
+        due_amount: pos ? 0 : computedDue,
+        paid_amount: pos ? totals.total : computedPaid,
+        status: pos ? "paid" : computedStatus,
+        payment_method: pos ? "cash" : paymentMethod,
         currency_code: currencyCode,
         exchange_rate_to_base: exchangeRateToBase,
         notes,
         internal_note: internalNote,
+        ...(pos ? { source: "pos", walk_in_customer_name: walkInName.trim() || "عميل نقدي" } : {}),
       };
 
       let invId = editId;
@@ -1463,7 +1465,7 @@ export default function InvoiceCreatePage() {
 
   // ---------- Render ----------
   return (
-    <div ref={pageRef} className="neo-quote-scope" dir="rtl" style={{ position: "relative" }}>
+    <div ref={pageRef} className={`neo-quote-scope${pos ? " pos-mode" : ""}`} dir="rtl" style={{ position: "relative" }}>
       <style>{`
         .neo-quote-scope { background: hsl(var(--background)); color: hsl(var(--foreground)); font-size: 12px; height: calc(100vh - 64px); overflow: hidden; container-type: inline-size; }
         .neo-quote-scope .panel { background: hsl(var(--card)); border-radius: 6px; padding: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.04); border: 1px solid hsl(var(--border)); }
@@ -1490,6 +1492,7 @@ export default function InvoiceCreatePage() {
         .search-suggestions .suggestions-status[data-status="empty"] { color: hsl(var(--destructive)); }
         @keyframes sugg-spin { to { transform: rotate(360deg); } }
         .neo-quote-scope .item_header { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+        .neo-quote-scope.pos-mode .item_header { background: hsl(var(--warning)); color: hsl(var(--warning-foreground)); }
         .neo-quote-scope .item_header th { padding: 5px 4px; font-weight:600; font-size: 11px; text-align: center; }
         .neo-quote-scope .excel-table { width: 100%; border-collapse: collapse; }
         .neo-quote-scope .excel-row td { padding: 2px 3px; border-bottom: 1px solid hsl(var(--border)); font-size: 11px; }
@@ -1540,67 +1543,94 @@ export default function InvoiceCreatePage() {
         <div className="form-column">
           {/* ============ Header bar ============ */}
           <div className="header-bar" style={{ flexShrink: 0, height: "auto" }}>
-            <div className="field product-search-container" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
-              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                <span>{isCash ? "عميل (اختياري)" : "العميل"}</span>
+            {pos ? (
+              <div className="field" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
+                <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                  <span>اسم العميل (اختياري)</span>
+                  <input
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    title="تاريخ الفاتورة"
+                    style={{ fontSize: 10, height: 18, padding: "0 4px", border: "1px solid hsl(var(--border))", borderRadius: 3, background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontWeight: 600 }}
+                  />
+                </label>
                 <input
-                  type="date"
-                  value={invoiceDate}
-                  onChange={(e) => setInvoiceDate(e.target.value)}
-                  title="تاريخ الفاتورة"
-                  style={{ fontSize: 10, height: 18, padding: "0 4px", border: "1px solid hsl(var(--border))", borderRadius: 3, background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontWeight: 600 }}
+                  ref={customerInputRef}
+                  type="text"
+                  className="form-control customer-name-input"
+                  placeholder="عميل نقدي"
+                  value={walkInName}
+                  onChange={(e) => setWalkInName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickProductRef.current?.focus(); } }}
+                  style={{ fontWeight: 600, width: "100%" }}
                 />
-              </label>
-              {!colsLocked && <ExpandFieldButton currentExtra={custExtras[0] || 0} onDrag={(v) => custSetExtra(0, v)} onReset={() => custReset(0)} title="اسحب لتغيير عرض حقل العميل · نقرة مزدوجة لإعادة الضبط" />}
-              <input
-                ref={customerInputRef}
-                type="text"
-                className="form-control customer-name-input"
-                placeholder="اسم العميل أو رقم الهاتف"
-                value={customerSearch}
-                onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerSugg(true); if (customer) setCustomer(null); }}
-                onFocus={() => setShowCustomerSugg(true)}
-                onBlur={() => setTimeout(() => setShowCustomerSugg(false), 150)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (customerMatches[0] && !customer) pickCustomer(customerMatches[0]);
-                    else quickProductRef.current?.focus();
-                  }
-                }}
-                style={{ fontWeight: 600, width: "100%" }}
-              />
-              {showCustomerSugg && customerMatches.length > 0 && (
-                <div className="customer-suggestions">
-                  {customerMatches.map((c, i) => (
-                    <div key={c.id} className="customer-item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickCustomer(c)}>
-                      <strong>{c.name}</strong>
-                      <span style={{ color: "hsl(var(--muted-foreground))", marginRight: 8 }}>{c.phone}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="field product-search-container" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
+                <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                  <span>{isCash ? "عميل (اختياري)" : "العميل"}</span>
+                  <input
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    title="تاريخ الفاتورة"
+                    style={{ fontSize: 10, height: 18, padding: "0 4px", border: "1px solid hsl(var(--border))", borderRadius: 3, background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontWeight: 600 }}
+                  />
+                </label>
+                {!colsLocked && <ExpandFieldButton currentExtra={custExtras[0] || 0} onDrag={(v) => custSetExtra(0, v)} onReset={() => custReset(0)} title="اسحب لتغيير عرض حقل العميل · نقرة مزدوجة لإعادة الضبط" />}
+                <input
+                  ref={customerInputRef}
+                  type="text"
+                  className="form-control customer-name-input"
+                  placeholder="اسم العميل أو رقم الهاتف"
+                  value={customerSearch}
+                  onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerSugg(true); if (customer) setCustomer(null); }}
+                  onFocus={() => setShowCustomerSugg(true)}
+                  onBlur={() => setTimeout(() => setShowCustomerSugg(false), 150)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (customerMatches[0] && !customer) pickCustomer(customerMatches[0]);
+                      else quickProductRef.current?.focus();
+                    }
+                  }}
+                  style={{ fontWeight: 600, width: "100%" }}
+                />
+                {showCustomerSugg && customerMatches.length > 0 && (
+                  <div className="customer-suggestions">
+                    {customerMatches.map((c, i) => (
+                      <div key={c.id} className="customer-item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickCustomer(c)}>
+                        <strong>{c.name}</strong>
+                        <span style={{ color: "hsl(var(--muted-foreground))", marginRight: 8 }}>{c.phone}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Add new customer button */}
-            <div className="field" style={{ flex: "0 0 auto", width: 28 }}>
-              <label>&nbsp;</label>
-              <button
-                type="button"
-                onClick={() => setShowAddCustomer(true)}
-                className="form-control"
-                title="إضافة عميل جديد"
-                aria-label="إضافة عميل جديد"
-                style={{
-                  background: "#28a745", color: "#fff", border: "none", cursor: "pointer",
-                  padding: 0, width: 28, minWidth: 28,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 700, fontSize: 16, lineHeight: 1,
-                }}
-              >
-                +
-              </button>
-            </div>
+            {/* Add new customer button — hidden in POS mode */}
+            {!pos && (
+              <div className="field" style={{ flex: "0 0 auto", width: 28 }}>
+                <label>&nbsp;</label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustomer(true)}
+                  className="form-control"
+                  title="إضافة عميل جديد"
+                  aria-label="إضافة عميل جديد"
+                  style={{
+                    background: "#28a745", color: "#fff", border: "none", cursor: "pointer",
+                    padding: 0, width: 28, minWidth: 28,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontWeight: 700, fontSize: 16, lineHeight: 1,
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            )}
 
 
 
@@ -2064,6 +2094,7 @@ export default function InvoiceCreatePage() {
                 },
 
                 // === Group 2: Files & attachments ===
+                ...(!pos ? [
                 {
                   id: "packaging",
                   group: "2-files",
@@ -2102,6 +2133,7 @@ export default function InvoiceCreatePage() {
                     </button>
                   ),
                 },
+                ] : []),
                 {
                   id: "attachments",
                   group: "2-files",
@@ -2264,7 +2296,7 @@ export default function InvoiceCreatePage() {
 
         <PanelResizer storageKey="panels:invoice-create:sidebar" scopeSelector=".neo-quote-scope" />
         <aside className="recent-invoices-scope" style={{ alignSelf: "stretch", height: "100%", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <RecentItemsSidebar type="invoices" compact />
+          {pos ? <RecentItemsSidebar type="invoices" compact sourceFilter="pos" /> : <RecentItemsSidebar type="invoices" compact />}
           <RowResizer storageKey="rows:invoice-create:recent-density" scopeSelector=".recent-invoices-scope" cssVar="recent-density" mode="scale" defaultHeight={1.0} min={0.6} max={2.5} />
         </aside>
       </div>
@@ -2522,20 +2554,20 @@ export default function InvoiceCreatePage() {
         if (!effectiveId) return null;
         return (
           <>
-            <PackagingDialog
+            {!pos && <PackagingDialog
               open={packagingDialogOpen}
               onOpenChange={setPackagingDialogOpen}
               parentType="invoice"
               parentId={effectiveId}
-            />
-            <TransportDialog
+            />}
+            {!pos && <TransportDialog
               open={transportDialogOpen}
               onOpenChange={setTransportDialogOpen}
               parentType="invoice"
               parentId={effectiveId}
               customerId={customer?.id || null}
               showAllReady={false}
-            />
+            />}
             <InvoiceAttachmentsDialog
               invoiceId={effectiveId}
               open={attachmentsDialogOpen}
