@@ -13,87 +13,13 @@ import DispatchPrintPreview from "@/components/dispatch/DispatchPrintPreview";
 import DispatchEntitiesBar from "@/components/dispatch/DispatchEntitiesBar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Eye } from "lucide-react";
+import { buildDispatchSheetForInvoiceIds } from "@/utils/dispatchReportPrint";
 
-// ── Build Print HTML (used by ReadyToShipPanel for its "طباعة وتحويل" button) ───
-function buildDispatchReportHTML(invoices: any[], company: any) {
-  const logoURL = company?.logo_url || "";
-  const dateStr = new Date().toLocaleDateString("ar-SA", {
-    year: "numeric", month: "long", day: "numeric",
-  });
-  const fmt = (d?: string) => {
-    if (!d) return "";
-    const [y, m, day] = d.split("-");
-    return `${day}/${m}/${y}`;
-  };
-
-  const byCustomer: Record<string, { name: string; invoices: any[] }> = {};
-  invoices.forEach((inv) => {
-    const cid = inv.customer_id || "cash";
-    const name = inv.customers?.name || "كاش";
-    if (!byCustomer[cid]) byCustomer[cid] = { name, invoices: [] };
-    byCustomer[cid].invoices.push(inv);
-  });
-
-  const blocks = Object.values(byCustomer).map((cust) => {
-    const totalPieces = cust.invoices.reduce(
-      (s, inv) => s + (inv.packaging_total_pieces || 0), 0
-    );
-    const rows = cust.invoices.map((inv, i) => {
-      const items = (inv.invoice_items || []).map(
-        (it: any) => `<tr style="font-size:10px">
-          <td style="border:1px solid #ccc;padding:3px 6px;text-align:center">${i + 1}</td>
-          <td style="border:1px solid #ccc;padding:3px 6px;text-align:center">${inv.invoice_number}</td>
-          <td style="border:1px solid #ccc;padding:3px 6px;text-align:right">${it.product_name || it.products?.name || "—"}</td>
-          <td style="border:1px solid #ccc;padding:3px 6px;text-align:center">${it.quantity || 0}</td>
-        </tr>`
-      ).join("");
-      if (items) return items;
-      return `<tr><td style="border:1px solid #ccc;padding:3px 6px;text-align:center">${i + 1}</td>
-        <td style="border:1px solid #ccc;padding:3px 6px;text-align:center">${inv.invoice_number}</td>
-        <td style="border:1px solid #ccc;padding:3px 6px;text-align:right">—</td>
-        <td style="border:1px solid #ccc;padding:3px 6px;text-align:center">—</td></tr>`;
-    }).join("");
-    return `<div style="margin-bottom:18px;border:2px solid hsl(220 70% 55%);border-radius:6px;overflow:hidden;page-break-inside:avoid">
-      <div style="background:hsl(220 70% 55%);color:#fff;padding:6px 10px;display:flex;justify-content:space-between">
-        <span style="font-weight:800;font-size:13px">اسم الزبون: ${cust.name}</span>
-        <span style="font-size:11px">عدد الفواتير: ${cust.invoices.length}</span>
-      </div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr style="background:#e8edff">
-          <th style="border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:center;width:35px">#</th>
-          <th style="border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:center;width:90px">رقم الفاتورة</th>
-          <th style="border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:right">الصنف</th>
-          <th style="border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:center;width:60px">الكمية</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div style="background:#f0f4ff;padding:5px 10px;border-top:2px solid hsl(220 70% 55%);display:flex;justify-content:space-between">
-        <span style="font-weight:800;font-size:11px">إجمالي القطع: <b style="color:#b91c1c;font-size:14px">${totalPieces || cust.invoices.length}</b></span>
-        <span style="font-size:10px;color:#555">عدد الطلبات: ${cust.invoices.length}</span>
-      </div>
-    </div>`;
-  }).join("");
-
-  return `<!DOCTYPE html><html dir="rtl" lang="ar"><head>
-<meta charset="utf-8"><title>تقرير الترحيلات - ${dateStr}</title>
-<style>
-  @page { size: A4; margin: 10mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family:'Cairo','Segoe UI',Tahoma,Arial,sans-serif; color:#1a1a1a; font-weight:600; padding:10px; font-size:11px; line-height:1.4; }
-  h1 { font-size:18px; font-weight:800; margin-bottom:8px; }
-  .head { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #1f2937; padding-bottom:8px; margin-bottom:12px; }
-  .footer { margin-top:12px; padding-top:6px; border-top:1px solid #ddd; font-size:9px; color:#888; text-align:center; }
-</style></head><body>
-<div class="head">
-  <div style="display:flex;gap:8px;align-items:center">
-    ${logoURL ? `<img src="${logoURL}" style="width:48px;height:48px;object-fit:contain" />` : ""}
-    <div><div style="font-size:14px;font-weight:800">${company?.name || "أولاد جابر — البتول ستور"}</div></div>
-  </div>
-  <div><h1>🚚 تقرير الترحيلات</h1><div style="font-size:10px;color:#666">${dateStr}</div></div>
-</div>
-${blocks}
-<div class="footer">تم إنشاء هذا التقرير من نظام البتول — ${dateStr}</div>
-</body></html>`;
+// Build the unified dispatch sheet HTML for the selected invoices.
+// Shared identical template with the left-side preview pane.
+async function buildDispatchReportHTML(invoices: any[], company: any) {
+  const ids = invoices.map((i) => i.id).filter(Boolean);
+  return await buildDispatchSheetForInvoiceIds(ids, company);
 }
 
 export default function DispatchPage() {

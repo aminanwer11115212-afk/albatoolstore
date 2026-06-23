@@ -17,7 +17,7 @@ import {
 import SearchableSelect from "@/components/transport/SearchableSelect";
 
 type Props = {
-  buildPrintHTML: (invoices: any[], company: any, mode: "all" | "collected") => string;
+  buildPrintHTML: (invoices: any[], company: any, mode: "all" | "collected") => string | Promise<string>;
   company: any;
   /** Optional controlled selection (lifted by parent for preview pane). */
   checked?: Set<string>;
@@ -212,7 +212,7 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
     }
     setBusy(true);
     try {
-      const html = buildPrintHTML(selected, company, "all");
+      const html = await buildPrintHTML(selected, company, "all");
       const win = window.open("", "_blank", "width=900,height=700");
       if (!win) {
         toast.error("تعذّر فتح نافذة الطباعة");
