@@ -465,7 +465,7 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourc
       }
       return true;
     });
-  }, [rawData, statusFilter, payFilter, userFilter, isInvoices, isQuotesSide, search, partyKey]);
+  }, [rawData, statusFilter, payFilter, userFilter, isInvoices, isQuotesSide, search, partyKey, sourceFilter]);
 
   const data = useMemo(() => filteredData.slice(0, limit), [filteredData, limit]);
 
