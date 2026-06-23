@@ -17,7 +17,7 @@ import {
 import SearchableSelect from "@/components/transport/SearchableSelect";
 
 type Props = {
-  buildPrintHTML: (invoices: any[], company: any, mode: "all" | "collected") => string;
+  buildPrintHTML: (invoices: any[], company: any, mode: "all" | "collected") => string | Promise<string>;
   company: any;
   /** Optional controlled selection (lifted by parent for preview pane). */
   checked?: Set<string>;
