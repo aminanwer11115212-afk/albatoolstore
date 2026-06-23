@@ -29,6 +29,7 @@ import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDia
 import UnavailableItemsPanel from "@/components/invoice/UnavailableItemsPanel";
 import { recordInvoiceRevision, diffRows } from "@/utils/invoiceRevisions";
 import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 export default function InvoiceViewPage() {
   const { id } = useParams();

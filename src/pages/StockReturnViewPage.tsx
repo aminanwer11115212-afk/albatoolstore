@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Edit, FileText, Printer, Eye, RefreshCw, XCircle, ArrowRight } from "lucide-react";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 const statusLabels: Record<string, { label: string; bg: string }> = {
   pending:   { label: "معلق",  bg: "bg-amber-500 text-white" },
