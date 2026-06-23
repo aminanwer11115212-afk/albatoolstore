@@ -181,6 +181,7 @@ function renderTransports(rows: any[]): string {
       const date = fmtDate(r.transport_date);
       const cost = Number(r.cost || 0);
       const notes = r.notes || "";
+      const isPreview = r.__preview === true;
       const parts: string[] = [];
       if (transporter) {
         let t = `الناقل: <b>${esc(transporter)}</b>`;
@@ -198,7 +199,10 @@ function renderTransports(rows: any[]): string {
       const note = notes
         ? `<div class="d-line d-muted">ملاحظة: ${esc(notes)}</div>`
         : "";
-      return `<div class="d-tn-row">${main}${note}</div>`;
+      const previewTag = isPreview
+        ? `<span class="d-preview-tag">معاينة — لم يُثبَّت بعد</span>`
+        : "";
+      return `<div class="d-tn-row${isPreview ? " d-tn-preview" : ""}">${previewTag}${main}${note}</div>`;
     })
     .join("");
 }
@@ -328,13 +332,41 @@ function signaturesHTML(): string {
   </div>`;
 }
 
+export type LiveOverlayEntry = {
+  transporterName?: string;
+  transporterPhone?: string;
+  destinationName?: string;
+};
+
 export function buildDispatchSheetHTML(
   docs: DispatchDoc[],
-  company: any
+  company: any,
+  liveOverlay?: Record<string, LiveOverlayEntry>
 ): string {
   const today = new Date().toLocaleDateString("en-GB");
-  const cardsHtml = docs.map((d, i) => renderCard(d, i)).join("");
-  const totalPacksAll = docs.reduce((s, d) => s + totalPacksFor(d), 0);
+
+  // Merge live (unsaved) choices for invoices that don't yet have any saved
+  // transport record. Each becomes a synthetic preview row marked `__preview`.
+  const mergedDocs: DispatchDoc[] = docs.map((d) => {
+    const overlay = liveOverlay?.[d.invoice?.id];
+    if (!overlay) return d;
+    if ((d.transports || []).length > 0) return d;
+    if (!overlay.transporterName && !overlay.destinationName) return d;
+    const previewRow = {
+      __preview: true,
+      transporters: overlay.transporterName
+        ? { name: overlay.transporterName, phone: overlay.transporterPhone }
+        : null,
+      destinations: overlay.destinationName ? { name: overlay.destinationName } : null,
+      transport_date: null,
+      cost: 0,
+      notes: null,
+    };
+    return { ...d, transports: [previewRow] };
+  });
+
+  const cardsHtml = mergedDocs.map((d, i) => renderCard(d, i)).join("");
+  const totalPacksAll = mergedDocs.reduce((s, d) => s + totalPacksFor(d), 0);
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
