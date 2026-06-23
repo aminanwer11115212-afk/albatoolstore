@@ -25,6 +25,7 @@ import {
   Printer, Eye, RefreshCw, XCircle, Trash2, PlusCircle, ChevronDown, ArrowRight,
   Paperclip, Download, Image as ImageIcon,
 } from "lucide-react";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 const statusLabels: Record<string, { label: string; bg: string }> = {
   draft: { label: "عرض سعر", bg: "bg-gray-400 text-white" },
