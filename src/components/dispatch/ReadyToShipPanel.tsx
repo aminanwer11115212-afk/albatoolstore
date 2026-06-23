@@ -641,10 +641,6 @@ export default function ReadyToShipPanel({
         }
         .rts-pin-toggle input { accent-color: hsl(var(--primary)); }
         .rts-pin-toggle:hover { color: hsl(var(--primary)); }
-          background: hsl(var(--primary) / 0.12);
-          color: hsl(var(--primary));
-          font-size: 10px; font-weight: 800;
-        }
         @media (max-width: 640px) {
           .rts-table thead th.cell-sel { width: 110px; }
           .rts-select { font-size: 16px; min-height: 40px; }
