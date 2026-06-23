@@ -16,12 +16,17 @@ import {
 } from "@/hooks/useData";
 import SearchableSelect from "@/components/transport/SearchableSelect";
 
+type RowChoice = { transporterId?: string; destinationId?: string };
+
 type Props = {
   buildPrintHTML: (invoices: any[], company: any, mode: "all" | "collected") => string | Promise<string>;
   company: any;
   /** Optional controlled selection (lifted by parent for preview pane). */
   checked?: Set<string>;
   onCheckedChange?: (next: Set<string>) => void;
+  /** Optional controlled per-row choice (lifted by parent for live preview). */
+  rowChoice?: Record<string, RowChoice>;
+  onRowChoiceChange?: (next: Record<string, RowChoice>) => void;
   /** When true, hide the bottom "طباعة وتحويل" footer (parent shows its own actions). */
   hideFooter?: boolean;
 };
@@ -34,7 +39,12 @@ const fmtDateAr = (d?: string) => {
 
 type Tab = "all" | "by_transport" | "by_customer";
 
-export default function ReadyToShipPanel({ buildPrintHTML, company, checked: checkedProp, onCheckedChange, hideFooter }: Props) {
+export default function ReadyToShipPanel({
+  buildPrintHTML, company,
+  checked: checkedProp, onCheckedChange,
+  rowChoice: rowChoiceProp, onRowChoiceChange,
+  hideFooter,
+}: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("all");
   const [internalChecked, setInternalChecked] = useState<Set<string>>(new Set());
@@ -55,9 +65,18 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
   const { data: custDestinations } = useCustomerDestinations();
   const { data: prefTransporters } = useCustomerPreferredTransporter();
 
-  // اختيار المستخدم لكل فاتورة (قبل التثبيت)
-  const [rowChoice, setRowChoice] = useState<Record<string, { transporterId?: string; destinationId?: string }>>({});
+  // اختيار المستخدم لكل فاتورة (قبل التثبيت) — controlled أو داخلي
+  const [internalRowChoice, setInternalRowChoice] = useState<Record<string, RowChoice>>({});
+  const rowChoice = rowChoiceProp ?? internalRowChoice;
+  const setRowChoice = (updater: Record<string, RowChoice> | ((prev: Record<string, RowChoice>) => Record<string, RowChoice>)) => {
+    const next = typeof updater === "function" ? (updater as any)(rowChoice) : updater;
+    if (onRowChoiceChange) onRowChoiceChange(next);
+    else setInternalRowChoice(next);
+  };
   const [savingRow, setSavingRow] = useState<string | null>(null);
+  // افتراضيًا: تثبيت الاختيار كمعتاد للعميل عند الضغط على «تثبيت».
+  const [pinAsDefault, setPinAsDefault] = useState<Record<string, boolean>>({});
+  const isPinAsDefault = (id: string) => pinAsDefault[id] ?? true;
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dispatch-ready-to-ship"],
