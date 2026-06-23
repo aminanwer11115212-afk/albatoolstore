@@ -1113,40 +1113,35 @@ export default function QuoteCreatePage() {
         <div className="form-column">
           {/* ============ Header: شريط واحد ============ */}
           <div className="header-bar" style={{ flexShrink: 0, height: "auto" }}>
-            {/* Current quote number badge */}
-            <div
-              className="field"
-              style={{
-                flex: "0 0 auto",
-                background: "hsl(var(--primary) / 0.08)",
-                border: "1px solid hsl(var(--primary) / 0.4)",
-                borderRadius: 4,
-                padding: "2px 8px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                minHeight: 36,
-              }}
-              title={editId ? "رقم العرض المحفوظ" : "رقم العرض المقترح (قد يتغيّر عند الحفظ لتفادي التكرار)"}
-            >
-              <label style={{ fontSize: 9, color: "hsl(var(--muted-foreground))", margin: 0 }}>
-                رقم العرض {editId ? "" : "(مقترح)"}
-              </label>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "hsl(var(--primary))", lineHeight: 1.2 }}>
-                {quoteNumber || "—"}
-              </span>
-            </div>
-            {/* Customer search */}
+            {/* Customer search (مع رقم العرض + التاريخ مدمجين في نفس المستطيل) */}
             <div className="field product-search-container" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
               <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                 <span>العميل</span>
-                <input
-                  type="date"
-                  value={quoteDate}
-                  onChange={(e) => setQuoteDate(e.target.value)}
-                  title="تاريخ عرض السعر"
-                  style={{ fontSize: 10, height: 18, padding: "0 4px", border: "1px solid hsl(var(--border))", borderRadius: 3, background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontWeight: 600 }}
-                />
+                <div
+                  title={editId ? "رقم العرض المحفوظ والتاريخ" : "رقم العرض المقترح والتاريخ"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 6,
+                    height: 18,
+                    padding: "0 4px",
+                    border: "1px solid hsl(var(--primary) / 0.4)",
+                    borderRadius: 3,
+                    background: "hsl(var(--primary) / 0.08)",
+                  }}
+                >
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "hsl(var(--primary))", lineHeight: 1, whiteSpace: "nowrap" }}>
+                    #{quoteNumber || "—"}
+                  </span>
+                  <input
+                    type="date"
+                    value={quoteDate}
+                    onChange={(e) => setQuoteDate(e.target.value)}
+                    title="تاريخ عرض السعر"
+                    style={{ fontSize: 10, height: 16, padding: "0 2px", border: "none", background: "transparent", color: "hsl(var(--foreground))", fontWeight: 600, outline: "none" }}
+                  />
+                </div>
               </label>
               {!colsLocked && <ExpandFieldButton currentExtra={custExtras[0] || 0} onDrag={(v) => custSetExtra(0, v)} onReset={() => custReset(0)} title="اسحب لتغيير عرض حقل العميل · نقرة مزدوجة لإعادة الضبط" />}
               <input
