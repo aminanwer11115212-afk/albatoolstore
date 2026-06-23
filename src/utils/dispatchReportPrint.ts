@@ -457,6 +457,8 @@ export function buildDispatchSheetHTML(
 
     .d-tn-row { padding: 2px 0; border-bottom: 1px dotted #e5e7eb; }
     .d-tn-row:last-child { border-bottom: none; }
+    .d-tn-preview { background: #fffbeb; padding: 3px 5px; border-radius: 3px; border: 1px dashed #f59e0b; }
+    .d-preview-tag { display: inline-block; font-size: 9.5px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1px 5px; border-radius: 3px; margin-bottom: 2px; }
 
     .d-pk-lines { display: block; margin-top: 2px; }
     .d-pk-line {
