@@ -590,12 +590,17 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourc
   const headPad = compact ? "px-[4px] py-[3px]" : "px-1 py-2.5";
   const isQuotes = !isInvoices && !isPurchases && !isReturns;
   const isSideQuotes = isQuotes && sideOnly;
-  const headBg = isSideQuotes
+  const isPos = isInvoices && sourceFilter === "pos";
+  const headBg = isPos
+    ? "bg-destructive text-destructive-foreground"
+    : isSideQuotes
     ? "bg-[#7c3aed] text-white"
     : isQuotes
     ? "bg-[#2563eb] text-white"
     : "bg-primary text-primary-foreground";
-  const headBorder = isSideQuotes
+  const headBorder = isPos
+    ? "border-destructive"
+    : isSideQuotes
     ? "border-[#7c3aed]"
     : isQuotes
     ? "border-[#2563eb]"

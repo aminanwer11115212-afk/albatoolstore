@@ -1492,7 +1492,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         .search-suggestions .suggestions-status[data-status="empty"] { color: hsl(var(--destructive)); }
         @keyframes sugg-spin { to { transform: rotate(360deg); } }
         .neo-quote-scope .item_header { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-        .neo-quote-scope.pos-mode .item_header { background: hsl(var(--warning)); color: hsl(var(--warning-foreground)); }
+        .neo-quote-scope.pos-mode .item_header { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
         .neo-quote-scope .item_header th { padding: 5px 4px; font-weight:600; font-size: 11px; text-align: center; }
         .neo-quote-scope .excel-table { width: 100%; border-collapse: collapse; }
         .neo-quote-scope .excel-row td { padding: 2px 3px; border-bottom: 1px solid hsl(var(--border)); font-size: 11px; }
