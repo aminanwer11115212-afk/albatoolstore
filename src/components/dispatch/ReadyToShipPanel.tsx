@@ -431,15 +431,29 @@ export default function ReadyToShipPanel({
           {hasTransport ? (
             <span className="rts-pill"><CheckCircle2 size={12} /> مُرحَّلة</span>
           ) : (
-            <button
-              type="button"
-              className="rts-btn rts-btn-primary rts-btn-sm"
-              onClick={() => dispatchRow(inv)}
-              disabled={isSaving || !choice.transporterId}
-            >
-              <Send size={12} />
-              {isSaving ? "…" : "تثبيت"}
-            </button>
+            <div className="rts-act-stack">
+              <button
+                type="button"
+                className="rts-btn rts-btn-primary rts-btn-sm"
+                onClick={() => dispatchRow(inv)}
+                disabled={isSaving || !choice.transporterId}
+              >
+                <Send size={12} />
+                {isSaving ? "…" : "تثبيت"}
+              </button>
+              {inv.customer_id ? (
+                <label className="rts-pin-toggle" title="حفظ الاختيار كناقل/وجهة افتراضية لهذا العميل">
+                  <input
+                    type="checkbox"
+                    checked={isPinAsDefault(inv.id)}
+                    onChange={(e) =>
+                      setPinAsDefault((p) => ({ ...p, [inv.id]: e.target.checked }))
+                    }
+                  />
+                  <span>📌 معتاد</span>
+                </label>
+              ) : null}
+            </div>
           )}
         </td>
       </tr>
@@ -614,6 +628,19 @@ export default function ReadyToShipPanel({
         .rts-pill {
           display: inline-flex; align-items: center; gap: 3px;
           padding: 3px 8px; border-radius: 999px;
+          background: hsl(var(--primary) / 0.12);
+          color: hsl(var(--primary));
+          font-size: 10px; font-weight: 800;
+        }
+        .rts-act-stack { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .rts-pin-toggle {
+          display: inline-flex; align-items: center; gap: 3px;
+          font-size: 9.5px; font-weight: 700;
+          color: hsl(var(--muted-foreground));
+          cursor: pointer; user-select: none;
+        }
+        .rts-pin-toggle input { accent-color: hsl(var(--primary)); }
+        .rts-pin-toggle:hover { color: hsl(var(--primary)); }
           background: hsl(var(--primary) / 0.12);
           color: hsl(var(--primary));
           font-size: 10px; font-weight: 800;
