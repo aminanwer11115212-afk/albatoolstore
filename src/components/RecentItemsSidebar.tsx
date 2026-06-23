@@ -387,7 +387,9 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourc
   const isPurchases = type === "purchases";
   const isReturns = type === "returns";
   const statusMap = isInvoices ? invoiceStatusMap : isPurchases ? purchaseStatusMap : isReturns ? returnStatusMap : quoteStatusMap;
-  const baseTitle = isInvoices ? "الفواتير" : isPurchases ? "أوامر الشراء" : isReturns ? "المرتجعات" : (sideOnly ? "عروض الأسعار الجانبية" : "عروض الأسعار");
+  const baseTitle = isInvoices
+    ? (sourceFilter === "pos" ? "فواتير الكاش" : "الفواتير")
+    : isPurchases ? "أوامر الشراء" : isReturns ? "المرتجعات" : (sideOnly ? "عروض الأسعار الجانبية" : "عروض الأسعار");
   const title = `آخر ${limit} ${baseTitle}`;
   const editPath = isInvoices ? "/invoices/edit/" : isPurchases ? "/purchase/edit/" : isReturns ? "/stock-return/edit/" : (sideOnly ? "/quotes/side/edit/" : "/quotes/edit/");
   const managePath = isInvoices ? "/invoices" : isPurchases ? "/purchase" : isReturns ? "/stock-return" : (sideOnly ? "/quotes/side" : "/quotes");
