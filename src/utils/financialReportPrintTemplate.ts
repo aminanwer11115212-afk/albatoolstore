@@ -56,8 +56,7 @@ export interface FinancialReportData {
   currency?: string;
 }
 
-const LOGO_FALLBACK =
-  "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 const fmt = (v: any): string => {
   if (v === null || v === undefined || v === "") return "—";
@@ -83,7 +82,7 @@ export function generateFinancialReportHTML(data: FinancialReportData): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
   const { title, subtitle, fromDate, toDate, company, summary = [], sections, notes, currency } = data;
-  const logoURL = company?.logo_url || LOGO_FALLBACK;
+  const logoURL = resolveLogoUrl(company?.logo_url);
   const periodTxt =
     fromDate || toDate
       ? `${fromDate ? `من ${fromDate}` : ""}${fromDate && toDate ? " " : ""}${toDate ? `إلى ${toDate}` : ""}`

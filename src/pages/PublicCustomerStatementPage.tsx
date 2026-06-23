@@ -75,8 +75,7 @@ interface StatementData {
   transactions: Tx[];
 }
 
-const LOGO_FALLBACK =
-  "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 const fmt = (n: number | null | undefined) =>
   Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -171,7 +170,7 @@ export default function PublicCustomerStatementPage() {
   }
 
   const { customer, company, invoices, quotes, returns, transactions } = data;
-  const logoURL = company?.logo_url || LOGO_FALLBACK;
+  const logoURL = resolveLogoUrl(company?.logo_url);
 
   return (
     <div dir="rtl" lang="ar" className="public-statement min-h-screen bg-gray-100 py-6 print:bg-white print:py-0">

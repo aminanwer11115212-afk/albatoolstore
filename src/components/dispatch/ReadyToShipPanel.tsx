@@ -16,12 +16,17 @@ import {
 } from "@/hooks/useData";
 import SearchableSelect from "@/components/transport/SearchableSelect";
 
+type RowChoice = { transporterId?: string; destinationId?: string };
+
 type Props = {
   buildPrintHTML: (invoices: any[], company: any, mode: "all" | "collected") => string | Promise<string>;
   company: any;
   /** Optional controlled selection (lifted by parent for preview pane). */
   checked?: Set<string>;
   onCheckedChange?: (next: Set<string>) => void;
+  /** Optional controlled per-row choice (lifted by parent for live preview). */
+  rowChoice?: Record<string, RowChoice>;
+  onRowChoiceChange?: (next: Record<string, RowChoice>) => void;
   /** When true, hide the bottom "طباعة وتحويل" footer (parent shows its own actions). */
   hideFooter?: boolean;
 };
@@ -34,7 +39,12 @@ const fmtDateAr = (d?: string) => {
 
 type Tab = "all" | "by_transport" | "by_customer";
 
-export default function ReadyToShipPanel({ buildPrintHTML, company, checked: checkedProp, onCheckedChange, hideFooter }: Props) {
+export default function ReadyToShipPanel({
+  buildPrintHTML, company,
+  checked: checkedProp, onCheckedChange,
+  rowChoice: rowChoiceProp, onRowChoiceChange,
+  hideFooter,
+}: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("all");
   const [internalChecked, setInternalChecked] = useState<Set<string>>(new Set());
@@ -55,9 +65,18 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
   const { data: custDestinations } = useCustomerDestinations();
   const { data: prefTransporters } = useCustomerPreferredTransporter();
 
-  // اختيار المستخدم لكل فاتورة (قبل التثبيت)
-  const [rowChoice, setRowChoice] = useState<Record<string, { transporterId?: string; destinationId?: string }>>({});
+  // اختيار المستخدم لكل فاتورة (قبل التثبيت) — controlled أو داخلي
+  const [internalRowChoice, setInternalRowChoice] = useState<Record<string, RowChoice>>({});
+  const rowChoice = rowChoiceProp ?? internalRowChoice;
+  const setRowChoice = (updater: Record<string, RowChoice> | ((prev: Record<string, RowChoice>) => Record<string, RowChoice>)) => {
+    const next = typeof updater === "function" ? (updater as any)(rowChoice) : updater;
+    if (onRowChoiceChange) onRowChoiceChange(next);
+    else setInternalRowChoice(next);
+  };
   const [savingRow, setSavingRow] = useState<string | null>(null);
+  // افتراضيًا: تثبيت الاختيار كمعتاد للعميل عند الضغط على «تثبيت».
+  const [pinAsDefault, setPinAsDefault] = useState<Record<string, boolean>>({});
+  const isPinAsDefault = (id: string) => pinAsDefault[id] ?? true;
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dispatch-ready-to-ship"],
@@ -298,10 +317,68 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
         transport_date: new Date().toISOString().slice(0, 10),
       });
       if (error) throw error;
-      toast.success("تم تثبيت الترحيل — انتقلت الفاتورة إلى «في الطريق»");
+
+      // ثبّت الناقل/الوجهة كمعتاد لهذا العميل (إن كان العميل حقيقيًا والخيار مفعّل).
+      const customerId = inv.customer_id || null;
+      if (customerId && isPinAsDefault(inv.id)) {
+        try {
+          // 1) ناقل العميل المُفضّل
+          await (supabase as any)
+            .from("customer_preferred_transporter")
+            .upsert(
+              { customer_id: customerId, transporter_id: choice.transporterId },
+              { onConflict: "customer_id" }
+            );
+          // 2) ربط ناقل بالعميل (لقائمته)
+          await (supabase as any)
+            .from("customer_transporters")
+            .upsert(
+              { customer_id: customerId, transporter_id: choice.transporterId },
+              { onConflict: "customer_id,transporter_id", ignoreDuplicates: true }
+            );
+          // 3) وجهة افتراضية للعميل
+          if (choice.destinationId) {
+            // ضمان وجود الربط
+            const { data: existing } = await (supabase as any)
+              .from("customer_destinations")
+              .select("id")
+              .eq("customer_id", customerId)
+              .eq("destination_id", choice.destinationId)
+              .maybeSingle();
+            if (!existing) {
+              await (supabase as any)
+                .from("customer_destinations")
+                .insert({ customer_id: customerId, destination_id: choice.destinationId, is_default: true });
+            }
+            // تصفير is_default على باقي وجهات العميل، ثم ضبطه على المختار
+            await (supabase as any)
+              .from("customer_destinations")
+              .update({ is_default: false })
+              .eq("customer_id", customerId)
+              .neq("destination_id", choice.destinationId);
+            await (supabase as any)
+              .from("customer_destinations")
+              .update({ is_default: true })
+              .eq("customer_id", customerId)
+              .eq("destination_id", choice.destinationId);
+          }
+          toast.success("تم تثبيت الترحيل وحفظه كمعتاد للعميل");
+        } catch (pinErr: any) {
+          // لا نوقف العملية الأساسية لو فشل التثبيت كمعتاد
+          console.error("pin-as-default error:", pinErr);
+          toast.success("تم تثبيت الترحيل (لم يُحفظ كمعتاد)");
+        }
+      } else {
+        toast.success("تم تثبيت الترحيل — انتقلت الفاتورة إلى «في الطريق»");
+      }
+
       qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      qc.invalidateQueries({ queryKey: ["table", "customer_preferred_transporter"] });
+      qc.invalidateQueries({ queryKey: ["table", "customer_destinations"] });
+      qc.invalidateQueries({ queryKey: ["table", "customer_transporters"] });
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
     } catch (e: any) {
       toast.error(e.message || "تعذّر تثبيت الترحيل");
     } finally {
@@ -354,15 +431,29 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
           {hasTransport ? (
             <span className="rts-pill"><CheckCircle2 size={12} /> مُرحَّلة</span>
           ) : (
-            <button
-              type="button"
-              className="rts-btn rts-btn-primary rts-btn-sm"
-              onClick={() => dispatchRow(inv)}
-              disabled={isSaving || !choice.transporterId}
-            >
-              <Send size={12} />
-              {isSaving ? "…" : "تثبيت"}
-            </button>
+            <div className="rts-act-stack">
+              <button
+                type="button"
+                className="rts-btn rts-btn-primary rts-btn-sm"
+                onClick={() => dispatchRow(inv)}
+                disabled={isSaving || !choice.transporterId}
+              >
+                <Send size={12} />
+                {isSaving ? "…" : "تثبيت"}
+              </button>
+              {inv.customer_id ? (
+                <label className="rts-pin-toggle" title="حفظ الاختيار كناقل/وجهة افتراضية لهذا العميل">
+                  <input
+                    type="checkbox"
+                    checked={isPinAsDefault(inv.id)}
+                    onChange={(e) =>
+                      setPinAsDefault((p) => ({ ...p, [inv.id]: e.target.checked }))
+                    }
+                  />
+                  <span>📌 معتاد</span>
+                </label>
+              ) : null}
+            </div>
           )}
         </td>
       </tr>
@@ -541,6 +632,15 @@ export default function ReadyToShipPanel({ buildPrintHTML, company, checked: che
           color: hsl(var(--primary));
           font-size: 10px; font-weight: 800;
         }
+        .rts-act-stack { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .rts-pin-toggle {
+          display: inline-flex; align-items: center; gap: 3px;
+          font-size: 9.5px; font-weight: 700;
+          color: hsl(var(--muted-foreground));
+          cursor: pointer; user-select: none;
+        }
+        .rts-pin-toggle input { accent-color: hsl(var(--primary)); }
+        .rts-pin-toggle:hover { color: hsl(var(--primary)); }
         @media (max-width: 640px) {
           .rts-table thead th.cell-sel { width: 110px; }
           .rts-select { font-size: 16px; min-height: 40px; }

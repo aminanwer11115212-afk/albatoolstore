@@ -25,6 +25,7 @@ import {
   Printer, Eye, RefreshCw, XCircle, Trash2, PlusCircle, ChevronDown, ArrowRight,
   Paperclip, Download, Image as ImageIcon,
 } from "lucide-react";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 const statusLabels: Record<string, { label: string; bg: string }> = {
   draft: { label: "عرض سعر", bg: "bg-gray-400 text-white" },
@@ -474,7 +475,7 @@ export default function QuoteViewPage() {
             </div>
           </div>
           <div className="text-left">
-            <img src={company?.logo_url || "/images/company-logo.png"} alt="Logo" className="h-16 mb-2" />
+            <img src={resolveLogoUrl(company?.logo_url)} alt="Logo" className="h-16 mb-2" />
             <div className="text-sm text-muted-foreground mt-4">
               <p className="font-medium text-foreground">عرض سعر إلى</p>
               <p className="text-primary font-semibold text-base">{quote.customers?.name || "عميل"}</p>

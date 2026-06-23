@@ -62,7 +62,7 @@ const esc = (s: any) => String(s ?? "")
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#39;");
 
-const LOGO_FALLBACK = "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 const baseStyles = (accent: string) => `
   @page { size: A4; margin: 10mm; }
@@ -105,7 +105,7 @@ const baseStyles = (accent: string) => `
 `;
 
 const headerHTML = (company?: CompanyInfo | null) => {
-  const logo = company?.logo_url || LOGO_FALLBACK;
+  const logo = resolveLogoUrl(company?.logo_url);
   return `
   <div class="header">
     <div class="header-logos">

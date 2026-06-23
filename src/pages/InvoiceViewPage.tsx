@@ -29,6 +29,7 @@ import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDia
 import UnavailableItemsPanel from "@/components/invoice/UnavailableItemsPanel";
 import { recordInvoiceRevision, diffRows } from "@/utils/invoiceRevisions";
 import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 export default function InvoiceViewPage() {
   const { id } = useParams();
@@ -689,7 +690,7 @@ export default function InvoiceViewPage() {
             </div>
           </div>
           <div className="text-left">
-            <img src={company?.logo_url || "/images/company-logo.png"} alt="Logo" className="h-16 mb-2" />
+            <img src={resolveLogoUrl(company?.logo_url)} alt="Logo" className="h-16 mb-2" />
             <div className="text-sm text-muted-foreground mt-4">
               <p className="font-medium text-foreground">فاتورة الى</p>
               <p className="text-primary font-semibold text-base">{invoice.customers?.name || "كاش"}</p>

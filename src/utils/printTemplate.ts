@@ -48,7 +48,7 @@ interface PrintData {
   customTitle?: string;
 }
 
-const LOGO_FALLBACK = "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png";
+import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 function cleanExtraHTML(s?: string): string | undefined {
   if (!s) return undefined;
@@ -92,7 +92,7 @@ export function generatePrintHTML(data: PrintData): string {
   const showAccount = variant !== "no-account" && variant !== "no-details" && variant !== "stocktake";
   // Packaging/transport block: hidden for account-only and no-details variants.
   const showExtras = variant !== "account-only" && variant !== "no-details" && variant !== "stocktake";
-  const logoURL = company?.logo_url || LOGO_FALLBACK;
+  const logoURL = resolveLogoUrl(company?.logo_url);
   const finalTotal = grandTotal + oldBalance;
   const cleanPackaging = cleanExtraHTML(packagingInfo);
   const cleanTransport = cleanExtraHTML(transportInfo);
