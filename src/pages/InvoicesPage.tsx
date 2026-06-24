@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { useQueryClient } from "@tanstack/react-query";
-import { openWhatsAppInvoice } from "@/utils/whatsapp";
+
 import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";

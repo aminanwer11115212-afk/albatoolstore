@@ -9,7 +9,7 @@ import { validatePaymentAmount, computePaymentStatus } from "@/utils/paymentVali
 import { splitPayment } from "@/utils/overpayment";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
-import { openWhatsAppMessage, type WhatsAppMessageType } from "@/utils/whatsapp";
+import { type WhatsAppMessageType } from "@/utils/whatsapp";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PackagingDialog from "@/components/packaging/PackagingDialog";
 import TransportDialog from "@/components/transport/TransportDialog";

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { deductStockForLines } from "@/utils/stockDeduction";
-import { openWhatsAppMessage } from "@/utils/whatsapp";
+
 import { useQuoteConvertedDialog } from "@/hooks/useQuoteConvertedDialog";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 

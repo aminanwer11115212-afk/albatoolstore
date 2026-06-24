@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadQuoteExtras } from "@/utils/printExtras";
 import { deductStockForLines } from "@/utils/stockDeduction";
-import { openWhatsAppMessage, type WhatsAppMessageType } from "@/utils/whatsapp";
+import { type WhatsAppMessageType } from "@/utils/whatsapp";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
