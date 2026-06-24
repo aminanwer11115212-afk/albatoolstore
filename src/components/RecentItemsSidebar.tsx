@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { RefreshCw, FileText, StickyNote, Search, X, Lock, Unlock, Settings2, RotateCcw } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
-import { WORKFLOW_STATUSES, getWorkflowStatus, type WorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
+import { WORKFLOW_STATUSES, getWorkflowStatus, invalidateWorkflowAutoCache, type WorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInvoicesWithCustomers, useQuotesWithCustomers } from "@/hooks/useData";
 import { useQuery } from "@tanstack/react-query";
