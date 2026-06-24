@@ -85,9 +85,10 @@ export default function ReadyToShipPanel({
     else setInternalRowChoice(next);
   };
   const [savingRow, setSavingRow] = useState<string | null>(null);
-  // افتراضيًا: تثبيت الاختيار كمعتاد للعميل عند الضغط على «تثبيت».
-  const [pinAsDefault, setPinAsDefault] = useState<Record<string, boolean>>({});
-  const isPinAsDefault = (id: string) => pinAsDefault[id] ?? true;
+  // Dialog تأكيد التثبيت كافتراضي للعميل
+  const [pendingPinInv, setPendingPinInv] = useState<any | null>(null);
+  // التنقّل بلوحة المفاتيح: مؤشّر مُركّز على صف
+  const [focusedIdx, setFocusedIdx] = useState<number>(-1);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dispatch-ready-to-ship"],
