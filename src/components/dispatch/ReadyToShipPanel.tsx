@@ -294,6 +294,7 @@ export default function ReadyToShipPanel({
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       for (const id of ids) qc.invalidateQueries({ queryKey: ["invoice", id] });
+      ids.forEach((id) => invalidateWorkflowAutoCache(id));
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
     } catch (e: any) {
       toast.error(e.message || "تعذّر إتمام العملية");
