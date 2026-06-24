@@ -897,6 +897,9 @@ export default function ReadyToShipPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QuickAddTransporterDialog open={addTrOpen} onOpenChange={setAddTrOpen} />
+      <QuickAddDestinationDialog open={addDsOpen} onOpenChange={setAddDsOpen} />
     </div>
 
   );
