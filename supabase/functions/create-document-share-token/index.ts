@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const docType = String(body?.doc_type || "");
     const docId = String(body?.doc_id || "");
-    const ttlHours = Math.min(Math.max(Number(body?.ttl_hours || 168), 1), 24 * 30); // 1h..30d, default 7d
+    const ttlHours = Math.min(Math.max(Number(body?.ttl_hours || 24), 1), 24 * 30); // 1h..30d, default 24h
 
     // Optional: list of section keys hidden in the preview that should also be
     // hidden when the customer opens the public link. Sanitize to a flat array
