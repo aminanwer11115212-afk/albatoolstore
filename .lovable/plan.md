@@ -1,67 +1,61 @@
-## الخطة — تحسينات الترحيلات + توحيد اللوجو الجديد
 
-### 1) عرض الناقل/الوجهة المختارَين فورًا في معاينة كشف الترحيلات
-المشكلة: المعاينة على اليسار (`DispatchPrintPreview`) تقرأ فقط الترحيلات المحفوظة في `invoice_transports`. لو اخترت "Amiko System / أم درمان" في صف الفاتورة قبل الضغط على «تثبيت»، لن يظهرا في المعاينة.
+## الخطة — جدول إدارة الترحيلات «مثل Excel» + تأكيد ترحيل
 
-الحل:
-- رفع `rowChoice` من `ReadyToShipPanel` إلى `DispatchPage` (state مشترك، إلى جانب `selectedIds`).
-- إضافة prop جديد `liveChoices: Record<invoiceId, { transporter, destination }>` لـ `DispatchPrintPreview`.
-- داخل `DispatchPrintPreview`/`dispatchReportPrint.ts`: إذا كانت الفاتورة بلا `invoice_transports` محفوظة لكن لها `liveChoices`، نُولّد سطر ترحيل "تجريبي" يحوي اسم الناقل واسم الوجهة (نضمّه إلى `doc.transports` قبل توليد HTML)، مع علامة CSS خفيفة (مثلاً خلفية شفافة + وسم «معاينة») لتمييزه عن سجل محفوظ.
-- جلب أسماء الناقلين/الوجهات يتم من نفس الـ hooks المستخدمة في `ReadyToShipPanel` (`useTransporters`, `useDestinations`) ويُمرَّر إلى المعاينة كخريطة `id → name`.
+### 1) جدول «الفواتير الجاهزة للرفع» بأسلوب Excel
 
-### 2) زر «تثبيت كمعتاد» للناقل والوجهة على مستوى العميل
-المطلوب: عند الضغط على زر/خيار التثبيت، يُحفظ الناقل + الوجهة كـ«المعتاد» للعميل، ويظهران تلقائيًا في أي صفحة لاحقة (إنشاء فاتورة، صفحة ترحيل الفاتورة، إدارة الترحيلات).
+تعديلات `src/components/dispatch/ReadyToShipPanel.tsx` (واجهة فقط):
 
-التنفيذ في `src/components/dispatch/ReadyToShipPanel.tsx` ضمن دالة `dispatchRow`:
-- بعد `INSERT` في `invoice_transports` بنجاح، وإذا كانت الفاتورة لعميل حقيقي (`customer_id` موجود):
-  - **`customer_preferred_transporter`**: `upsert` على `(customer_id)` ليصبح `transporter_id = choice.transporterId`. (إن لم يوجد سطر سابق نُدخل جديدًا.)
-  - **`customer_destinations`**: نضمن وجود ربط `(customer_id, destination_id)` ثم نضع `is_default = true` على هذا الربط، ونصفّر `is_default` على باقي الوجهات للعميل (لتبقى وجهة افتراضية واحدة فقط).
-  - **`customer_transporters`** (الربط الذي يحدّ القائمة): نضمن وجود سطر `(customer_id, transporter_id)` إن لم يكن.
-- إضافة خانة اختيار صغيرة في رأس الصف "📌 ثبّت كمعتاد لهذا العميل" (افتراضيًا مفعّلة لأن المستخدم طلبها كسلوك أساسي). إن أُلغيت، يتم الحفظ في `invoice_transports` فقط دون ترقية المعتاد.
-- إبطال كاش `useQueryClient` لمفاتيح:
-  `customer_preferred_transporter`, `customer_destinations`, `customer_transporters` حتى تتحدّث جميع الصفحات.
+- إعادة الناقل/الوجهة كقائمتين منسدلتين داخل الخلية مباشرة (بدل الأزرار المنبثقة) — قائمة `SearchableSelect` مدمجة بحدود الخلية، تظهر القيمة المختارة كاملة.
+- تنسيق Excel:
+  - أعمدة بحدود رفيعة (`1px solid`) حول كل خلية، خطوط شبكة كاملة.
+  - رأس مُجمَّد (sticky) بخلفية رمادية مميّزة، وحدود سفلية أغمق.
+  - رقم صف تسلسلي في عمود `#` على اليمين (1، 2، 3…) — يحلّ مكان عمود التحديد كأول عمود؛ مربع التحديد يبقى في خانة منفصلة بعده.
+  - تظليل صفوف بالتناوب (zebra) + تظليل أوضح للصف المختار/المحوم.
+  - تنسيق أرقام `tabular-nums` للحفاظ على محاذاة الأعداد.
+- تنقّل لوحة المفاتيح بين الخلايا:
+  - `Tab` / `Shift+Tab` للتنقّل أفقياً بين «الناقل ← الوجهة ← زر تثبيت».
+  - `Enter` على زر «تثبيت» يُنفّذ الإجراء.
+  - `Space` على صف محدّد يبدّل الـ checkbox.
+- خانة «📌 معتاد» تنزل بجانب زر «تثبيت» كأيقونة صغيرة بدل عنصر منفصل (لتوفير ارتفاع الصف).
 
-أثر هذا على باقي الصفحات (لا حاجة لتعديل كود إضافي):
-- `InvoiceTransportPage` يقرأ بالفعل وجهة العميل الافتراضية ويعبّئها (سيُحمَّل تلقائيًا).
-- `ReadyToShipPanel.optionsForInvoice` يستخدم `preferred` و`is_default` كقيم افتراضية للصف الجديد للعميل.
-- تحديث `InvoiceTransportPage` ليُحمّل أيضًا الناقل المُفضّل (`customer_preferred_transporter`) كقيمة افتراضية لخانة الناقل عند فتح الصفحة لفاتورة العميل (إضافة بسيطة، 5 أسطر).
+ملاحظة: الأعمدة المخفية حالياً (رقم الفاتورة، التاريخ) تبقى مخفية كما طلبت سابقاً.
 
-### 3) توحيد شعار البتول الجديد في كل مواضع الطباعة
-ملف اللوجو الجديد المرفوع: `user-uploads://native_1782211614496_0.png` (نمر يقفز فوق كلمة «البتول»).
+### 2) تأكيد قبل «طباعة وتحويل إلى ترحيلات»
 
-التنفيذ على خطوتين متوازيتين بحيث يستفيد منه كل قالب موجود وكل قالب مستقبلي:
+داخل `printAndDispatch` في نفس الملف:
 
-أ. **رفعه إلى CDN عبر lovable-assets** ثم استخدام رابطه الثابت:
-   - إنشاء `src/assets/albatool-logo.png.asset.json` يحوي رابط CDN.
-   - استبدال ثابت `LOGO_FALLBACK` في كل الملفات التالية برابط الـ CDN الجديد:
-     - `src/utils/printTemplate.ts`
-     - `src/utils/transportPackagingPrint.ts`
-     - `src/utils/dispatchReportPrint.ts`
-     - `src/utils/statementPrintTemplate.ts`
-     - `src/utils/financialReportPrintTemplate.ts`
-     - `src/pages/PublicCustomerStatementPage.tsx`
-     - `src/components/transport/TransportDialog.tsx`
-   - في الصفحات التي تعتمد فقط على `company.logo_url` ولا تحوي fallback (`InvoiceViewPage.tsx`, `QuoteViewPage.tsx`, `StockReturnViewPage.tsx`): استبدال `"/images/company-logo.png"` بـ نفس رابط الـ CDN، حتى لو لم تحدَّث `company_settings`.
+- قبل أي إجراء، فتح Dialog تأكيد (`AlertDialog` من shadcn):
+  - العنوان: «تأكيد ترحيل الفواتير».
+  - الرسالة: «سيتم طباعة كشف الترحيلات لـ {N} فاتورة، ثم تحويل حالتها إلى «في الطريق للترحيلات» واختفائها من هذه الشاشة. هل تريد المتابعة؟».
+  - زرّان: «إلغاء» / «نعم، تأكيد وطباعة».
+- عند التأكيد فقط: تنفيذ التسلسل الحالي (فتح نافذة الطباعة + استدعاء `advance_invoice_workflow(in_transit)` لكل فاتورة).
 
-ب. **تحديث `company_settings.logo_url` في قاعدة البيانات** ليصبح هو الرابط الجديد — هذا يجعل كل المكونات التي تقرأ `company.logo_url` (وهي الأغلبية) تستخدمه مباشرة بدون لمس الكود. (تتم عبر `supabase--insert` بتحديث الصف الموجود.)
+### 3) ضمان الاختفاء وتحديث الحالة في النظام كله
 
-النتيجة: كل طباعة (فاتورة، عرض سعر، تغليف، ترحيل، كشف ترحيلات، كشف عميل، تقرير مالي، استرجاع مخزون) تظهر باللوجو الجديد في نفس المواقع الحالية بلا تغيير في التصميم.
+السلوك صحيح حالياً لكن نوثّقه ونعزّزه:
 
-### 4) ملفات تتعدل/تنشأ
-- معدّل: `src/pages/DispatchPage.tsx` — رفع `rowChoice` كحالة مشتركة وتمريرها للمعاينة.
-- معدّل: `src/components/dispatch/ReadyToShipPanel.tsx`:
-  - قبول `rowChoice` و`setRowChoice` كـ props اختيارية (controlled).
-  - خانة «📌 ثبّت كمعتاد» في كل صف.
-  - منطق upsert على `customer_preferred_transporter` + `customer_destinations`.
-- معدّل: `src/components/dispatch/DispatchPrintPreview.tsx` — استقبال `liveChoices` ودمجها مع الترحيلات قبل بناء HTML.
-- معدّل: `src/utils/dispatchReportPrint.ts` — قبول overlay من choices غير محفوظة وعرضها كسطر «معاينة».
-- معدّل: `src/pages/InvoiceTransportPage.tsx` — تحميل الناقل المفضل كقيمة افتراضية.
-- معدّل: قوالب الطباعة (المذكورة في 3-أ) لاستبدال `LOGO_FALLBACK`.
-- جديد: `src/assets/albatool-logo.png.asset.json` (CDN pointer).
-- تحديث بيانات: صف واحد في `company_settings` (`logo_url = <CDN URL>`).
+- بعد نجاح `advance_invoice_workflow`:
+  - `qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] })` — يختفي الصف من الجدول لأن الاستعلام مفلتر بـ `workflow_status = 'ready_to_ship'`.
+  - `qc.invalidateQueries({ queryKey: ["invoices"] })` و`["invoices-with-customers"]` — لتحديث صفحات الفواتير/تقارير المبيعات.
+  - `window.dispatchEvent(new Event("invoices:changed"))` — يستمع له كل من: قائمة الفواتير، شارة الـ workflow، صفحات الترحيلات/التغليف.
+  - إضافة: `qc.invalidateQueries({ queryKey: ["invoice", id] })` لكل فاتورة محوَّلة لتحديث صفحات العرض المفتوحة.
+- رسالة `toast.success` نهائية: «تم تحويل {N} فاتورة إلى «في الطريق للترحيلات» — اختفت من الشاشة».
+- إفراغ `selectedIds` و`rowChoice` للفواتير المحوَّلة فقط (الإبقاء على اختيارات صفوف أخرى لم تُرحَّل بعد).
+
+### 4) قائمة الملفات المتأثرة
+
+- معدَّل: `src/components/dispatch/ReadyToShipPanel.tsx`
+  - استعادة الـ `SearchableSelect` داخل الخلايا (إزالة `Popover`).
+  - إضافة CSS للجدول بأسلوب Excel (حدود/زبرا/رأس مُجمَّد/عمود #).
+  - دمج `AlertDialog` للتأكيد.
+  - تنقّل لوحة المفاتيح.
+  - تحسين تنظيف الحالة بعد الترحيل.
+- بدون تغييرات على: قاعدة البيانات، الـ RPC، `DispatchPage.tsx`، `DispatchPrintPreview.tsx`، قوالب الطباعة. (المنطق القائم على `advance_invoice_workflow` يفي بكل المتطلّبات الخلفية.)
 
 ### 5) التحقق بعد التنفيذ
-- في صفحة إدارة الترحيلات: اختيار ناقل/وجهة لصف فاتورة (بدون ضغط «تثبيت») → يظهران فورًا في كشف المعاينة على اليسار.
-- الضغط على «تثبيت» مع خانة 📌 مفعّلة → فتح صفحة العميل أو صفحة ترحيل فاتورة جديدة له يُظهر الناقل/الوجهة جاهزَين.
-- طباعة أي مستند (فاتورة/عرض سعر/ترحيل/تغليف/كشف حساب) تُظهر اللوجو الجديد للبتول في نفس المكان.
-- لا تغيير في المخطط/RLS/Edge functions.
+
+- الجدول يبدو مثل Excel، مع حدود واضحة وصفوف مرقّمة.
+- اختيار الناقل/الوجهة يتم مباشرة داخل الخلية بدون نقرات إضافية لفتح popover.
+- الضغط على «طباعة وتحويل» يفتح نافذة تأكيد → تأكيد → تفتح ورقة الطباعة → الفواتير تختفي من الشاشة فوراً.
+- فتح صفحة «إدارة الفواتير» يُظهر الحالة الجديدة «في الطريق للترحيلات» للفواتير نفسها.
+- شارة الـ workflow (`WorkflowStatusBadge`) تعرض السبب «ترحيل الفواتير الجاهزة من شاشة الترحيلات».

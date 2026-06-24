@@ -9,13 +9,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { filterSelectColumns } from "@/lib/tableColumns";
 import { toast } from "sonner";
-import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2, Search, MapPin } from "lucide-react";
+import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2, Search } from "lucide-react";
 import {
   useTransporters, useDestinations,
   useCustomerTransporters, useCustomerDestinations, useCustomerPreferredTransporter,
 } from "@/hooks/useData";
 import SearchableSelect from "@/components/transport/SearchableSelect";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 
 type RowChoice = { transporterId?: string; destinationId?: string };
@@ -225,13 +229,24 @@ export default function ReadyToShipPanel({
     });
   };
 
-  const printAndDispatch = async () => {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const requestPrintAndDispatch = () => {
+    if (checked.size === 0) {
+      toast.error("اختر فاتورة واحدة على الأقل");
+      return;
+    }
+    setConfirmOpen(true);
+  };
+
+  const doPrintAndDispatch = async () => {
     const selected = invoices.filter((i) => checked.has(i.id));
     if (selected.length === 0) {
       toast.error("اختر فاتورة واحدة على الأقل");
       return;
     }
     setBusy(true);
+    setConfirmOpen(false);
     try {
       const html = await buildPrintHTML(selected, company, "all");
       const win = window.open("", "_blank", "width=900,height=700");
@@ -242,13 +257,9 @@ export default function ReadyToShipPanel({
       win.document.open();
       win.document.write(html);
       win.document.close();
-      // Use a timeout instead of win.onload — onload can fire too early
-      // (or never) for about:blank windows, which causes
-      // "Failed to execute 'print' on 'Window': callback is no longer runnable".
       setTimeout(() => {
         try { win.focus(); win.print(); } catch (e) { console.error(e); }
       }, 500);
-
 
       const ids = selected.map((i) => i.id);
       const results = await Promise.all(
@@ -263,11 +274,21 @@ export default function ReadyToShipPanel({
       const firstErr = results.find((r) => (r as any).error)?.error;
       if (firstErr) throw firstErr;
 
-      toast.success(`تم تحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات"`);
+      toast.success(`تم تحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات" واختفت من الشاشة`);
+
+      // Clear selection + row choices ONLY for the dispatched invoices
       setChecked(new Set());
+      setRowChoice((prev) => {
+        const next = { ...prev };
+        for (const id of ids) delete next[id];
+        return next;
+      });
+
+      // Refresh everywhere that depends on workflow_status
       qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      for (const id of ids) qc.invalidateQueries({ queryKey: ["invoice", id] });
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
     } catch (e: any) {
       toast.error(e.message || "تعذّر إتمام العملية");
@@ -275,6 +296,7 @@ export default function ReadyToShipPanel({
       setTimeout(() => setBusy(false), 1500);
     }
   };
+
 
   const TabBtn = ({ id, icon: Icon, label }: { id: Tab; icon: any; label: string }) => (
     <button
@@ -423,16 +445,13 @@ export default function ReadyToShipPanel({
     const choice = getChoice(inv);
     const hasTransport = (inv.invoice_transports?.length ?? 0) > 0;
     const isSaving = savingRow === inv.id;
-    const transporterName =
-      (transporters as any[]).find((t) => t.id === choice.transporterId)?.name || "";
-    const destinationName =
-      (destinations as any[]).find((d) => d.id === choice.destinationId)?.name || "";
     return (
       <tr
         key={inv.id}
         className={isChecked ? "checked" : ""}
         onClick={() => toggle(inv.id)}
       >
+        <td className="cell-idx">{idx + 1}</td>
         <td className="cell-check">
           <input
             type="checkbox"
@@ -443,50 +462,22 @@ export default function ReadyToShipPanel({
         </td>
         <td className="cell-name">{inv.customers?.name || "كاش"}</td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={`rts-mini-btn ${choice.transporterId ? "filled" : ""}`}
-                title={transporterName || "اختر ناقل"}
-              >
-                <Truck size={11} />
-                <span className="rts-mini-label">{transporterName || "ناقل"}</span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="p-2 w-56" dir="rtl">
-              <SearchableSelect
-                options={transporters as any}
-                value={choice.transporterId}
-                onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: val } }))}
-                placeholder="— اختر ناقل —"
-                className="rts-select"
-              />
-            </PopoverContent>
-          </Popover>
+          <SearchableSelect
+            options={transporters as any}
+            value={choice.transporterId}
+            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: val } }))}
+            placeholder="— اختر ناقل —"
+            className="rts-select"
+          />
         </td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={`rts-mini-btn ${choice.destinationId ? "filled" : ""}`}
-                title={destinationName || "اختر وجهة"}
-              >
-                <MapPin size={11} />
-                <span className="rts-mini-label">{destinationName || "وجهة"}</span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="p-2 w-56" dir="rtl">
-              <SearchableSelect
-                options={destinations as any}
-                value={choice.destinationId}
-                onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
-                placeholder="— بدون وجهة —"
-                className="rts-select"
-              />
-            </PopoverContent>
-          </Popover>
+          <SearchableSelect
+            options={destinations as any}
+            value={choice.destinationId}
+            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
+            placeholder="— بدون وجهة —"
+            className="rts-select"
+          />
         </td>
         <td className="cell-act" onClick={(e) => e.stopPropagation()}>
           {hasTransport ? (
@@ -511,7 +502,7 @@ export default function ReadyToShipPanel({
                       setPinAsDefault((p) => ({ ...p, [inv.id]: e.target.checked }))
                     }
                   />
-                  <span>📌 معتاد</span>
+                  <span>📌</span>
                 </label>
               ) : null}
             </div>
@@ -520,6 +511,8 @@ export default function ReadyToShipPanel({
       </tr>
     );
   };
+
+
 
 
   return (
@@ -612,35 +605,43 @@ export default function ReadyToShipPanel({
 
         .rts-body { flex: 1; overflow: auto; }
 
+        /* Excel-like grid */
         .rts-table { width: 100%; border-collapse: collapse; font-size: 11px; }
         .rts-table thead th {
           position: sticky; top: 0; z-index: 2;
           background: hsl(var(--muted));
           color: hsl(var(--foreground));
           font-weight: 800; font-size: 10.5px;
-          padding: 6px 6px; text-align: right;
-          border-bottom: 1px solid hsl(var(--border));
+          padding: 6px 6px; text-align: center;
+          border: 1px solid hsl(var(--border));
+          border-bottom: 2px solid hsl(var(--border));
           white-space: nowrap;
         }
-        .rts-table thead th.cell-check { text-align: center; width: 32px; }
-        .rts-table thead th.cell-num { width: 78px; text-align: center; }
-        .rts-table thead th.cell-date { width: 88px; text-align: center; }
         .rts-table tbody td {
-          padding: 5px 6px; border-bottom: 1px solid hsl(var(--border));
+          padding: 4px 6px;
+          border: 1px solid hsl(var(--border));
           vertical-align: middle;
         }
-        .rts-table .cell-check { text-align: center; }
-        .rts-table .cell-num { text-align: center; font-weight: 700; color: hsl(var(--primary)); font-variant-numeric: tabular-nums; }
-        .rts-table .cell-name { font-weight: 700; }
-        .rts-table .cell-date { text-align: center; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+        .rts-table thead th.cell-idx,
+        .rts-table td.cell-idx {
+          width: 32px; text-align: center;
+          font-weight: 800; color: hsl(var(--muted-foreground));
+          background: hsl(var(--muted) / 0.6);
+          font-variant-numeric: tabular-nums;
+        }
+        .rts-table thead th.cell-check,
+        .rts-table td.cell-check { width: 32px; text-align: center; }
+        .rts-table .cell-name { font-weight: 700; text-align: right; }
         .rts-table tbody tr { cursor: pointer; }
-        .rts-table tbody tr:hover td { background: hsl(var(--muted) / 0.5); }
-        .rts-table tbody tr.checked td { background: hsl(var(--primary) / 0.10); }
+        /* Zebra */
+        .rts-table tbody tr:nth-child(even) td { background: hsl(var(--muted) / 0.18); }
+        .rts-table tbody tr:hover td { background: hsl(var(--muted) / 0.55); }
+        .rts-table tbody tr.checked td { background: hsl(var(--primary) / 0.12) !important; }
 
         .rts-group-head {
           display: flex; align-items: center; justify-content: space-between;
           padding: 6px 10px; cursor: pointer;
-          background: hsl(var(--muted) / 0.6);
+          background: hsl(var(--muted) / 0.7);
           border-top: 1px solid hsl(var(--border));
           border-bottom: 1px solid hsl(var(--border));
           font-size: 11px; font-weight: 800;
@@ -675,36 +676,19 @@ export default function ReadyToShipPanel({
         .rts-btn-ghost { background: transparent; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
         .rts-btn-sm { height: 26px; width: auto; padding: 0 8px; font-size: 10.5px; }
 
-        .rts-table thead th.cell-sel { width: 70px; text-align: center; }
+        .rts-table thead th.cell-sel { min-width: 130px; }
         .rts-table thead th.cell-act { width: 92px; text-align: center; }
-        .rts-table td.cell-sel { padding: 3px 4px; text-align: center; }
+        .rts-table td.cell-sel { padding: 2px 3px; }
         .rts-table td.cell-act { text-align: center; padding: 3px 4px; }
         .rts-select {
-          width: 100%; min-height: 28px; padding: 2px 6px;
-          background: hsl(var(--background));
+          width: 100%; min-height: 28px;
+          background: transparent;
           color: hsl(var(--foreground));
-          border: 1px solid hsl(var(--border));
-          border-radius: 6px; font-size: 11px; font-weight: 600;
+          border: 1px solid transparent;
+          border-radius: 4px; font-size: 11px; font-weight: 600;
         }
-        .rts-select:focus { outline: 2px solid hsl(var(--primary) / 0.35); outline-offset: 0; border-color: hsl(var(--primary)); }
-        .rts-mini-btn {
-          display: inline-flex; align-items: center; gap: 4px;
-          max-width: 100%;
-          height: 24px; padding: 0 6px;
-          background: hsl(var(--background));
-          color: hsl(var(--muted-foreground));
-          border: 1px dashed hsl(var(--border));
-          border-radius: 6px; cursor: pointer;
-          font-size: 10.5px; font-weight: 700;
-        }
-        .rts-mini-btn:hover { border-color: hsl(var(--primary)); color: hsl(var(--primary)); }
-        .rts-mini-btn.filled {
-          background: hsl(var(--primary) / 0.10);
-          border-style: solid;
-          border-color: hsl(var(--primary) / 0.5);
-          color: hsl(var(--primary));
-        }
-        .rts-mini-label { max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rts-select:hover { border-color: hsl(var(--border)); background: hsl(var(--background)); }
+        .rts-select:focus-within { outline: 2px solid hsl(var(--primary) / 0.45); outline-offset: -1px; border-color: hsl(var(--primary)); background: hsl(var(--background)); }
         .rts-pill {
           display: inline-flex; align-items: center; gap: 3px;
           padding: 3px 8px; border-radius: 999px;
@@ -712,21 +696,21 @@ export default function ReadyToShipPanel({
           color: hsl(var(--primary));
           font-size: 10px; font-weight: 800;
         }
-        .rts-act-stack { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .rts-act-stack { display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
         .rts-pin-toggle {
-          display: inline-flex; align-items: center; gap: 3px;
-          font-size: 9.5px; font-weight: 700;
+          display: inline-flex; align-items: center; gap: 2px;
+          font-size: 11px; font-weight: 700;
           color: hsl(var(--muted-foreground));
           cursor: pointer; user-select: none;
         }
         .rts-pin-toggle input { accent-color: hsl(var(--primary)); }
         .rts-pin-toggle:hover { color: hsl(var(--primary)); }
         @media (max-width: 640px) {
-          .rts-table thead th.cell-sel { width: 64px; }
-          .rts-mini-btn { height: 32px; font-size: 12px; }
-          .rts-mini-label { max-width: 70px; }
+          .rts-table thead th.cell-sel { min-width: 110px; }
+          .rts-select { font-size: 16px; min-height: 36px; }
           .rts-btn-sm { height: 36px; padding: 0 10px; font-size: 12px; }
         }
+
 
       `}</style>
 
@@ -779,6 +763,7 @@ export default function ReadyToShipPanel({
           <table className="rts-table">
             <thead>
               <tr>
+                <th className="cell-idx">#</th>
                 <th className="cell-check">
                   <input
                     type="checkbox"
@@ -798,13 +783,15 @@ export default function ReadyToShipPanel({
           <table className="rts-table">
             <thead>
               <tr>
-                <th className="cell-check">#</th>
+                <th className="cell-idx">#</th>
+                <th className="cell-check">✓</th>
                 <th>اسم الزبون</th>
                 <th className="cell-sel">الناقل</th>
                 <th className="cell-sel">الوجهة</th>
                 <th className="cell-act">إجراء</th>
               </tr>
             </thead>
+
 
             <tbody>
               {groups!.map((g) => {
@@ -813,7 +800,7 @@ export default function ReadyToShipPanel({
                 return (
                   <Fragment key={`g-${g.key}`}>
                     <tr>
-                      <td colSpan={5} style={{ padding: 0 }}>
+                      <td colSpan={6} style={{ padding: 0 }}>
                         <div
                           className="rts-group-head"
                           onClick={() => toggleGroup(g.key)}
@@ -860,7 +847,7 @@ export default function ReadyToShipPanel({
           </div>
           <button
             className="rts-btn rts-btn-primary"
-            onClick={printAndDispatch}
+            onClick={requestPrintAndDispatch}
             disabled={busy || checked.size === 0}
           >
             <Printer size={14} />
@@ -868,6 +855,25 @@ export default function ReadyToShipPanel({
           </button>
         </div>
       )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد ترحيل الفواتير</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم طباعة كشف الترحيلات لـ <b>{checked.size}</b> فاتورة، ثم تحويل حالتها إلى
+              «في الطريق للترحيلات» واختفائها من هذه الشاشة. هل تريد المتابعة؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={doPrintAndDispatch}>
+              نعم، تأكيد وطباعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
   );
 }
