@@ -140,6 +140,20 @@ export default function CashInvoicesPage() {
 
   const handlePrint = (id: string) => navigate(`/preview/invoice/${id}`);
 
+  const handleWhatsApp = async (r: CashInv) => {
+    const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+    await shareDocumentViaWhatsApp({
+      docType: "invoice",
+      docId: r.id,
+      phone: null, // POS عادةً بدون رقم — يفتح واتساب لاختيار جهة الاتصال يدوياً
+      customerName: r.walk_in_customer_name || "عميل نقدي",
+      docNumber: r.invoice_number,
+      total: r.total,
+      currency,
+      docLabel: "فاتورة كاش",
+    });
+  };
+
   const reload = () => fetchPage(0, true);
 
 
