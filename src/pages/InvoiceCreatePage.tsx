@@ -1214,23 +1214,14 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
             break;
           }
           lastError = error;
-          // إذا كان الخطأ تكرار رقم الفاتورة، أعد جلب أعلى رقم وحاول مجدداً
+          // إذا كان الخطأ تكرار رقم الفاتورة، ولّد رقماً عشوائياً جديداً وحاول مجدداً
           const isDup = (error as any).code === "23505" || /duplicate key|invoices_invoice_number_key/i.test(error.message || "");
           if (!isDup) throw error;
-          // اجلب أعلى رقم موجود لإعادة الحساب بدقة (مفصول حسب نوع الفاتورة pos / regular)
-          let allQ = supabase
-            .from("invoices")
-            .select("invoice_number,source")
-            .like("invoice_number", `${prefix}%`);
-          if (pos) allQ = allQ.eq("source", "pos");
-          else allQ = allQ.neq("source", "pos");
-          const { data: all } = await allQ;
-          let maxN = 0;
-          (all || []).forEach((r: any) => {
-            const m = String(r.invoice_number).match(/(\d+)$/);
-            if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+          const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+          currentNumber = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
+            scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+            digits: 5 + Math.min(attempt, 2),
           });
-          currentNumber = `${prefix}${String(maxN + 1 + attempt).padStart(padLen, "0")}`;
           attempt++;
         }
         if (lastError) throw lastError;
