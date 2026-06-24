@@ -14,7 +14,6 @@ import { useState, useMemo, useCallback } from "react";
 import { useCompanySettings, useTransporters, useDestinations } from "@/hooks/useData";
 import ReadyToShipPanel from "@/components/dispatch/ReadyToShipPanel";
 import DispatchPrintPreview from "@/components/dispatch/DispatchPrintPreview";
-import DispatchEntitiesBar from "@/components/dispatch/DispatchEntitiesBar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Eye } from "lucide-react";
 import { buildDispatchSheetForInvoiceIds } from "@/utils/dispatchReportPrint";
