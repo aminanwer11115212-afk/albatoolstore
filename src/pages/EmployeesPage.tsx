@@ -88,7 +88,10 @@ export default function EmployeesPage() {
     } catch (e: any) { toast.error(e.message); }
   };
 
+  const isPending = (emp: any) => typeof emp?.id === "string" && emp.id.startsWith("__");
+
   const openAccess = (emp: any) => {
+    if (isPending(emp)) { toast.error("جاري حفظ الموظف… أعد المحاولة بعد ثانية"); return; }
     const existing = roleMap[emp.id];
     setAccessFor(emp);
     setAccessForm({
