@@ -193,10 +193,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const [workflowStatus, setWorkflowStatus] = useState<string>("new");
   const [invoiceStatus, setInvoiceStatus] = useState<string>("pending");
 
-  // ---------- Payment dialog state ----------
-  const [paymentDialogOpen, setPaymentDialogOpen] = [undefined, undefined] as any; // placeholder, replaced just below
-  const _pay = useDocumentPayment();
+  // ---------- Payment dialog state (extracted to useDocumentPayment) ----------
   const {
+    paymentDialogOpen, setPaymentDialogOpen,
     savedTotal, setSavedTotal,
     savedPaid, setSavedPaid,
     savedDue, setSavedDue,
@@ -209,9 +208,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     payRef, setPayRef,
     payDiscount, setPayDiscount,
     savingPayment, setSavingPayment,
-  } = _pay;
-  // re-bind dialog open (keep names identical)
-  const paymentDialogOpenV = _pay.paymentDialogOpen; const setPaymentDialogOpenV = _pay.setPaymentDialogOpen;
+  } = useDocumentPayment();
+  const [savedCustomerId, setSavedCustomerId] = useState<string | null>(null);
+  const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
   const [showMessageImport, setShowMessageImport] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
