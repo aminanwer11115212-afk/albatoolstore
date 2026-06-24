@@ -675,9 +675,9 @@ export default function ReadyToShipPanel({
         .rts-btn-ghost { background: transparent; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
         .rts-btn-sm { height: 26px; width: auto; padding: 0 8px; font-size: 10.5px; }
 
-        .rts-table thead th.cell-sel { width: 130px; text-align: center; }
+        .rts-table thead th.cell-sel { width: 70px; text-align: center; }
         .rts-table thead th.cell-act { width: 92px; text-align: center; }
-        .rts-table td.cell-sel { padding: 3px 4px; }
+        .rts-table td.cell-sel { padding: 3px 4px; text-align: center; }
         .rts-table td.cell-act { text-align: center; padding: 3px 4px; }
         .rts-select {
           width: 100%; min-height: 28px; padding: 2px 6px;
@@ -687,6 +687,24 @@ export default function ReadyToShipPanel({
           border-radius: 6px; font-size: 11px; font-weight: 600;
         }
         .rts-select:focus { outline: 2px solid hsl(var(--primary) / 0.35); outline-offset: 0; border-color: hsl(var(--primary)); }
+        .rts-mini-btn {
+          display: inline-flex; align-items: center; gap: 4px;
+          max-width: 100%;
+          height: 24px; padding: 0 6px;
+          background: hsl(var(--background));
+          color: hsl(var(--muted-foreground));
+          border: 1px dashed hsl(var(--border));
+          border-radius: 6px; cursor: pointer;
+          font-size: 10.5px; font-weight: 700;
+        }
+        .rts-mini-btn:hover { border-color: hsl(var(--primary)); color: hsl(var(--primary)); }
+        .rts-mini-btn.filled {
+          background: hsl(var(--primary) / 0.10);
+          border-style: solid;
+          border-color: hsl(var(--primary) / 0.5);
+          color: hsl(var(--primary));
+        }
+        .rts-mini-label { max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .rts-pill {
           display: inline-flex; align-items: center; gap: 3px;
           padding: 3px 8px; border-radius: 999px;
@@ -704,10 +722,12 @@ export default function ReadyToShipPanel({
         .rts-pin-toggle input { accent-color: hsl(var(--primary)); }
         .rts-pin-toggle:hover { color: hsl(var(--primary)); }
         @media (max-width: 640px) {
-          .rts-table thead th.cell-sel { width: 110px; }
-          .rts-select { font-size: 16px; min-height: 40px; }
-          .rts-btn-sm { height: 40px; padding: 0 10px; font-size: 12px; }
+          .rts-table thead th.cell-sel { width: 64px; }
+          .rts-mini-btn { height: 32px; font-size: 12px; }
+          .rts-mini-label { max-width: 70px; }
+          .rts-btn-sm { height: 36px; padding: 0 10px; font-size: 12px; }
         }
+
       `}</style>
 
       {/* Header */}
