@@ -25,6 +25,7 @@ import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { useDocumentCurrency } from "@/hooks/document/useDocumentCurrency";
 import { useDocumentItems } from "@/hooks/document/useDocumentItems";
+import { useDocumentCustomer } from "@/hooks/document/useDocumentCustomer";
 
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLocked, screenColWidthsKey, migrateScreenColKeys, COLS_TOAST_SAVED, COLS_TOAST_SAVE_FAILED, COLS_TOAST_EDIT_MODE, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE } from "@/hooks/useColumnWidths";
@@ -103,19 +104,19 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [lastPayment, setLastPayment] = useState<{ amount: number; status: string; currency?: string } | null>(null);
-  const [customerBalances, setCustomerBalances] = useState<{ debt: number; credit: number } | null>(null);
+  // customer state moved to useDocumentCustomer hook (see below)
 
   // Header
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState("");
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const selectedCustomerIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    selectedCustomerIdRef.current = customer?.id || null;
-  }, [customer]);
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [showCustomerSugg, setShowCustomerSugg] = useState(false);
+  const {
+    customer, setCustomer,
+    customerSearch, setCustomerSearch,
+    showCustomerSugg, setShowCustomerSugg,
+    customerBalances, setCustomerBalances,
+    selectedCustomerIdRef,
+  } = useDocumentCustomer();
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
   // Add customer dialog
