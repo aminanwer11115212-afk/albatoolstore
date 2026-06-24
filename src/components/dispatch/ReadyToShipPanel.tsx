@@ -141,11 +141,11 @@ export default function ReadyToShipPanel({
   // وأيضاً مزامنة لوجيستيات العميل (روابط الناقلين/الوجهات) لتظهر فوراً في القوائم.
   useEffect(() => {
     const invalidateLogistics = () => {
-      qc.invalidateQueries({ queryKey: ["table", "customer_transporters"] });
-      qc.invalidateQueries({ queryKey: ["table", "customer_destinations"] });
-      qc.invalidateQueries({ queryKey: ["table", "customer_preferred_transporter"] });
-      qc.invalidateQueries({ queryKey: ["table", "transporters"] });
-      qc.invalidateQueries({ queryKey: ["table", "destinations"] });
+      qc.invalidateQueries({ queryKey: ["customer_transporters"] });
+      qc.invalidateQueries({ queryKey: ["customer_destinations"] });
+      qc.invalidateQueries({ queryKey: ["customer_preferred_transporter"] });
+      qc.invalidateQueries({ queryKey: ["transporters"] });
+      qc.invalidateQueries({ queryKey: ["destinations"] });
     };
     const channel = (supabase as any)
       .channel("dispatch-ready-to-ship-rt")
