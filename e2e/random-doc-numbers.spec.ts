@@ -66,20 +66,20 @@ function assertNotSequential(numbers: string[], label: string) {
 }
 
 test.describe("Random default document numbers", () => {
-  test("Regular invoice — /invoices/new generates unique INV-* per load", async ({ page }) => {
-    const nums = await collectNumbers(page, "/invoices/new", TRIES, /^INV-\d{4,}$/);
+  test("Regular invoice — /invoices/create generates unique INV-* per load", async ({ page }) => {
+    const nums = await collectNumbers(page, "/invoices/create", TRIES, /^INV-\d{4,}$/);
     assertAllUnique(nums, "invoice");
     assertNotSequential(nums, "invoice");
   });
 
-  test("Cash invoice — /invoices/cash generates unique POS-* (or configured prefix) per load", async ({ page }) => {
-    const nums = await collectNumbers(page, "/invoices/cash", TRIES, /-\d{4,}$/);
+  test("Cash invoice — /invoices/cash/new generates unique POS-* (or configured prefix) per load", async ({ page }) => {
+    const nums = await collectNumbers(page, "/invoices/cash/new", TRIES, /-\d{4,}$/);
     assertAllUnique(nums, "cash-invoice");
     assertNotSequential(nums, "cash-invoice");
   });
 
-  test("Regular quote — /quotes/new generates unique QT-* per load", async ({ page }) => {
-    const nums = await collectNumbers(page, "/quotes/new", TRIES, /^QT-\d{4,}$/);
+  test("Regular quote — /quotes/create generates unique QT-* per load", async ({ page }) => {
+    const nums = await collectNumbers(page, "/quotes/create", TRIES, /^QT-\d{4,}$/);
     assertAllUnique(nums, "quote");
     assertNotSequential(nums, "quote");
   });
@@ -91,8 +91,8 @@ test.describe("Random default document numbers", () => {
   });
 
   test("Cross-mode isolation: regular and cash invoice numbers don't collide", async ({ page }) => {
-    const regular = await collectNumbers(page, "/invoices/new", 3, /^INV-\d{4,}$/);
-    const cash = await collectNumbers(page, "/invoices/cash", 3, /-\d{4,}$/);
+    const regular = await collectNumbers(page, "/invoices/create", 3, /^INV-\d{4,}$/);
+    const cash = await collectNumbers(page, "/invoices/cash/new", 3, /-\d{4,}$/);
     // البادئات مختلفة → لن يحدث تصادم نصّي حتى لو تطابقت الأرقام
     for (const r of regular) for (const c of cash) expect(r).not.toBe(c);
   });
