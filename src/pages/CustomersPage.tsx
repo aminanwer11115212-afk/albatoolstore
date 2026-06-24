@@ -5,6 +5,7 @@ import { useCustomers } from "@/hooks/useData";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { supabase } from "@/integrations/supabase/client";
+import { pickCustomerWhatsApp, openWhatsApp, isValidWhatsAppPhone } from "@/utils/whatsapp";
 import { toast } from "sonner";
 import CustomerDetailView from "@/components/CustomerDetailView";
 import LocationPicker, { LocationValue, validateLocation } from "@/components/LocationPicker";
