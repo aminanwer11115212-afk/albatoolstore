@@ -248,6 +248,33 @@ export default function ReadyToShipPanel({
     });
   };
 
+  // قائمة الصفوف المرئية في الترتيب الفعلي على الشاشة — تستخدمها Shift+Click / Shift+Arrow / Ctrl+A.
+  const flatVisible = useMemo<any[]>(() => {
+    if (tab === "all") return invoices;
+    return (groups || []).flatMap((g) => collapsedGroups.has(g.key) ? [] : g.items);
+  }, [tab, invoices, groups, collapsedGroups]);
+
+  // تحديد مدى من lastAnchorId إلى toId (يُضاف إلى التحديد القائم).
+  const selectRange = useCallback((toId: string) => {
+    const anchorId = lastAnchorIdRef.current;
+    if (!anchorId || anchorId === toId) {
+      setChecked((p) => { const n = new Set(p); n.add(toId); return n; });
+      return;
+    }
+    const a = flatVisible.findIndex((x) => x.id === anchorId);
+    const b = flatVisible.findIndex((x) => x.id === toId);
+    if (a < 0 || b < 0) {
+      setChecked((p) => { const n = new Set(p); n.add(toId); return n; });
+      return;
+    }
+    const [lo, hi] = a <= b ? [a, b] : [b, a];
+    setChecked((p) => {
+      const n = new Set(p);
+      for (let i = lo; i <= hi; i++) n.add(flatVisible[i].id);
+      return n;
+    });
+  }, [flatVisible]);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const requestPrintAndDispatch = () => {
