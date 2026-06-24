@@ -766,7 +766,44 @@ export default function ReadyToShipPanel({
       
 
       {/* Body */}
-      <div className="rts-body">
+      <div
+        className="rts-body"
+        ref={bodyRef}
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          // بناء قائمة الصفوف المرئية حسب التاب/المجموعات
+          const flat: any[] = tab === "all"
+            ? invoices
+            : (groups || []).flatMap((g) => collapsedGroups.has(g.key) ? [] : g.items);
+          if (flat.length === 0) return;
+          const curIdx = focusedRowId ? flat.findIndex((x) => x.id === focusedRowId) : -1;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            const next = flat[Math.min(curIdx + 1, flat.length - 1)] || flat[0];
+            setFocusedRowId(next.id);
+            bodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-row-id="${next.id}"]`)?.focus();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            const prev = flat[Math.max(curIdx - 1, 0)] || flat[0];
+            setFocusedRowId(prev.id);
+            bodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-row-id="${prev.id}"]`)?.focus();
+          } else if (e.key === " " || e.code === "Space") {
+            if (curIdx >= 0) {
+              e.preventDefault();
+              toggle(flat[curIdx].id);
+            }
+          } else if (e.key === "Enter") {
+            if (curIdx >= 0) {
+              const inv = flat[curIdx];
+              const hasTransport = (inv.invoice_transports?.length ?? 0) > 0;
+              if (!hasTransport) {
+                e.preventDefault();
+                requestDispatchRow(inv);
+              }
+            }
+          }
+        }}
+      >
         {isLoading ? (
           <div className="rts-empty">جارٍ التحميل…</div>
         ) : invoices.length === 0 ? (
