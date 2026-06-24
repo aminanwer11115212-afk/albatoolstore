@@ -1618,21 +1618,43 @@ export default function CustomersPage() {
                           />
                         </td>
                         <td className="tabular-nums" style={{ padding: 0 }}>
-                          <EditableCell
-                            value={c.whatsapp || ""}
-                            disabled={savingRow === c.id}
-                            onSave={(v) => updateRowField(c.id, { whatsapp: v.trim() || null })}
-                            inputClassName="text-[11px] tabular-nums"
-                            placeholder="واتساب"
-                            inputMode="tel"
-                            dir="ltr"
-                            validate={(v) => {
-                              const t = (v || "").trim();
-                              if (!t) return null;
-                              const dups = findDuplicatesByPhone(t, c.id);
-                              return dups.length > 0 ? `رقم مكرر مع: ${dups.map((d: any) => d.name).slice(0, 2).join("، ")}` : null;
-                            }}
-                          />
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <EditableCell
+                                value={c.whatsapp || ""}
+                                disabled={savingRow === c.id}
+                                onSave={(v) => updateRowField(c.id, { whatsapp: v.trim() || null })}
+                                inputClassName="text-[11px] tabular-nums"
+                                placeholder="واتساب"
+                                inputMode="tel"
+                                dir="ltr"
+                                validate={(v) => {
+                                  const t = (v || "").trim();
+                                  if (!t) return null;
+                                  if (!isValidWhatsAppPhone(t)) return "رقم غير صالح للإرسال (8-15 خانة)";
+                                  const dups = findDuplicatesByPhone(t, c.id);
+                                  return dups.length > 0 ? `رقم مكرر مع: ${dups.map((d: any) => d.name).slice(0, 2).join("، ")}` : null;
+                                }}
+                              />
+                            </div>
+                            {(() => {
+                              const wa = pickCustomerWhatsApp(c);
+                              if (!wa) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  title={`إرسال واتساب إلى ${wa}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openWhatsApp(wa, `مرحباً ${c.name || ""} 👋`);
+                                  }}
+                                  style={{ background: "#25D366", color: "#fff", border: 0, borderRadius: 3, padding: "2px 6px", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                                >
+                                  💬
+                                </button>
+                              );
+                            })()}
+                          </div>
                         </td>
                         <td>
                           <InlineSearchSelect
