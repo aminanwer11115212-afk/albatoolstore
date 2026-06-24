@@ -203,14 +203,18 @@ Deno.serve(async (req) => {
   const token = (url.searchParams.get("token") || "").trim();
   const traceId = generateTraceId();
 
-  // Destination: point directly to the standalone document HTML served by the
-  // document-share edge function. This avoids loading the full Lovable SPA on
-  // the customer's device — they only see the document.
+  // Destination: the React share page on the app origin. This page fetches
+  // the document HTML and renders it inside an iframe with a toolbar that
+  // offers Print and Download PDF — exactly like the in-app preview. We
+  // avoid pointing directly at the edge function URL because the Supabase
+  // gateway forces a sandbox CSP + text/plain content-type when a browser
+  // hits it without an apikey header, which makes the page render as raw
+  // code on the customer's device.
   const appOrigin = pickAppOrigin(url.searchParams.get("origin"));
   const supabaseUrlEnv = Deno.env.get("SUPABASE_URL") || `${url.protocol}//${url.host}`;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
   const targetUrl = token
-    ? `${supabaseUrlEnv}/functions/v1/document-share?token=${encodeURIComponent(token)}${anonKey ? `&apikey=${encodeURIComponent(anonKey)}` : ""}`
+    ? `${appOrigin}/share/document/${encodeURIComponent(token)}`
     : appOrigin;
 
   const userAgent = req.headers.get("user-agent") || "";
@@ -257,60 +261,31 @@ Deno.serve(async (req) => {
   }
 
   if (!isPreviewBot) {
-    // Proxy: fetch the document HTML server-side with apikey in the HEADER
-    // (query-param apikey is sometimes ignored by the gateway, which then
-    // returns text/plain + CSP sandbox — making the page render as raw code).
-    // Returning the HTML directly from this function avoids both the redirect
-    // and the sandbox.
-    try {
-      const proxyUrl = `${supabaseUrlEnv}/functions/v1/document-share?token=${encodeURIComponent(token)}`;
-      const upstream = await fetch(proxyUrl, {
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
-          Accept: "text/html",
-        },
-      });
-      const html = await upstream.text();
-      logRedirectEvent({
-        trace_id: traceId,
-        ts: new Date().toISOString(),
-        kind: "browser-redirect",
-        status: upstream.status,
-        token_present: !!token,
-        target: proxyUrl,
-        user_agent: userAgent.slice(0, 200),
-        is_bot: false,
-      });
-      return new Response(new TextEncoder().encode(html), {
-        status: upstream.status,
-        headers: {
-          ...corsHeaders,
-          "content-type": "text/html; charset=UTF-8",
-          "cache-control": "no-store, must-revalidate",
-          "x-content-type-options": "nosniff",
-          "x-share-trace-id": traceId,
-          "x-share-redirect": "browser-proxy",
-        },
-      });
-    } catch (err: any) {
-      logRedirectEvent({
-        trace_id: traceId,
-        ts: new Date().toISOString(),
-        kind: "error",
-        status: 502,
-        token_present: !!token,
-        target: targetUrl,
-        user_agent: userAgent.slice(0, 200),
-        is_bot: false,
-        error: err?.message || String(err),
-      });
-      return new Response(`<!DOCTYPE html><html dir="rtl" lang="ar"><body style="font-family:sans-serif;padding:24px;text-align:center"><h2>تعذّر فتح المستند</h2><p>${escapeHtml(err?.message || String(err))}</p></body></html>`, {
-        status: 502,
-        headers: { ...corsHeaders, "content-type": "text/html; charset=UTF-8" },
-      });
-    }
+    // Real browser: 302 to the React preview page on the app origin.
+    // That page fetches the document HTML via XHR and renders it inside
+    // an iframe (srcDoc), with Print + Download PDF buttons in the toolbar.
+    logRedirectEvent({
+      trace_id: traceId,
+      ts: new Date().toISOString(),
+      kind: "browser-redirect",
+      status: 302,
+      token_present: !!token,
+      target: targetUrl,
+      user_agent: userAgent.slice(0, 200),
+      is_bot: false,
+    });
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders,
+        location: targetUrl,
+        "cache-control": "no-store, must-revalidate",
+        "x-share-trace-id": traceId,
+        "x-share-redirect": "browser-302-app",
+      },
+    });
   }
+
 
   logRedirectEvent({
     trace_id: traceId,
