@@ -470,7 +470,11 @@ export default function ReadyToShipPanel({
       <tr
         key={inv.id}
         className={isChecked ? "checked" : ""}
-        onClick={() => toggle(inv.id)}
+        tabIndex={0}
+        data-row-id={inv.id}
+        onFocus={() => setFocusedIdx(idx)}
+        onClick={() => { setFocusedIdx(idx); toggle(inv.id); }}
+        style={focusedIdx === idx ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : undefined}
       >
         <td className="cell-idx">{idx + 1}</td>
         <td className="cell-check">
@@ -508,29 +512,15 @@ export default function ReadyToShipPanel({
           {hasTransport ? (
             <span className="rts-pill"><CheckCircle2 size={12} /> مُرحَّلة</span>
           ) : (
-            <div className="rts-act-stack">
-              <button
-                type="button"
-                className="rts-btn rts-btn-primary rts-btn-sm"
-                onClick={() => dispatchRow(inv)}
-                disabled={isSaving || !choice.transporterId}
-              >
-                <Send size={12} />
-                {isSaving ? "…" : "تثبيت"}
-              </button>
-              {inv.customer_id ? (
-                <label className="rts-pin-toggle" title="حفظ الاختيار كناقل/وجهة افتراضية لهذا العميل">
-                  <input
-                    type="checkbox"
-                    checked={isPinAsDefault(inv.id)}
-                    onChange={(e) =>
-                      setPinAsDefault((p) => ({ ...p, [inv.id]: e.target.checked }))
-                    }
-                  />
-                  <span>📌</span>
-                </label>
-              ) : null}
-            </div>
+            <button
+              type="button"
+              className="rts-btn rts-btn-primary rts-btn-sm"
+              onClick={() => requestDispatchRow(inv)}
+              disabled={isSaving || !choice.transporterId}
+            >
+              <Send size={12} />
+              {isSaving ? "…" : "تثبيت"}
+            </button>
           )}
         </td>
       </tr>
