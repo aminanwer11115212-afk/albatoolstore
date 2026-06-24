@@ -840,14 +840,34 @@ export default function ReadyToShipPanel({
             <div className="rts-counter">
               <b>{checked.size}</b> محدد من <b>{invoices.length}</b>
             </div>
-            <button
-              className="rts-btn rts-btn-ghost"
-              onClick={toggleAll}
-              disabled={invoices.length === 0}
-            >
-              {allChecked ? <X size={11} /> : null}
-              {allChecked ? "إلغاء التحديد" : "تحديد الكل"}
-            </button>
+            <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+              <button
+                type="button"
+                className="rts-btn rts-btn-ghost"
+                style={{ height: 28, padding: "0 8px", fontSize: 11, gap: 4 }}
+                onClick={() => setAddTrOpen(true)}
+                title="إضافة ناقل جديد"
+              >
+                <Plus size={12} /> <Truck size={12} /> ناقل
+              </button>
+              <button
+                type="button"
+                className="rts-btn rts-btn-ghost"
+                style={{ height: 28, padding: "0 8px", fontSize: 11, gap: 4 }}
+                onClick={() => setAddDsOpen(true)}
+                title="إضافة وجهة جديدة"
+              >
+                <Plus size={12} /> <MapPin size={12} /> وجهة
+              </button>
+              <button
+                className="rts-btn rts-btn-ghost"
+                onClick={toggleAll}
+                disabled={invoices.length === 0}
+              >
+                {allChecked ? <X size={11} /> : null}
+                {allChecked ? "إلغاء التحديد" : "تحديد الكل"}
+              </button>
+            </div>
           </div>
           <button
             className="rts-btn rts-btn-primary"
