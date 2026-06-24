@@ -188,10 +188,14 @@ Deno.serve(async (req) => {
   const token = (url.searchParams.get("token") || "").trim();
   const traceId = generateTraceId();
 
-  // Build the destination app URL (where the React preview page lives).
+  // Destination: point directly to the standalone document HTML served by the
+  // document-share edge function. This avoids loading the full Lovable SPA on
+  // the customer's device — they only see the document.
   const appOrigin = pickAppOrigin(url.searchParams.get("origin"));
+  const supabaseUrlEnv = Deno.env.get("SUPABASE_URL") || `${url.protocol}//${url.host}`;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
   const targetUrl = token
-    ? `${appOrigin}/share/document/${encodeURIComponent(token)}`
+    ? `${supabaseUrlEnv}/functions/v1/document-share?token=${encodeURIComponent(token)}${anonKey ? `&apikey=${encodeURIComponent(anonKey)}` : ""}`
     : appOrigin;
 
   const userAgent = req.headers.get("user-agent") || "";
