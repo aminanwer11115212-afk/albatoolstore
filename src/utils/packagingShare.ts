@@ -64,7 +64,7 @@ export async function createPackagingShareLink(opts: {
     body: JSON.stringify({
       doc_type: opts.isInvoice ? "packaging-invoice" : "packaging-quote",
       doc_id: opts.docId,
-      ttl_hours: 168,
+      ttl_hours: 24,
     }),
   });
   const json = await resp.json();
