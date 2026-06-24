@@ -9,7 +9,7 @@ import { validatePaymentAmount, computePaymentStatus } from "@/utils/paymentVali
 import { splitPayment } from "@/utils/overpayment";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
-import { openWhatsAppMessage, type WhatsAppMessageType } from "@/utils/whatsapp";
+import { type WhatsAppMessageType } from "@/utils/whatsapp";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PackagingDialog from "@/components/packaging/PackagingDialog";
 import TransportDialog from "@/components/transport/TransportDialog";
@@ -273,12 +273,17 @@ export default function InvoiceViewPage() {
     } catch {}
   };
 
-  const handleWhatsApp = (type: WhatsAppMessageType) => {
-    if (!invoice?.customers?.phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
-    openWhatsAppMessage(invoice.customers.phone, type, {
-      invoice_number: invoice.invoice_number, total: invoice.total || 0,
-      paid_amount: invoice.paid_amount || 0, due_amount: invoice.due_amount || 0,
-      date: invoice.date, customerName: invoice.customers?.name, currency: "",
+  const handleWhatsApp = async (_type: WhatsAppMessageType) => {
+    if (!invoice) return;
+    const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+    await shareDocumentViaWhatsApp({
+      docType: "invoice",
+      docId: invoice.id,
+      phone: invoice.customers?.phone,
+      customerName: invoice.customers?.name || (invoice as any).walk_in_customer_name,
+      docNumber: invoice.invoice_number,
+      total: invoice.total,
+      docLabel: (invoice as any).source === "pos" ? "فاتورة كاش" : "فاتورة",
     });
     setShowWhatsappMenu(false);
   };

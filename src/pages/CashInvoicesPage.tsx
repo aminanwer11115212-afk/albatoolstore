@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Printer, Trash2, RefreshCw, Search, ArrowRight } from "lucide-react";
+import { Plus, Printer, Trash2, RefreshCw, Search, ArrowRight, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useInvoices, useCompanySettings } from "@/hooks/useData";
 import { startsWithMatch } from "@/utils/searchMatch";
@@ -139,6 +139,20 @@ export default function CashInvoicesPage() {
   };
 
   const handlePrint = (id: string) => navigate(`/preview/invoice/${id}`);
+
+  const handleWhatsApp = async (r: CashInv) => {
+    const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+    await shareDocumentViaWhatsApp({
+      docType: "invoice",
+      docId: r.id,
+      phone: null, // POS عادةً بدون رقم — يفتح واتساب لاختيار جهة الاتصال يدوياً
+      customerName: r.walk_in_customer_name || "عميل نقدي",
+      docNumber: r.invoice_number,
+      total: r.total,
+      currency,
+      docLabel: "فاتورة كاش",
+    });
+  };
 
   const reload = () => fetchPage(0, true);
 
@@ -280,6 +294,13 @@ export default function CashInvoicesPage() {
                         <Printer size={14} />
                       </button>
                       <button
+                        onClick={() => handleWhatsApp(r)}
+                        className="p-1.5 rounded-md hover:bg-muted text-green-600"
+                        title="إرسال رابط المعاينة عبر واتساب"
+                      >
+                        <MessageCircle size={14} />
+                      </button>
+                      <button
                         onClick={() => navigate(`/invoices/cash/edit/${r.id}`)}
                         className="px-2 py-1 text-xs rounded-md border border-border hover:bg-muted"
                       >
@@ -324,6 +345,12 @@ export default function CashInvoicesPage() {
                     className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted"
                   >
                     <Printer size={12} /> طباعة
+                  </button>
+                  <button
+                    onClick={() => handleWhatsApp(r)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-green-600 text-green-700 hover:bg-green-600 hover:text-white"
+                  >
+                    <MessageCircle size={12} /> واتساب
                   </button>
                   <button
                     onClick={() => handleDelete(r.id)}

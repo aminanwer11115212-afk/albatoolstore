@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadQuoteExtras } from "@/utils/printExtras";
 import { deductStockForLines } from "@/utils/stockDeduction";
-import { openWhatsAppMessage, type WhatsAppMessageType } from "@/utils/whatsapp";
+import { type WhatsAppMessageType } from "@/utils/whatsapp";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -227,13 +227,18 @@ export default function QuoteViewPage() {
     await markQuoteAsSent(quote.id);
   };
 
-  const handleWhatsApp = async (type: WhatsAppMessageType) => {
-    if (!quote?.customers?.phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
-    openWhatsAppMessage(quote.customers.phone, type, {
-      invoice_number: quote.quote_number, total: quote.total || 0,
-      paid_amount: 0, due_amount: quote.total || 0,
-      date: quote.date, customerName: quote.customers?.name,
-      currency: "",
+  const handleWhatsApp = async (_type: WhatsAppMessageType) => {
+    if (!quote) return;
+    const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+    await shareDocumentViaWhatsApp({
+      docType: "quote",
+      docId: quote.id,
+      phone: quote.customers?.phone,
+      customerName: quote.customers?.name,
+      docNumber: quote.quote_number,
+      total: quote.total,
+      currency: quote.currency_code || company?.currency || "",
+      docLabel: (quote as any).is_side ? "عرض سعر جانبي" : "عرض سعر",
     });
     setShowWhatsappMenu(false);
     const { markQuoteAsSent } = await import("@/utils/quoteSentStatus");
