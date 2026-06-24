@@ -847,7 +847,7 @@ export default function ReadyToShipPanel({
           </div>
           <button
             className="rts-btn rts-btn-primary"
-            onClick={printAndDispatch}
+            onClick={requestPrintAndDispatch}
             disabled={busy || checked.size === 0}
           >
             <Printer size={14} />
@@ -855,6 +855,25 @@ export default function ReadyToShipPanel({
           </button>
         </div>
       )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد ترحيل الفواتير</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم طباعة كشف الترحيلات لـ <b>{checked.size}</b> فاتورة، ثم تحويل حالتها إلى
+              «في الطريق للترحيلات» واختفائها من هذه الشاشة. هل تريد المتابعة؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={doPrintAndDispatch}>
+              نعم، تأكيد وطباعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
   );
 }
