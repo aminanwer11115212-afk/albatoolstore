@@ -1467,6 +1467,46 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     action(id);
   };
 
+  // ---------- POS: اختصارات لوحة المفاتيح للكاشير ----------
+  // F2 = حفظ، F4 = حفظ + طباعة، F6 = تركيز حقل العميل، F3 = تركيز حقل المنتج، F8 = حفظ + جديد
+  useEffect(() => {
+    if (!pos) return;
+    const handler = (e: KeyboardEvent) => {
+      // تجاهل لو المستخدم ضاغط Ctrl/Meta/Alt مع F-key لتفادي اختصارات النظام
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      switch (e.key) {
+        case "F2":
+          e.preventDefault();
+          void saveInvoice({ skipNavigate: true });
+          break;
+        case "F4":
+          e.preventDefault();
+          (async () => {
+            const ok = await saveInvoice({ skipNavigate: true, silent: true });
+            const id = lastSavedIdRef.current;
+            if (ok && id) navigate(`/preview/invoice/${id}`);
+          })();
+          break;
+        case "F8":
+          e.preventDefault();
+          void saveInvoice({ andNew: true });
+          break;
+        case "F3":
+          e.preventDefault();
+          quickProductRef.current?.focus();
+          break;
+        case "F6":
+          e.preventDefault();
+          customerInputRef.current?.focus();
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos]);
+
+
   // ---------- Render ----------
   return (
     <div ref={pageRef} className={`neo-quote-scope${pos ? " pos-mode" : ""}`} dir="rtl" style={{ position: "relative" }}>
@@ -2057,7 +2097,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                     </button>
                   ),
                 }] : []),
-                {
+                ...(!pos ? [{
                   id: "record-payment",
                   group: "1-primary",
                   node: (
@@ -2071,7 +2111,21 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                       <Wallet size={14} /> تسجيل دفعة
                     </button>
                   ),
-                },
+                }] : []),
+                ...(pos ? [{
+                  id: "manage-cash",
+                  group: "1-primary",
+                  node: (
+                    <button
+                      type="button"
+                      onClick={() => navigate("/invoices/cash/list")}
+                      title="إدارة فواتير الكاش"
+                      style={btnStyle("#0ea5e9")}
+                    >
+                      إدارة الكاش
+                    </button>
+                  ),
+                }] : []),
 
                 // === Group 2: Files & attachments ===
                 ...(!pos ? [
