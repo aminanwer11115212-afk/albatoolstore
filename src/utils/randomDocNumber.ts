@@ -9,8 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
  * - الأمان النهائي يبقى عبر UNIQUE constraint + حلقة retry في صفحة الحفظ.
  */
 
-type Tbl = "invoices" | "quotes" | "purchase_orders";
-type Col = "invoice_number" | "quote_number" | "order_number";
+type Tbl = "invoices" | "quotes" | "purchase_orders" | "stock_returns";
+type Col = "invoice_number" | "quote_number" | "order_number" | "return_number";
 
 function rand(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
