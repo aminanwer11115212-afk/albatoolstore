@@ -1337,8 +1337,8 @@ export default function StockReturnCreatePage() {
                   id: "edit-save",
                   group: "1-primary",
                   node: (
-                    <button onClick={saveReturn} title="حفظ التعديلات" style={btnStyle("#f97316")}>
-                      <Edit size={14} /> تعديل
+                    <button onClick={saveReturn} disabled={savingReturn} title="حفظ التعديلات" style={btnStyle("#f97316")}>
+                      <Edit size={14} /> {savingReturn ? "جارٍ..." : "تعديل"}
                     </button>
                   ),
                 }] : []),
