@@ -253,7 +253,7 @@ export default function CustomersPage() {
     return arr;
   }, [filtered, sortBy, lastActivity]);
 
-  const activeFiltersCount = [filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity !== "all" ? filterActivity : ""].filter(Boolean).length;
+  const activeFiltersCount = [filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterWaValid, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity !== "all" ? filterActivity : ""].filter(Boolean).length;
 
   // إحصاءات الديون من السيرفر (RPC) — أخفّ بكثير من حسابها على المتصفح
   const { data: serverStats } = useQuery({
