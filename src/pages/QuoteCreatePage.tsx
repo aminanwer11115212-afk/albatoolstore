@@ -436,23 +436,17 @@ export default function QuoteCreatePage() {
         setQuotePrefix(cfg.data.quote_prefix || "QT-");
         setSideQuotePrefix((cfg.data as any).side_quote_prefix || "QTS-");
       }
-      // generate quote number for new quotes — find highest numeric suffix for the prefix
-      // Side quotes use their own prefix and counter, fully independent of regular quotes.
+      // رقم افتراضي عشوائي لكل عرض سعر جديد لتفادي التكرار
+      // (العروض الجانبية لها بادئة وعدّاد مستقلان)
       if (!editId) {
         const prefix = isSideMode
           ? ((cfg.data as any)?.side_quote_prefix || "QTS-")
           : (cfg.data?.quote_prefix || "QT-");
-        let q = supabase.from("quotes").select("quote_number").like("quote_number", `${prefix}%`);
-        q = isSideMode ? q.eq("is_side", true) : q.or("is_side.is.null,is_side.eq.false");
-        const { data: rows } = await q;
-        let maxN = 0;
-        (rows || []).forEach((r: any) => {
-          const after = String(r.quote_number || "").slice(prefix.length);
-          const mm = after.match(/^(\d+)/);
-          const n = mm ? parseInt(mm[1]) : 0;
-          if (n > maxN) maxN = n;
+        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+        const candidate = await generateRandomDocNumber("quotes", "quote_number", prefix, {
+          scope: (q) => (isSideMode ? q.eq("is_side", true) : q.or("is_side.is.null,is_side.eq.false")),
         });
-        setQuoteNumber(`${prefix}${String(maxN + 1).padStart(4, "0")}`);
+        setQuoteNumber(candidate);
       }
     })();
 
