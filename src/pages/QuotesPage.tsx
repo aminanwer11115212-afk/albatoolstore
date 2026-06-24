@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { pickCustomerWhatsApp } from "@/utils/whatsapp";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useQuotes, useCompanySettings } from "@/hooks/useData";
 import { useNavigate } from "react-router-dom";
@@ -63,7 +64,7 @@ export default function QuotesPage() {
   };
 
   const handleSendQuote = async (q: any, channel: "whatsapp" | "email" | "sms") => {
-    const phone = q.customers?.phone;
+    const phone = pickCustomerWhatsApp(q.customers);
     const email = q.customers?.email;
     const cur = q.currency_code || currency;
     if (channel === "whatsapp") {

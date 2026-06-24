@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { pickCustomerWhatsApp } from "@/utils/whatsapp";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useInvoicesWithCustomers, useInvoices, useCompanySettings } from "@/hooks/useData";
 import { useNavigate } from "react-router-dom";
@@ -75,7 +76,7 @@ export default function InvoicesPage() {
     await shareDocumentViaWhatsApp({
       docType: "invoice",
       docId: inv.id,
-      phone: inv.customers?.phone,
+      phone: pickCustomerWhatsApp(inv.customers),
       customerName: inv.customers?.name || inv.walk_in_customer_name,
       docNumber: inv.invoice_number,
       total: inv.total,

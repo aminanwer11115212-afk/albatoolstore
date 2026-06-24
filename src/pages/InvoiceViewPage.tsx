@@ -9,7 +9,7 @@ import { validatePaymentAmount, computePaymentStatus } from "@/utils/paymentVali
 import { splitPayment } from "@/utils/overpayment";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
-import { type WhatsAppMessageType } from "@/utils/whatsapp";
+import { type WhatsAppMessageType, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PackagingDialog from "@/components/packaging/PackagingDialog";
 import TransportDialog from "@/components/transport/TransportDialog";
@@ -279,7 +279,7 @@ export default function InvoiceViewPage() {
     await shareDocumentViaWhatsApp({
       docType: "invoice",
       docId: invoice.id,
-      phone: invoice.customers?.phone,
+      phone: pickCustomerWhatsApp(invoice.customers),
       customerName: invoice.customers?.name || (invoice as any).walk_in_customer_name,
       docNumber: invoice.invoice_number,
       total: invoice.total,

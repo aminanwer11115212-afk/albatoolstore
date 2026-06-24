@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { generateWhatsAppLink, openWhatsApp } from "@/utils/whatsapp";
+import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { getLatestRate } from "@/utils/currency";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadQuoteExtras } from "@/utils/printExtras";
@@ -1839,7 +1839,7 @@ export default function QuoteCreatePage() {
                           if (!resp.ok) throw new Error(json.error || "فشل إنشاء الرابط");
                           toast.dismiss(tId);
                           const msg = `مرحباً ${customer.name} 👋\n📄 عرض سعر رقم: ${quoteNumber}\n💰 الإجمالي: ${totals.total.toLocaleString()} ${companyCurrency}\n\nرابط عرض السعر:\n${json.url}`;
-                          openWhatsApp(customer.phone, msg);
+                          openWhatsApp(pickCustomerWhatsApp(customer), msg);
                           const { markQuoteAsSent } = await import("@/utils/quoteSentStatus");
                           await markQuoteAsSent(editId);
                         } catch (err: any) {

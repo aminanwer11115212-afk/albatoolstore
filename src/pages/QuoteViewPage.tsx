@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadQuoteExtras } from "@/utils/printExtras";
 import { deductStockForLines } from "@/utils/stockDeduction";
-import { type WhatsAppMessageType } from "@/utils/whatsapp";
+import { type WhatsAppMessageType, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -233,7 +233,7 @@ export default function QuoteViewPage() {
     await shareDocumentViaWhatsApp({
       docType: "quote",
       docId: quote.id,
-      phone: quote.customers?.phone,
+      phone: pickCustomerWhatsApp(quote.customers),
       customerName: quote.customers?.name,
       docNumber: quote.quote_number,
       total: quote.total,
