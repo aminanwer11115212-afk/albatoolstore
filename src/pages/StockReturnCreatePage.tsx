@@ -290,6 +290,9 @@ export default function StockReturnCreatePage() {
 
   const [quickRow, setQuickRow] = useState<ReturnRow>(newRow());
   const [rows, setRows] = useState<ReturnRow[]>([]);
+  // قفل الحفظ لمنع النقرات المتكررة وتكرار سجلات المرتجع
+  const savingReturnRef = useRef(false);
+  const [savingReturn, setSavingReturn] = useState(false);
   const itemsScrollRef = useRef<HTMLDivElement>(null);
   useContainerFit(itemsScrollRef, clampWidthsToContainer, { locked: colsLocked });
   const prevRowsLen = useRef(1);
@@ -659,9 +662,14 @@ export default function StockReturnCreatePage() {
 
   // ---------- Save ----------
   async function saveReturn() {
+    // منع النقرات المتكررة أثناء حفظ سابق غير مكتمل
+    if (savingReturnRef.current) return;
     if (!customer) { toast.error("اختر عميلاً"); return; }
     const valid = rows.filter((r) => r.product_id);
     if (!valid.length) { toast.error("أضف منتجاً واحداً على الأقل"); return; }
+    savingReturnRef.current = true;
+    setSavingReturn(true);
+    try {
 
     // If linked to an invoice, validate that no row exceeds the invoice's original quantity
     if (linkedInvoiceId) {
@@ -774,6 +782,10 @@ export default function StockReturnCreatePage() {
 
     toast.success(editId ? "تم تحديث المرتجع وتعديل المخزون" : "تم حفظ المرتجع وإعادة الكميات للمخزون");
     navigate(`/stock-return/view/${rid}`);
+    } finally {
+      savingReturnRef.current = false;
+      setSavingReturn(false);
+    }
   }
 
   // ---------- Render ----------
@@ -1318,15 +1330,15 @@ export default function StockReturnCreatePage() {
                   id: "save",
                   group: "1-primary",
                   node: (
-                    <button className="btn btn-success btn-sm" onClick={saveReturn}>حفظ</button>
+                    <button className="btn btn-success btn-sm" onClick={saveReturn} disabled={savingReturn}>{savingReturn ? "جاري الحفظ..." : "حفظ"}</button>
                   ),
                 },
                 ...(editId ? [{
                   id: "edit-save",
                   group: "1-primary",
                   node: (
-                    <button onClick={saveReturn} title="حفظ التعديلات" style={btnStyle("#f97316")}>
-                      <Edit size={14} /> تعديل
+                    <button onClick={saveReturn} disabled={savingReturn} title="حفظ التعديلات" style={btnStyle("#f97316")}>
+                      <Edit size={14} /> {savingReturn ? "جارٍ..." : "تعديل"}
                     </button>
                   ),
                 }] : []),

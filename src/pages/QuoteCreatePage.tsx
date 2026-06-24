@@ -357,6 +357,9 @@ export default function QuoteCreatePage() {
   const [quoteWorkflowStatus, setQuoteWorkflowStatus] = useState<string>("draft");
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  // قفل الحفظ لمنع النقرات المتكررة وإنشاء سجلات مكررة
+  const savingQuoteRef = useRef(false);
+  const [savingQuote, setSavingQuote] = useState(false);
   const { isAdmin } = useUserRole();
 
   // Default exchange rate from Dashboard (latest in exchange_rates for foreign currency)
@@ -789,6 +792,11 @@ export default function QuoteCreatePage() {
   async function saveQuote(asStatus: "draft" | "sent" = "draft", opts: { andNew?: boolean; skipNavigate?: boolean; silent?: boolean } = {}): Promise<boolean> {
     // لا تحفظ إذا كان العرض قد حُذف/حُوِّل في الجلسة الحالية
     if (quoteGoneRef.current) return false;
+    // منع النقرات المتكررة أثناء حفظ سابق غير مكتمل
+    if (savingQuoteRef.current) return false;
+    savingQuoteRef.current = true;
+    setSavingQuote(true);
+    try {
     let activeCustomer = customer;
     // إن لم يُختَر عميل من القائمة لكن يوجد اسم نصي حر، أنشئ عميلاً جديداً تلقائياً
     if (!activeCustomer) {
@@ -973,6 +981,10 @@ export default function QuoteCreatePage() {
       }
     }
     return true;
+    } finally {
+      savingQuoteRef.current = false;
+      setSavingQuote(false);
+    }
   }
 
 
@@ -2039,8 +2051,9 @@ export default function QuoteCreatePage() {
                       onClick={() => saveQuote("draft")}
                       style={btnStyle("#2563eb")}
                       title="حفظ عرض السعر"
+                      disabled={savingQuote}
                     >
-                      حفظ
+                      {savingQuote ? "جاري الحفظ..." : "حفظ"}
                     </button>
                   ),
                 },
@@ -2054,6 +2067,7 @@ export default function QuoteCreatePage() {
                       onClick={() => saveQuote("draft", { andNew: true })}
                       style={btnStyle("#0ea5e9")}
                       title="حفظ والانتقال إلى عرض سعر جديد"
+                      disabled={savingQuote}
                     >
                       + جديد
                     </button>
