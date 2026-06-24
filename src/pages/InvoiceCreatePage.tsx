@@ -26,6 +26,7 @@ import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils
 import { useDocumentCurrency } from "@/hooks/document/useDocumentCurrency";
 import { useDocumentItems } from "@/hooks/document/useDocumentItems";
 import { useDocumentCustomer } from "@/hooks/document/useDocumentCustomer";
+import { useDocumentPayment } from "@/hooks/document/useDocumentPayment";
 
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLocked, screenColWidthsKey, migrateScreenColKeys, COLS_TOAST_SAVED, COLS_TOAST_SAVE_FAILED, COLS_TOAST_EDIT_MODE, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE } from "@/hooks/useColumnWidths";
@@ -192,21 +193,23 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const [workflowStatus, setWorkflowStatus] = useState<string>("new");
   const [invoiceStatus, setInvoiceStatus] = useState<string>("pending");
 
-  // ---------- Payment dialog state ----------
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  // ---------- Payment dialog state (extracted to useDocumentPayment) ----------
+  const {
+    paymentDialogOpen, setPaymentDialogOpen,
+    savedTotal, setSavedTotal,
+    savedPaid, setSavedPaid,
+    savedDue, setSavedDue,
+    accounts, setAccounts,
+    payAmount, setPayAmount,
+    payMethod, setPayMethod,
+    payAccount, setPayAccount,
+    payDate, setPayDate,
+    payNote, setPayNote,
+    payRef, setPayRef,
+    payDiscount, setPayDiscount,
+    savingPayment, setSavingPayment,
+  } = useDocumentPayment();
   const [savedCustomerId, setSavedCustomerId] = useState<string | null>(null);
-  const [savedTotal, setSavedTotal] = useState<number>(0);
-  const [savedPaid, setSavedPaid] = useState<number>(0);
-  const [savedDue, setSavedDue] = useState<number>(0);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [payAmount, setPayAmount] = useState<string>("");
-  const [payMethod, setPayMethod] = useState<string>("cash");
-  const [payAccount, setPayAccount] = useState<string>("");
-  const [payDate, setPayDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [payNote, setPayNote] = useState<string>("");
-  const [payRef, setPayRef] = useState<string>("");
-  const [payDiscount, setPayDiscount] = useState<string>("");
-  const [savingPayment, setSavingPayment] = useState(false);
   const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
   const [showMessageImport, setShowMessageImport] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
