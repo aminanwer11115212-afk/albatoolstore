@@ -36,6 +36,7 @@ const TransactionsPage = lazy(() => import("./pages/TransactionsPage"));
 const InvoicesPage = lazy(() => import("./pages/InvoicesPage"));
 const InvoiceCreatePage = lazy(() => import("./pages/InvoiceCreatePage"));
 const CashInvoicesPage = lazy(() => import("./pages/CashInvoicesPage"));
+const MigratePosNumbersPage = lazy(() => import("./pages/MigratePosNumbersPage"));
 const InvoiceViewPage = lazy(() => import("./pages/InvoiceViewPage"));
 const InvoicePackagingPage = lazy(() => import("./pages/InvoicePackagingPage"));
 const InvoiceTransportPage = lazy(() => import("./pages/InvoiceTransportPage"));
