@@ -458,7 +458,7 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourc
         if (sourceFilter === "regular" && it.source === "pos") return false;
       }
       if (term) {
-        const partyName = String(it[partyKey]?.name || "").toLowerCase();
+        const partyName = String(it[partyKey]?.name || (isInvoices && it.source === "pos" ? (it.walk_in_customer_name || "") : "")).toLowerCase();
         const partyPhone = String(it[partyKey]?.phone || "").toLowerCase();
         const docNo = String(
           it.invoice_number || it.quote_number || it.order_number || it.return_number || ""
