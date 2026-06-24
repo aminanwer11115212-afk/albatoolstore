@@ -65,7 +65,12 @@ export default function EmployeesPage() {
   };
 
   const loadRoles = async () => {
-    const { data } = await supabase.from("user_roles").select("user_id, role, employee_id, permissions");
+    const { data, error } = await supabase.from("user_roles").select("user_id, role, employee_id, permissions");
+    if (error) {
+      console.error("[EmployeesPage] loadRoles failed:", error);
+      toast.error(`تعذّر تحميل صلاحيات الموظفين: ${error.message}`);
+      return;
+    }
     const map: any = {};
     (data || []).forEach((r: any) => { if (r.employee_id) map[r.employee_id] = r; });
     setRoleMap(map);

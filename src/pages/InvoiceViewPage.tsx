@@ -87,16 +87,36 @@ export default function InvoiceViewPage() {
   const loadInvoice = async () => {
     if (!id) return;
     setLoading(true);
-    const { data: inv } = await supabase.from("invoices").select("*, customers(name, phone, email, address, balance)").eq("id", id).single();
-    const { data: itms } = await supabase.from("invoice_items").select("*").eq("invoice_id", id);
-    setInvoice(inv);
-    setItems(itms || []);
-    if (inv) {
-      setPayAmount(String(inv.due_amount || inv.total || 0));
-      setPayNote(`Payment for invoice #${inv.invoice_number}`);
-      setNewStatus(inv.status || "pending");
+    try {
+      const { data: inv, error: invErr } = await supabase
+        .from("invoices")
+        .select("*, customers(name, phone, email, address, balance)")
+        .eq("id", id)
+        .single();
+      if (invErr) {
+        console.error("[InvoiceViewPage] loadInvoice failed:", invErr);
+        toast.error(`تعذّر تحميل الفاتورة: ${invErr.message}`);
+        setInvoice(null); setItems([]);
+        return;
+      }
+      const { data: itms, error: itErr } = await supabase
+        .from("invoice_items")
+        .select("*")
+        .eq("invoice_id", id);
+      if (itErr) {
+        console.error("[InvoiceViewPage] items failed:", itErr);
+        toast.error(`تعذّر تحميل بنود الفاتورة: ${itErr.message}`);
+      }
+      setInvoice(inv);
+      setItems(itms || []);
+      if (inv) {
+        setPayAmount(String(inv.due_amount || inv.total || 0));
+        setPayNote(`Payment for invoice #${inv.invoice_number}`);
+        setNewStatus(inv.status || "pending");
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const isBankMethod = (m: string) => m === "bank" || m === "bank_transfer";
@@ -289,13 +309,18 @@ export default function InvoiceViewPage() {
       }).select().single();
       if (error) throw error;
       if (newInv && items.length > 0) {
-        await supabase.from("invoice_items").insert(
+        const { error: itErr } = await supabase.from("invoice_items").insert(
           items.map((it: any) => ({
             invoice_id: newInv.id, product_id: it.product_id, product_name: it.product_name,
             quantity: it.quantity, unit_price: it.unit_price,
             discount: it.discount, total: it.total,
           }))
         );
+        if (itErr) {
+          // Rollback: حذف الفاتورة المنشأة لتفادي فاتورة فارغة يتيمة.
+          await supabase.from("invoices").delete().eq("id", newInv.id);
+          throw new Error(`فشل نسخ البنود، تم التراجع: ${itErr.message}`);
+        }
       }
       toast.success("تم نسخ الفاتورة بنجاح");
       navigate(`/invoices/view/${newInv.id}`);

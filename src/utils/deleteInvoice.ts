@@ -41,32 +41,45 @@ export async function deleteInvoiceWithStockRestore(
     restoredStock = true;
   }
 
-  // 4) حذف توابع الفاتورة بالترتيب الآمن
-  // أ) عناصر التغليف ثم رؤوس التغليف
-  const { data: pkgs } = await supabase
+  // 4) حذف توابع الفاتورة بالترتيب الآمن — فحص كل خطوة لمنع البيانات اليتيمة الصامتة.
+  const { data: pkgs, error: pkgQErr } = await supabase
     .from("invoice_packaging")
     .select("id")
     .eq("invoice_id", invoiceId);
+  if (pkgQErr) throw new Error(`تعذّر قراءة سجلات التغليف: ${pkgQErr.message}`);
   const pkgIds = (pkgs || []).map((p: any) => p.id);
   if (pkgIds.length) {
-    await supabase.from("invoices_packaging_items").delete().in("invoice_packaging_id", pkgIds);
+    const { error } = await supabase.from("invoices_packaging_items").delete().in("invoice_packaging_id", pkgIds);
+    if (error) throw new Error(`تعذّر حذف بنود التغليف: ${error.message}`);
   }
 
-  // ب) عناصر النقل ثم رؤوس النقل
-  const { data: trs } = await supabase
+  const { data: trs, error: trQErr } = await supabase
     .from("invoice_transports")
     .select("id")
     .eq("invoice_id", invoiceId);
+  if (trQErr) throw new Error(`تعذّر قراءة سجلات الترحيل: ${trQErr.message}`);
   const trIds = (trs || []).map((t: any) => t.id);
   if (trIds.length) {
-    await supabase.from("invoices_transports_items").delete().in("invoice_transport_id", trIds);
+    const { error } = await supabase.from("invoices_transports_items").delete().in("invoice_transport_id", trIds);
+    if (error) throw new Error(`تعذّر حذف بنود الترحيل: ${error.message}`);
   }
 
-  // ج) باقي التوابع
-  await supabase.from("invoice_items").delete().eq("invoice_id", invoiceId);
-  await supabase.from("invoice_packaging").delete().eq("invoice_id", invoiceId);
-  await supabase.from("invoice_transports").delete().eq("invoice_id", invoiceId);
-  await supabase.from("invoice_attachments").delete().eq("invoice_id", invoiceId);
+  {
+    const { error } = await supabase.from("invoice_items").delete().eq("invoice_id", invoiceId);
+    if (error) throw new Error(`تعذّر حذف بنود الفاتورة: ${error.message}`);
+  }
+  {
+    const { error } = await supabase.from("invoice_packaging").delete().eq("invoice_id", invoiceId);
+    if (error) throw new Error(`تعذّر حذف رؤوس التغليف: ${error.message}`);
+  }
+  {
+    const { error } = await supabase.from("invoice_transports").delete().eq("invoice_id", invoiceId);
+    if (error) throw new Error(`تعذّر حذف رؤوس الترحيل: ${error.message}`);
+  }
+  {
+    const { error } = await supabase.from("invoice_attachments").delete().eq("invoice_id", invoiceId);
+    if (error) throw new Error(`تعذّر حذف مرفقات الفاتورة: ${error.message}`);
+  }
 
   // 5) حذف الفاتورة نفسها
   const { error: delErr } = await supabase.from("invoices").delete().eq("id", invoiceId);

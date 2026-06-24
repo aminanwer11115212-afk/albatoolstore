@@ -162,7 +162,10 @@ export default function SideQuotesPage() {
           transferred_by_name: actorName,
           note: transferNote.trim() || null,
         });
-      if (logErr) console.warn("transfer log failed:", logErr);
+      if (logErr) {
+        console.warn("transfer log failed:", logErr);
+        toast.message("تم نقل الملكية لكن فشل تسجيل سجل التدقيق");
+      }
 
       toast.success("تم نقل الملكية");
       setTransferringId(null);

@@ -121,23 +121,27 @@ export default function ProductsPage() {
   useEffect(() => {
     const fetchRate = async () => {
       try {
-        const { data: currencies } = await supabase.from("currencies").select("*").eq("is_active", true).order("is_base", { ascending: false });
+        const { data: currencies, error: cErr } = await supabase.from("currencies").select("*").eq("is_active", true).order("is_base", { ascending: false });
+        if (cErr) throw cErr;
         if (currencies && currencies.length > 0) {
           const nonBase = currencies.find((c: any) => !c.is_base);
           if (nonBase) {
-            const { data: er } = await supabase
+            const { data: er, error: erErr } = await supabase
               .from("exchange_rates")
               .select("rate_to_base")
               .eq("currency_code", nonBase.code)
               .order("effective_date", { ascending: false })
               .limit(1)
               .maybeSingle();
+            if (erErr) throw erErr;
             if (er?.rate_to_base) {
               setExchangeRate(Number(er.rate_to_base));
             }
           }
         }
-      } catch (e) {
+      } catch (e: any) {
+        console.error("[ProductsPage] exchange rate fetch failed:", e);
+        toast.message("تعذّر جلب سعر الصرف الحالي — الأسعار بالعملة الأجنبية قد تكون غير دقيقة");
         console.error("Error fetching rate:", e);
       }
     };

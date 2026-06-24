@@ -44,20 +44,22 @@ export default function StockReturnViewPage() {
   const handleStatusChange = async () => {
     if (!ret) return;
     try {
-      await supabase.from("stock_returns").update({ status: newStatus }).eq("id", ret.id);
+      const { error } = await supabase.from("stock_returns").update({ status: newStatus }).eq("id", ret.id);
+      if (error) throw error;
+      await load();
       toast.success("تم تغيير الوضع");
       setShowStatusChange(false);
-      load();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { toast.error(e.message || "تعذّر تغيير الوضع"); }
   };
 
   const handleDelete = async () => {
     if (!ret || !confirm("هل أنت متأكد من إلغاء المرتجع؟")) return;
     try {
-      await supabase.from("stock_returns").update({ status: "cancelled" }).eq("id", ret.id);
+      const { error } = await supabase.from("stock_returns").update({ status: "cancelled" }).eq("id", ret.id);
+      if (error) throw error;
+      await load();
       toast.success("تم إلغاء المرتجع");
-      load();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { toast.error(e.message || "تعذّر إلغاء المرتجع"); }
   };
 
   const startEdit = (index: number, field: string, value: any) => {
@@ -75,12 +77,14 @@ export default function StockReturnViewPage() {
     const price = field === "unit_price" ? val : item.unit_price;
     updates.total = qty * price;
     try {
-      await supabase.from("stock_return_items").update(updates).eq("id", item.id);
+      const { error: itErr } = await supabase.from("stock_return_items").update(updates).eq("id", item.id);
+      if (itErr) throw itErr;
       const newItems = items.map((it, i) => i === index ? { ...it, ...updates } : it);
       const newTotal = newItems.reduce((s: number, it: any) => s + Number(it.total || 0), 0);
-      await supabase.from("stock_returns").update({ total: newTotal }).eq("id", ret.id);
+      const { error: rErr } = await supabase.from("stock_returns").update({ total: newTotal }).eq("id", ret.id);
+      if (rErr) throw new Error(`تم حفظ البند لكن فشل تحديث الإجمالي: ${rErr.message}`);
+      await load();
       toast.success("تم التحديث");
-      load();
     } catch (e: any) { toast.error(e.message); }
     setEditingCell(null);
   };
