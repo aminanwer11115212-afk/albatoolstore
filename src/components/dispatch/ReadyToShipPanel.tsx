@@ -466,7 +466,11 @@ export default function ReadyToShipPanel({
             onClick={(e) => e.stopPropagation()}
           />
         </td>
-        <td className="cell-name">{inv.customers?.name || "كاش"}</td>
+        <td className="cell-name">
+          {tab === "by_customer"
+            ? (inv.invoice_number || "—")
+            : (inv.customers?.name || "كاش")}
+        </td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
           <SearchableSelect
             options={transporters as any}
@@ -791,7 +795,7 @@ export default function ReadyToShipPanel({
               <tr>
                 <th className="cell-idx">#</th>
                 <th className="cell-check">✓</th>
-                <th>اسم الزبون</th>
+                <th>{tab === "by_customer" ? "رقم الفاتورة" : "اسم الزبون"}</th>
                 <th className="cell-sel">الناقل</th>
                 <th className="cell-sel">الوجهة</th>
                 <th className="cell-act">إجراء</th>
