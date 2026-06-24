@@ -66,18 +66,37 @@ export default function AccountsOpeningBalanceDialog({ open, onOpenChange }: Pro
   };
 
   const save = async (a: Account) => {
+    if (savingId) return; // منع النقر المتكرر
     setSavingId(a.id);
-    const newBalance = netFor(a);
-    const { error } = await supabase
-      .from("accounts")
-      .update({ balance: newBalance })
-      .eq("id", a.id);
-    setSavingId(null);
-    if (error) { toast.error("فشل الحفظ: " + error.message); return; }
-    toast.success(`تم تحديث رصيد ${a.name}`);
-    setAccounts(prev => prev.map(x => x.id === a.id ? { ...x, balance: newBalance } : x));
-    setOpening(prev => ({ ...prev, [a.id]: String(newBalance) }));
-    setIncome(prev => ({ ...prev, [a.id]: "0" }));
+    try {
+      const targetBalance = netFor(a);
+      const currentBalance = Number(a.balance ?? 0);
+      const diff = Number((targetBalance - currentBalance).toFixed(2));
+      // الرصيد عمود محسوب بواسطة triggers من جدول المعاملات،
+      // فبدل الكتابة المباشرة نُسجّل معاملة تسوية بقيمة الفرق ليُعاد حسابه تلقائياً.
+      if (Math.abs(diff) >= 0.01) {
+        const today = new Date().toISOString().split("T")[0];
+        const isIncome = diff > 0;
+        const { error } = await supabase.from("transactions").insert({
+          type: isIncome ? "income" : "expense",
+          amount: Math.abs(diff),
+          date: today,
+          description: `تسوية رصيد افتتاحي - ${a.name}`,
+          category: "opening_balance_adjustment",
+          account_id: a.id,
+          method: "cash",
+          debit: isIncome ? Math.abs(diff) : 0,
+          credit: isIncome ? 0 : Math.abs(diff),
+        } as any);
+        if (error) { toast.error("فشل الحفظ: " + error.message); return; }
+      }
+      toast.success(`تم تحديث رصيد ${a.name}`);
+      setAccounts(prev => prev.map(x => x.id === a.id ? { ...x, balance: targetBalance } : x));
+      setOpening(prev => ({ ...prev, [a.id]: String(targetBalance) }));
+      setIncome(prev => ({ ...prev, [a.id]: "0" }));
+    } finally {
+      setSavingId(null);
+    }
   };
 
   return (

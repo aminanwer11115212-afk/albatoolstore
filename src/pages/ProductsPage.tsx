@@ -89,6 +89,16 @@ export default function ProductsPage() {
   });
   useEffect(() => { try { localStorage.setItem(PP_PER_PAGE, String(perPage)); } catch {} }, [perPage]);
 
+  // مزامنة: أعد جلب المنتجات عند أي تغيير من فاتورة/مرتجع/تحويل (يبث events بنفس الاسم)
+  useEffect(() => {
+    const onChanged = () => {
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    };
+    window.addEventListener("products:changed", onChanged);
+    return () => window.removeEventListener("products:changed", onChanged);
+  }, []);
+
   const [openFilter, setOpenFilter] = useState<{ key: string; mode: "list" | "search" } | null>(null);
   // isMobile state removed — the desktop table is now shown on mobile via the
   // global `.desktop-on-mobile` CSS, so we no longer branch on viewport here.
@@ -651,12 +661,17 @@ export default function ProductsPage() {
       warehouse_id: form.warehouse_id || null, company_id: primaryBrandId,
       supplier_id: form.supplier_id || null,
       purchase_price: parseFloat(form.purchase_price) || 0, sale_price: parseFloat(form.sale_price) || 0,
-      stock_quantity: parseInt(form.stock_quantity) || 0, min_stock: parseInt(form.min_stock) || 0,
+      min_stock: parseInt(form.min_stock) || 0,
       unit: form.unit, description: form.description || null,
       foreign_price: parseFloat(form.foreign_price) || null,
       image_url: form.image_url || null,
       is_frozen: !!form.is_frozen,
     };
+    // الكمية تُدار عبر حركات المخزون (فواتير/مرتجعات/تحويلات) — لا تكتبها مباشرة عند التعديل.
+    // عند الإنشاء فقط تُعتبر كمية افتتاحية.
+    if (!editId) {
+      payload.stock_quantity = parseInt(form.stock_quantity) || 0;
+    }
     try {
       let productId: string;
       if (editId) {
@@ -1418,10 +1433,17 @@ export default function ProductsPage() {
 
                   {(() => { const k = idx(); return (
                     <div>
-                      <label className={lbl}>الوحدات بالمخزن</label>
+                      <label className={lbl}>
+                        الوحدات بالمخزن
+                        {editId && <span className="text-[10px] text-muted-foreground mr-1">(تُحسب من حركات المخزون)</span>}
+                      </label>
                       <input ref={el => fieldRefs.current[k] = el} type="number" value={form.stock_quantity}
                         onChange={e => setForm({ ...form, stock_quantity: e.target.value })}
-                        onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0" />
+                        onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus}
+                        disabled={!!editId}
+                        readOnly={!!editId}
+                        title={editId ? "تُحدَّث تلقائياً من الفواتير والمرتجعات والتحويلات" : ""}
+                        className={`${inp} ${editId ? "opacity-60 cursor-not-allowed" : ""}`} placeholder="0" />
                     </div>
                   ); })()}
 

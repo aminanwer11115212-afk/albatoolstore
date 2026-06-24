@@ -25,6 +25,8 @@ export default function StockReturnViewPage() {
   const [loading, setLoading] = useState(true);
   const [showStatusChange, setShowStatusChange] = useState(false);
   const [newStatus, setNewStatus] = useState("pending");
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [cancelSaving, setCancelSaving] = useState(false);
   const [editingCell, setEditingCell] = useState<{ index: number; field: string } | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -42,7 +44,8 @@ export default function StockReturnViewPage() {
   };
 
   const handleStatusChange = async () => {
-    if (!ret) return;
+    if (!ret || statusSaving) return;
+    setStatusSaving(true);
     try {
       const { error } = await supabase.from("stock_returns").update({ status: newStatus }).eq("id", ret.id);
       if (error) throw error;
@@ -50,16 +53,20 @@ export default function StockReturnViewPage() {
       toast.success("تم تغيير الوضع");
       setShowStatusChange(false);
     } catch (e: any) { toast.error(e.message || "تعذّر تغيير الوضع"); }
+    finally { setStatusSaving(false); }
   };
 
   const handleDelete = async () => {
-    if (!ret || !confirm("هل أنت متأكد من إلغاء المرتجع؟")) return;
+    if (!ret || cancelSaving) return;
+    if (!confirm("هل أنت متأكد من إلغاء المرتجع؟")) return;
+    setCancelSaving(true);
     try {
       const { error } = await supabase.from("stock_returns").update({ status: "cancelled" }).eq("id", ret.id);
       if (error) throw error;
       await load();
       toast.success("تم إلغاء المرتجع");
     } catch (e: any) { toast.error(e.message || "تعذّر إلغاء المرتجع"); }
+    finally { setCancelSaving(false); }
   };
 
   const startEdit = (index: number, field: string, value: any) => {
@@ -139,8 +146,8 @@ export default function StockReturnViewPage() {
         <Button onClick={() => setShowStatusChange(true)} className="bg-sky-500 hover:bg-sky-600 text-white gap-1.5 text-xs h-9">
           <RefreshCw size={14} /> تغيير الوضع
         </Button>
-        <Button onClick={handleDelete} className="bg-red-500 hover:bg-red-600 text-white gap-1.5 text-xs h-9">
-          <XCircle size={14} /> إلغاء
+        <Button onClick={handleDelete} disabled={cancelSaving} className="bg-red-500 hover:bg-red-600 text-white gap-1.5 text-xs h-9">
+          <XCircle size={14} /> {cancelSaving ? "..." : "إلغاء"}
         </Button>
         <Button onClick={() => navigate("/stock-return")} variant="outline" className="gap-1.5 text-xs h-9 mr-auto">
           <ArrowRight size={14} /> العودة للمرتجعات
@@ -233,7 +240,7 @@ export default function StockReturnViewPage() {
               </select>
             </div>
             <div className="flex gap-3 justify-center pt-2">
-              <Button onClick={handleStatusChange} className="bg-purple-600 hover:bg-purple-700 text-white px-8">تغيير الوضع</Button>
+              <Button onClick={handleStatusChange} disabled={statusSaving} className="bg-purple-600 hover:bg-purple-700 text-white px-8">{statusSaving ? "جارٍ الحفظ..." : "تغيير الوضع"}</Button>
               <Button variant="outline" onClick={() => setShowStatusChange(false)} className="px-8">إغلاق</Button>
             </div>
           </div>
