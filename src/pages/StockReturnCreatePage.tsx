@@ -662,9 +662,14 @@ export default function StockReturnCreatePage() {
 
   // ---------- Save ----------
   async function saveReturn() {
+    // منع النقرات المتكررة أثناء حفظ سابق غير مكتمل
+    if (savingReturnRef.current) return;
     if (!customer) { toast.error("اختر عميلاً"); return; }
     const valid = rows.filter((r) => r.product_id);
     if (!valid.length) { toast.error("أضف منتجاً واحداً على الأقل"); return; }
+    savingReturnRef.current = true;
+    setSavingReturn(true);
+    try {
 
     // If linked to an invoice, validate that no row exceeds the invoice's original quantity
     if (linkedInvoiceId) {
