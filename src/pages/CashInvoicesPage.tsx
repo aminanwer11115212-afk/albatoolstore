@@ -218,8 +218,10 @@ export default function CashInvoicesPage() {
       {/* Totals card */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <div className="p-3 rounded-md border border-border bg-card">
-          <div className="text-xs text-muted-foreground">عدد الفواتير</div>
-          <div className="text-xl font-bold">{totals.count}</div>
+          <div className="text-xs text-muted-foreground">المعروض / الإجمالي بالفلتر</div>
+          <div className="text-xl font-bold">
+            {rows.length.toLocaleString("ar-EG")} / {totalCount.toLocaleString("ar-EG")}
+          </div>
         </div>
         <div className="p-3 rounded-md border border-border bg-card">
           <div className="text-xs text-muted-foreground">إجمالي المبيعات</div>
