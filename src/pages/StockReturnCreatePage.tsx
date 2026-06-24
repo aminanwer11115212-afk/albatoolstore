@@ -334,18 +334,10 @@ export default function StockReturnCreatePage() {
       }
       if (!editId) {
         const prefix = (cfg.data as any)?.return_prefix || "RET-";
-        const { data: rs } = await supabase
-          .from("stock_returns")
-          .select("return_number")
-          .like("return_number", `${prefix}%`);
-        let maxN = 0;
-        (rs || []).forEach((r: any) => {
-          const after = String(r.return_number || "").slice(prefix.length);
-          const mm = after.match(/^(\d+)/);
-          const n = mm ? parseInt(mm[1]) : 0;
-          if (n > maxN) maxN = n;
-        });
-        setReturnNumber(`${prefix}${String(maxN + 1).padStart(4, "0")}`);
+        // رقم عشوائي فريد عبر helper موحّد بدلاً من التسلسل (يمنع التكرار في الجلسات المتوازية)
+        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+        const num = await generateRandomDocNumber("stock_returns", "return_number", prefix);
+        setReturnNumber(num);
       }
     })();
 
