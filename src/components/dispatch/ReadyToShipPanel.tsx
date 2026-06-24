@@ -385,19 +385,17 @@ export default function ReadyToShipPanel({
     </button>
   );
 
-  // قوائم مفلتَرة لكل فاتورة بناءً على ربط العميل (إن وجد)
+  // القوائم تعرض كل الناقلين/الوجهات في النظام (متزامنة مع صفحة إدارة العملاء)
+  // الافتراضي يبقى من ربط العميل (preferred / is_default) إن وُجد.
   const optionsForInvoice = useCallback((inv: any) => {
     const cid = inv.customer_id;
     const allT = (allTransporters as any[]) || [];
     const allD = (allDestinations as any[]) || [];
-    const linkedT = ((custTransporters as any[]) || []).filter((x) => x.customer_id === cid).map((x) => x.transporter_id);
     const linkedD = ((custDestinations as any[]) || []).filter((x) => x.customer_id === cid);
-    const transporters = cid && linkedT.length > 0 ? allT.filter((t) => linkedT.includes(t.id)) : allT;
-    const destinations = cid && linkedD.length > 0 ? allD.filter((d) => linkedD.some((ld) => ld.destination_id === d.id)) : allD;
     const preferred = ((prefTransporters as any[]) || []).find((p) => p.customer_id === cid)?.transporter_id;
     const defaultDest = linkedD.find((ld) => ld.is_default)?.destination_id;
-    return { transporters, destinations, preferred, defaultDest };
-  }, [allTransporters, allDestinations, custTransporters, custDestinations, prefTransporters]);
+    return { transporters: allT, destinations: allD, preferred, defaultDest };
+  }, [allTransporters, allDestinations, custDestinations, prefTransporters]);
 
   // Sync resolved defaults (preferred / first available) into rowChoice so the
   // parent (DispatchPage) can render them in the preview/print overlay even
