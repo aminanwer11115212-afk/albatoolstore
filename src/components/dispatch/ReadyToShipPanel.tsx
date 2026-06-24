@@ -365,7 +365,7 @@ export default function ReadyToShipPanel({
     };
   };
 
-  const dispatchRow = async (inv: any) => {
+  const dispatchRow = async (inv: any, pinDefault: boolean) => {
     const choice = getChoice(inv);
     if (!choice.transporterId) { toast.error("اختر ناقلاً"); return; }
     setSavingRow(inv.id);
@@ -378,27 +378,23 @@ export default function ReadyToShipPanel({
       });
       if (error) throw error;
 
-      // ثبّت الناقل/الوجهة كمعتاد لهذا العميل (إن كان العميل حقيقيًا والخيار مفعّل).
+      // ثبّت الناقل/الوجهة كمعتاد لهذا العميل (إن كان العميل حقيقيًا والمستخدم وافق).
       const customerId = inv.customer_id || null;
-      if (customerId && isPinAsDefault(inv.id)) {
+      if (customerId && pinDefault) {
         try {
-          // 1) ناقل العميل المُفضّل
           await (supabase as any)
             .from("customer_preferred_transporter")
             .upsert(
               { customer_id: customerId, transporter_id: choice.transporterId },
               { onConflict: "customer_id" }
             );
-          // 2) ربط ناقل بالعميل (لقائمته)
           await (supabase as any)
             .from("customer_transporters")
             .upsert(
               { customer_id: customerId, transporter_id: choice.transporterId },
               { onConflict: "customer_id,transporter_id", ignoreDuplicates: true }
             );
-          // 3) وجهة افتراضية للعميل
           if (choice.destinationId) {
-            // ضمان وجود الربط
             const { data: existing } = await (supabase as any)
               .from("customer_destinations")
               .select("id")
@@ -410,7 +406,6 @@ export default function ReadyToShipPanel({
                 .from("customer_destinations")
                 .insert({ customer_id: customerId, destination_id: choice.destinationId, is_default: true });
             }
-            // تصفير is_default على باقي وجهات العميل، ثم ضبطه على المختار
             await (supabase as any)
               .from("customer_destinations")
               .update({ is_default: false })
@@ -422,14 +417,13 @@ export default function ReadyToShipPanel({
               .eq("customer_id", customerId)
               .eq("destination_id", choice.destinationId);
           }
-          toast.success("تم تثبيت الترحيل وحفظه كمعتاد للعميل");
+          toast.success("تم التثبيت وحُدّثت افتراضيات العميل");
         } catch (pinErr: any) {
-          // لا نوقف العملية الأساسية لو فشل التثبيت كمعتاد
           console.error("pin-as-default error:", pinErr);
-          toast.success("تم تثبيت الترحيل (لم يُحفظ كمعتاد)");
+          toast.success("تم التثبيت (تعذّر تحديث افتراضيات العميل)");
         }
       } else {
-        toast.success("تم تثبيت الترحيل — انتقلت الفاتورة إلى «في الطريق»");
+        toast.success("تم تثبيت الترحيل لهذه الفاتورة");
       }
 
       qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
@@ -443,6 +437,26 @@ export default function ReadyToShipPanel({
       toast.error(e.message || "تعذّر تثبيت الترحيل");
     } finally {
       setSavingRow(null);
+    }
+  };
+
+  // قرار: نفتح Dialog سؤال «حدّث الافتراضي؟» فقط إذا اختلف الاختيار عن المعتاد للعميل.
+  const requestDispatchRow = (inv: any) => {
+    const customerId = inv.customer_id;
+    if (!customerId) {
+      dispatchRow(inv, false);
+      return;
+    }
+    const choice = getChoice(inv);
+    const { preferred, destinations: _d } = optionsForInvoice(inv);
+    const linkedD = ((custDestinations as any[]) || []).filter((x) => x.customer_id === customerId);
+    const currentDefaultDest = linkedD.find((ld) => ld.is_default)?.destination_id ?? null;
+    const sameTransporter = (preferred ?? null) === (choice.transporterId || null);
+    const sameDestination = (currentDefaultDest ?? null) === (choice.destinationId || null);
+    if (sameTransporter && sameDestination) {
+      dispatchRow(inv, false);
+    } else {
+      setPendingPinInv(inv);
     }
   };
 
