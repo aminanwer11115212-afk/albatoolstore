@@ -899,18 +899,12 @@ export default function QuoteCreatePage() {
           break;
         }
         if (error.code === "23505" || /duplicate key|quotes_quote_number_key/i.test(error.message)) {
-          // recompute next number
-          let qq = supabase.from("quotes").select("quote_number").like("quote_number", `${prefix}%`);
-          qq = isSideMode ? qq.eq("is_side", true) : qq.or("is_side.is.null,is_side.eq.false");
-          const { data: rows } = await qq;
-          let maxN = 0;
-          (rows || []).forEach((r: any) => {
-            const after = String(r.quote_number || "").slice(prefix.length);
-            const mm = after.match(/^(\d+)/);
-            const n = mm ? parseInt(mm[1]) : 0;
-            if (n > maxN) maxN = n;
+          // ولّد رقماً عشوائياً جديداً وحاول مجدداً
+          const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+          qNum = await generateRandomDocNumber("quotes", "quote_number", prefix, {
+            scope: (q) => (isSideMode ? q.eq("is_side", true) : q.or("is_side.is.null,is_side.eq.false")),
+            digits: 5 + Math.min(attempt, 2),
           });
-          qNum = `${prefix}${String(maxN + 1).padStart(4, "0")}`;
           attempt++;
           continue;
         }
