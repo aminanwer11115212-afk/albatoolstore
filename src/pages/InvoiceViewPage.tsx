@@ -28,7 +28,7 @@ import InvoiceRevisionsDialog from "@/components/invoice/InvoiceRevisionsDialog"
 import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDialog";
 import UnavailableItemsPanel from "@/components/invoice/UnavailableItemsPanel";
 import { recordInvoiceRevision, diffRows } from "@/utils/invoiceRevisions";
-import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
+import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 export default function InvoiceViewPage() {
