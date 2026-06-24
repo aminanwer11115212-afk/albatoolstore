@@ -243,20 +243,31 @@ export default function CashInvoicesPage() {
         ) : filtered.length === 0 ? (
           <div className="p-6 text-center text-muted-foreground">لا توجد فواتير كاش بعد</div>
         ) : (
-          filtered.map((r) => (
+          filtered.map((r, i) => (
             <MobileDocCard
               key={r.id}
-              title={r.invoice_number}
-              subtitle={r.walk_in_customer_name || "عميل نقدي"}
-              meta={[
-                { label: "التاريخ", value: r.date },
-                { label: "الإجمالي", value: `${Number(r.total || 0).toLocaleString("ar-EG")} ${currency}` },
-              ]}
-              actions={[
-                { label: "طباعة", onClick: () => handlePrint(r.id), icon: <Printer size={14} /> },
-                { label: "فتح", onClick: () => navigate(`/invoices/cash/edit/${r.id}`) },
-                { label: "حذف", onClick: () => handleDelete(r.id), variant: "destructive", icon: <Trash2 size={14} /> },
-              ]}
+              index={i + 1}
+              number={r.invoice_number}
+              party={r.walk_in_customer_name || "عميل نقدي"}
+              date={r.date}
+              amount={`${Number(r.total || 0).toLocaleString("ar-EG")} ${currency}`}
+              onOpen={() => navigate(`/invoices/cash/edit/${r.id}`)}
+              actions={
+                <>
+                  <button
+                    onClick={() => handlePrint(r.id)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted"
+                  >
+                    <Printer size={12} /> طباعة
+                  </button>
+                  <button
+                    onClick={() => handleDelete(r.id)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  >
+                    <Trash2 size={12} /> حذف
+                  </button>
+                </>
+              }
             />
           ))
         )}
