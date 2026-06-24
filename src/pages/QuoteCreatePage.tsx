@@ -953,7 +953,7 @@ export default function QuoteCreatePage() {
     }
 
 
-    if (!opts.silent) toast.success(editId ? "تم تحديث عرض السعر" : "تم حفظ عرض السعر");
+    if (!opts.silent) toast.success(effectiveEditId && recordExisted ? "تم تحديث عرض السعر" : "تم حفظ عرض السعر");
     savedRef.current = true;
     lastSavedIdRef.current = qid!;
     // إذا كنّا في وضع الإنشاء وتم الحفظ بنجاح، بدّل العنوان لوضع التعديل
