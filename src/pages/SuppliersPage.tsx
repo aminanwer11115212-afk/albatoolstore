@@ -144,8 +144,21 @@ export default function SuppliersPage() {
                 <input placeholder="الشركة" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} className={inputCls} maxLength={100} />
               </div>
               <div>
-                <label className={labelCls}>الرصيد الافتتاحي</label>
-                <input type="number" step="0.01" placeholder="0" value={form.balance} onChange={e => setForm({ ...form, balance: e.target.value })} className={inputCls} dir="ltr" />
+                <label className={labelCls}>
+                  {editId ? "الرصيد الحالي (محسوب تلقائياً)" : "الرصيد الافتتاحي"}
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0"
+                  value={form.balance}
+                  onChange={e => !editId && setForm({ ...form, balance: e.target.value })}
+                  className={inputCls}
+                  dir="ltr"
+                  readOnly={!!editId}
+                  disabled={!!editId}
+                  title={editId ? "الرصيد يُحسب تلقائياً من أوامر الشراء — لا يُعدّل يدوياً" : "أدخل الرصيد الافتتاحي للمورد"}
+                />
               </div>
             </div>
           </div>
