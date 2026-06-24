@@ -97,6 +97,8 @@ export default function CustomersPage() {
   // فلاتر هيدر (Excel-style)
   const [filterName, setFilterName] = useState("");
   const [filterPhone, setFilterPhone] = useState("");
+  // فلتر صلاحية واتساب للإرسال: "" | valid | invalid | missing
+  const [filterWaValid, setFilterWaValid] = useState<"" | "valid" | "invalid" | "missing">("");
   const [filterAddress, setFilterAddress] = useState("");
   const [filterGroup, setFilterGroup] = useState("");
   const [filterTransporter, setFilterTransporter] = useState("");
