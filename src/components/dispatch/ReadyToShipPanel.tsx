@@ -85,10 +85,14 @@ export default function ReadyToShipPanel({
   // اختيار المستخدم لكل فاتورة (قبل التثبيت) — controlled أو داخلي
   const [internalRowChoice, setInternalRowChoice] = useState<Record<string, RowChoice>>({});
   const rowChoice = rowChoiceProp ?? internalRowChoice;
+  // نُمرّر updater للمسار الداخلي حتى لا نقرأ rowChoice stale من الإغلاق.
   const setRowChoice = (updater: Record<string, RowChoice> | ((prev: Record<string, RowChoice>) => Record<string, RowChoice>)) => {
-    const next = typeof updater === "function" ? (updater as any)(rowChoice) : updater;
-    if (onRowChoiceChange) onRowChoiceChange(next);
-    else setInternalRowChoice(next);
+    if (onRowChoiceChange) {
+      const next = typeof updater === "function" ? (updater as any)(rowChoice) : updater;
+      onRowChoiceChange(next);
+    } else {
+      setInternalRowChoice((prev) => (typeof updater === "function" ? (updater as any)(prev) : updater));
+    }
   };
   const [savingRow, setSavingRow] = useState<string | null>(null);
   // Dialog تأكيد التثبيت كافتراضي للعميل
@@ -127,10 +131,14 @@ export default function ReadyToShipPanel({
       const rows = (data || []) as any[];
       const ids = rows.map((r) => r.id);
       if (ids.length > 0) {
-        const { data: trs } = await (supabase as any)
+        const { data: trs, error: trsErr } = await (supabase as any)
           .from("invoice_transports")
           .select("id, invoice_id, transporter_id, transporters(id, name)")
           .in("invoice_id", ids);
+        if (trsErr) {
+          // فشل صامت هنا = الفواتير تظهر بدون ناقل والـauto-select يقفز إلى خيارات خاطئة.
+          console.error("[ReadyToShipPanel] invoice_transports query failed:", trsErr);
+        }
         const byInv = new Map<string, any[]>();
         for (const t of (trs || [])) {
           const arr = byInv.get(t.invoice_id) || [];
@@ -315,24 +323,39 @@ export default function ReadyToShipPanel({
 
       const ids = selected.map((i) => i.id);
       const results = await Promise.all(
-        ids.map((id) =>
-          supabase.rpc("advance_invoice_workflow" as any, {
+        ids.map(async (id) => {
+          const res = await supabase.rpc("advance_invoice_workflow" as any, {
             _invoice_id: id,
             _target: "in_transit",
             _reason: "ترحيل الفواتير الجاهزة من شاشة الترحيلات",
-          })
-        )
+          });
+          return { id, error: (res as any).error };
+        })
       );
-      const firstErr = results.find((r) => (r as any).error)?.error;
-      if (firstErr) throw firstErr;
+      const failed = results.filter((r) => r.error);
+      const okIds = results.filter((r) => !r.error).map((r) => r.id);
 
-      toast.success(`تم تحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات" واختفت من الشاشة`);
-
-      // Clear selection + row choices ONLY for the dispatched invoices
-      setChecked(new Set());
+      if (failed.length > 0) {
+        const sample = failed.slice(0, 3).map((f) => f.id.slice(0, 8)).join("، ");
+        const more = failed.length > 3 ? ` و ${failed.length - 3} أخرى` : "";
+        toast.error(`فشل ترحيل ${failed.length} من ${ids.length} فاتورة (${sample}${more}): ${(failed[0].error as any)?.message || ""}`);
+      }
+      if (okIds.length > 0) {
+        toast.success(`تم تحويل ${okIds.length} فاتورة إلى "في الطريق للترحيلات"`);
+      }
+      if (okIds.length === 0) {
+        // كل المحاولات فشلت — نتوقف قبل تنظيف الاختيار.
+        return;
+      }
+      // Clear selection فقط للفواتير التي نجحت.
+      setChecked((prev) => {
+        const next = new Set(prev);
+        for (const id of okIds) next.delete(id);
+        return next;
+      });
       setRowChoice((prev) => {
         const next = { ...prev };
-        for (const id of ids) delete next[id];
+        for (const id of okIds) delete next[id];
         return next;
       });
 

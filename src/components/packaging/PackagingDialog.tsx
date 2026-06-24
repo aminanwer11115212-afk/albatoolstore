@@ -400,21 +400,31 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
     // ─── أتمتة: إضافة تغليف → الفاتورة جاهزة للرفع تلقائياً ───
     if (isInvoice && parentId) {
       try {
-        await supabase.rpc("advance_invoice_workflow" as any, {
+        const { error: rpcErr } = await supabase.rpc("advance_invoice_workflow" as any, {
           _invoice_id: parentId,
           _target: "ready_to_ship",
           _reason: "إضافة تغليف",
         });
+        if (rpcErr) {
+          // غير حرجة لمسار الإضافة، لكن يجب أن تظهر في السجل لمنع التشخيص الأعمى.
+          console.warn("[PackagingDialog.add] advance_workflow failed:", rpcErr);
+        }
         invalidateWorkflowAutoCache(parentId);
-        // بث حدث لتحديث شاشة الترحيلات وغيرها
         try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
-      } catch { /* غير حرجة */ }
+      } catch (e) {
+        console.warn("[PackagingDialog.add] advance_workflow threw:", e);
+      }
     }
   };
 
   const handleDelete = async (rowId: string) => {
     if (!confirm("حذف هذا البند؟")) return;
-    await (supabase as any).from(itemsTable).delete().eq("id", rowId);
+    const { error } = await (supabase as any).from(itemsTable).delete().eq("id", rowId);
+    if (error) {
+      console.error("[PackagingDialog.handleDelete] failed:", error);
+      toast.error(`تعذّر الحذف: ${error.message}`);
+      return;
+    }
     toast.success("تم الحذف");
     loadData();
   };
@@ -422,7 +432,12 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
   const handleDeleteSelected = async () => {
     if (selected.size === 0) return;
     if (!confirm(`حذف ${selected.size} بند؟`)) return;
-    await (supabase as any).from(itemsTable).delete().in("id", Array.from(selected));
+    const { error } = await (supabase as any).from(itemsTable).delete().in("id", Array.from(selected));
+    if (error) {
+      console.error("[PackagingDialog.handleDeleteSelected] failed:", error);
+      toast.error(`تعذّر حذف المحدد: ${error.message}`);
+      return;
+    }
     toast.success("تم حذف المحدد");
     loadData();
   };
@@ -432,14 +447,19 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
     // أتمتة إضافية: حفظ يُؤكد الحالة ready_to_ship أيضاً
     if (isInvoice && parentId) {
       try {
-        await supabase.rpc("advance_invoice_workflow" as any, {
+        const { error: rpcErr } = await supabase.rpc("advance_invoice_workflow" as any, {
           _invoice_id: parentId,
           _target: "ready_to_ship",
           _reason: "حفظ التغليف",
         });
+        if (rpcErr) {
+          console.warn("[PackagingDialog.save] advance_workflow failed:", rpcErr);
+        }
         invalidateWorkflowAutoCache(parentId);
         try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
-      } catch { /* غير حرجة */ }
+      } catch (e) {
+        console.warn("[PackagingDialog.save] advance_workflow threw:", e);
+      }
     }
   };
 

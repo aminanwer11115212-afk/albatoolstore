@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, lazy } from "react";
 import { lazyEl } from "@/components/PageLoader";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryCache, MutationCache, QueryClientProvider } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { BrowserRouter, Route, Routes, useParams, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -117,19 +118,53 @@ const StaffCustomersPage = lazy(() => import("./pages/staff/StaffCustomersPage")
 const StaffProfilePage = lazy(() => import("./pages/staff/StaffProfilePage"));
 const StaffMyRecordsPage = lazy(() => import("./pages/staff/StaffMyRecordsPage"));
 
+const isAuthOrNetworkError = (err: any) => {
+  const msg = String(err?.message || err || "").toLowerCase();
+  return (
+    err?.status === 401 ||
+    err?.status === 403 ||
+    msg.includes("jwt") ||
+    msg.includes("unauthorized") ||
+    msg.includes("forbidden")
+  );
+};
+
 const queryClient = new QueryClient({
+  // Global fallback: أي query/mutation فشلَت ولم تُعالَج محلياً يُظهر toast.
+  // يكفي السبب رسالة الخطأ — لا نعرض stack للمستخدم.
+  queryCache: new QueryCache({
+    onError: (err, query) => {
+      // تجاهل أخطاء أُعلِنت كـ "صامتة" عبر meta.silent
+      if ((query?.meta as any)?.silent) return;
+      // eslint-disable-next-line no-console
+      console.error("[QueryCache.onError]", query?.queryKey, err);
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (err, _vars, _ctx, mutation) => {
+      if ((mutation?.meta as any)?.silent) return;
+      const msg = (err as any)?.message || "تعذّر تنفيذ العملية";
+      toast.error(msg);
+      // eslint-disable-next-line no-console
+      console.error("[MutationCache.onError]", mutation?.options?.mutationKey, err);
+    },
+  }),
   defaultOptions: {
     queries: {
-      // البيانات تبقى "طازجة" 5 دقائق → التنقل بين الصفحات لا يُطلق
-      // أي إعادة جلب طوال هذه المدة (يُعرَض الـ cache مباشرة).
       staleTime: 5 * 60_000,
-      // الإبقاء على الـ cache في الذاكرة 30 دقيقة بعد آخر استخدام.
-      // يعني: لو رجعت لصفحة زرتها منذ ربع ساعة → تظهر فوراً بلا spinner.
       gcTime: 30 * 60_000,
-      refetchOnWindowFocus: false,  // لا إعادة جلب عند تبديل النوافذ
-      refetchOnMount: false,        // لا إعادة جلب عند العودة للصفحة طالما البيانات fresh
-      refetchOnReconnect: false,    // لا إعادة جلب عند عودة الاتصال
-      retry: 1,                     // محاولة واحدة عند فشل الطلب
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      // إعادة الجلب عند عودة الاتصال ضرورية لـ ERP بياناته حسّاسة للوقت.
+      refetchOnReconnect: true,
+      retry: (count, err) => {
+        if (isAuthOrNetworkError(err)) return false;
+        return count < 1;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+    },
+    mutations: {
+      retry: 0,
     },
   },
 });
@@ -167,7 +202,17 @@ const App = () => {
   const [showSplash, setShowSplash] = useState(true);
   const handleSplashFinish = useCallback(() => setShowSplash(false), []);
   useUiPrefsCloudSync();
-  useEffect(() => { initPerfMonitor(); initPagePerf(); prefetchPopularPages(); }, []);
+  useEffect(() => {
+    initPerfMonitor();
+    initPagePerf();
+    // void + catch ضروري: prefetchPopularPages تُرجِع Promise، بدون catch
+    // أي فشل شبكة يصبح unhandledrejection.
+    try {
+      prefetchPopularPages();
+    } catch (e) {
+      console.error("[prefetch] failed:", e);
+    }
+  }, []);
 
   return (
   <QueryClientProvider client={queryClient}>

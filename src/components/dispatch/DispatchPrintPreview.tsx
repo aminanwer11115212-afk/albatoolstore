@@ -52,13 +52,27 @@ export default function DispatchPrintPreview({ selectedIds, company, liveOverlay
   const handlePrint = () => {
     if (!html) return;
     const win = window.open("", "_blank", "width=900,height=1000");
-    if (!win) return;
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => {
-      try { win.focus(); win.print(); } catch (e) { console.error(e); }
-    }, 500);
+    if (!win) {
+      // popup-block: لو فشل الفتح بدون toast، المستخدم يظن أن الزر لا يعمل.
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { toast } = require("sonner");
+        toast.error("تعذّر فتح نافذة الطباعة — تحقق من سماح النوافذ المنبثقة في المتصفح");
+      } catch {
+        alert("تعذّر فتح نافذة الطباعة — تحقق من سماح النوافذ المنبثقة");
+      }
+      return;
+    }
+    try {
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => {
+        try { win.focus(); win.print(); } catch (e) { console.error("[print] failed:", e); }
+      }, 500);
+    } catch (e) {
+      console.error("[print] write failed:", e);
+    }
   };
 
 
