@@ -39,8 +39,11 @@ export default function QuickAddTransporterDialog({ open, onOpenChange, onCreate
         notes: notes.trim() || null,
       }).select().single();
       if (error) throw error;
-      toast.success("تمت إضافة الناقل");
-      qc.invalidateQueries({ queryKey: ["table", "transporters"] });
+      toast.success("تمت إضافة الناقل بنجاح", {
+        description: `«${data?.name ?? name.trim()}» متاح الآن في قائمة الناقلين`,
+      });
+      await qc.invalidateQueries({ queryKey: ["table", "transporters"] });
+      try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
       onCreated?.(data);
       reset();
       onOpenChange(false);
