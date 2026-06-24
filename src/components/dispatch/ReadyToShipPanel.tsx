@@ -813,7 +813,7 @@ export default function ReadyToShipPanel({
                 return (
                   <Fragment key={`g-${g.key}`}>
                     <tr>
-                      <td colSpan={7} style={{ padding: 0 }}>
+                      <td colSpan={5} style={{ padding: 0 }}>
                         <div
                           className="rts-group-head"
                           onClick={() => toggleGroup(g.key)}
