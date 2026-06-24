@@ -10,7 +10,7 @@
  * فورًا في كشف المعاينة (مع وسم «معاينة — لم يُثبَّت بعد»).
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useCompanySettings, useTransporters, useDestinations } from "@/hooks/useData";
 import ReadyToShipPanel from "@/components/dispatch/ReadyToShipPanel";
 import DispatchPrintPreview from "@/components/dispatch/DispatchPrintPreview";
@@ -20,12 +20,6 @@ import { Eye } from "lucide-react";
 import { buildDispatchSheetForInvoiceIds } from "@/utils/dispatchReportPrint";
 import type { LiveOverlayEntry } from "@/utils/dispatchReportPrint";
 
-// Build the unified dispatch sheet HTML for the selected invoices.
-// Shared identical template with the left-side preview pane.
-async function buildDispatchReportHTML(invoices: any[], company: any) {
-  const ids = invoices.map((i) => i.id).filter(Boolean);
-  return await buildDispatchSheetForInvoiceIds(ids, company);
-}
 
 export default function DispatchPage() {
   const { data: company } = useCompanySettings();
@@ -52,6 +46,17 @@ export default function DispatchPage() {
     }
     return out;
   }, [rowChoice, allTransporters, allDestinations]);
+
+  // Build print HTML with the same live overlay used by the preview pane,
+  // so chosen-but-not-pinned transporter/destination print exactly as previewed.
+  const buildDispatchReportHTML = useCallback(
+    async (invoices: any[], _companyArg: any) => {
+      const ids = invoices.map((i) => i.id).filter(Boolean);
+      return await buildDispatchSheetForInvoiceIds(ids, company, liveOverlay);
+    },
+    [company, liveOverlay]
+  );
+
 
   return (
     <article className="dispatch-page" dir="rtl">

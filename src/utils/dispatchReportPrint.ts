@@ -529,10 +529,12 @@ export function buildDispatchSheetHTML(
  */
 export async function buildDispatchSheetForInvoiceIds(
   ids: string[],
-  company: any
+  company: any,
+  liveOverlay?: Record<string, LiveOverlayEntry>
 ): Promise<string> {
   const docs = (
     await Promise.all(ids.map((id) => loadDispatchDoc(id).catch(() => null)))
   ).filter(Boolean) as DispatchDoc[];
-  return buildDispatchSheetHTML(docs, company);
+  return buildDispatchSheetHTML(docs, company, liveOverlay);
 }
+

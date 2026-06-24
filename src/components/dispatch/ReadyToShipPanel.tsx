@@ -237,12 +237,16 @@ export default function ReadyToShipPanel({
         toast.error("تعذّر فتح نافذة الطباعة");
         return;
       }
+      win.document.open();
       win.document.write(html);
       win.document.close();
-      win.onload = () => {
-        win.print();
-        win.onafterprint = () => win.close();
-      };
+      // Use a timeout instead of win.onload — onload can fire too early
+      // (or never) for about:blank windows, which causes
+      // "Failed to execute 'print' on 'Window': callback is no longer runnable".
+      setTimeout(() => {
+        try { win.focus(); win.print(); } catch (e) { console.error(e); }
+      }, 500);
+
 
       const ids = selected.map((i) => i.id);
       const results = await Promise.all(
