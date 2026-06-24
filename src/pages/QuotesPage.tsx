@@ -67,11 +67,16 @@ export default function QuotesPage() {
     const email = q.customers?.email;
     const cur = q.currency_code || currency;
     if (channel === "whatsapp") {
-      if (!phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
-      openWhatsAppMessage(phone, "invoice_notification", {
-        invoice_number: q.quote_number, total: q.total || 0,
-        paid_amount: 0, due_amount: q.total || 0,
-        date: q.date, customerName: q.customers?.name, currency: cur,
+      const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+      await shareDocumentViaWhatsApp({
+        docType: "quote",
+        docId: q.id,
+        phone,
+        customerName: q.customers?.name,
+        docNumber: q.quote_number,
+        total: q.total,
+        currency: cur,
+        docLabel: q.is_side ? "عرض سعر جانبي" : "عرض سعر",
       });
     } else if (channel === "email") {
       if (!email) { toast.error("لا يوجد بريد إلكتروني للعميل"); return; }

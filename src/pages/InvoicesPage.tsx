@@ -70,13 +70,17 @@ export default function InvoicesPage() {
     return () => { cancelled = true; };
   }, [refetch]);
 
-  const handleWhatsApp = (inv: any) => {
-    const phone = inv.customers?.phone;
-    if (!phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
-    openWhatsAppInvoice(phone, {
-      invoice_number: inv.invoice_number, total: inv.total || 0,
-      paid_amount: inv.paid_amount || 0, due_amount: inv.due_amount || 0,
-      date: inv.date, customerName: inv.customers?.name, currency,
+  const handleWhatsApp = async (inv: any) => {
+    const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+    await shareDocumentViaWhatsApp({
+      docType: "invoice",
+      docId: inv.id,
+      phone: inv.customers?.phone,
+      customerName: inv.customers?.name || inv.walk_in_customer_name,
+      docNumber: inv.invoice_number,
+      total: inv.total,
+      currency,
+      docLabel: inv.source === "pos" ? "فاتورة كاش" : "فاتورة",
     });
   };
 

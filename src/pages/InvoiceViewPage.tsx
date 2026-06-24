@@ -273,12 +273,17 @@ export default function InvoiceViewPage() {
     } catch {}
   };
 
-  const handleWhatsApp = (type: WhatsAppMessageType) => {
-    if (!invoice?.customers?.phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
-    openWhatsAppMessage(invoice.customers.phone, type, {
-      invoice_number: invoice.invoice_number, total: invoice.total || 0,
-      paid_amount: invoice.paid_amount || 0, due_amount: invoice.due_amount || 0,
-      date: invoice.date, customerName: invoice.customers?.name, currency: "",
+  const handleWhatsApp = async (_type: WhatsAppMessageType) => {
+    if (!invoice) return;
+    const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+    await shareDocumentViaWhatsApp({
+      docType: "invoice",
+      docId: invoice.id,
+      phone: invoice.customers?.phone,
+      customerName: invoice.customers?.name || (invoice as any).walk_in_customer_name,
+      docNumber: invoice.invoice_number,
+      total: invoice.total,
+      docLabel: (invoice as any).source === "pos" ? "فاتورة كاش" : "فاتورة",
     });
     setShowWhatsappMenu(false);
   };
