@@ -175,6 +175,15 @@ export default function PrintVisibilityToolbar({
   const handleWhatsApp = () => {
     const lines = [shareTitle || document.title || "كشف"];
     if (shareSummary) lines.push(shareSummary);
+    // أرفق رابط الصفحة الحالية حتى تصل المعاينة كاملةً لمستلم الواتساب
+    try {
+      const url = typeof window !== "undefined" ? window.location.href : "";
+      if (url) {
+        lines.push("");
+        lines.push("رابط المعاينة:");
+        lines.push(url);
+      }
+    } catch { /* noop */ }
     openWhatsApp(undefined, lines.join("\n"));
   };
 
