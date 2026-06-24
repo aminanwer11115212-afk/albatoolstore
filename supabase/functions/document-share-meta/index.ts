@@ -17,20 +17,35 @@ const corsHeaders = {
 const LOGO_URL =
   "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/albatool-logo.png";
 
-const DEFAULT_APP_ORIGIN = "https://preview--albatool.lovable.app";
+const DEFAULT_APP_ORIGIN = "https://albatoolstore.lovable.app";
 
 // Allowlist of origins permitted as redirect targets. Anything else falls back to DEFAULT_APP_ORIGIN.
+// Also allows any *.lovable.app preview origin so that share links opened from
+// the in-app preview route to the correct preview host.
 const ALLOWED_APP_ORIGINS = new Set<string>(
   [
     DEFAULT_APP_ORIGIN,
     "https://albatool.lovable.app",
+    "https://preview--albatoolstore.lovable.app",
+    "https://preview--albatool.lovable.app",
     Deno.env.get("PUBLIC_APP_URL"),
   ].filter((v): v is string => !!v).map((v) => v.replace(/\/$/, "")),
 );
 
-function pickAppOrigin(raw: string | null): string {
+function pickAppOriginLoose(raw: string | null): string {
   const candidate = (raw || "").replace(/\/$/, "");
-  return candidate && ALLOWED_APP_ORIGINS.has(candidate) ? candidate : DEFAULT_APP_ORIGIN;
+  if (!candidate) return DEFAULT_APP_ORIGIN;
+  if (ALLOWED_APP_ORIGINS.has(candidate)) return candidate;
+  // Accept any *.lovable.app sub-origin to support dynamic preview hosts.
+  try {
+    const u = new URL(candidate);
+    if (u.protocol === "https:" && /\.lovable\.app$/i.test(u.hostname)) return candidate;
+  } catch { /* ignore */ }
+  return DEFAULT_APP_ORIGIN;
+}
+
+function pickAppOrigin(raw: string | null): string {
+  return pickAppOriginLoose(raw);
 }
 
 function escapeHtml(v: unknown): string {
