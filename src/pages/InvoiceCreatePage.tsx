@@ -27,6 +27,7 @@ import { useDocumentCurrency } from "@/hooks/document/useDocumentCurrency";
 import { useDocumentItems } from "@/hooks/document/useDocumentItems";
 import { useDocumentCustomer } from "@/hooks/document/useDocumentCustomer";
 import { useDocumentPayment } from "@/hooks/document/useDocumentPayment";
+import { useDocumentForm } from "@/hooks/document/useDocumentForm";
 
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLocked, screenColWidthsKey, migrateScreenColKeys, COLS_TOAST_SAVED, COLS_TOAST_SAVE_FAILED, COLS_TOAST_EDIT_MODE, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE } from "@/hooks/useColumnWidths";
@@ -107,10 +108,16 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const [lastPayment, setLastPayment] = useState<{ amount: number; status: string; currency?: string } | null>(null);
   // customer state moved to useDocumentCustomer hook (see below)
 
-  // Header
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
-  const [dueDate, setDueDate] = useState("");
+  // Header (مُستخرج إلى hook موحّد: رقم/تاريخ/استحقاق/خصم/شحن/ملاحظات)
+  const {
+    invoiceNumber, setInvoiceNumber,
+    invoiceDate, setInvoiceDate,
+    dueDate, setDueDate,
+    generalDiscount, setGeneralDiscount,
+    shipping, setShipping,
+    notes, setNotes,
+    internalNote, setInternalNote,
+  } = useDocumentForm();
   const {
     customer, setCustomer,
     customerSearch, setCustomerSearch,
@@ -130,13 +137,6 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     exchangeRateToBase, setExchangeRateToBase,
     loadCurrencies,
   } = useDocumentCurrency();
-
-
-  // Notes / discount / shipping
-  const [generalDiscount, setGeneralDiscount] = useState(0);
-  const [shipping, setShipping] = useState(0);
-  const [notes, setNotes] = useState("");
-  const [internalNote, setInternalNote] = useState("");
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
   const [itemNoteEditing, setItemNoteEditing] = useState<{ uid: string; productName?: string; value: string } | null>(null);
