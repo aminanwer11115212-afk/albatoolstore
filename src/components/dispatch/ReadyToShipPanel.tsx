@@ -9,7 +9,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { filterSelectColumns } from "@/lib/tableColumns";
 import { toast } from "sonner";
-import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2, Search } from "lucide-react";
+import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2, Search, Plus, MapPin } from "lucide-react";
+import QuickAddTransporterDialog from "./QuickAddTransporterDialog";
+import QuickAddDestinationDialog from "./QuickAddDestinationDialog";
 import {
   useTransporters, useDestinations,
   useCustomerTransporters, useCustomerDestinations, useCustomerPreferredTransporter,
@@ -63,6 +65,8 @@ export default function ReadyToShipPanel({
   const [busy, setBusy] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [addTrOpen, setAddTrOpen] = useState(false);
+  const [addDsOpen, setAddDsOpen] = useState(false);
 
   // قوائم الناقلين والوجهات + روابط العميل
   const { data: allTransporters } = useTransporters();
@@ -747,7 +751,7 @@ export default function ReadyToShipPanel({
           </button>
         )}
       </div>
-      <div className="rts-hint">الرجاء اختيار زبون أو مجموعة من الزبائن</div>
+      
 
       {/* Body */}
       <div className="rts-body">
@@ -836,14 +840,34 @@ export default function ReadyToShipPanel({
             <div className="rts-counter">
               <b>{checked.size}</b> محدد من <b>{invoices.length}</b>
             </div>
-            <button
-              className="rts-btn rts-btn-ghost"
-              onClick={toggleAll}
-              disabled={invoices.length === 0}
-            >
-              {allChecked ? <X size={11} /> : null}
-              {allChecked ? "إلغاء التحديد" : "تحديد الكل"}
-            </button>
+            <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+              <button
+                type="button"
+                className="rts-btn rts-btn-ghost"
+                style={{ height: 28, padding: "0 8px", fontSize: 11, gap: 4 }}
+                onClick={() => setAddTrOpen(true)}
+                title="إضافة ناقل جديد"
+              >
+                <Plus size={12} /> <Truck size={12} /> ناقل
+              </button>
+              <button
+                type="button"
+                className="rts-btn rts-btn-ghost"
+                style={{ height: 28, padding: "0 8px", fontSize: 11, gap: 4 }}
+                onClick={() => setAddDsOpen(true)}
+                title="إضافة وجهة جديدة"
+              >
+                <Plus size={12} /> <MapPin size={12} /> وجهة
+              </button>
+              <button
+                className="rts-btn rts-btn-ghost"
+                onClick={toggleAll}
+                disabled={invoices.length === 0}
+              >
+                {allChecked ? <X size={11} /> : null}
+                {allChecked ? "إلغاء التحديد" : "تحديد الكل"}
+              </button>
+            </div>
           </div>
           <button
             className="rts-btn rts-btn-primary"
@@ -873,6 +897,9 @@ export default function ReadyToShipPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QuickAddTransporterDialog open={addTrOpen} onOpenChange={setAddTrOpen} />
+      <QuickAddDestinationDialog open={addDsOpen} onOpenChange={setAddDsOpen} />
     </div>
 
   );
