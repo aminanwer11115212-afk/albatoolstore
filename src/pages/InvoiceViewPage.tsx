@@ -194,7 +194,9 @@ export default function InvoiceViewPage() {
   };
 
   const handleConvertToReturn = async () => {
-    if (!invoice || !confirm("تحويل هذه الفاتورة لمرتجع مبيعات؟")) return;
+    if (!invoice || convertSaving) return;
+    if (!confirm("تحويل هذه الفاتورة لمرتجع مبيعات؟")) return;
+    setConvertSaving(true);
     try {
       const returnNumber = `RET-${invoice.invoice_number}-${Date.now().toString().slice(-4)}`;
       const { data: ret, error } = await supabase.from("stock_returns").insert({
@@ -230,11 +232,13 @@ export default function InvoiceViewPage() {
       toast.success("تم إنشاء المرتجع");
       navigate(`/stock-returns/edit/${ret.id}`);
     } catch (e: any) { toast.error(e.message); }
+    finally { setConvertSaving(false); }
     setShowAdditionalMenu(false);
   };
 
   const handleStatusChange = async () => {
-    if (!invoice) return;
+    if (!invoice || statusSaving) return;
+    setStatusSaving(true);
     try {
       const before = { status: invoice.status, paid_amount: invoice.paid_amount, due_amount: invoice.due_amount };
       const updates: any = { status: newStatus };
@@ -252,6 +256,7 @@ export default function InvoiceViewPage() {
       qc.invalidateQueries({ queryKey: ["invoices-full"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
     } catch (e: any) { toast.error(e.message); }
+    finally { setStatusSaving(false); }
   };
 
   const handlePrint = async (variant: "full" | "no-account" | "account-only" | "no-details" = "full", noHeader: boolean = false) => {
