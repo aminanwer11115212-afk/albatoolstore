@@ -423,6 +423,10 @@ export default function ReadyToShipPanel({
     const choice = getChoice(inv);
     const hasTransport = (inv.invoice_transports?.length ?? 0) > 0;
     const isSaving = savingRow === inv.id;
+    const transporterName =
+      (transporters as any[]).find((t) => t.id === choice.transporterId)?.name || "";
+    const destinationName =
+      (destinations as any[]).find((d) => d.id === choice.destinationId)?.name || "";
     return (
       <tr
         key={inv.id}
@@ -437,26 +441,52 @@ export default function ReadyToShipPanel({
             onClick={(e) => e.stopPropagation()}
           />
         </td>
-        <td className="cell-num">{inv.invoice_number}</td>
         <td className="cell-name">{inv.customers?.name || "كاش"}</td>
-        <td className="cell-date">{fmtDateAr(inv.date)}</td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <SearchableSelect
-            options={transporters as any}
-            value={choice.transporterId}
-            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: val } }))}
-            placeholder="— اختر ناقل —"
-            className="rts-select"
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={`rts-mini-btn ${choice.transporterId ? "filled" : ""}`}
+                title={transporterName || "اختر ناقل"}
+              >
+                <Truck size={11} />
+                <span className="rts-mini-label">{transporterName || "ناقل"}</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="p-2 w-56" dir="rtl">
+              <SearchableSelect
+                options={transporters as any}
+                value={choice.transporterId}
+                onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: val } }))}
+                placeholder="— اختر ناقل —"
+                className="rts-select"
+              />
+            </PopoverContent>
+          </Popover>
         </td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <SearchableSelect
-            options={destinations as any}
-            value={choice.destinationId}
-            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
-            placeholder="— بدون وجهة —"
-            className="rts-select"
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={`rts-mini-btn ${choice.destinationId ? "filled" : ""}`}
+                title={destinationName || "اختر وجهة"}
+              >
+                <MapPin size={11} />
+                <span className="rts-mini-label">{destinationName || "وجهة"}</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="p-2 w-56" dir="rtl">
+              <SearchableSelect
+                options={destinations as any}
+                value={choice.destinationId}
+                onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
+                placeholder="— بدون وجهة —"
+                className="rts-select"
+              />
+            </PopoverContent>
+          </Popover>
         </td>
         <td className="cell-act" onClick={(e) => e.stopPropagation()}>
           {hasTransport ? (
@@ -490,6 +520,7 @@ export default function ReadyToShipPanel({
       </tr>
     );
   };
+
 
   return (
     <div className="rts-panel" dir="rtl">
