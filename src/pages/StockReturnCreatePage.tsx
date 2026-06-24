@@ -1330,7 +1330,7 @@ export default function StockReturnCreatePage() {
                   id: "save",
                   group: "1-primary",
                   node: (
-                    <button className="btn btn-success btn-sm" onClick={saveReturn}>حفظ</button>
+                    <button className="btn btn-success btn-sm" onClick={saveReturn} disabled={savingReturn}>{savingReturn ? "جاري الحفظ..." : "حفظ"}</button>
                   ),
                 },
                 ...(editId ? [{
