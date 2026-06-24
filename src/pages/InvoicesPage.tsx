@@ -9,7 +9,7 @@ import { openWhatsAppInvoice } from "@/utils/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
-import WorkflowStatusBadge, { WORKFLOW_STATUSES, type WorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
+import WorkflowStatusBadge, { WORKFLOW_STATUSES, type WorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import ShippingDispatchDialog from "@/components/invoice/ShippingDispatchDialog";
