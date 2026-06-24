@@ -104,7 +104,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [lastPayment, setLastPayment] = useState<{ amount: number; status: string; currency?: string } | null>(null);
-  const [customerBalances, setCustomerBalances] = useState<{ debt: number; credit: number } | null>(null);
+  // customer state moved to useDocumentCustomer hook (see below)
 
   // Header
   const [invoiceNumber, setInvoiceNumber] = useState("");
