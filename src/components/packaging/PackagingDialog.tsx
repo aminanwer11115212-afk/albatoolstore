@@ -437,6 +437,7 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
           _target: "ready_to_ship",
           _reason: "حفظ التغليف",
         });
+        invalidateWorkflowAutoCache(parentId);
         try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       } catch { /* غير حرجة */ }
     }
