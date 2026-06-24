@@ -229,13 +229,24 @@ export default function ReadyToShipPanel({
     });
   };
 
-  const printAndDispatch = async () => {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const requestPrintAndDispatch = () => {
+    if (checked.size === 0) {
+      toast.error("اختر فاتورة واحدة على الأقل");
+      return;
+    }
+    setConfirmOpen(true);
+  };
+
+  const doPrintAndDispatch = async () => {
     const selected = invoices.filter((i) => checked.has(i.id));
     if (selected.length === 0) {
       toast.error("اختر فاتورة واحدة على الأقل");
       return;
     }
     setBusy(true);
+    setConfirmOpen(false);
     try {
       const html = await buildPrintHTML(selected, company, "all");
       const win = window.open("", "_blank", "width=900,height=700");
@@ -246,13 +257,9 @@ export default function ReadyToShipPanel({
       win.document.open();
       win.document.write(html);
       win.document.close();
-      // Use a timeout instead of win.onload — onload can fire too early
-      // (or never) for about:blank windows, which causes
-      // "Failed to execute 'print' on 'Window': callback is no longer runnable".
       setTimeout(() => {
         try { win.focus(); win.print(); } catch (e) { console.error(e); }
       }, 500);
-
 
       const ids = selected.map((i) => i.id);
       const results = await Promise.all(
@@ -267,11 +274,21 @@ export default function ReadyToShipPanel({
       const firstErr = results.find((r) => (r as any).error)?.error;
       if (firstErr) throw firstErr;
 
-      toast.success(`تم تحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات"`);
+      toast.success(`تم تحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات" واختفت من الشاشة`);
+
+      // Clear selection + row choices ONLY for the dispatched invoices
       setChecked(new Set());
+      setRowChoice((prev) => {
+        const next = { ...prev };
+        for (const id of ids) delete next[id];
+        return next;
+      });
+
+      // Refresh everywhere that depends on workflow_status
       qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      for (const id of ids) qc.invalidateQueries({ queryKey: ["invoice", id] });
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
     } catch (e: any) {
       toast.error(e.message || "تعذّر إتمام العملية");
@@ -279,6 +296,7 @@ export default function ReadyToShipPanel({
       setTimeout(() => setBusy(false), 1500);
     }
   };
+
 
   const TabBtn = ({ id, icon: Icon, label }: { id: Tab; icon: any; label: string }) => (
     <button
