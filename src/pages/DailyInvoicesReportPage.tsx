@@ -15,6 +15,8 @@ export default function DailyInvoicesReportPage() {
   const { data: invoices, isLoading } = useInvoicesWithCustomers();
 
   const filtered = (invoices || []).filter((inv: any) => {
+    // استبعاد مبيعات الكاش (POS) من تقرير الفواتير العام — تقاريرها مستقلة في صفحة "إدارة فواتير الكاش"
+    if ((inv.source || "regular") === "pos") return false;
     const matchDate = inv.date === date;
     const matchSearch = !search || startsWithAny([inv.invoice_number, (inv.customers as any)?.name], search);
     return matchDate && matchSearch;
