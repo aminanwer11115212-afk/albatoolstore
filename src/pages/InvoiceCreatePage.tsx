@@ -1393,6 +1393,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           _target: "preparing",
           _reason: variant === "stocktake" ? "طباعة كشف جرد" : "طباعة الفاتورة",
         });
+        invalidateWorkflowAutoCache(editId);
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       } catch {}
       navigate(`/preview/invoice/${editId}${suffix}`);
       return;
