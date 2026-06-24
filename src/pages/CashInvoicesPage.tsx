@@ -164,6 +164,12 @@ export default function CashInvoicesPage() {
           >
             <ArrowRight size={14} /> الفواتير العامة
           </button>
+          <button
+            onClick={() => navigate("/invoices/cash/migrate-numbers")}
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-md border border-border bg-background text-foreground hover:bg-muted text-sm"
+            title="ترحيل أرقام الفواتير القديمة من INV- إلى POS-"
+          >
+            ترحيل الترقيم
         </div>
         <h1 className="text-lg font-bold m-0">إدارة فواتير الكاش (POS)</h1>
       </div>
