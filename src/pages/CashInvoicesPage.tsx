@@ -330,6 +330,24 @@ export default function CashInvoicesPage() {
           ))
         )}
       </div>
+
+      {/* Infinite scroll sentinel + load-more fallback */}
+      {!loading && rows.length > 0 && (
+        <div ref={sentinelRef} className="py-4 flex items-center justify-center">
+          {loadingMore ? (
+            <span className="text-xs text-muted-foreground">جارٍ تحميل المزيد…</span>
+          ) : hasMore ? (
+            <button
+              onClick={() => fetchPage(page + 1, false)}
+              className="px-3 py-1.5 text-xs rounded-md border border-border bg-background hover:bg-muted"
+            >
+              تحميل المزيد
+            </button>
+          ) : (
+            <span className="text-xs text-muted-foreground">— انتهت السجلات ({totalCount.toLocaleString("ar-EG")}) —</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
