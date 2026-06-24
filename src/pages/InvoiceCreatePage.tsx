@@ -1578,6 +1578,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         <div className="form-column">
           {/* ============ Header bar ============ */}
           <div className="header-bar" style={{ flexShrink: 0, height: "auto" }}>
+            {/* hidden marker للاختبارات E2E لقراءة الرقم المُولَّد */}
+            <span data-testid="doc-number" data-doc-kind={pos ? "pos-invoice" : (isCash ? "cash-invoice" : "invoice")} style={{ display: "none" }}>{invoiceNumber}</span>
             {pos ? (
               <div className="field" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
                 <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
