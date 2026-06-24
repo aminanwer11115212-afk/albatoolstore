@@ -294,6 +294,13 @@ export default function CashInvoicesPage() {
                         <Printer size={14} />
                       </button>
                       <button
+                        onClick={() => handleWhatsApp(r)}
+                        className="p-1.5 rounded-md hover:bg-muted text-green-600"
+                        title="إرسال رابط المعاينة عبر واتساب"
+                      >
+                        <MessageCircle size={14} />
+                      </button>
+                      <button
                         onClick={() => navigate(`/invoices/cash/edit/${r.id}`)}
                         className="px-2 py-1 text-xs rounded-md border border-border hover:bg-muted"
                       >
