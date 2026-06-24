@@ -28,7 +28,7 @@ function useQuotesFullList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("*, customers(name, phone, balance)")
+        .select("*, customers(name, phone, whatsapp, balance)")
         .or("is_side.is.null,is_side.eq.false")
         .order("created_at", { ascending: false });
       if (error) throw error;

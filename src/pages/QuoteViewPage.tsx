@@ -78,7 +78,7 @@ export default function QuoteViewPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const { data: q, error: qErr } = await supabase.from("quotes").select("*, customers(name, phone, email, address, balance)").eq("id", id).single();
+      const { data: q, error: qErr } = await supabase.from("quotes").select("*, customers(name, phone, whatsapp, email, address, balance)").eq("id", id).single();
       if (qErr) {
         console.error("[QuoteViewPage] loadQuote failed:", qErr);
         toast.error(`تعذّر تحميل عرض السعر: ${qErr.message}`);

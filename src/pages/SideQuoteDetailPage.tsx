@@ -19,7 +19,7 @@ export default function SideQuoteDetailPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("*, customers(name, phone, address)")
+        .select("*, customers(name, phone, whatsapp, address)")
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
