@@ -47,7 +47,7 @@ function useStockMovements(from: string, to: string) {
       const [inv, ret, pur, prods] = await Promise.all([
         supabase
           .from("invoice_items")
-          .select("id, product_id, product_name, quantity, invoice_id, invoices!inner(id, invoice_number, date, customer_id, status, customers(name))")
+          .select("id, product_id, product_name, quantity, invoice_id, invoices!inner(id, invoice_number, date, customer_id, status, source, walk_in_customer_name, customers(name))")
           .gte("invoices.date", from).lte("invoices.date", to)
           .neq("invoices.status", "cancelled")
           .order("created_at", { ascending: false })
