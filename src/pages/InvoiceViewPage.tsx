@@ -248,6 +248,8 @@ export default function InvoiceViewPage() {
         _target: "preparing",
         _reason: "طباعة الفاتورة",
       });
+      invalidateWorkflowAutoCache(invoice.id);
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
     } catch {}
   };
 
