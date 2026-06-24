@@ -1947,20 +1947,16 @@ export default function QuoteCreatePage() {
                           return;
                         }
 
-                        if (!confirm(`تحويل العرض ${quoteNumber} إلى فاتورة وحذفه من قائمة عروض الأسعار؟`)) return;
+                        if (!confirm(`تحويل العرض ${quoteNumber} إلى فاتورة؟ سيُحفظ العرض بحالة "مقبول/محوّل" ويظهر في سجل التحويلات.`)) return;
                         const ok = await saveQuote("draft", { skipNavigate: true, silent: true });
                         if (!ok) return;
                         try {
                           const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
                           const { invoiceId, invoiceNumber, alreadyConverted } = await convertQuoteToInvoice(editId);
-                          if (!alreadyConverted) {
-                            try {
-                              await supabase.from("quote_items").delete().eq("quote_id", editId);
-                              await supabase.from("quotes").delete().eq("id", editId);
-                            } catch (delErr: any) {
-                              toast.error(`تم التحويل لكن تعذر حذف عرض السعر: ${delErr.message}`);
-                            }
-                          }
+                          // ملاحظة: لا نحذف العرض — convertQuoteToInvoice يعلِّمه accepted/converted
+                          // مع converted_to_invoice_id للحفاظ على السجل وإمكانية التتبع.
+                          // علِّم العرض كمنتهٍ في الجلسة لإيقاف أي حفظ خلفي لاحق
+                          quoteGoneRef.current = true;
                           showConverted({ invoiceId, invoiceNumber, alreadyConverted, quoteId: editId });
                         } catch (e: any) {
                           toast.error(e.message || "فشل تحويل العرض إلى فاتورة");
