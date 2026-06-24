@@ -720,15 +720,11 @@ export default function StockReturnCreatePage() {
           break;
         }
         if (error.code === "23505" || /duplicate/i.test(error.message)) {
-          const { data: rs } = await supabase.from("stock_returns").select("return_number").like("return_number", `${prefix}%`);
-          let maxN = 0;
-          (rs || []).forEach((r: any) => {
-            const after = String(r.return_number || "").slice(prefix.length);
-            const mm = after.match(/^(\d+)/);
-            const n = mm ? parseInt(mm[1]) : 0;
-            if (n > maxN) maxN = n;
+          // ولّد رقماً عشوائياً جديداً (يتسع تلقائياً عند الاصطدام)
+          const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+          num = await generateRandomDocNumber("stock_returns", "return_number", prefix, {
+            digits: 5 + Math.min(attempt, 2),
           });
-          num = `${prefix}${String(maxN + 1).padStart(4, "0")}`;
           attempt++;
           continue;
         }
