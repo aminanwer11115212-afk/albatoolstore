@@ -53,13 +53,14 @@ export default function DispatchPrintPreview({ selectedIds, company, liveOverlay
     if (!html) return;
     const win = window.open("", "_blank", "width=900,height=1000");
     if (!win) return;
+    win.document.open();
     win.document.write(html);
     win.document.close();
-    win.onload = () => {
-      win.print();
-      win.onafterprint = () => win.close();
-    };
+    setTimeout(() => {
+      try { win.focus(); win.print(); } catch (e) { console.error(e); }
+    }, 500);
   };
+
 
   if (ids.length === 0) {
     return (
