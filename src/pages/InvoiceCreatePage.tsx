@@ -119,10 +119,14 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   // Add customer dialog
   const [showAddCustomer, setShowAddCustomer] = useState(false);
 
-  // Currency
-  const [currencies, setCurrencies] = useState<Currency[]>([]);
-  const [currencyCode, setCurrencyCode] = useState("SDG");
-  const [exchangeRateToBase, setExchangeRateToBase] = useState(1);
+  // Currency (مُستخرج إلى hook موحّد)
+  const {
+    currencies, setCurrencies,
+    currencyCode, setCurrencyCode,
+    exchangeRateToBase, setExchangeRateToBase,
+    loadCurrencies,
+  } = useDocumentCurrency();
+
 
   // Notes / discount / shipping
   const [generalDiscount, setGeneralDiscount] = useState(0);
