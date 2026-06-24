@@ -283,6 +283,11 @@ export default function StockTrackingPage() {
                   </TableCell>
                   <TableCell>
                     <Link to={docHref(m)} className="text-primary hover:underline">{m.doc_number}</Link>
+                    {m.is_pos && (
+                      <span className="ms-2 inline-block px-1.5 py-0.5 text-[10px] rounded border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold">
+                        كاش
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>{m.party_name}</TableCell>
                   <TableCell className="text-muted-foreground">{m.current_stock ?? "—"}</TableCell>
