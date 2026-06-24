@@ -302,10 +302,10 @@ export default function EmployeesPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-1">
-                      <button onClick={() => openAccess(emp)} title="صلاحيات الدخول" className="p-1.5 text-primary hover:bg-primary/10 rounded"><KeyRound size={15} /></button>
-                      {r && <button onClick={() => toggleLogin(emp)} title="تفعيل/تعطيل الدخول" disabled={busy} className="p-1.5 text-warning hover:bg-warning/10 rounded"><Power size={15} /></button>}
-                      <button onClick={() => { setEditId(emp.id); setForm({ name: emp.name, role: emp.role, status: emp.status, phone: emp.phone || "", email: emp.email || "", salary: emp.salary || "", notes: emp.notes || "" }); setShowForm(true); }} className="p-1.5 text-warning hover:bg-warning/10 rounded"><Edit size={15} /></button>
-                      <button onClick={async () => { if (!confirm("حذف؟")) return; try { if (r) await callFn({ action: "delete", user_id: r.user_id, employee_id: emp.id }); await remove.mutateAsync(emp.id); toast.success("تم"); loadRoles(); } catch (e: any) { toast.error(e.message); } }} className="p-1.5 text-destructive hover:bg-destructive/10 rounded"><Trash2 size={15} /></button>
+                      <button onClick={() => openAccess(emp)} title="صلاحيات الدخول" disabled={isPending(emp)} className="p-1.5 text-primary hover:bg-primary/10 rounded disabled:opacity-40"><KeyRound size={15} /></button>
+                      {r && <button onClick={() => toggleLogin(emp)} title="تفعيل/تعطيل الدخول" disabled={busy || isPending(emp)} className="p-1.5 text-warning hover:bg-warning/10 rounded disabled:opacity-40"><Power size={15} /></button>}
+                      <button onClick={() => { if (isPending(emp)) { toast.error("جاري حفظ الموظف…"); return; } setEditId(emp.id); setForm({ name: emp.name, role: emp.role, status: emp.status, phone: emp.phone || "", email: emp.email || "", salary: emp.salary || "", notes: emp.notes || "" }); setShowForm(true); }} disabled={isPending(emp)} className="p-1.5 text-warning hover:bg-warning/10 rounded disabled:opacity-40"><Edit size={15} /></button>
+                      <button onClick={async () => { if (isPending(emp)) { toast.error("جاري حفظ الموظف…"); return; } if (!confirm("حذف؟")) return; try { if (r) await callFn({ action: "delete", user_id: r.user_id, employee_id: emp.id }); await remove.mutateAsync(emp.id); toast.success("تم"); loadRoles(); } catch (e: any) { toast.error(e.message); } }} disabled={isPending(emp)} className="p-1.5 text-destructive hover:bg-destructive/10 rounded disabled:opacity-40"><Trash2 size={15} /></button>
                     </div>
                   </td>
                 </tr>
