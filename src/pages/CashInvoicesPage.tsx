@@ -170,6 +170,7 @@ export default function CashInvoicesPage() {
             title="ترحيل أرقام الفواتير القديمة من INV- إلى POS-"
           >
             ترحيل الترقيم
+          </button>
         </div>
         <h1 className="text-lg font-bold m-0">إدارة فواتير الكاش (POS)</h1>
       </div>
