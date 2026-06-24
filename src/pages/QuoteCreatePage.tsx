@@ -792,6 +792,11 @@ export default function QuoteCreatePage() {
   async function saveQuote(asStatus: "draft" | "sent" = "draft", opts: { andNew?: boolean; skipNavigate?: boolean; silent?: boolean } = {}): Promise<boolean> {
     // لا تحفظ إذا كان العرض قد حُذف/حُوِّل في الجلسة الحالية
     if (quoteGoneRef.current) return false;
+    // منع النقرات المتكررة أثناء حفظ سابق غير مكتمل
+    if (savingQuoteRef.current) return false;
+    savingQuoteRef.current = true;
+    setSavingQuote(true);
+    try {
     let activeCustomer = customer;
     // إن لم يُختَر عميل من القائمة لكن يوجد اسم نصي حر، أنشئ عميلاً جديداً تلقائياً
     if (!activeCustomer) {
