@@ -58,8 +58,14 @@ export default function ReadyToShipPanel({
   const [tab, setTab] = useState<Tab>("all");
   const [internalChecked, setInternalChecked] = useState<Set<string>>(new Set());
   const checked = checkedProp ?? internalChecked;
+  // مرجع يحمل أحدث Set من المحدَّد — يصلح مشكلة الاستدعاءات المتسلسلة
+  // في نفس الـtick (Set من الـclosure يصبح قديماً فيكتب فوق بعضها).
+  const latestCheckedRef = useRef<Set<string>>(checked);
+  useEffect(() => { latestCheckedRef.current = checked; }, [checked]);
   const setChecked = (updater: Set<string> | ((prev: Set<string>) => Set<string>)) => {
-    const next = typeof updater === "function" ? (updater as any)(checked) : updater;
+    const cur = latestCheckedRef.current;
+    const next = typeof updater === "function" ? (updater as any)(cur) : updater;
+    latestCheckedRef.current = next;
     if (onCheckedChange) onCheckedChange(next);
     else setInternalChecked(next);
   };
