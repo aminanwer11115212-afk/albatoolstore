@@ -2629,7 +2629,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
               parentId={effectiveId}
               customerId={customer?.id || null}
               showAllReady={false}
-            />},
+            />
             <InvoiceAttachmentsDialog
               invoiceId={effectiveId}
               open={attachmentsDialogOpen}
