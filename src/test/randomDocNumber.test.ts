@@ -7,7 +7,7 @@ const selectMock: any = vi.fn(() => ({ eq: eqMock, limit: limitMock }));
 const fromMock = vi.fn(() => ({ select: selectMock }));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: (...args: any[]) => fromMock(...args) },
+  supabase: { from: (table: string) => fromMock(table) },
 }));
 
 import { generateRandomDocNumber } from "@/utils/randomDocNumber";
