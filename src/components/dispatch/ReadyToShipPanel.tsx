@@ -4,7 +4,7 @@
  * ذات الحالة "جاهز للرفع" (workflow_status = ready_to_ship).
  * بعد الطباعة → تحويل الحالة إلى in_transit.
  */
-import { useMemo, useState, useCallback, Fragment, useEffect } from "react";
+import { useMemo, useState, useCallback, Fragment, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
@@ -85,9 +85,11 @@ export default function ReadyToShipPanel({
     else setInternalRowChoice(next);
   };
   const [savingRow, setSavingRow] = useState<string | null>(null);
-  // افتراضيًا: تثبيت الاختيار كمعتاد للعميل عند الضغط على «تثبيت».
-  const [pinAsDefault, setPinAsDefault] = useState<Record<string, boolean>>({});
-  const isPinAsDefault = (id: string) => pinAsDefault[id] ?? true;
+  // Dialog تأكيد التثبيت كافتراضي للعميل
+  const [pendingPinInv, setPendingPinInv] = useState<any | null>(null);
+  // التنقّل بلوحة المفاتيح: مؤشّر مُركّز على صف
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dispatch-ready-to-ship"],
@@ -364,7 +366,7 @@ export default function ReadyToShipPanel({
     };
   };
 
-  const dispatchRow = async (inv: any) => {
+  const dispatchRow = async (inv: any, pinDefault: boolean) => {
     const choice = getChoice(inv);
     if (!choice.transporterId) { toast.error("اختر ناقلاً"); return; }
     setSavingRow(inv.id);
@@ -377,27 +379,23 @@ export default function ReadyToShipPanel({
       });
       if (error) throw error;
 
-      // ثبّت الناقل/الوجهة كمعتاد لهذا العميل (إن كان العميل حقيقيًا والخيار مفعّل).
+      // ثبّت الناقل/الوجهة كمعتاد لهذا العميل (إن كان العميل حقيقيًا والمستخدم وافق).
       const customerId = inv.customer_id || null;
-      if (customerId && isPinAsDefault(inv.id)) {
+      if (customerId && pinDefault) {
         try {
-          // 1) ناقل العميل المُفضّل
           await (supabase as any)
             .from("customer_preferred_transporter")
             .upsert(
               { customer_id: customerId, transporter_id: choice.transporterId },
               { onConflict: "customer_id" }
             );
-          // 2) ربط ناقل بالعميل (لقائمته)
           await (supabase as any)
             .from("customer_transporters")
             .upsert(
               { customer_id: customerId, transporter_id: choice.transporterId },
               { onConflict: "customer_id,transporter_id", ignoreDuplicates: true }
             );
-          // 3) وجهة افتراضية للعميل
           if (choice.destinationId) {
-            // ضمان وجود الربط
             const { data: existing } = await (supabase as any)
               .from("customer_destinations")
               .select("id")
@@ -409,7 +407,6 @@ export default function ReadyToShipPanel({
                 .from("customer_destinations")
                 .insert({ customer_id: customerId, destination_id: choice.destinationId, is_default: true });
             }
-            // تصفير is_default على باقي وجهات العميل، ثم ضبطه على المختار
             await (supabase as any)
               .from("customer_destinations")
               .update({ is_default: false })
@@ -421,14 +418,13 @@ export default function ReadyToShipPanel({
               .eq("customer_id", customerId)
               .eq("destination_id", choice.destinationId);
           }
-          toast.success("تم تثبيت الترحيل وحفظه كمعتاد للعميل");
+          toast.success("تم التثبيت وحُدّثت افتراضيات العميل");
         } catch (pinErr: any) {
-          // لا نوقف العملية الأساسية لو فشل التثبيت كمعتاد
           console.error("pin-as-default error:", pinErr);
-          toast.success("تم تثبيت الترحيل (لم يُحفظ كمعتاد)");
+          toast.success("تم التثبيت (تعذّر تحديث افتراضيات العميل)");
         }
       } else {
-        toast.success("تم تثبيت الترحيل — انتقلت الفاتورة إلى «في الطريق»");
+        toast.success("تم تثبيت الترحيل لهذه الفاتورة");
       }
 
       qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
@@ -445,6 +441,26 @@ export default function ReadyToShipPanel({
     }
   };
 
+  // قرار: نفتح Dialog سؤال «حدّث الافتراضي؟» فقط إذا اختلف الاختيار عن المعتاد للعميل.
+  const requestDispatchRow = (inv: any) => {
+    const customerId = inv.customer_id;
+    if (!customerId) {
+      dispatchRow(inv, false);
+      return;
+    }
+    const choice = getChoice(inv);
+    const { preferred, destinations: _d } = optionsForInvoice(inv);
+    const linkedD = ((custDestinations as any[]) || []).filter((x) => x.customer_id === customerId);
+    const currentDefaultDest = linkedD.find((ld) => ld.is_default)?.destination_id ?? null;
+    const sameTransporter = (preferred ?? null) === (choice.transporterId || null);
+    const sameDestination = (currentDefaultDest ?? null) === (choice.destinationId || null);
+    if (sameTransporter && sameDestination) {
+      dispatchRow(inv, false);
+    } else {
+      setPendingPinInv(inv);
+    }
+  };
+
   const renderRow = (inv: any, idx: number) => {
     const isChecked = checked.has(inv.id);
     const { transporters, destinations } = optionsForInvoice(inv);
@@ -455,7 +471,11 @@ export default function ReadyToShipPanel({
       <tr
         key={inv.id}
         className={isChecked ? "checked" : ""}
-        onClick={() => toggle(inv.id)}
+        tabIndex={0}
+        data-row-id={inv.id}
+        onFocus={() => setFocusedRowId(inv.id)}
+        onClick={() => { setFocusedRowId(inv.id); toggle(inv.id); }}
+        style={focusedRowId === inv.id ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : undefined}
       >
         <td className="cell-idx">{idx + 1}</td>
         <td className="cell-check">
@@ -493,29 +513,15 @@ export default function ReadyToShipPanel({
           {hasTransport ? (
             <span className="rts-pill"><CheckCircle2 size={12} /> مُرحَّلة</span>
           ) : (
-            <div className="rts-act-stack">
-              <button
-                type="button"
-                className="rts-btn rts-btn-primary rts-btn-sm"
-                onClick={() => dispatchRow(inv)}
-                disabled={isSaving || !choice.transporterId}
-              >
-                <Send size={12} />
-                {isSaving ? "…" : "تثبيت"}
-              </button>
-              {inv.customer_id ? (
-                <label className="rts-pin-toggle" title="حفظ الاختيار كناقل/وجهة افتراضية لهذا العميل">
-                  <input
-                    type="checkbox"
-                    checked={isPinAsDefault(inv.id)}
-                    onChange={(e) =>
-                      setPinAsDefault((p) => ({ ...p, [inv.id]: e.target.checked }))
-                    }
-                  />
-                  <span>📌</span>
-                </label>
-              ) : null}
-            </div>
+            <button
+              type="button"
+              className="rts-btn rts-btn-primary rts-btn-sm"
+              onClick={() => requestDispatchRow(inv)}
+              disabled={isSaving || !choice.transporterId}
+            >
+              <Send size={12} />
+              {isSaving ? "…" : "تثبيت"}
+            </button>
           )}
         </td>
       </tr>
@@ -760,7 +766,44 @@ export default function ReadyToShipPanel({
       
 
       {/* Body */}
-      <div className="rts-body">
+      <div
+        className="rts-body"
+        ref={bodyRef}
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          // بناء قائمة الصفوف المرئية حسب التاب/المجموعات
+          const flat: any[] = tab === "all"
+            ? invoices
+            : (groups || []).flatMap((g) => collapsedGroups.has(g.key) ? [] : g.items);
+          if (flat.length === 0) return;
+          const curIdx = focusedRowId ? flat.findIndex((x) => x.id === focusedRowId) : -1;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            const next = flat[Math.min(curIdx + 1, flat.length - 1)] || flat[0];
+            setFocusedRowId(next.id);
+            bodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-row-id="${next.id}"]`)?.focus();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            const prev = flat[Math.max(curIdx - 1, 0)] || flat[0];
+            setFocusedRowId(prev.id);
+            bodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-row-id="${prev.id}"]`)?.focus();
+          } else if (e.key === " " || e.code === "Space") {
+            if (curIdx >= 0) {
+              e.preventDefault();
+              toggle(flat[curIdx].id);
+            }
+          } else if (e.key === "Enter") {
+            if (curIdx >= 0) {
+              const inv = flat[curIdx];
+              const hasTransport = (inv.invoice_transports?.length ?? 0) > 0;
+              if (!hasTransport) {
+                e.preventDefault();
+                requestDispatchRow(inv);
+              }
+            }
+          }
+        }}
+      >
         {isLoading ? (
           <div className="rts-empty">جارٍ التحميل…</div>
         ) : invoices.length === 0 ? (
@@ -899,6 +942,50 @@ export default function ReadyToShipPanel({
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction onClick={doPrintAndDispatch}>
               نعم، تأكيد وطباعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog: تثبيت الناقل/الوجهة كافتراضي للعميل */}
+      <AlertDialog open={!!pendingPinInv} onOpenChange={(o) => !o && setPendingPinInv(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تحديث افتراضيات العميل؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingPinInv ? (() => {
+                const choice = getChoice(pendingPinInv);
+                const tName = ((allTransporters as any[]) || []).find((t) => t.id === choice.transporterId)?.name || "—";
+                const dName = ((allDestinations as any[]) || []).find((d) => d.id === choice.destinationId)?.name || "—";
+                const cName = pendingPinInv.customers?.name || "هذا الزبون";
+                return (
+                  <>
+                    هل تريد جعل <b>{tName}</b> الناقل المعتاد و<b>{dName}</b> الوجهة الافتراضية لـ <b>{cName}</b> في كل النظام؟
+                    <br />
+                    التغيير سيظهر في صفحة إدارة العملاء وفي كل فاتورة جديدة لهذا الزبون.
+                  </>
+                );
+              })() : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                const inv = pendingPinInv;
+                setPendingPinInv(null);
+                if (inv) dispatchRow(inv, false);
+              }}
+            >
+              لا، فقط لهذه الفاتورة
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const inv = pendingPinInv;
+                setPendingPinInv(null);
+                if (inv) dispatchRow(inv, true);
+              }}
+            >
+              نعم، حدّث افتراضيات العميل
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
