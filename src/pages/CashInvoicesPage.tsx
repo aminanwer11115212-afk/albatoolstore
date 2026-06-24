@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, Printer, Trash2, RefreshCw, Search, ArrowRight } from "lucide-react";
@@ -18,6 +18,8 @@ type CashInv = {
   created_at: string;
 };
 
+const PAGE_SIZE = 50;
+
 export default function CashInvoicesPage() {
   const navigate = useNavigate();
   const { remove } = useInvoices();
@@ -25,38 +27,87 @@ export default function CashInvoicesPage() {
   const currency = companyArr?.[0]?.currency || "SDG";
   const [rows, setRows] = useState<CashInv[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [toDate, setToDate] = useState<string>("");
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const fetchingRef = useRef(false);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      let q = supabase
-        .from("invoices")
-        .select("id, invoice_number, date, total, paid_amount, walk_in_customer_name, status, created_at")
-        .eq("source", "pos")
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (fromDate) q = q.gte("date", fromDate);
-      if (toDate) q = q.lte("date", toDate);
-      const { data, error } = await q;
-      if (error) throw error;
-      setRows((data as any) || []);
-    } catch (e: any) {
-      toast.error(`تعذّر تحميل فواتير الكاش: ${e?.message || "خطأ غير معروف"}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const buildBaseQuery = useCallback(() => {
+    let q = supabase
+      .from("invoices")
+      .select("id, invoice_number, date, total, paid_amount, walk_in_customer_name, status, created_at", { count: "exact" })
+      .eq("source", "pos")
+      .order("created_at", { ascending: false });
+    if (fromDate) q = q.gte("date", fromDate);
+    if (toDate) q = q.lte("date", toDate);
+    return q;
+  }, [fromDate, toDate]);
 
+  const fetchPage = useCallback(
+    async (pageIndex: number, replace: boolean) => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+      if (replace) setLoading(true); else setLoadingMore(true);
+      try {
+        const from = pageIndex * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        const { data, error, count } = await buildBaseQuery().range(from, to);
+        if (error) throw error;
+        const batch = (data as any[]) || [];
+        if (typeof count === "number") setTotalCount(count);
+        setRows((prev) => {
+          const merged = replace ? batch : [...prev, ...batch];
+          // إزالة أي تكرار محتمل بحسب id
+          const seen = new Set<string>();
+          return merged.filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
+        });
+        setHasMore(batch.length === PAGE_SIZE);
+        setPage(pageIndex);
+      } catch (e: any) {
+        toast.error(`تعذّر تحميل فواتير الكاش: ${e?.message || "خطأ غير معروف"}`);
+        setHasMore(false);
+      } finally {
+        fetchingRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [buildBaseQuery],
+  );
+
+  // إعادة التحميل من البداية عند تغيير الفلاتر
   useEffect(() => {
-    fetchData();
-    const refresh = () => fetchData();
+    setRows([]);
+    setPage(0);
+    setHasMore(true);
+    void fetchPage(0, true);
+    const refresh = () => fetchPage(0, true);
     window.addEventListener("invoices:changed", refresh);
     return () => window.removeEventListener("invoices:changed", refresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromDate, toDate]);
+
+  // مراقب التقاطع للـ Infinite Scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && hasMore && !loading && !loadingMore && !fetchingRef.current) {
+          void fetchPage(page + 1, false);
+        }
+      },
+      { rootMargin: "200px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [page, hasMore, loading, loadingMore, fetchPage]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return rows;
@@ -80,6 +131,7 @@ export default function CashInvoicesPage() {
       await deleteInvoiceWithStockRestore(id);
       toast.success("تم الحذف");
       setRows((p) => p.filter((r) => r.id !== id));
+      setTotalCount((c) => Math.max(0, c - 1));
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
     } catch (e: any) {
       toast.error(`فشل الحذف: ${e?.message || "خطأ"}`);
@@ -87,6 +139,10 @@ export default function CashInvoicesPage() {
   };
 
   const handlePrint = (id: string) => navigate(`/preview/invoice/${id}`);
+
+  const reload = () => fetchPage(0, true);
+
+
 
   return (
     <div dir="rtl" className="p-3 space-y-3 font-cairo">
@@ -152,7 +208,7 @@ export default function CashInvoicesPage() {
           مسح
         </button>
         <button
-          onClick={fetchData}
+          onClick={reload}
           className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-border hover:bg-muted"
         >
           <RefreshCw size={12} /> تحديث
@@ -162,8 +218,10 @@ export default function CashInvoicesPage() {
       {/* Totals card */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <div className="p-3 rounded-md border border-border bg-card">
-          <div className="text-xs text-muted-foreground">عدد الفواتير</div>
-          <div className="text-xl font-bold">{totals.count}</div>
+          <div className="text-xs text-muted-foreground">المعروض / الإجمالي بالفلتر</div>
+          <div className="text-xl font-bold">
+            {rows.length.toLocaleString("ar-EG")} / {totalCount.toLocaleString("ar-EG")}
+          </div>
         </div>
         <div className="p-3 rounded-md border border-border bg-card">
           <div className="text-xs text-muted-foreground">إجمالي المبيعات</div>
@@ -272,6 +330,24 @@ export default function CashInvoicesPage() {
           ))
         )}
       </div>
+
+      {/* Infinite scroll sentinel + load-more fallback */}
+      {!loading && rows.length > 0 && (
+        <div ref={sentinelRef} className="py-4 flex items-center justify-center">
+          {loadingMore ? (
+            <span className="text-xs text-muted-foreground">جارٍ تحميل المزيد…</span>
+          ) : hasMore ? (
+            <button
+              onClick={() => fetchPage(page + 1, false)}
+              className="px-3 py-1.5 text-xs rounded-md border border-border bg-background hover:bg-muted"
+            >
+              تحميل المزيد
+            </button>
+          ) : (
+            <span className="text-xs text-muted-foreground">— انتهت السجلات ({totalCount.toLocaleString("ar-EG")}) —</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
