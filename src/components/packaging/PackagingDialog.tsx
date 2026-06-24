@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { usePackagingTypes } from "@/hooks/useData";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import { toast } from "sonner";
