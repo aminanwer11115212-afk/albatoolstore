@@ -119,7 +119,7 @@ export const QUOTE_STATUS_OPTIONS: StatusOption[] = [
 export const INVOICE_STATUS_OPTIONS: StatusOption[] = [
   { value: "new",           label: "مقبول",                color: "#6b7280" },
   { value: "preparing",     label: "قيد التجهيز",          color: "#eab308" },
-  { value: "ready_to_ship", label: "جاهزة للرفع",          color: "#f97316" },
+  { value: "ready_to_ship", label: "جاهز للرفع",           color: "#f97316" },
   { value: "in_transit",    label: "في الطريق للترحيلات", color: "#a855f7" },
   { value: "done",           label: "تم",                  color: "#16a34a" },
 ];
