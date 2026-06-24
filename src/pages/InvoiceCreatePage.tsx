@@ -444,18 +444,25 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       setProductsLoading(false);
       if (cfg.data) setCompany(cfg.data);
       if (!editId) {
-        const { data: last } = await supabase
+        // Numbering: POS uses its own prefix + sequence isolated from regular invoices
+        const prefix = pos
+          ? ((cfg.data as any)?.pos_invoice_prefix || "POS-")
+          : (cfg.data?.invoice_prefix || "INV-");
+        let lastQ = supabase
           .from("invoices")
           .select("invoice_number")
+          .like("invoice_number", `${prefix}%`)
           .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
+        if (pos) lastQ = lastQ.eq("source", "pos");
+        else lastQ = lastQ.neq("source", "pos");
+        const { data: lastRows } = await lastQ.maybeSingle();
         let next = 1;
-        if (last?.invoice_number) {
-          const m = last.invoice_number.match(/(\d+)$/);
+        if (lastRows?.invoice_number) {
+          const m = String(lastRows.invoice_number).match(/(\d+)$/);
           if (m) next = parseInt(m[1]) + 1;
         }
-        setInvoiceNumber(`${cfg.data?.invoice_prefix || "INV-"}${String(next).padStart(4, "0")}`);
+        setInvoiceNumber(`${prefix}${String(next).padStart(4, "0")}`);
       }
     })();
 
