@@ -200,6 +200,9 @@ export default function ReadyToShipPanel({
     });
   }, []);
 
+  // مرجع آخر صف تمّ التفاعل معه — يستخدمه Shift+Click / Shift+Arrow لتحديد المدى.
+  const lastAnchorIdRef = useRef<string | null>(null);
+
   const allChecked = invoices.length > 0 && invoices.every((i) => checked.has(i.id));
   const toggleAll = () => {
     if (allChecked) setChecked(new Set());
@@ -244,6 +247,33 @@ export default function ReadyToShipPanel({
       return n;
     });
   };
+
+  // قائمة الصفوف المرئية في الترتيب الفعلي على الشاشة — تستخدمها Shift+Click / Shift+Arrow / Ctrl+A.
+  const flatVisible = useMemo<any[]>(() => {
+    if (tab === "all") return invoices;
+    return (groups || []).flatMap((g) => collapsedGroups.has(g.key) ? [] : g.items);
+  }, [tab, invoices, groups, collapsedGroups]);
+
+  // تحديد مدى من lastAnchorId إلى toId (يُضاف إلى التحديد القائم).
+  const selectRange = useCallback((toId: string) => {
+    const anchorId = lastAnchorIdRef.current;
+    if (!anchorId || anchorId === toId) {
+      setChecked((p) => { const n = new Set(p); n.add(toId); return n; });
+      return;
+    }
+    const a = flatVisible.findIndex((x) => x.id === anchorId);
+    const b = flatVisible.findIndex((x) => x.id === toId);
+    if (a < 0 || b < 0) {
+      setChecked((p) => { const n = new Set(p); n.add(toId); return n; });
+      return;
+    }
+    const [lo, hi] = a <= b ? [a, b] : [b, a];
+    setChecked((p) => {
+      const n = new Set(p);
+      for (let i = lo; i <= hi; i++) n.add(flatVisible[i].id);
+      return n;
+    });
+  }, [flatVisible]);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -483,7 +513,15 @@ export default function ReadyToShipPanel({
         tabIndex={0}
         data-row-id={inv.id}
         onFocus={() => setFocusedRowId(inv.id)}
-        onClick={() => { setFocusedRowId(inv.id); toggle(inv.id); }}
+        onClick={(e) => {
+          setFocusedRowId(inv.id);
+          if (e.shiftKey) {
+            selectRange(inv.id);
+          } else {
+            toggle(inv.id);
+          }
+          lastAnchorIdRef.current = inv.id;
+        }}
         style={focusedRowId === inv.id ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : undefined}
       >
         <td className="cell-idx">{idx + 1}</td>
@@ -491,8 +529,17 @@ export default function ReadyToShipPanel({
           <input
             type="checkbox"
             checked={isChecked}
-            onChange={() => toggle(inv.id)}
-            onClick={(e) => e.stopPropagation()}
+            onChange={() => {}}
+            onClick={(e) => {
+              e.stopPropagation();
+              setFocusedRowId(inv.id);
+              if ((e as any).shiftKey) {
+                selectRange(inv.id);
+              } else {
+                toggle(inv.id);
+              }
+              lastAnchorIdRef.current = inv.id;
+            }}
           />
         </td>
         <td className="cell-name">
@@ -780,26 +827,50 @@ export default function ReadyToShipPanel({
         ref={bodyRef}
         tabIndex={-1}
         onKeyDown={(e) => {
-          // بناء قائمة الصفوف المرئية حسب التاب/المجموعات
-          const flat: any[] = tab === "all"
-            ? invoices
-            : (groups || []).flatMap((g) => collapsedGroups.has(g.key) ? [] : g.items);
+          const flat = flatVisible;
           if (flat.length === 0) return;
           const curIdx = focusedRowId ? flat.findIndex((x) => x.id === focusedRowId) : -1;
+          const focusRow = (id: string) => {
+            setFocusedRowId(id);
+            bodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-row-id="${id}"]`)?.focus();
+          };
+          // Ctrl/Cmd+A: تحديد كل الفواتير الظاهرة
+          if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+            e.preventDefault();
+            setChecked(new Set(flat.map((x) => x.id)));
+            return;
+          }
           if (e.key === "ArrowDown") {
             e.preventDefault();
-            const next = flat[Math.min(curIdx + 1, flat.length - 1)] || flat[0];
-            setFocusedRowId(next.id);
-            bodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-row-id="${next.id}"]`)?.focus();
+            const nextIdx = Math.min((curIdx < 0 ? -1 : curIdx) + 1, flat.length - 1);
+            const next = flat[nextIdx];
+            if (e.shiftKey) {
+              if (!lastAnchorIdRef.current) lastAnchorIdRef.current = flat[Math.max(curIdx, 0)].id;
+              selectRange(next.id);
+            } else {
+              lastAnchorIdRef.current = next.id;
+            }
+            focusRow(next.id);
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
-            const prev = flat[Math.max(curIdx - 1, 0)] || flat[0];
-            setFocusedRowId(prev.id);
-            bodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-row-id="${prev.id}"]`)?.focus();
+            const prevIdx = Math.max((curIdx < 0 ? 1 : curIdx) - 1, 0);
+            const prev = flat[prevIdx];
+            if (e.shiftKey) {
+              if (!lastAnchorIdRef.current) lastAnchorIdRef.current = flat[Math.max(curIdx, 0)].id;
+              selectRange(prev.id);
+            } else {
+              lastAnchorIdRef.current = prev.id;
+            }
+            focusRow(prev.id);
           } else if (e.key === " " || e.code === "Space") {
             if (curIdx >= 0) {
               e.preventDefault();
-              toggle(flat[curIdx].id);
+              if (e.shiftKey) {
+                selectRange(flat[curIdx].id);
+              } else {
+                toggle(flat[curIdx].id);
+                lastAnchorIdRef.current = flat[curIdx].id;
+              }
             }
           } else if (e.key === "Enter") {
             if (curIdx >= 0) {
