@@ -2145,7 +2145,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                 }] : []),
 
                 // === Group 2: Files & attachments ===
-                ...(!pos ? [
+                ...([
                 {
                   id: "packaging",
                   group: "2-files",
@@ -2171,7 +2171,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                   ),
                 },
                 // (تم حذف زرّي "تقرير الترحيل" و"تقرير التغليف" بناءً على طلب المالك)
-                {
+                ...(!pos ? [{
                   id: "dispatch-page",
                   group: "2-files",
                   node: (
@@ -2183,8 +2183,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                       <Truck size={14} /> الترحيلات
                     </button>
                   ),
-                },
-                ] : []),
+                }] : []),
+                ]),
                 {
                   id: "attachments",
                   group: "2-files",
@@ -2616,20 +2616,20 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         if (!effectiveId) return null;
         return (
           <>
-            {!pos && <PackagingDialog
+            <PackagingDialog
               open={packagingDialogOpen}
               onOpenChange={setPackagingDialogOpen}
               parentType="invoice"
               parentId={effectiveId}
-            />}
-            {!pos && <TransportDialog
+            />
+            <TransportDialog
               open={transportDialogOpen}
               onOpenChange={setTransportDialogOpen}
               parentType="invoice"
               parentId={effectiveId}
               customerId={customer?.id || null}
               showAllReady={false}
-            />}
+            />
             <InvoiceAttachmentsDialog
               invoiceId={effectiveId}
               open={attachmentsDialogOpen}
