@@ -42,10 +42,7 @@ export default function QuickAddTransporterDialog({ open, onOpenChange, onCreate
       toast.success("تمت إضافة الناقل بنجاح", {
         description: `«${data?.name ?? name.trim()}» متاح الآن في قائمة الناقلين`,
       });
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["transporters"] }),
-        qc.invalidateQueries({ queryKey: ["table", "transporters"] }),
-      ]);
+      await qc.invalidateQueries({ queryKey: ["transporters"] });
       await qc.refetchQueries({ queryKey: ["transporters"], type: "active" });
       try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
       onCreated?.(data);

@@ -34,10 +34,7 @@ export default function QuickAddDestinationDialog({ open, onOpenChange, onCreate
       toast.success("تمت إضافة الوجهة بنجاح", {
         description: `«${data?.name ?? name.trim()}» متاحة الآن في قائمة الوجهات`,
       });
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["destinations"] }),
-        qc.invalidateQueries({ queryKey: ["table", "destinations"] }),
-      ]);
+      await qc.invalidateQueries({ queryKey: ["destinations"] });
       await qc.refetchQueries({ queryKey: ["destinations"], type: "active" });
       try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
       onCreated?.(data);
