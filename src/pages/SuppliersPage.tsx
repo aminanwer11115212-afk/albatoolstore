@@ -38,8 +38,13 @@ export default function SuppliersPage() {
       address: form.address.trim() || null,
       company: form.company.trim() || null,
       notes: form.notes.trim() || null,
-      balance: form.balance === "" ? 0 : Number(form.balance) || 0,
     };
+    // الرصيد يُحسب تلقائياً من أوامر الشراء عبر trigger recompute_supplier_balance.
+    // نسمح فقط بإدخال رصيد افتتاحي عند إنشاء مورد جديد، ولا نسمح بتعديله لاحقاً
+    // حتى لا يتعارض مع القيمة المُعاد حسابها.
+    if (!editId) {
+      payload.balance = form.balance === "" ? 0 : Number(form.balance) || 0;
+    }
     try {
       if (editId) {
         const updated = await update.mutateAsync({ id: editId, ...payload });
