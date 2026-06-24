@@ -9,7 +9,7 @@ import { validatePaymentAmount, computePaymentStatus } from "@/utils/paymentVali
 import { splitPayment } from "@/utils/overpayment";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
-import { type WhatsAppMessageType } from "@/utils/whatsapp";
+import { type WhatsAppMessageType, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PackagingDialog from "@/components/packaging/PackagingDialog";
 import TransportDialog from "@/components/transport/TransportDialog";
@@ -90,7 +90,7 @@ export default function InvoiceViewPage() {
     try {
       const { data: inv, error: invErr } = await supabase
         .from("invoices")
-        .select("*, customers(name, phone, email, address, balance)")
+        .select("*, customers(name, phone, whatsapp, email, address, balance)")
         .eq("id", id)
         .single();
       if (invErr) {
@@ -279,7 +279,7 @@ export default function InvoiceViewPage() {
     await shareDocumentViaWhatsApp({
       docType: "invoice",
       docId: invoice.id,
-      phone: invoice.customers?.phone,
+      phone: pickCustomerWhatsApp(invoice.customers),
       customerName: invoice.customers?.name || (invoice as any).walk_in_customer_name,
       docNumber: invoice.invoice_number,
       total: invoice.total,
@@ -396,7 +396,7 @@ export default function InvoiceViewPage() {
   };
 
   const handleSMS = () => {
-    if (!invoice?.customers?.phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
+    if (!pickCustomerWhatsApp(invoice?.customers)) { toast.error("لا يوجد رقم واتساب صالح للعميل"); return; }
     const msg = encodeURIComponent(`فاتورة رقم ${invoice.invoice_number} بمبلغ ${invoice.currency_code || company?.currency || "SDG"} ${Number(invoice.total || 0).toLocaleString()}. المبلغ المستحق: ${invoice.currency_code || company?.currency || "SDG"} ${Number(invoice.due_amount || 0).toLocaleString()}`);
     window.open(`sms:${invoice.customers.phone}?body=${msg}`);
   };
@@ -823,7 +823,7 @@ export default function InvoiceViewPage() {
             docId={invoice.id}
             docNumber={invoice.invoice_number}
             customerName={invoice.customers?.name}
-            customerPhone={invoice.customers?.phone}
+            customerPhone={pickCustomerWhatsApp(invoice.customers) || invoice.customers?.phone}
             date={invoice.date}
             company={company}
           />

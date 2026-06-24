@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { pickCustomerWhatsApp } from "@/utils/whatsapp";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useInvoicesWithCustomers, useInvoices, useCompanySettings } from "@/hooks/useData";
 import { useNavigate } from "react-router-dom";
@@ -75,7 +76,7 @@ export default function InvoicesPage() {
     await shareDocumentViaWhatsApp({
       docType: "invoice",
       docId: inv.id,
-      phone: inv.customers?.phone,
+      phone: pickCustomerWhatsApp(inv.customers),
       customerName: inv.customers?.name || inv.walk_in_customer_name,
       docNumber: inv.invoice_number,
       total: inv.total,
@@ -522,7 +523,7 @@ export default function InvoicesPage() {
                         >
                           ✎ تعديل
                         </button>
-                        {inv.customers?.phone && (
+                        {pickCustomerWhatsApp(inv.customers) && (
                           <button
                             type="button"
                             className="btn-xs btn-primary"
@@ -583,7 +584,7 @@ export default function InvoicesPage() {
                     <>
                       <button className="btn-xs btn-warning" onClick={() => navigate(`/invoices/edit/${inv.id}`)}>✎ تعديل</button>
                       <button className="btn-xs btn-info" onClick={() => handlePrint(inv, "full", false)} title="طباعة">🖨 طباعة</button>
-                      {inv.customers?.phone && (
+                      {pickCustomerWhatsApp(inv.customers) && (
                         <button className="btn-xs btn-primary" onClick={() => handleWhatsApp(inv)}>✉ واتساب</button>
                       )}
                       <button className="btn-xs btn-danger" onClick={() => handleDelete(inv.id)}>🗑 حذف</button>

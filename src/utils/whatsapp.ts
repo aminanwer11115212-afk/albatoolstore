@@ -13,6 +13,34 @@ export function normalizeWhatsAppPhone(phone: string): string {
 }
 
 /**
+ * يتحقق هل الرقم صالح للإرسال عبر واتساب (بعد التطبيع: 8–15 خانة رقمية).
+ */
+export function isValidWhatsAppPhone(phone: string | undefined | null): boolean {
+  if (!phone) return false;
+  const n = normalizeWhatsAppPhone(String(phone));
+  return /^\d{8,15}$/.test(n);
+}
+
+/**
+ * يختار رقم واتساب العميل: يفضّل حقل `whatsapp` ثم يقع لـ `phone` إن كان `whatsapp`
+ * فارغاً أو غير صالح. يُرجع `null` إذا لم يوجد رقم صالح للإرسال.
+ *
+ * هذا هو المصدر الوحيد المعتمد لاستخراج رقم واتساب من سجل عميل في كامل النظام
+ * — لا تستخدم `customer.phone` مباشرة لزر/مشاركة واتساب.
+ */
+export function pickCustomerWhatsApp(
+  customer: { whatsapp?: string | null; phone?: string | null } | null | undefined,
+): string | null {
+  if (!customer) return null;
+  const wa = (customer.whatsapp || "").trim();
+  if (isValidWhatsAppPhone(wa)) return wa;
+  const ph = (customer.phone || "").trim();
+  if (isValidWhatsAppPhone(ph)) return ph;
+  return null;
+}
+
+
+/**
  * Build a WhatsApp deep link that opens the installed app directly
  * (mobile or desktop), skipping the wa.me intermediate web page.
  */

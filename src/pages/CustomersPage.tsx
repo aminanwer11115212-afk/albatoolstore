@@ -5,6 +5,7 @@ import { useCustomers } from "@/hooks/useData";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { supabase } from "@/integrations/supabase/client";
+import { pickCustomerWhatsApp, openWhatsApp, isValidWhatsAppPhone } from "@/utils/whatsapp";
 import { toast } from "sonner";
 import CustomerDetailView from "@/components/CustomerDetailView";
 import LocationPicker, { LocationValue, validateLocation } from "@/components/LocationPicker";
@@ -97,6 +98,8 @@ export default function CustomersPage() {
   // فلاتر هيدر (Excel-style)
   const [filterName, setFilterName] = useState("");
   const [filterPhone, setFilterPhone] = useState("");
+  // فلتر صلاحية واتساب للإرسال: "" | valid | invalid | missing
+  const [filterWaValid, setFilterWaValid] = useState<"" | "valid" | "invalid" | "missing">("");
   const [filterAddress, setFilterAddress] = useState("");
   const [filterGroup, setFilterGroup] = useState("");
   const [filterTransporter, setFilterTransporter] = useState("");
@@ -217,6 +220,13 @@ export default function CustomersPage() {
     if (filterLocality && c.locality_id !== filterLocality) return false;
     if (filterName && !startsWithMatch(c.name, filterName)) return false;
     if (filterPhone && !normalizePhone(c.whatsapp || c.phone || "").includes(normalizePhone(filterPhone))) return false;
+    if (filterWaValid) {
+      const wa = pickCustomerWhatsApp(c);
+      const hasAny = !!(c.whatsapp || c.phone);
+      if (filterWaValid === "valid" && !wa) return false;
+      if (filterWaValid === "invalid" && (wa || !hasAny)) return false;
+      if (filterWaValid === "missing" && hasAny) return false;
+    }
     if (filterAddress && !startsWithMatch(c.address, filterAddress)) return false;
     if (filterGroup && c.group_id !== filterGroup) return false;
     if (filterTransporter && customerTransporter[c.id] !== filterTransporter) return false;
@@ -233,7 +243,7 @@ export default function CustomersPage() {
       if (filterActivity === "with_credit" && !(Number(c.credit_balance || 0) > 0)) return false;
     }
     return true;
-  }), [customers, search, filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity, customerTransporter, customerDestination, lastActivity]);
+  }), [customers, search, filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterWaValid, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity, customerTransporter, customerDestination, lastActivity]);
 
   const sortedFiltered = useMemo(() => {
     const arr = [...filtered];
@@ -243,7 +253,7 @@ export default function CustomersPage() {
     return arr;
   }, [filtered, sortBy, lastActivity]);
 
-  const activeFiltersCount = [filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity !== "all" ? filterActivity : ""].filter(Boolean).length;
+  const activeFiltersCount = [filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterWaValid, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity !== "all" ? filterActivity : ""].filter(Boolean).length;
 
   // إحصاءات الديون من السيرفر (RPC) — أخفّ بكثير من حسابها على المتصفح
   const { data: serverStats } = useQuery({
@@ -320,7 +330,7 @@ export default function CustomersPage() {
 
   const clearFilters = () => {
     setFilterCity(""); setFilterRegion(""); setFilterState(""); setFilterLocality(""); setFilterActivity("all");
-    setFilterName(""); setFilterPhone(""); setFilterAddress(""); setFilterGroup(""); setFilterTransporter(""); setFilterDestination("");
+    setFilterName(""); setFilterPhone(""); setFilterWaValid(""); setFilterAddress(""); setFilterGroup(""); setFilterTransporter(""); setFilterDestination("");
     setPage(1);
   };
 
@@ -1299,7 +1309,11 @@ export default function CustomersPage() {
                       const headers: { i: number; key: string; label: string; filter?: { kind: "text" | "select"; value: string; setValue: (v: string) => void; options?: { value: string; label: string }[]; placeholder?: string } }[] = [
                         { i: 1, key: "name", label: "اسم العميل", filter: { kind: "text", value: filterName, setValue: setFilterName, placeholder: "ابحث بالاسم..." } },
                         { i: 2, key: "address", label: "عنوان", filter: { kind: "text", value: filterAddress, setValue: setFilterAddress, placeholder: "ابحث بالعنوان..." } },
-                        { i: 3, key: "phone", label: "واتساب", filter: { kind: "text", value: filterPhone, setValue: setFilterPhone, placeholder: "ابحث بالواتساب..." } },
+                        { i: 3, key: "phone", label: "واتساب", filter: { kind: "select", value: filterWaValid, setValue: (v) => setFilterWaValid(v as any), options: [
+                          { value: "valid", label: "✅ صالح للإرسال" },
+                          { value: "invalid", label: "⚠️ رقم غير صالح" },
+                          { value: "missing", label: "✖ بدون رقم" },
+                        ] } },
                         { i: 4, key: "region", label: "الاتجاه", filter: { kind: "select", value: filterRegion, setValue: (v) => { setFilterRegion(v); setFilterState(""); setFilterCity(""); setFilterLocality(""); }, options: regions.map(r => ({ value: r.id, label: r.name })) } },
                         { i: 5, key: "state", label: "الولاية", filter: { kind: "select", value: filterState, setValue: (v) => { setFilterState(v); setFilterCity(""); setFilterLocality(""); }, options: filteredStates.map(s => ({ value: s.id, label: s.name })) } },
                         { i: 6, key: "city", label: "المدينة", filter: { kind: "select", value: filterCity, setValue: (v) => { setFilterCity(v); setFilterLocality(""); }, options: filteredCities.map(c => ({ value: c.id, label: c.name })) } },
@@ -1604,21 +1618,43 @@ export default function CustomersPage() {
                           />
                         </td>
                         <td className="tabular-nums" style={{ padding: 0 }}>
-                          <EditableCell
-                            value={c.whatsapp || ""}
-                            disabled={savingRow === c.id}
-                            onSave={(v) => updateRowField(c.id, { whatsapp: v.trim() || null })}
-                            inputClassName="text-[11px] tabular-nums"
-                            placeholder="واتساب"
-                            inputMode="tel"
-                            dir="ltr"
-                            validate={(v) => {
-                              const t = (v || "").trim();
-                              if (!t) return null;
-                              const dups = findDuplicatesByPhone(t, c.id);
-                              return dups.length > 0 ? `رقم مكرر مع: ${dups.map((d: any) => d.name).slice(0, 2).join("، ")}` : null;
-                            }}
-                          />
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <EditableCell
+                                value={c.whatsapp || ""}
+                                disabled={savingRow === c.id}
+                                onSave={(v) => updateRowField(c.id, { whatsapp: v.trim() || null })}
+                                inputClassName="text-[11px] tabular-nums"
+                                placeholder="واتساب"
+                                inputMode="tel"
+                                dir="ltr"
+                                validate={(v) => {
+                                  const t = (v || "").trim();
+                                  if (!t) return null;
+                                  if (!isValidWhatsAppPhone(t)) return "رقم غير صالح للإرسال (8-15 خانة)";
+                                  const dups = findDuplicatesByPhone(t, c.id);
+                                  return dups.length > 0 ? `رقم مكرر مع: ${dups.map((d: any) => d.name).slice(0, 2).join("، ")}` : null;
+                                }}
+                              />
+                            </div>
+                            {(() => {
+                              const wa = pickCustomerWhatsApp(c);
+                              if (!wa) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  title={`إرسال واتساب إلى ${wa}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openWhatsApp(wa, `مرحباً ${c.name || ""} 👋`);
+                                  }}
+                                  style={{ background: "#25D366", color: "#fff", border: 0, borderRadius: 3, padding: "2px 6px", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                                >
+                                  💬
+                                </button>
+                              );
+                            })()}
+                          </div>
                         </td>
                         <td>
                           <InlineSearchSelect

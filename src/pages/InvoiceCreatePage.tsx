@@ -22,7 +22,7 @@ import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
 import { deductStockForLines, applyStockDeltaForLines } from "@/utils/stockDeduction";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
-import { generateWhatsAppLink, openWhatsApp } from "@/utils/whatsapp";
+import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { getCurrencies, getLatestRate, type Currency } from "@/utils/currency";
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLocked, screenColWidthsKey, migrateScreenColKeys, COLS_TOAST_SAVED, COLS_TOAST_SAVE_FAILED, COLS_TOAST_EDIT_MODE, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE } from "@/hooks/useColumnWidths";
@@ -2250,7 +2250,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                         await shareDocumentViaWhatsApp({
                           docType: "invoice",
                           docId: editId,
-                          phone: customer?.phone,
+                          phone: pickCustomerWhatsApp(customer),
                           customerName: customer?.name || (pos ? (walkInName?.trim() || "عميل نقدي") : null),
                           docNumber: invoiceNumber,
                           total: totals.total,

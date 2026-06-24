@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadQuoteExtras } from "@/utils/printExtras";
 import { deductStockForLines } from "@/utils/stockDeduction";
-import { type WhatsAppMessageType } from "@/utils/whatsapp";
+import { type WhatsAppMessageType, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -78,7 +78,7 @@ export default function QuoteViewPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const { data: q, error: qErr } = await supabase.from("quotes").select("*, customers(name, phone, email, address, balance)").eq("id", id).single();
+      const { data: q, error: qErr } = await supabase.from("quotes").select("*, customers(name, phone, whatsapp, email, address, balance)").eq("id", id).single();
       if (qErr) {
         console.error("[QuoteViewPage] loadQuote failed:", qErr);
         toast.error(`تعذّر تحميل عرض السعر: ${qErr.message}`);
@@ -233,7 +233,7 @@ export default function QuoteViewPage() {
     await shareDocumentViaWhatsApp({
       docType: "quote",
       docId: quote.id,
-      phone: quote.customers?.phone,
+      phone: pickCustomerWhatsApp(quote.customers),
       customerName: quote.customers?.name,
       docNumber: quote.quote_number,
       total: quote.total,
@@ -255,7 +255,7 @@ export default function QuoteViewPage() {
   };
 
   const handleSMS = async () => {
-    if (!quote?.customers?.phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
+    if (!pickCustomerWhatsApp(quote?.customers)) { toast.error("لا يوجد رقم واتساب صالح للعميل"); return; }
     const msg = encodeURIComponent(`عرض سعر رقم ${quote.quote_number} بمبلغ ${quote.currency_code || company?.currency || "SDG"} ${Number(quote.total || 0).toLocaleString()}`);
     window.open(`sms:${quote.customers.phone}?body=${msg}`);
     const { markQuoteAsSent } = await import("@/utils/quoteSentStatus");
@@ -634,7 +634,7 @@ export default function QuoteViewPage() {
             docId={quote.id}
             docNumber={quote.quote_number}
             customerName={quote.customers?.name}
-            customerPhone={quote.customers?.phone}
+            customerPhone={pickCustomerWhatsApp(quote.customers) || quote.customers?.phone}
             date={quote.date}
             company={company}
           />

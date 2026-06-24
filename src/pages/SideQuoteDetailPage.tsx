@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { pickCustomerWhatsApp } from "@/utils/whatsapp";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +20,7 @@ export default function SideQuoteDetailPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("*, customers(name, phone, address)")
+        .select("*, customers(name, phone, whatsapp, address)")
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
@@ -126,7 +127,7 @@ export default function SideQuoteDetailPage() {
                 await shareDocumentViaWhatsApp({
                   docType: "quote",
                   docId: id!,
-                  phone: (quote as any).customers?.phone,
+                  phone: pickCustomerWhatsApp((quote as any).customers),
                   customerName: (quote as any).customers?.name,
                   docNumber: (quote as any).quote_number,
                   total: (quote as any).total,

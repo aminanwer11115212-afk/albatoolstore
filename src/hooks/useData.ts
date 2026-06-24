@@ -243,7 +243,7 @@ export function useInvoicesWithCustomers(limit?: number) {
     queryFn: async () => {
       let query = supabase
         .from("invoices")
-        .select("*, customers(name, phone, balance)")
+        .select("*, customers(name, phone, whatsapp, balance)")
         .order("created_at", { ascending: false });
       if (limit) query = query.limit(limit);
       const { data, error } = await query;
