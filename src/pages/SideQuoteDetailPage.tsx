@@ -118,6 +118,28 @@ export default function SideQuoteDetailPage() {
             <button className="btn-xs" onClick={() => navigate("/quotes/side")}>← القائمة</button>
             <button className="btn-xs btn-warning" onClick={() => navigate(`/quotes/side/edit/${id}`)}>تعديل</button>
             <button className="btn-xs btn-info" onClick={async () => { navigate(`/preview/quote/${id}`); const { markQuoteAsSent } = await import("@/utils/quoteSentStatus"); await markQuoteAsSent(id); }}>طباعة</button>
+            <button
+              className="btn-xs"
+              style={{ background: "#22c55e", color: "#fff" }}
+              onClick={async () => {
+                const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+                await shareDocumentViaWhatsApp({
+                  docType: "quote",
+                  docId: id!,
+                  phone: (quote as any).customers?.phone,
+                  customerName: (quote as any).customers?.name,
+                  docNumber: (quote as any).quote_number,
+                  total: (quote as any).total,
+                  currency: cur,
+                  docLabel: "عرض سعر جانبي",
+                });
+                const { markQuoteAsSent } = await import("@/utils/quoteSentStatus");
+                await markQuoteAsSent(id!);
+              }}
+              title="إرسال رابط المعاينة عبر واتساب"
+            >
+              واتساب
+            </button>
           </div>
         </div>
 
