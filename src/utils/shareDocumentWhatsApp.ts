@@ -58,7 +58,7 @@ function docLabelDefault(t: ShareDocType): string {
 export async function shareDocumentViaWhatsApp(opts: ShareDocOptions): Promise<string | null> {
   const {
     docType, docId, phone, customerName, docNumber,
-    total, currency, hiddenSections, ttlHours = 168, docLabel,
+    total, currency, hiddenSections, ttlHours = 24, docLabel,
   } = opts;
 
   if (!docId) {
