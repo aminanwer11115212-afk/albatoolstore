@@ -754,6 +754,7 @@ export default function ReadyToShipPanel({
           <table className="rts-table">
             <thead>
               <tr>
+                <th className="cell-idx">#</th>
                 <th className="cell-check">
                   <input
                     type="checkbox"
@@ -773,13 +774,15 @@ export default function ReadyToShipPanel({
           <table className="rts-table">
             <thead>
               <tr>
-                <th className="cell-check">#</th>
+                <th className="cell-idx">#</th>
+                <th className="cell-check">✓</th>
                 <th>اسم الزبون</th>
                 <th className="cell-sel">الناقل</th>
                 <th className="cell-sel">الوجهة</th>
                 <th className="cell-act">إجراء</th>
               </tr>
             </thead>
+
 
             <tbody>
               {groups!.map((g) => {
