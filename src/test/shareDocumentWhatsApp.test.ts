@@ -10,20 +10,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
  */
 
 // --- mocks ---------------------------------------------------------------
-const toastErr = vi.fn();
-const toastLoading = vi.fn(() => "tid");
-const toastDismiss = vi.fn();
+const h = vi.hoisted(() => ({
+  toastErr: vi.fn(),
+  toastLoading: vi.fn(() => "tid"),
+  toastDismiss: vi.fn(),
+  getSession: vi.fn(async () => ({ data: { session: { access_token: "tok-abc" } } })),
+  openWhatsApp: vi.fn(),
+}));
+const { toastErr, toastLoading, toastDismiss, getSession, openWhatsApp } = h;
+
 vi.mock("sonner", () => ({
-  toast: { error: toastErr, loading: toastLoading, dismiss: toastDismiss, success: vi.fn() },
+  toast: { error: h.toastErr, loading: h.toastLoading, dismiss: h.toastDismiss, success: vi.fn() },
 }));
-
-const getSession = vi.fn(async () => ({ data: { session: { access_token: "tok-abc" } } }));
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { auth: { getSession } },
+  supabase: { auth: { getSession: h.getSession } },
 }));
-
-const openWhatsApp = vi.fn();
-vi.mock("@/utils/whatsapp", () => ({ openWhatsApp }));
+vi.mock("@/utils/whatsapp", () => ({ openWhatsApp: h.openWhatsApp }));
 
 import { shareDocumentViaWhatsApp } from "@/utils/shareDocumentWhatsApp";
 
