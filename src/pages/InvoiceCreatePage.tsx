@@ -110,13 +110,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState("");
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const selectedCustomerIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    selectedCustomerIdRef.current = customer?.id || null;
-  }, [customer]);
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [showCustomerSugg, setShowCustomerSugg] = useState(false);
+  const {
+    customer, setCustomer,
+    customerSearch, setCustomerSearch,
+    showCustomerSugg, setShowCustomerSugg,
+    customerBalances, setCustomerBalances,
+    selectedCustomerIdRef,
+  } = useDocumentCustomer();
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
   // Add customer dialog
