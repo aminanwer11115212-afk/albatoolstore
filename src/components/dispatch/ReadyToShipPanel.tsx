@@ -751,7 +751,7 @@ export default function ReadyToShipPanel({
           </button>
         )}
       </div>
-      <div className="rts-hint">الرجاء اختيار زبون أو مجموعة من الزبائن</div>
+      
 
       {/* Body */}
       <div className="rts-body">
