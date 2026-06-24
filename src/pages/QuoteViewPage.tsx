@@ -255,7 +255,7 @@ export default function QuoteViewPage() {
   };
 
   const handleSMS = async () => {
-    if (!quote?.customers?.phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
+    if (!pickCustomerWhatsApp(quote?.customers)) { toast.error("لا يوجد رقم واتساب صالح للعميل"); return; }
     const msg = encodeURIComponent(`عرض سعر رقم ${quote.quote_number} بمبلغ ${quote.currency_code || company?.currency || "SDG"} ${Number(quote.total || 0).toLocaleString()}`);
     window.open(`sms:${quote.customers.phone}?body=${msg}`);
     const { markQuoteAsSent } = await import("@/utils/quoteSentStatus");
@@ -634,7 +634,7 @@ export default function QuoteViewPage() {
             docId={quote.id}
             docNumber={quote.quote_number}
             customerName={quote.customers?.name}
-            customerPhone={quote.customers?.phone}
+            customerPhone={pickCustomerWhatsApp(quote.customers) || quote.customers?.phone}
             date={quote.date}
             company={company}
           />

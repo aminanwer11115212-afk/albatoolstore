@@ -396,7 +396,7 @@ export default function InvoiceViewPage() {
   };
 
   const handleSMS = () => {
-    if (!invoice?.customers?.phone) { toast.error("لا يوجد رقم هاتف للعميل"); return; }
+    if (!pickCustomerWhatsApp(invoice?.customers)) { toast.error("لا يوجد رقم واتساب صالح للعميل"); return; }
     const msg = encodeURIComponent(`فاتورة رقم ${invoice.invoice_number} بمبلغ ${invoice.currency_code || company?.currency || "SDG"} ${Number(invoice.total || 0).toLocaleString()}. المبلغ المستحق: ${invoice.currency_code || company?.currency || "SDG"} ${Number(invoice.due_amount || 0).toLocaleString()}`);
     window.open(`sms:${invoice.customers.phone}?body=${msg}`);
   };
@@ -823,7 +823,7 @@ export default function InvoiceViewPage() {
             docId={invoice.id}
             docNumber={invoice.invoice_number}
             customerName={invoice.customers?.name}
-            customerPhone={invoice.customers?.phone}
+            customerPhone={pickCustomerWhatsApp(invoice.customers) || invoice.customers?.phone}
             date={invoice.date}
             company={company}
           />

@@ -523,7 +523,7 @@ export default function InvoicesPage() {
                         >
                           ✎ تعديل
                         </button>
-                        {inv.customers?.phone && (
+                        {pickCustomerWhatsApp(inv.customers) && (
                           <button
                             type="button"
                             className="btn-xs btn-primary"
@@ -584,7 +584,7 @@ export default function InvoicesPage() {
                     <>
                       <button className="btn-xs btn-warning" onClick={() => navigate(`/invoices/edit/${inv.id}`)}>✎ تعديل</button>
                       <button className="btn-xs btn-info" onClick={() => handlePrint(inv, "full", false)} title="طباعة">🖨 طباعة</button>
-                      {inv.customers?.phone && (
+                      {pickCustomerWhatsApp(inv.customers) && (
                         <button className="btn-xs btn-primary" onClick={() => handleWhatsApp(inv)}>✉ واتساب</button>
                       )}
                       <button className="btn-xs btn-danger" onClick={() => handleDelete(inv.id)}>🗑 حذف</button>
