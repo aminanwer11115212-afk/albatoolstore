@@ -614,8 +614,18 @@ export default function InvoiceViewPage() {
               const newStatus = e.target.value as WorkflowStatus;
               const before = (invoice.workflow_status || "new") as WorkflowStatus;
               if (newStatus === before) return;
+              const rankOf = (s: string) => WORKFLOW_STATUSES.findIndex(x => x.value === s);
+              if (rankOf(newStatus) < rankOf(before)) {
+                toast.error("لا يمكن تخفيض حالة التجهيز");
+                return;
+              }
               try {
-                await supabase.from("invoices").update({ workflow_status: newStatus }).eq("id", invoice.id);
+                const { error } = await supabase.rpc("advance_invoice_workflow" as any, {
+                  _invoice_id: invoice.id,
+                  _target: newStatus,
+                  _reason: `تغيير يدوي من ${getWorkflowStatus(before).label} إلى ${getWorkflowStatus(newStatus).label}`,
+                });
+                if (error) throw error;
                 if (before === "new" && newStatus !== "new") {
                   try {
                     const { data: items } = await supabase
@@ -629,12 +639,7 @@ export default function InvoiceViewPage() {
                     );
                   } catch (stockErr) { console.error("[InvoiceViewPage] stock deduction failed", stockErr); }
                 }
-                await recordInvoiceRevision({
-                  invoiceId: invoice.id,
-                  action: "workflow_status_change",
-                  changes: { workflow_status: { before, after: newStatus } },
-                  note: `حالة التجهيز: ${getWorkflowStatus(before).label} → ${getWorkflowStatus(newStatus).label}`,
-                });
+                invalidateWorkflowAutoCache(invoice.id);
                 toast.success("تم تحديث حالة التجهيز");
                 try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
                 loadInvoice();
