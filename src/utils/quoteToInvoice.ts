@@ -62,7 +62,9 @@ export async function convertQuoteToInvoice(
     );
   }
   const prefix = invoicePrefix;
-  const invNum = `${prefix}${Date.now().toString(36).toUpperCase()}`;
+  // رقم عشوائي فريد عبر helper موحّد بدل Date.now() لتفادي التكرار وضمان عدم التسلسل
+  const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+  const invNum = await generateRandomDocNumber("invoices", "invoice_number", prefix);
   // حماية نهائية: تأكد أن الرقم الناتج لا يبدأ بأي بادئة عرض سعر
   if (
     (quotePrefix && invNum.startsWith(quotePrefix)) ||

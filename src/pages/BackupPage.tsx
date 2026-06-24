@@ -35,17 +35,28 @@ export default function BackupPage() {
     setBusy("export"); setProgress("");
     const bundle: Record<string, any[]> = {};
     let totalRows = 0;
+    const PAGE = 1000;
     try {
       for (const t of TABLES) {
-        setProgress(`جاري قراءة ${t}...`);
-        const { data, error } = await (supabase as any).from(t).select("*");
-        if (error) {
-          console.warn(`[backup] skip ${t}:`, error.message);
-          bundle[t] = [];
-          continue;
+        const rows: any[] = [];
+        let from = 0;
+        while (true) {
+          setProgress(`جاري قراءة ${t}... (${rows.length.toLocaleString()})`);
+          const { data, error } = await (supabase as any)
+            .from(t)
+            .select("*")
+            .range(from, from + PAGE - 1);
+          if (error) {
+            console.warn(`[backup] skip ${t}:`, error.message);
+            break;
+          }
+          const chunk = data || [];
+          rows.push(...chunk);
+          if (chunk.length < PAGE) break; // آخر صفحة
+          from += PAGE;
         }
-        bundle[t] = data || [];
-        totalRows += (data || []).length;
+        bundle[t] = rows;
+        totalRows += rows.length;
       }
       const payload = {
         version: 1,

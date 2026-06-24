@@ -38,8 +38,13 @@ export default function SuppliersPage() {
       address: form.address.trim() || null,
       company: form.company.trim() || null,
       notes: form.notes.trim() || null,
-      balance: form.balance === "" ? 0 : Number(form.balance) || 0,
     };
+    // الرصيد يُحسب تلقائياً من أوامر الشراء عبر trigger recompute_supplier_balance.
+    // نسمح فقط بإدخال رصيد افتتاحي عند إنشاء مورد جديد، ولا نسمح بتعديله لاحقاً
+    // حتى لا يتعارض مع القيمة المُعاد حسابها.
+    if (!editId) {
+      payload.balance = form.balance === "" ? 0 : Number(form.balance) || 0;
+    }
     try {
       if (editId) {
         const updated = await update.mutateAsync({ id: editId, ...payload });
@@ -139,8 +144,21 @@ export default function SuppliersPage() {
                 <input placeholder="الشركة" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} className={inputCls} maxLength={100} />
               </div>
               <div>
-                <label className={labelCls}>الرصيد الافتتاحي</label>
-                <input type="number" step="0.01" placeholder="0" value={form.balance} onChange={e => setForm({ ...form, balance: e.target.value })} className={inputCls} dir="ltr" />
+                <label className={labelCls}>
+                  {editId ? "الرصيد الحالي (محسوب تلقائياً)" : "الرصيد الافتتاحي"}
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0"
+                  value={form.balance}
+                  onChange={e => !editId && setForm({ ...form, balance: e.target.value })}
+                  className={inputCls}
+                  dir="ltr"
+                  readOnly={!!editId}
+                  disabled={!!editId}
+                  title={editId ? "الرصيد يُحسب تلقائياً من أوامر الشراء — لا يُعدّل يدوياً" : "أدخل الرصيد الافتتاحي للمورد"}
+                />
               </div>
             </div>
           </div>
