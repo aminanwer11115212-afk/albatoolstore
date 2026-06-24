@@ -357,6 +357,9 @@ export default function QuoteCreatePage() {
   const [quoteWorkflowStatus, setQuoteWorkflowStatus] = useState<string>("draft");
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  // قفل الحفظ لمنع النقرات المتكررة وإنشاء سجلات مكررة
+  const savingQuoteRef = useRef(false);
+  const [savingQuote, setSavingQuote] = useState(false);
   const { isAdmin } = useUserRole();
 
   // Default exchange rate from Dashboard (latest in exchange_rates for foreign currency)
