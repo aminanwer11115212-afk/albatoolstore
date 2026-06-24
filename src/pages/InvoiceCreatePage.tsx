@@ -1200,7 +1200,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         const { data: { user: _u } } = await supabase.auth.getUser();
         (payload as any).created_by_uid = _u?.id || null;
         // محاولة الإدراج مع إعادة توليد الرقم تلقائياً عند تعارض المفتاح الفريد
-        const prefix = company?.invoice_prefix || "INV-";
+        const prefix = pos
+          ? ((company as any)?.pos_invoice_prefix || "POS-")
+          : (company?.invoice_prefix || "INV-");
         const padLen = (() => {
           const m = invoiceNumber.match(/(\d+)$/);
           return m ? m[1].length : 4;
