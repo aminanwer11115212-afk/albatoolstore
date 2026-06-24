@@ -330,7 +330,7 @@ export default function CustomersPage() {
 
   const clearFilters = () => {
     setFilterCity(""); setFilterRegion(""); setFilterState(""); setFilterLocality(""); setFilterActivity("all");
-    setFilterName(""); setFilterPhone(""); setFilterAddress(""); setFilterGroup(""); setFilterTransporter(""); setFilterDestination("");
+    setFilterName(""); setFilterPhone(""); setFilterWaValid(""); setFilterAddress(""); setFilterGroup(""); setFilterTransporter(""); setFilterDestination("");
     setPage(1);
   };
 
