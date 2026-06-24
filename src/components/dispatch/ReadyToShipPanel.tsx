@@ -513,7 +513,15 @@ export default function ReadyToShipPanel({
         tabIndex={0}
         data-row-id={inv.id}
         onFocus={() => setFocusedRowId(inv.id)}
-        onClick={() => { setFocusedRowId(inv.id); toggle(inv.id); }}
+        onClick={(e) => {
+          setFocusedRowId(inv.id);
+          if (e.shiftKey) {
+            selectRange(inv.id);
+          } else {
+            toggle(inv.id);
+          }
+          lastAnchorIdRef.current = inv.id;
+        }}
         style={focusedRowId === inv.id ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : undefined}
       >
         <td className="cell-idx">{idx + 1}</td>
@@ -521,8 +529,17 @@ export default function ReadyToShipPanel({
           <input
             type="checkbox"
             checked={isChecked}
-            onChange={() => toggle(inv.id)}
-            onClick={(e) => e.stopPropagation()}
+            onChange={() => {}}
+            onClick={(e) => {
+              e.stopPropagation();
+              setFocusedRowId(inv.id);
+              if ((e as any).shiftKey) {
+                selectRange(inv.id);
+              } else {
+                toggle(inv.id);
+              }
+              lastAnchorIdRef.current = inv.id;
+            }}
           />
         </td>
         <td className="cell-name">
