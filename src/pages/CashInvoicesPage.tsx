@@ -347,6 +347,12 @@ export default function CashInvoicesPage() {
                     <Printer size={12} /> طباعة
                   </button>
                   <button
+                    onClick={() => handleWhatsApp(r)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-green-600 text-green-700 hover:bg-green-600 hover:text-white"
+                  >
+                    <MessageCircle size={12} /> واتساب
+                  </button>
+                  <button
                     onClick={() => handleDelete(r.id)}
                     className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                   >
