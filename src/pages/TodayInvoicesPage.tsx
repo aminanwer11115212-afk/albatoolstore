@@ -14,6 +14,8 @@ export default function TodayInvoicesPage() {
         .from("invoices")
         .select("*, customers(name)")
         .eq("date", today)
+        // استبعاد مبيعات الكاش (POS) — لها صفحة وتقارير مستقلة
+        .neq("source", "pos")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
