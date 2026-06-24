@@ -851,22 +851,26 @@ export default function QuoteCreatePage() {
       total: totals.total,
       notes,
       internal_note: internalNote,
-      status: editId ? (quoteWorkflowStatus || asStatus) : asStatus,
+      status: (editId || lastSavedIdRef.current) ? (quoteWorkflowStatus || asStatus) : asStatus,
       currency_code: companyCurrency,
     };
 
-    let qid: string | undefined = editId;
+    // المعرّف الفعّال للتعديل: من URL، أو من آخر حفظ ناجح في نفس الجلسة
+    // (window.history.replaceState لا يُحدِّث useParams، لذلك بدون هذا
+    // الاحتياط ستُنشئ نقرة الحفظ الثانية عرض سعر جديداً مكرَّراً).
+    const effectiveEditId = editId || lastSavedIdRef.current || undefined;
+    let qid: string | undefined = effectiveEditId;
     // إن كنا في وضع التعديل، احسب البصمة الحالية وقارنها بالأصلية لتقرير ما إذا كنا سنعيد كتابة البنود
     const currentItemsHash = quoteItemsHash(validRows);
-    const itemsUnchanged = !!editId && originalItemsHashRef.current !== null && originalItemsHashRef.current === currentItemsHash;
+    const itemsUnchanged = !!effectiveEditId && originalItemsHashRef.current !== null && originalItemsHashRef.current === currentItemsHash;
     let recordExisted = true;
 
-    if (editId) {
+    if (effectiveEditId) {
       // UPDATE مباشر بدون SELECT وقائي مسبق؛ نتحقق من العدد المُعاد لمعرفة إن كان السجل موجوداً
       const { data: updated, error } = await supabase
         .from("quotes")
         .update(payload)
-        .eq("id", editId)
+        .eq("id", effectiveEditId)
         .select("id");
       if (error) {
         toast.error(error.message);
@@ -877,9 +881,10 @@ export default function QuoteCreatePage() {
         toast.message("عرض السعر السابق غير موجود في قاعدة البيانات — سيتم إنشاء عرض جديد");
         qid = undefined;
         recordExisted = false;
+        lastSavedIdRef.current = null;
       } else if (!itemsUnchanged) {
         // البنود تغيّرت — احذفها لإعادة إدراجها لاحقاً
-        await (supabase as any).rpc("delete_quote_items_silent", { p_quote_id: editId });
+        await (supabase as any).rpc("delete_quote_items_silent", { p_quote_id: effectiveEditId });
       }
     }
 
