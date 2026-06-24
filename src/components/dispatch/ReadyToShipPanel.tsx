@@ -88,7 +88,8 @@ export default function ReadyToShipPanel({
   // Dialog تأكيد التثبيت كافتراضي للعميل
   const [pendingPinInv, setPendingPinInv] = useState<any | null>(null);
   // التنقّل بلوحة المفاتيح: مؤشّر مُركّز على صف
-  const [focusedIdx, setFocusedIdx] = useState<number>(-1);
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dispatch-ready-to-ship"],
