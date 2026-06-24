@@ -117,7 +117,7 @@ export default function Dashboard() {
           <DashboardRecentQuotes quotes={quotes || []} isLoading={quotesLoading} />
         </div>
         <div className="order-1 lg:order-2">
-          <DashboardRecentInvoices invoices={invoices || []} isLoading={invLoading} />
+          <DashboardRecentInvoices invoices={(invoices || []).filter((i: any) => (i.source || "regular") !== "pos")} isLoading={invLoading} />
         </div>
       </div>
 
