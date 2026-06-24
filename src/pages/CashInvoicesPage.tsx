@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Printer, Trash2, RefreshCw, Search, ArrowRight } from "lucide-react";
+import { Plus, Printer, Trash2, RefreshCw, Search, ArrowRight, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useInvoices, useCompanySettings } from "@/hooks/useData";
 import { startsWithMatch } from "@/utils/searchMatch";
