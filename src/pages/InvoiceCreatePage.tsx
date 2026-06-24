@@ -24,6 +24,8 @@ import { deductStockForLines, applyStockDeltaForLines } from "@/utils/stockDeduc
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { useDocumentCurrency } from "@/hooks/document/useDocumentCurrency";
+import { useDocumentItems } from "@/hooks/document/useDocumentItems";
+
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLocked, screenColWidthsKey, migrateScreenColKeys, COLS_TOAST_SAVED, COLS_TOAST_SAVE_FAILED, COLS_TOAST_EDIT_MODE, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE } from "@/hooks/useColumnWidths";
 import { useSuggestionsWidth, SuggestionsResizeHandle } from "@/hooks/useSuggestionsWidth";
@@ -144,9 +146,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   // Default exchange rate
   const [defaultRate, setDefaultRate] = useState<number>(1);
 
-  // Quick add row + table rows
-  const [quickRow, setQuickRow] = useState<InvRow>(newRow());
-  const [rows, setRows] = useState<InvRow[]>([]);
+  // Quick add row + table rows (مُستخرج إلى hook موحّد)
+  const { quickRow, setQuickRow, rows, setRows } = useDocumentItems();
+
   const itemsScrollRef = useRef<HTMLDivElement>(null);
   const savedRef = useRef(false);
   const lastSavedIdRef = useRef<string | null>(null);
