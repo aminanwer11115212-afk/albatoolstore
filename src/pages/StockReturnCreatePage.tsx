@@ -782,6 +782,10 @@ export default function StockReturnCreatePage() {
 
     toast.success(editId ? "تم تحديث المرتجع وتعديل المخزون" : "تم حفظ المرتجع وإعادة الكميات للمخزون");
     navigate(`/stock-return/view/${rid}`);
+    } finally {
+      savingReturnRef.current = false;
+      setSavingReturn(false);
+    }
   }
 
   // ---------- Render ----------
