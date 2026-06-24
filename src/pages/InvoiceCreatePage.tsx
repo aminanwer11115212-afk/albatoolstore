@@ -194,21 +194,24 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const [invoiceStatus, setInvoiceStatus] = useState<string>("pending");
 
   // ---------- Payment dialog state ----------
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [savedCustomerId, setSavedCustomerId] = useState<string | null>(null);
-  const [savedTotal, setSavedTotal] = useState<number>(0);
-  const [savedPaid, setSavedPaid] = useState<number>(0);
-  const [savedDue, setSavedDue] = useState<number>(0);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [payAmount, setPayAmount] = useState<string>("");
-  const [payMethod, setPayMethod] = useState<string>("cash");
-  const [payAccount, setPayAccount] = useState<string>("");
-  const [payDate, setPayDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [payNote, setPayNote] = useState<string>("");
-  const [payRef, setPayRef] = useState<string>("");
-  const [payDiscount, setPayDiscount] = useState<string>("");
-  const [savingPayment, setSavingPayment] = useState(false);
-  const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = [undefined, undefined] as any; // placeholder, replaced just below
+  const _pay = useDocumentPayment();
+  const {
+    savedTotal, setSavedTotal,
+    savedPaid, setSavedPaid,
+    savedDue, setSavedDue,
+    accounts, setAccounts,
+    payAmount, setPayAmount,
+    payMethod, setPayMethod,
+    payAccount, setPayAccount,
+    payDate, setPayDate,
+    payNote, setPayNote,
+    payRef, setPayRef,
+    payDiscount, setPayDiscount,
+    savingPayment, setSavingPayment,
+  } = _pay;
+  // re-bind dialog open (keep names identical)
+  const paymentDialogOpenV = _pay.paymentDialogOpen; const setPaymentDialogOpenV = _pay.setPaymentDialogOpen;
   const [showMessageImport, setShowMessageImport] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
