@@ -152,14 +152,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const { quickRow, setQuickRow, rows, setRows } = useDocumentItems();
 
   const itemsScrollRef = useRef<HTMLDivElement>(null);
-  const savedRef = useRef(false);
-  const lastSavedIdRef = useRef<string | null>(null);
-  // معرّف الفاتورة بعد أول حفظ في وضع الإنشاء — يُستخدم لتركيب الحوارات (المستندات/التغليف/الترحيل)
-  // لأن window.history.replaceState لا يُحدِّث useParams.
-  const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(null);
-  const isSavingRef = useRef(false);
-  // بصمة بنود الفاتورة كما حُمِّلت من قاعدة البيانات؛ تُستخدم لتخطّي إعادة كتابة البنود وعمليات المخزون إن لم تتغيّر
-  const originalItemsHashRef = useRef<string | null>(null);
+  const {
+    savedRef,
+    lastSavedIdRef,
+    savedInvoiceId, setSavedInvoiceId,
+    isSavingRef,
+    originalItemsHashRef,
+  } = useDocumentSave();
   useContainerFit(itemsScrollRef, clampWidthsToContainer, { locked: colsLocked });
   const prevRowsLen = useRef(1);
   useEffect(() => {
