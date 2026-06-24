@@ -391,8 +391,8 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourc
     ? (sourceFilter === "pos" ? "فواتير الكاش" : "الفواتير")
     : isPurchases ? "أوامر الشراء" : isReturns ? "المرتجعات" : (sideOnly ? "عروض الأسعار الجانبية" : "عروض الأسعار");
   const title = `آخر ${limit} ${baseTitle}`;
-  const editPath = isInvoices ? "/invoices/edit/" : isPurchases ? "/purchase/edit/" : isReturns ? "/stock-return/edit/" : (sideOnly ? "/quotes/side/edit/" : "/quotes/edit/");
-  const managePath = isInvoices ? "/invoices" : isPurchases ? "/purchase" : isReturns ? "/stock-return" : (sideOnly ? "/quotes/side" : "/quotes");
+  const editPath = isInvoices ? (sourceFilter === "pos" ? "/invoices/cash/edit/" : "/invoices/edit/") : isPurchases ? "/purchase/edit/" : isReturns ? "/stock-return/edit/" : (sideOnly ? "/quotes/side/edit/" : "/quotes/edit/");
+  const managePath = isInvoices ? (sourceFilter === "pos" ? "/invoices/cash/list" : "/invoices") : isPurchases ? "/purchase" : isReturns ? "/stock-return" : (sideOnly ? "/quotes/side" : "/quotes");
   const partyKey = isPurchases ? "suppliers" : "customers";
   const queryKey = isInvoices ? "invoices-with-customers" : isPurchases ? "purchase-orders-with-suppliers" : isReturns ? "stock-returns-with-customers" : "quotes-with-customers";
 
@@ -947,7 +947,7 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourc
               const docNumber = isInvoices ? item.invoice_number : isPurchases ? item.order_number : isReturns ? item.return_number : item.quote_number;
               const docLabel = isInvoices ? "فاتورة" : isPurchases ? "أمر شراء" : isReturns ? "مرتجع" : "عرض سعر";
               const partyLabel = isPurchases ? "المورد" : "العميل";
-              const partyName = item[partyKey]?.name || "-";
+              const partyName = item[partyKey]?.name || (isInvoices && item.source === "pos" ? (item.walk_in_customer_name || "عميل نقدي") : "-");
               return (
                 <tr key={item.id} className={`hover:bg-muted/40 transition-colors ${compact ? "even:bg-gray-50" : ""}`}>
                   {!isHidden("party") && (
