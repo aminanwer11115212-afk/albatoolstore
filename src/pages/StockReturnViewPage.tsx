@@ -44,7 +44,8 @@ export default function StockReturnViewPage() {
   };
 
   const handleStatusChange = async () => {
-    if (!ret) return;
+    if (!ret || statusSaving) return;
+    setStatusSaving(true);
     try {
       const { error } = await supabase.from("stock_returns").update({ status: newStatus }).eq("id", ret.id);
       if (error) throw error;
@@ -52,16 +53,20 @@ export default function StockReturnViewPage() {
       toast.success("تم تغيير الوضع");
       setShowStatusChange(false);
     } catch (e: any) { toast.error(e.message || "تعذّر تغيير الوضع"); }
+    finally { setStatusSaving(false); }
   };
 
   const handleDelete = async () => {
-    if (!ret || !confirm("هل أنت متأكد من إلغاء المرتجع؟")) return;
+    if (!ret || cancelSaving) return;
+    if (!confirm("هل أنت متأكد من إلغاء المرتجع؟")) return;
+    setCancelSaving(true);
     try {
       const { error } = await supabase.from("stock_returns").update({ status: "cancelled" }).eq("id", ret.id);
       if (error) throw error;
       await load();
       toast.success("تم إلغاء المرتجع");
     } catch (e: any) { toast.error(e.message || "تعذّر إلغاء المرتجع"); }
+    finally { setCancelSaving(false); }
   };
 
   const startEdit = (index: number, field: string, value: any) => {
