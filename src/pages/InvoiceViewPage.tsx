@@ -55,6 +55,8 @@ export default function InvoiceViewPage() {
   const [showAttachments, setShowAttachments] = useState(false);
   const [packagingDialogOpen, setPackagingDialogOpen] = useState(false);
   const [transportDialogOpen, setTransportDialogOpen] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [convertSaving, setConvertSaving] = useState(false);
   const [editingCell, setEditingCell] = useState<{ index: number; field: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"document" | "conversion">("document");
   const [editValue, setEditValue] = useState("");
