@@ -299,6 +299,31 @@ export default function ReadyToShipPanel({
     return { transporters, destinations, preferred, defaultDest };
   }, [allTransporters, allDestinations, custTransporters, custDestinations, prefTransporters]);
 
+  // Sync resolved defaults (preferred / first available) into rowChoice so the
+  // parent (DispatchPage) can render them in the preview/print overlay even
+  // when the user hasn't manually changed the dropdowns.
+  useEffect(() => {
+    if (!invoices.length) return;
+    const next: Record<string, RowChoice> = { ...rowChoice };
+    let changed = false;
+    for (const inv of invoices) {
+      const { preferred, defaultDest, transporters, destinations } = optionsForInvoice(inv);
+      const existing = inv.invoice_transports?.[0];
+      const tId = existing?.transporter_id ?? preferred ?? transporters[0]?.id ?? "";
+      const dId = existing?.destination_id ?? defaultDest ?? destinations[0]?.id ?? "";
+      const cur = next[inv.id] || {};
+      const newT = cur.transporterId ?? tId;
+      const newD = cur.destinationId ?? dId;
+      if (cur.transporterId !== newT || cur.destinationId !== newD) {
+        next[inv.id] = { transporterId: newT, destinationId: newD };
+        changed = true;
+      }
+    }
+    if (changed) setRowChoice(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, allTransporters, allDestinations, custTransporters, custDestinations, prefTransporters]);
+
+
   const getChoice = (inv: any) => {
     const c = rowChoice[inv.id] || {};
     const { preferred, defaultDest, transporters, destinations } = optionsForInvoice(inv);
