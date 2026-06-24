@@ -210,7 +210,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const quickQtyRef = useRef<HTMLInputElement>(null);
   const quickRateRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
-  useKeyboardNav(pageRef);
+  useInvoiceKeyboardNav(pageRef);
   useCreatePageNav({ rootRef: pageRef, customerRef: customerInputRef, itemsTableId: "invoice-items" });
 
   // ---------- Initial load ----------
