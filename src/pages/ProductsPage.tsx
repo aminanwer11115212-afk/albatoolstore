@@ -1423,10 +1423,17 @@ export default function ProductsPage() {
 
                   {(() => { const k = idx(); return (
                     <div>
-                      <label className={lbl}>الوحدات بالمخزن</label>
+                      <label className={lbl}>
+                        الوحدات بالمخزن
+                        {editId && <span className="text-[10px] text-muted-foreground mr-1">(تُحسب من حركات المخزون)</span>}
+                      </label>
                       <input ref={el => fieldRefs.current[k] = el} type="number" value={form.stock_quantity}
                         onChange={e => setForm({ ...form, stock_quantity: e.target.value })}
-                        onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0" />
+                        onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus}
+                        disabled={!!editId}
+                        readOnly={!!editId}
+                        title={editId ? "تُحدَّث تلقائياً من الفواتير والمرتجعات والتحويلات" : ""}
+                        className={`${inp} ${editId ? "opacity-60 cursor-not-allowed" : ""}`} placeholder="0" />
                     </div>
                   ); })()}
 
