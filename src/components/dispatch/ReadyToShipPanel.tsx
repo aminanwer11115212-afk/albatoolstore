@@ -200,6 +200,9 @@ export default function ReadyToShipPanel({
     });
   }, []);
 
+  // مرجع آخر صف تمّ التفاعل معه — يستخدمه Shift+Click / Shift+Arrow لتحديد المدى.
+  const lastAnchorIdRef = useRef<string | null>(null);
+
   const allChecked = invoices.length > 0 && invoices.every((i) => checked.has(i.id));
   const toggleAll = () => {
     if (allChecked) setChecked(new Set());
