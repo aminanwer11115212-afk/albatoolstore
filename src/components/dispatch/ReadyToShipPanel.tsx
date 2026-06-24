@@ -9,12 +9,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { filterSelectColumns } from "@/lib/tableColumns";
 import { toast } from "sonner";
-import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2, Search } from "lucide-react";
+import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2, Search, MapPin } from "lucide-react";
 import {
   useTransporters, useDestinations,
   useCustomerTransporters, useCustomerDestinations, useCustomerPreferredTransporter,
 } from "@/hooks/useData";
 import SearchableSelect from "@/components/transport/SearchableSelect";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 
 type RowChoice = { transporterId?: string; destinationId?: string };
 
@@ -421,6 +423,10 @@ export default function ReadyToShipPanel({
     const choice = getChoice(inv);
     const hasTransport = (inv.invoice_transports?.length ?? 0) > 0;
     const isSaving = savingRow === inv.id;
+    const transporterName =
+      (transporters as any[]).find((t) => t.id === choice.transporterId)?.name || "";
+    const destinationName =
+      (destinations as any[]).find((d) => d.id === choice.destinationId)?.name || "";
     return (
       <tr
         key={inv.id}
@@ -435,26 +441,52 @@ export default function ReadyToShipPanel({
             onClick={(e) => e.stopPropagation()}
           />
         </td>
-        <td className="cell-num">{inv.invoice_number}</td>
         <td className="cell-name">{inv.customers?.name || "كاش"}</td>
-        <td className="cell-date">{fmtDateAr(inv.date)}</td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <SearchableSelect
-            options={transporters as any}
-            value={choice.transporterId}
-            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: val } }))}
-            placeholder="— اختر ناقل —"
-            className="rts-select"
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={`rts-mini-btn ${choice.transporterId ? "filled" : ""}`}
+                title={transporterName || "اختر ناقل"}
+              >
+                <Truck size={11} />
+                <span className="rts-mini-label">{transporterName || "ناقل"}</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="p-2 w-56" dir="rtl">
+              <SearchableSelect
+                options={transporters as any}
+                value={choice.transporterId}
+                onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], transporterId: val } }))}
+                placeholder="— اختر ناقل —"
+                className="rts-select"
+              />
+            </PopoverContent>
+          </Popover>
         </td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
-          <SearchableSelect
-            options={destinations as any}
-            value={choice.destinationId}
-            onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
-            placeholder="— بدون وجهة —"
-            className="rts-select"
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={`rts-mini-btn ${choice.destinationId ? "filled" : ""}`}
+                title={destinationName || "اختر وجهة"}
+              >
+                <MapPin size={11} />
+                <span className="rts-mini-label">{destinationName || "وجهة"}</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="p-2 w-56" dir="rtl">
+              <SearchableSelect
+                options={destinations as any}
+                value={choice.destinationId}
+                onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
+                placeholder="— بدون وجهة —"
+                className="rts-select"
+              />
+            </PopoverContent>
+          </Popover>
         </td>
         <td className="cell-act" onClick={(e) => e.stopPropagation()}>
           {hasTransport ? (
@@ -488,6 +520,7 @@ export default function ReadyToShipPanel({
       </tr>
     );
   };
+
 
   return (
     <div className="rts-panel" dir="rtl">
@@ -642,9 +675,9 @@ export default function ReadyToShipPanel({
         .rts-btn-ghost { background: transparent; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
         .rts-btn-sm { height: 26px; width: auto; padding: 0 8px; font-size: 10.5px; }
 
-        .rts-table thead th.cell-sel { width: 130px; text-align: center; }
+        .rts-table thead th.cell-sel { width: 70px; text-align: center; }
         .rts-table thead th.cell-act { width: 92px; text-align: center; }
-        .rts-table td.cell-sel { padding: 3px 4px; }
+        .rts-table td.cell-sel { padding: 3px 4px; text-align: center; }
         .rts-table td.cell-act { text-align: center; padding: 3px 4px; }
         .rts-select {
           width: 100%; min-height: 28px; padding: 2px 6px;
@@ -654,6 +687,24 @@ export default function ReadyToShipPanel({
           border-radius: 6px; font-size: 11px; font-weight: 600;
         }
         .rts-select:focus { outline: 2px solid hsl(var(--primary) / 0.35); outline-offset: 0; border-color: hsl(var(--primary)); }
+        .rts-mini-btn {
+          display: inline-flex; align-items: center; gap: 4px;
+          max-width: 100%;
+          height: 24px; padding: 0 6px;
+          background: hsl(var(--background));
+          color: hsl(var(--muted-foreground));
+          border: 1px dashed hsl(var(--border));
+          border-radius: 6px; cursor: pointer;
+          font-size: 10.5px; font-weight: 700;
+        }
+        .rts-mini-btn:hover { border-color: hsl(var(--primary)); color: hsl(var(--primary)); }
+        .rts-mini-btn.filled {
+          background: hsl(var(--primary) / 0.10);
+          border-style: solid;
+          border-color: hsl(var(--primary) / 0.5);
+          color: hsl(var(--primary));
+        }
+        .rts-mini-label { max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .rts-pill {
           display: inline-flex; align-items: center; gap: 3px;
           padding: 3px 8px; border-radius: 999px;
@@ -671,10 +722,12 @@ export default function ReadyToShipPanel({
         .rts-pin-toggle input { accent-color: hsl(var(--primary)); }
         .rts-pin-toggle:hover { color: hsl(var(--primary)); }
         @media (max-width: 640px) {
-          .rts-table thead th.cell-sel { width: 110px; }
-          .rts-select { font-size: 16px; min-height: 40px; }
-          .rts-btn-sm { height: 40px; padding: 0 10px; font-size: 12px; }
+          .rts-table thead th.cell-sel { width: 64px; }
+          .rts-mini-btn { height: 32px; font-size: 12px; }
+          .rts-mini-label { max-width: 70px; }
+          .rts-btn-sm { height: 36px; padding: 0 10px; font-size: 12px; }
         }
+
       `}</style>
 
       {/* Header */}
@@ -733,9 +786,7 @@ export default function ReadyToShipPanel({
                     onChange={toggleAll}
                   />
                 </th>
-                <th className="cell-num">رقم الفاتورة</th>
                 <th>اسم الزبون</th>
-                <th className="cell-date">التاريخ</th>
                 <th className="cell-sel">الناقل</th>
                 <th className="cell-sel">الوجهة</th>
                 <th className="cell-act">إجراء</th>
@@ -748,14 +799,13 @@ export default function ReadyToShipPanel({
             <thead>
               <tr>
                 <th className="cell-check">#</th>
-                <th className="cell-num">رقم الفاتورة</th>
                 <th>اسم الزبون</th>
-                <th className="cell-date">التاريخ</th>
                 <th className="cell-sel">الناقل</th>
                 <th className="cell-sel">الوجهة</th>
                 <th className="cell-act">إجراء</th>
               </tr>
             </thead>
+
             <tbody>
               {groups!.map((g) => {
                 const collapsed = collapsedGroups.has(g.key);
@@ -763,7 +813,7 @@ export default function ReadyToShipPanel({
                 return (
                   <Fragment key={`g-${g.key}`}>
                     <tr>
-                      <td colSpan={7} style={{ padding: 0 }}>
+                      <td colSpan={5} style={{ padding: 0 }}>
                         <div
                           className="rts-group-head"
                           onClick={() => toggleGroup(g.key)}

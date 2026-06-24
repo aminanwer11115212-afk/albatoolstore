@@ -374,130 +374,131 @@ export function buildDispatchSheetHTML(
   <meta charset="utf-8" />
   <title>كشف الترحيلات — ${today}</title>
   <style>
-    @page { size: A4; margin: 10mm; }
+    @page { size: A4; margin: 7mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { background: #fff; }
     body {
       font-family: 'Cairo', 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
-      color: #111; font-size: 12px; line-height: 1.5; padding: 6px;
+      color: #111; font-size: 10px; line-height: 1.35; padding: 4px;
       font-weight: 600;
     }
 
     /* Header — same identity as invoice/quote print */
     .d-header {
-      padding-bottom: 8px;
-      border-bottom: 3px solid ${ACCENT};
-      margin-bottom: 8px;
+      padding-bottom: 5px;
+      border-bottom: 2px solid ${ACCENT};
+      margin-bottom: 5px;
     }
     .d-header-row {
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
     .d-header-logo img {
-      height: 70px; width: auto; object-fit: contain;
+      height: 46px; width: auto; object-fit: contain;
     }
     .d-header-center { text-align: center; flex: 1; }
     .d-header-title {
-      font-size: 20px; font-weight: 900; color: #c0392b; margin-bottom: 4px;
+      font-size: 15px; font-weight: 900; color: #c0392b; margin-bottom: 2px;
     }
-    .d-header-meta { font-size: 12px; color: #333; line-height: 1.5; }
-    .d-header-phones { font-size: 13px; font-weight: 800; color: #1a1a1a; margin-top: 2px; }
+    .d-header-meta { font-size: 10px; color: #333; line-height: 1.35; }
+    .d-header-phones { font-size: 10.5px; font-weight: 800; color: #1a1a1a; margin-top: 1px; }
 
     .d-doc-title {
-      text-align: center; margin: 8px 0 10px;
+      text-align: center; margin: 4px 0 6px;
     }
     .d-doc-title h1 {
       display: inline-block;
-      font-size: 20px; font-weight: 900; color: #2c3e50;
-      padding: 4px 14px;
-      border: 2px solid ${ACCENT}; border-radius: 6px;
+      font-size: 14px; font-weight: 900; color: #2c3e50;
+      padding: 2px 10px;
+      border: 1.5px solid ${ACCENT}; border-radius: 5px;
       background: #f0fdf4;
     }
 
     .d-summary {
-      display: flex; justify-content: space-between; align-items: center; gap: 10px;
-      font-size: 12px; margin-bottom: 10px;
-      padding: 6px 10px; background: #f8fafc;
-      border: 1px solid #cbd5e1; border-radius: 6px;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      font-size: 10px; margin-bottom: 6px;
+      padding: 4px 8px; background: #f8fafc;
+      border: 1px solid #cbd5e1; border-radius: 5px;
     }
     .d-summary b { font-weight: 900; color: ${ACCENT}; }
 
     /* Card per invoice */
     .d-card {
-      border: 1.5px solid #111; border-radius: 6px;
-      margin-bottom: 8px; overflow: hidden;
+      border: 1px solid #111; border-radius: 5px;
+      margin-bottom: 5px; overflow: hidden;
       page-break-inside: avoid; break-inside: avoid;
     }
     .d-card-head {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 5px 10px; background: ${ACCENT}; color: #fff;
-      font-size: 13px; font-weight: 900;
+      padding: 3px 7px; background: ${ACCENT}; color: #fff;
+      font-size: 11px; font-weight: 900;
     }
     .d-idx {
       display: inline-flex; align-items: center; justify-content: center;
-      min-width: 20px; height: 20px; padding: 0 6px;
-      border-radius: 4px; background: #fff; color: ${ACCENT};
-      font-size: 11px; margin-left: 6px; font-weight: 900;
+      min-width: 16px; height: 16px; padding: 0 5px;
+      border-radius: 3px; background: #fff; color: ${ACCENT};
+      font-size: 9.5px; margin-left: 5px; font-weight: 900;
     }
-    .d-card-date { font-weight: 800; font-size: 12px; }
+    .d-card-date { font-weight: 800; font-size: 10px; }
 
-    .d-card-body { padding: 6px 8px; font-size: 11.5px; }
+    .d-card-body { padding: 4px 6px; font-size: 10px; }
     .d-cust-row {
-      display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
-      padding: 3px 0 4px;
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+      padding: 2px 0 3px;
       border-bottom: 1px dashed #d1d5db;
     }
-    .d-label-inline { font-size: 11px; font-weight: 800; color: #475569; margin-left: 3px; }
-    .d-section { margin-top: 4px; padding-top: 4px; border-top: 1px dashed #d1d5db; }
-    .d-section-pk { background: #fafafa; padding: 5px 7px; border-radius: 4px; border-top: 1.5px solid #cbd5e1; }
-    .d-label { font-size: 11.5px; font-weight: 900; color: #0f172a; margin-bottom: 3px; letter-spacing: 0.2px; }
+    .d-label-inline { font-size: 9.5px; font-weight: 800; color: #475569; margin-left: 2px; }
+    .d-section { margin-top: 3px; padding-top: 3px; border-top: 1px dashed #d1d5db; }
+    .d-section-pk { background: #fafafa; padding: 3px 5px; border-radius: 3px; border-top: 1px solid #cbd5e1; }
+    .d-label { font-size: 10px; font-weight: 900; color: #0f172a; margin-bottom: 2px; }
     .d-label-pk { color: #0f172a; }
-    .d-line { font-size: 11.5px; padding: 2px 0; }
+    .d-line { font-size: 10px; padding: 1px 0; }
     .d-muted { color: #64748b; }
-    .d-empty-line { font-size: 11px; color: #94a3b8; padding: 3px 0; font-style: italic; }
+    .d-empty-line { font-size: 9.5px; color: #94a3b8; padding: 2px 0; font-style: italic; }
 
-    .d-tn-row { padding: 2px 0; border-bottom: 1px dotted #e5e7eb; }
+    .d-tn-row { padding: 1px 0; border-bottom: 1px dotted #e5e7eb; }
     .d-tn-row:last-child { border-bottom: none; }
-    .d-tn-preview { background: #fffbeb; padding: 3px 5px; border-radius: 3px; border: 1px dashed #f59e0b; }
-    .d-preview-tag { display: inline-block; font-size: 9.5px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1px 5px; border-radius: 3px; margin-bottom: 2px; }
+    .d-tn-preview { background: #fffbeb; padding: 2px 4px; border-radius: 3px; border: 1px dashed #f59e0b; }
+    .d-preview-tag { display: inline-block; font-size: 8.5px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 0 4px; border-radius: 2px; margin-bottom: 1px; }
 
-    .d-pk-lines { display: block; margin-top: 2px; }
+    .d-pk-lines { display: block; margin-top: 1px; }
     .d-pk-line {
-      display: flex; align-items: baseline; gap: 5px;
-      font-size: 11.5px; padding: 2px 0;
+      display: flex; align-items: baseline; gap: 4px;
+      font-size: 10px; padding: 1px 0;
       border-bottom: 1px dotted #e5e7eb;
     }
     .d-pk-line:last-child { border-bottom: none; }
-    .d-pk-i { color: #64748b; font-weight: 800; min-width: 20px; }
-    .d-pk-p { font-weight: 900; color: ${ACCENT}; min-width: 22px; text-align: center; }
+    .d-pk-i { color: #64748b; font-weight: 800; min-width: 16px; }
+    .d-pk-p { font-weight: 900; color: ${ACCENT}; min-width: 18px; text-align: center; }
     .d-pk-sep { color: #94a3b8; }
     .d-pk-t { flex: 1; }
     .d-pk-total {
-      display: flex; justify-content: flex-end; gap: 8px; align-items: center;
-      margin-top: 5px; padding-top: 4px; border-top: 1.5px solid #1a1a1a;
-      font-size: 12px; font-weight: 800;
+      display: flex; justify-content: flex-end; gap: 6px; align-items: center;
+      margin-top: 3px; padding-top: 2px; border-top: 1px solid #1a1a1a;
+      font-size: 10.5px; font-weight: 800;
     }
-    .d-pk-total b { color: ${ACCENT}; font-size: 14px; font-weight: 900; }
+    .d-pk-total b { color: ${ACCENT}; font-size: 12px; font-weight: 900; }
 
     .d-notes {
-      font-size: 11px; background: #fefce8; padding: 3px 6px;
+      font-size: 9.5px; background: #fefce8; padding: 2px 5px;
       border-radius: 3px; border: 1px solid #fde68a;
     }
 
     .d-signatures {
       display: flex; justify-content: space-between;
-      padding: 20px 40px 4px; margin-top: 14px;
+      padding: 12px 30px 2px; margin-top: 8px;
       page-break-inside: avoid;
     }
-    .d-sig-box { text-align: center; width: 180px; }
+    .d-sig-box { text-align: center; width: 140px; }
     .d-sig-line {
-      border-top: 1px solid #999; margin-top: 40px;
-      padding-top: 5px; font-size: 12px; color: #555; font-weight: 700;
+      border-top: 1px solid #999; margin-top: 26px;
+      padding-top: 3px; font-size: 10px; color: #555; font-weight: 700;
     }
 
     .d-footer {
-      margin-top: 8px; padding-top: 4px; border-top: 1px solid #ddd;
-      font-size: 9.5px; color: #888; text-align: center;
+      margin-top: 5px; padding-top: 3px; border-top: 1px solid #ddd;
+      font-size: 8.5px; color: #888; text-align: center;
     }
+
 
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0; }
