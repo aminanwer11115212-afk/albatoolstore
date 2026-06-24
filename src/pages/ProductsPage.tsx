@@ -651,12 +651,17 @@ export default function ProductsPage() {
       warehouse_id: form.warehouse_id || null, company_id: primaryBrandId,
       supplier_id: form.supplier_id || null,
       purchase_price: parseFloat(form.purchase_price) || 0, sale_price: parseFloat(form.sale_price) || 0,
-      stock_quantity: parseInt(form.stock_quantity) || 0, min_stock: parseInt(form.min_stock) || 0,
+      min_stock: parseInt(form.min_stock) || 0,
       unit: form.unit, description: form.description || null,
       foreign_price: parseFloat(form.foreign_price) || null,
       image_url: form.image_url || null,
       is_frozen: !!form.is_frozen,
     };
+    // الكمية تُدار عبر حركات المخزون (فواتير/مرتجعات/تحويلات) — لا تكتبها مباشرة عند التعديل.
+    // عند الإنشاء فقط تُعتبر كمية افتتاحية.
+    if (!editId) {
+      payload.stock_quantity = parseInt(form.stock_quantity) || 0;
+    }
     try {
       let productId: string;
       if (editId) {
