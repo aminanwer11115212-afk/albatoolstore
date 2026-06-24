@@ -189,9 +189,11 @@ export default function ShippingDispatchDialog({ open, onClose }: Props) {
           toast.error(`فشل تحديث الحالات: ${firstErr.message}`);
         } else {
           toast.success(`✅ تم طباعة التقرير وتحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات"`);
-          // invalidate queries
+          // invalidate queries + bust badge tooltip cache + notify other screens
           qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
           qc.invalidateQueries({ queryKey: ["invoices-with-customers", undefined] });
+          ids.forEach(id => invalidateWorkflowAutoCache(id));
+          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
           await refetch();
           // تنظيف الصفوف المطبوعة
           setRows(prev => {
