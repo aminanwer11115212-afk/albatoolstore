@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Loader2, Download, AlertTriangle } from "lucide-react";
+import { Loader2, Download, AlertTriangle, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -203,23 +203,46 @@ export default function PublicDocumentSharePage() {
     );
   }
 
+  const handlePrint = () => {
+    try {
+      const win = iframeRef.current?.contentWindow;
+      if (!win) throw new Error("تعذّر فتح نافذة الطباعة");
+      win.focus();
+      win.print();
+    } catch (e: any) {
+      toast.error(e?.message || "تعذّر فتح نافذة الطباعة");
+    }
+  };
+
   return (
     <div dir="rtl" className="min-h-screen bg-background flex flex-col">
-      <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-2 flex items-center justify-between shadow-sm">
+      <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-2 flex items-center justify-between gap-2 shadow-sm">
         <h1 className="text-sm font-semibold text-foreground">معاينة المستند</h1>
-        <Button
-          size="sm"
-          onClick={handleDownloadPdf}
-          disabled={downloading || !html}
-          className="gap-2"
-        >
-          {downloading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {downloading ? "جاري التوليد..." : "تحميل PDF"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handlePrint}
+            disabled={!html}
+            className="gap-2"
+          >
+            <Printer className="h-4 w-4" />
+            طباعة
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleDownloadPdf}
+            disabled={downloading || !html}
+            className="gap-2"
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {downloading ? "جاري التوليد..." : "تحميل PDF"}
+          </Button>
+        </div>
       </div>
       <iframe
         ref={iframeRef}
