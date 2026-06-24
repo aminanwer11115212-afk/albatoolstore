@@ -28,6 +28,7 @@ interface Move {
   doc_id: string;
   party_name: string;
   current_stock: number | null;
+  is_pos?: boolean;
 }
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
