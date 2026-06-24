@@ -53,21 +53,25 @@ const fmtDate = (d: any) => {
 };
 
 export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
-  const { data: invoice } = await supabase
+  const { data: invoice, error: invErr } = await supabase
     .from("invoices")
     .select(
       "id, invoice_number, date, total, status, notes, customers(name, phone, address)"
     )
     .eq("id", id)
     .maybeSingle();
+  if (invErr) {
+    console.error(`[loadDispatchDoc] invoice ${id} failed:`, invErr);
+    return null;
+  }
   if (!invoice) return null;
 
   const [
-    { data: items },
-    { data: transports },
-    { data: packaging },
-    { data: packagingItems },
-    { data: transportItems },
+    { data: items, error: itemsErr },
+    { data: transports, error: trErr },
+    { data: packaging, error: pkErr },
+    { data: packagingItems, error: piErr },
+    { data: transportItems, error: tiErr },
   ] = await Promise.all([
     supabase.from("invoice_items").select("quantity").eq("invoice_id", id),
     supabase
@@ -95,6 +99,14 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
       )
       .eq("invoice_id", id),
   ]);
+
+  // أي sub-query فاشل يُسجَّل بوضوح حتى لا تطبع وثيقة ناقصة بصمت.
+  // لا نُلغي العملية كاملة — نمضي ببيانات جزئية لأن المستخدم بحاجة لما توفّر.
+  if (itemsErr) console.error(`[loadDispatchDoc] items ${id}:`, itemsErr);
+  if (trErr) console.error(`[loadDispatchDoc] transports ${id}:`, trErr);
+  if (pkErr) console.error(`[loadDispatchDoc] packaging ${id}:`, pkErr);
+  if (piErr) console.error(`[loadDispatchDoc] packagingItems ${id}:`, piErr);
+  if (tiErr) console.error(`[loadDispatchDoc] transportItems ${id}:`, tiErr);
 
   const itemsCount = items?.length || 0;
   const qtyTotal = (items || []).reduce(

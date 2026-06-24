@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanySettings } from "@/hooks/useData";
@@ -43,42 +44,69 @@ export default function TransportPackagingReportPage({ docType = "invoice", mode
     if (!id) return;
     setLoading(true);
 
-    const docRes = await supabase
-      .from(tableMain as any)
-      .select("*, customers(name, phone, address)")
-      .eq("id", id)
-      .single();
+    try {
+      const docRes = await supabase
+        .from(tableMain as any)
+        .select("*, customers(name, phone, address)")
+        .eq("id", id)
+        .single();
 
-    let childRows: any[] = [];
-    if (isTransport) {
-      const { data } = await supabase
-        .from(tableChild as any)
-        .select("*, transporters(name), destinations(name)")
-        .eq(fkColumn, id);
-      childRows = (data as any[]) || [];
-    } else {
-      // التغليف: نقرأ بنود التغليف الفعلية من الجدول التفصيلي الجديد
-      // (invoices_packaging_items / quotes_packaging_items) — نفس مصدر بيانات
-      // شاشة "إدارة تغليف الفاتورة".
-      const headerTable = isInvoice ? "invoice_packaging" : "quotes_packaging";
-      const itemsTable = isInvoice ? "invoices_packaging_items" : "quotes_packaging_items";
-      const fkItem = isInvoice ? "invoice_packaging_id" : "quote_packaging_id";
-
-      const { data: headers } = await (supabase as any)
-        .from(headerTable).select("id").eq(fkColumn, id);
-      const headerIds = (headers || []).map((h: any) => h.id);
-      if (headerIds.length) {
-        const { data } = await (supabase as any)
-          .from(itemsTable)
-          .select("*, packaging_types(name)")
-          .in(fkItem, headerIds);
-        childRows = (data as any[]) || [];
+      // فحص خطأ الاستعلام الرئيسي — وإلا الـUI يعرض "غير موجود" بدل سبب الفشل الحقيقي.
+      if (docRes.error) {
+        console.error("[loadData] main doc query failed:", docRes.error);
+        toast.error(`تعذّر تحميل الوثيقة: ${docRes.error.message}`);
+        setDoc(null);
+        setRows([]);
+        setLoading(false);
+        return;
       }
-    }
 
-    setDoc(docRes.data);
-    setRows(childRows);
-    setLoading(false);
+      let childRows: any[] = [];
+      if (isTransport) {
+        const { data, error } = await supabase
+          .from(tableChild as any)
+          .select("*, transporters(name), destinations(name)")
+          .eq(fkColumn, id);
+        if (error) {
+          console.error("[loadData] child rows (transport) failed:", error);
+          toast.error(`تعذّر تحميل بيانات الترحيل: ${error.message}`);
+        }
+        childRows = (data as any[]) || [];
+      } else {
+        const headerTable = isInvoice ? "invoice_packaging" : "quotes_packaging";
+        const itemsTable = isInvoice ? "invoices_packaging_items" : "quotes_packaging_items";
+        const fkItem = isInvoice ? "invoice_packaging_id" : "quote_packaging_id";
+
+        const { data: headers, error: hErr } = await (supabase as any)
+          .from(headerTable).select("id").eq(fkColumn, id);
+        if (hErr) {
+          console.error("[loadData] packaging headers failed:", hErr);
+          toast.error(`تعذّر تحميل رؤوس التغليف: ${hErr.message}`);
+        }
+        const headerIds = (headers || []).map((h: any) => h.id);
+        if (headerIds.length) {
+          const { data, error: itErr } = await (supabase as any)
+            .from(itemsTable)
+            .select("*, packaging_types(name)")
+            .in(fkItem, headerIds);
+          if (itErr) {
+            console.error("[loadData] packaging items failed:", itErr);
+            toast.error(`تعذّر تحميل بنود التغليف: ${itErr.message}`);
+          }
+          childRows = (data as any[]) || [];
+        }
+      }
+
+      setDoc(docRes.data);
+      setRows(childRows);
+    } catch (e: any) {
+      console.error("[loadData] unexpected error:", e);
+      toast.error(`خطأ غير متوقع: ${e?.message || e}`);
+      setDoc(null);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePrint = () => {

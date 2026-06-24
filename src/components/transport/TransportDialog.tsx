@@ -151,10 +151,16 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
 
   const handleDelete = async (tId: string) => {
     if (!confirm("حذف؟")) return;
-    await (supabase as any).from(table).delete().eq("id", tId);
-    toast.success("تم الحذف");
-    load();
-    try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+    try {
+      const { error } = await (supabase as any).from(table).delete().eq("id", tId);
+      if (error) throw error;
+      toast.success("تم الحذف");
+      load();
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+    } catch (e: any) {
+      console.error("[TransportDialog.handleDelete] failed:", e);
+      toast.error(`تعذّر الحذف: ${e?.message || e}`);
+    }
   };
 
   // === الوضع الشامل: جميع الفواتير الجاهزة للرفع ===
@@ -314,49 +320,82 @@ ${packagingHTML ? `
     setPrinting(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
+      // نتتبّع نتائج كل فاتورة بدقّة بدل blanket success.
+      const insertedOk: string[] = [];
+      const insertFailed: Array<{ id: string; reason: string }> = [];
+      const printSkipped: string[] = [];
+
       for (const inv of readyToPrint) {
         const transporterId = invoiceRows[inv.id]?.transporterId || "";
         const destinationId = invoiceRows[inv.id]?.destinationId || "";
         const notes = invoiceRows[inv.id]?.notes || "";
 
-        const html = await buildSingleInvoiceHTML(inv.id, inv, transporterId, destinationId, notes);
-        const win = window.open("", "_blank", "width=800,height=600");
-        if (win) {
-          win.document.write(html);
-          win.document.close();
-          win.onload = () => { win.print(); };
+        // 1) أوّلاً نُنشئ سجل الترحيل — إن فشل لا نتقدّم بـ workflow ولا نطبع.
+        const { error: insErr } = await (supabase as any).from("invoice_transports").insert({
+          invoice_id: inv.id,
+          transporter_id: transporterId || null,
+          destination_id: destinationId || null,
+          notes: notes || null,
+          transport_date: today,
+          status: "in_transit",
+          shipped_at: new Date().toISOString(),
+        });
+        if (insErr) {
+          console.error("[handlePrintAndTransit] insert invoice_transports failed:", insErr);
+          insertFailed.push({ id: inv.id, reason: insErr.message || "DB error" });
+          continue; // skip print + workflow advance لهذه الفاتورة
         }
+        insertedOk.push(inv.id);
 
-        // حفظ سجل الترحيل في invoice_transports حتى لا يضيع الناقل والوجهة
+        // 2) محاولة فتح نافذة الطباعة — لو blocked نُسجّل لكن نُكمل (السجل محفوظ).
         try {
-          await (supabase as any).from("invoice_transports").insert({
-            invoice_id: inv.id,
-            transporter_id: transporterId || null,
-            destination_id: destinationId || null,
-            notes: notes || null,
-            transport_date: today,
-            status: "in_transit",
-            shipped_at: new Date().toISOString(),
-          });
-        } catch (insErr) {
-          console.error("insert invoice_transports failed", insErr);
+          const html = await buildSingleInvoiceHTML(inv.id, inv, transporterId, destinationId, notes);
+          const win = window.open("", "_blank", "width=800,height=600");
+          if (!win) {
+            printSkipped.push(inv.invoice_number || inv.id);
+          } else {
+            win.document.write(html);
+            win.document.close();
+            win.onload = () => { try { win.print(); } catch (e) { console.error("[print]", e); } };
+          }
+        } catch (e) {
+          console.error("[handlePrintAndTransit] build/print failed:", e);
+          printSkipped.push(inv.invoice_number || inv.id);
         }
 
         await new Promise(r => setTimeout(r, 500));
       }
 
-      const ids = readyToPrint.map((inv: any) => inv.id);
-      // Use RPC for consistent automation logging in invoice_revisions
-      await Promise.all(ids.map((id: string) =>
-        supabase.rpc("advance_invoice_workflow" as any, {
-          _invoice_id: id,
-          _target: "in_transit",
-          _reason: "طباعة كشف ترحيل",
+      // 3) advance_workflow فقط للفواتير التي نجح إدراجها — مع تتبّع كل فشل.
+      const workflowResults = await Promise.all(
+        insertedOk.map(async (id) => {
+          const res = await supabase.rpc("advance_invoice_workflow" as any, {
+            _invoice_id: id,
+            _target: "in_transit",
+            _reason: "طباعة كشف ترحيل",
+          });
+          return { id, error: (res as any).error };
         })
-      ));
-      ids.forEach((id: string) => invalidateWorkflowAutoCache(id));
-      toast.success(`✅ تم طباعة ${ids.length} فاتورة وتحويلها إلى "في الطريق للترحيلات"`);
-      setInvoiceRows({});
+      );
+      const workflowFailed = workflowResults.filter((r) => r.error);
+      const workflowOk = workflowResults.filter((r) => !r.error).map((r) => r.id);
+      workflowOk.forEach((id) => invalidateWorkflowAutoCache(id));
+
+      // 4) تقرير نهائي صادق للمستخدم.
+      if (workflowOk.length > 0) {
+        toast.success(`✅ تم تحويل ${workflowOk.length} فاتورة إلى "في الطريق"`);
+      }
+      if (insertFailed.length > 0) {
+        toast.error(`فشل حفظ ${insertFailed.length} ترحيل: ${insertFailed.map((f) => f.reason).join("؛ ")}`);
+      }
+      if (workflowFailed.length > 0) {
+        toast.error(`فشل تحديث حالة ${workflowFailed.length} فاتورة — يلزم إعادة المحاولة`);
+      }
+      if (printSkipped.length > 0) {
+        toast.warning(`تعذّر فتح نافذة الطباعة لـ ${printSkipped.length} فاتورة (تحقق من النوافذ المنبثقة)`);
+      }
+
+      if (insertedOk.length > 0) setInvoiceRows({});
       await loadAllInvoices();
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       setPrinting(false);
