@@ -354,6 +354,7 @@ ${packagingHTML ? `
           _reason: "طباعة كشف ترحيل",
         })
       ));
+      ids.forEach((id: string) => invalidateWorkflowAutoCache(id));
       toast.success(`✅ تم طباعة ${ids.length} فاتورة وتحويلها إلى "في الطريق للترحيلات"`);
       setInvoiceRows({});
       await loadAllInvoices();
