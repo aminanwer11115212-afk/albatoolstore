@@ -587,20 +587,12 @@ export default function PurchaseCreatePage() {
         await supabase.from("purchase_order_items").delete().eq("purchase_order_id", orderId);
       } else {
         const prefix = company?.purchase_prefix || "PO-";
-        // initial candidate based on max existing number
-        const buildNextNumber = async (): Promise<string> => {
-          const { data: rows } = await supabase
-            .from("purchase_orders")
-            .select("order_number")
-            .like("order_number", `${prefix}%`);
-          let maxN = 0;
-          (rows || []).forEach((r: any) => {
-            const after = String(r.order_number || "").slice(prefix.length);
-            const mm = after.match(/^(\d+)/);
-            const n = mm ? parseInt(mm[1]) : 0;
-            if (n > maxN) maxN = n;
+        // رقم افتراضي عشوائي لكل أمر شراء جديد لتفادي التكرار
+        const buildNextNumber = async (extraDigits = 0): Promise<string> => {
+          const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+          return generateRandomDocNumber("purchase_orders", "order_number", prefix, {
+            digits: 5 + extraDigits,
           });
-          return `${prefix}${String(maxN + 1).padStart(4, "0")}`;
         };
         let candidate = orderNumber && orderNumber.startsWith(prefix) ? orderNumber : await buildNextNumber();
         let attempt = 0;
@@ -615,7 +607,7 @@ export default function PurchaseCreatePage() {
           if (!error) { createdRow = created; break; }
           const isDup = (error as any).code === "23505" || /duplicate key|purchase_orders_order_number_key/i.test(error.message || "");
           if (!isDup) throw error;
-          candidate = await buildNextNumber();
+          candidate = await buildNextNumber(Math.min(attempt, 2));
           attempt++;
         }
         if (!createdRow) throw new Error("تعذّر توليد رقم أمر شراء فريد، حاول مرة أخرى");

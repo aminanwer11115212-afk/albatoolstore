@@ -444,25 +444,16 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       setProductsLoading(false);
       if (cfg.data) setCompany(cfg.data);
       if (!editId) {
-        // Numbering: POS uses its own prefix + sequence isolated from regular invoices
+        // Numbering: رقم افتراضي عشوائي لكل فاتورة جديدة لتفادي التكرار
+        // (POS و Regular لكل منهما بادئة مستقلة)
         const prefix = pos
           ? ((cfg.data as any)?.pos_invoice_prefix || "POS-")
           : (cfg.data?.invoice_prefix || "INV-");
-        let lastQ = supabase
-          .from("invoices")
-          .select("invoice_number")
-          .like("invoice_number", `${prefix}%`)
-          .order("created_at", { ascending: false })
-          .limit(1);
-        if (pos) lastQ = lastQ.eq("source", "pos");
-        else lastQ = lastQ.neq("source", "pos");
-        const { data: lastRows } = await lastQ.maybeSingle();
-        let next = 1;
-        if (lastRows?.invoice_number) {
-          const m = String(lastRows.invoice_number).match(/(\d+)$/);
-          if (m) next = parseInt(m[1]) + 1;
-        }
-        setInvoiceNumber(`${prefix}${String(next).padStart(4, "0")}`);
+        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+        const candidate = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
+          scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+        });
+        setInvoiceNumber(candidate);
       }
     })();
 
@@ -1223,23 +1214,14 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
             break;
           }
           lastError = error;
-          // إذا كان الخطأ تكرار رقم الفاتورة، أعد جلب أعلى رقم وحاول مجدداً
+          // إذا كان الخطأ تكرار رقم الفاتورة، ولّد رقماً عشوائياً جديداً وحاول مجدداً
           const isDup = (error as any).code === "23505" || /duplicate key|invoices_invoice_number_key/i.test(error.message || "");
           if (!isDup) throw error;
-          // اجلب أعلى رقم موجود لإعادة الحساب بدقة (مفصول حسب نوع الفاتورة pos / regular)
-          let allQ = supabase
-            .from("invoices")
-            .select("invoice_number,source")
-            .like("invoice_number", `${prefix}%`);
-          if (pos) allQ = allQ.eq("source", "pos");
-          else allQ = allQ.neq("source", "pos");
-          const { data: all } = await allQ;
-          let maxN = 0;
-          (all || []).forEach((r: any) => {
-            const m = String(r.invoice_number).match(/(\d+)$/);
-            if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+          const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+          currentNumber = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
+            scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+            digits: 5 + Math.min(attempt, 2),
           });
-          currentNumber = `${prefix}${String(maxN + 1 + attempt).padStart(padLen, "0")}`;
           attempt++;
         }
         if (lastError) throw lastError;
@@ -1358,25 +1340,15 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         setSavedInvoiceId(null);
         savedRef.current = false;
         lastSavedIdRef.current = null;
-        // إعادة الرقم التسلسلي (مفصول حسب POS/Regular)
+        // رقم افتراضي عشوائي جديد للفاتورة التالية (مفصول حسب POS/Regular)
         const prefix = pos
           ? ((company as any)?.pos_invoice_prefix || "POS-")
           : (company?.invoice_prefix || "INV-");
-        let lastQ2 = supabase
-          .from("invoices")
-          .select("invoice_number")
-          .like("invoice_number", `${prefix}%`)
-          .order("created_at", { ascending: false })
-          .limit(1);
-        if (pos) lastQ2 = lastQ2.eq("source", "pos");
-        else lastQ2 = lastQ2.neq("source", "pos");
-        const { data: last } = await lastQ2.maybeSingle();
-        let next = 1;
-        if (last?.invoice_number) {
-          const m = String(last.invoice_number).match(/(\d+)$/);
-          if (m) next = parseInt(m[1]) + 1;
-        }
-        setInvoiceNumber(`${prefix}${String(next).padStart(4, "0")}`);
+        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+        const nextCandidate = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
+          scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+        });
+        setInvoiceNumber(nextCandidate);
         // أعد الرابط لوضع الإنشاء
         const createPath = isCash ? "/invoices/cash/new" : "/invoices/new";
         window.history.replaceState({}, "", createPath);
