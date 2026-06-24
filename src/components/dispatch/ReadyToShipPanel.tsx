@@ -947,6 +947,50 @@ export default function ReadyToShipPanel({
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Dialog: تثبيت الناقل/الوجهة كافتراضي للعميل */}
+      <AlertDialog open={!!pendingPinInv} onOpenChange={(o) => !o && setPendingPinInv(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تحديث افتراضيات العميل؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingPinInv ? (() => {
+                const choice = getChoice(pendingPinInv);
+                const tName = ((allTransporters as any[]) || []).find((t) => t.id === choice.transporterId)?.name || "—";
+                const dName = ((allDestinations as any[]) || []).find((d) => d.id === choice.destinationId)?.name || "—";
+                const cName = pendingPinInv.customers?.name || "هذا الزبون";
+                return (
+                  <>
+                    هل تريد جعل <b>{tName}</b> الناقل المعتاد و<b>{dName}</b> الوجهة الافتراضية لـ <b>{cName}</b> في كل النظام؟
+                    <br />
+                    التغيير سيظهر في صفحة إدارة العملاء وفي كل فاتورة جديدة لهذا الزبون.
+                  </>
+                );
+              })() : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                const inv = pendingPinInv;
+                setPendingPinInv(null);
+                if (inv) dispatchRow(inv, false);
+              }}
+            >
+              لا، فقط لهذه الفاتورة
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const inv = pendingPinInv;
+                setPendingPinInv(null);
+                if (inv) dispatchRow(inv, true);
+              }}
+            >
+              نعم، حدّث افتراضيات العميل
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <QuickAddTransporterDialog open={addTrOpen} onOpenChange={setAddTrOpen} />
       <QuickAddDestinationDialog open={addDsOpen} onOpenChange={setAddDsOpen} />
     </div>
