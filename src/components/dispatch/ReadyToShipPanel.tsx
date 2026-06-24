@@ -9,12 +9,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { filterSelectColumns } from "@/lib/tableColumns";
 import { toast } from "sonner";
-import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2, Search } from "lucide-react";
+import { Truck, Train, User, X, Printer, RefreshCw, ChevronDown, ChevronLeft, Send, CheckCircle2, Search, MapPin } from "lucide-react";
 import {
   useTransporters, useDestinations,
   useCustomerTransporters, useCustomerDestinations, useCustomerPreferredTransporter,
 } from "@/hooks/useData";
 import SearchableSelect from "@/components/transport/SearchableSelect";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 
 type RowChoice = { transporterId?: string; destinationId?: string };
 
