@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDestinations, useTransporters } from "@/hooks/useData";
 import { Printer, Truck, X, PackageCheck } from "lucide-react";
