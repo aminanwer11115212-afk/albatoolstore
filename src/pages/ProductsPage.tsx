@@ -89,6 +89,16 @@ export default function ProductsPage() {
   });
   useEffect(() => { try { localStorage.setItem(PP_PER_PAGE, String(perPage)); } catch {} }, [perPage]);
 
+  // مزامنة: أعد جلب المنتجات عند أي تغيير من فاتورة/مرتجع/تحويل (يبث events بنفس الاسم)
+  useEffect(() => {
+    const onChanged = () => {
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    };
+    window.addEventListener("products:changed", onChanged);
+    return () => window.removeEventListener("products:changed", onChanged);
+  }, []);
+
   const [openFilter, setOpenFilter] = useState<{ key: string; mode: "list" | "search" } | null>(null);
   // isMobile state removed — the desktop table is now shown on mobile via the
   // global `.desktop-on-mobile` CSS, so we no longer branch on viewport here.
