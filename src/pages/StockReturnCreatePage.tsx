@@ -290,6 +290,9 @@ export default function StockReturnCreatePage() {
 
   const [quickRow, setQuickRow] = useState<ReturnRow>(newRow());
   const [rows, setRows] = useState<ReturnRow[]>([]);
+  // قفل الحفظ لمنع النقرات المتكررة وتكرار سجلات المرتجع
+  const savingReturnRef = useRef(false);
+  const [savingReturn, setSavingReturn] = useState(false);
   const itemsScrollRef = useRef<HTMLDivElement>(null);
   useContainerFit(itemsScrollRef, clampWidthsToContainer, { locked: colsLocked });
   const prevRowsLen = useRef(1);
