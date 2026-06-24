@@ -444,18 +444,25 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       setProductsLoading(false);
       if (cfg.data) setCompany(cfg.data);
       if (!editId) {
-        const { data: last } = await supabase
+        // Numbering: POS uses its own prefix + sequence isolated from regular invoices
+        const prefix = pos
+          ? ((cfg.data as any)?.pos_invoice_prefix || "POS-")
+          : (cfg.data?.invoice_prefix || "INV-");
+        let lastQ = supabase
           .from("invoices")
           .select("invoice_number")
+          .like("invoice_number", `${prefix}%`)
           .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
+        if (pos) lastQ = lastQ.eq("source", "pos");
+        else lastQ = lastQ.neq("source", "pos");
+        const { data: lastRows } = await lastQ.maybeSingle();
         let next = 1;
-        if (last?.invoice_number) {
-          const m = last.invoice_number.match(/(\d+)$/);
+        if (lastRows?.invoice_number) {
+          const m = String(lastRows.invoice_number).match(/(\d+)$/);
           if (m) next = parseInt(m[1]) + 1;
         }
-        setInvoiceNumber(`${cfg.data?.invoice_prefix || "INV-"}${String(next).padStart(4, "0")}`);
+        setInvoiceNumber(`${prefix}${String(next).padStart(4, "0")}`);
       }
     })();
 
@@ -1193,7 +1200,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         const { data: { user: _u } } = await supabase.auth.getUser();
         (payload as any).created_by_uid = _u?.id || null;
         // محاولة الإدراج مع إعادة توليد الرقم تلقائياً عند تعارض المفتاح الفريد
-        const prefix = company?.invoice_prefix || "INV-";
+        const prefix = pos
+          ? ((company as any)?.pos_invoice_prefix || "POS-")
+          : (company?.invoice_prefix || "INV-");
         const padLen = (() => {
           const m = invoiceNumber.match(/(\d+)$/);
           return m ? m[1].length : 4;
@@ -1217,11 +1226,14 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           // إذا كان الخطأ تكرار رقم الفاتورة، أعد جلب أعلى رقم وحاول مجدداً
           const isDup = (error as any).code === "23505" || /duplicate key|invoices_invoice_number_key/i.test(error.message || "");
           if (!isDup) throw error;
-          // اجلب أعلى رقم موجود لإعادة الحساب بدقة
-          const { data: all } = await supabase
+          // اجلب أعلى رقم موجود لإعادة الحساب بدقة (مفصول حسب نوع الفاتورة pos / regular)
+          let allQ = supabase
             .from("invoices")
-            .select("invoice_number")
+            .select("invoice_number,source")
             .like("invoice_number", `${prefix}%`);
+          if (pos) allQ = allQ.eq("source", "pos");
+          else allQ = allQ.neq("source", "pos");
+          const { data: all } = await allQ;
           let maxN = 0;
           (all || []).forEach((r: any) => {
             const m = String(r.invoice_number).match(/(\d+)$/);
@@ -1346,17 +1358,22 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         setSavedInvoiceId(null);
         savedRef.current = false;
         lastSavedIdRef.current = null;
-        // إعادة الرقم التسلسلي
-        const prefix = company?.invoice_prefix || "INV-";
-        const { data: last } = await supabase
+        // إعادة الرقم التسلسلي (مفصول حسب POS/Regular)
+        const prefix = pos
+          ? ((company as any)?.pos_invoice_prefix || "POS-")
+          : (company?.invoice_prefix || "INV-");
+        let lastQ2 = supabase
           .from("invoices")
           .select("invoice_number")
+          .like("invoice_number", `${prefix}%`)
           .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
+        if (pos) lastQ2 = lastQ2.eq("source", "pos");
+        else lastQ2 = lastQ2.neq("source", "pos");
+        const { data: last } = await lastQ2.maybeSingle();
         let next = 1;
         if (last?.invoice_number) {
-          const m = last.invoice_number.match(/(\d+)$/);
+          const m = String(last.invoice_number).match(/(\d+)$/);
           if (m) next = parseInt(m[1]) + 1;
         }
         setInvoiceNumber(`${prefix}${String(next).padStart(4, "0")}`);

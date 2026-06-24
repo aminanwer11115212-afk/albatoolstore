@@ -28,6 +28,7 @@ interface Move {
   doc_id: string;
   party_name: string;
   current_stock: number | null;
+  is_pos?: boolean;
 }
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -46,7 +47,7 @@ function useStockMovements(from: string, to: string) {
       const [inv, ret, pur, prods] = await Promise.all([
         supabase
           .from("invoice_items")
-          .select("id, product_id, product_name, quantity, invoice_id, invoices!inner(id, invoice_number, date, customer_id, status, customers(name))")
+          .select("id, product_id, product_name, quantity, invoice_id, invoices!inner(id, invoice_number, date, customer_id, status, source, walk_in_customer_name, customers(name))")
           .gte("invoices.date", from).lte("invoices.date", to)
           .neq("invoices.status", "cancelled")
           .order("created_at", { ascending: false })
@@ -79,6 +80,7 @@ function useStockMovements(from: string, to: string) {
       const moves: Move[] = [];
 
       (inv.data || []).forEach((r: any) => {
+        const isPos = (r.invoices?.source || "") === "pos";
         moves.push({
           id: `sale-${r.id}`,
           date: r.invoices?.date,
@@ -88,8 +90,9 @@ function useStockMovements(from: string, to: string) {
           qty: -Number(r.quantity || 0),
           doc_number: r.invoices?.invoice_number || "—",
           doc_id: r.invoices?.id,
-          party_name: r.invoices?.customers?.name || "—",
+          party_name: r.invoices?.customers?.name || r.invoices?.walk_in_customer_name || (isPos ? "عميل نقدي" : "—"),
           current_stock: r.product_id ? stockMap.get(r.product_id) ?? null : null,
+          is_pos: isPos,
         });
       });
       (ret.data || []).forEach((r: any) => {
@@ -141,7 +144,7 @@ const typeBadgeCls: Record<MoveType, string> = {
 
 const docHref = (m: Move) =>
   m.type === "sale"
-    ? `/invoices/view/${m.doc_id}`
+    ? (m.is_pos ? `/invoices/cash/edit/${m.doc_id}` : `/invoices/view/${m.doc_id}`)
     : m.type === "return"
     ? `/stock-return/view/${m.doc_id}`
     : `/purchase/edit/${m.doc_id}`;
@@ -280,6 +283,11 @@ export default function StockTrackingPage() {
                   </TableCell>
                   <TableCell>
                     <Link to={docHref(m)} className="text-primary hover:underline">{m.doc_number}</Link>
+                    {m.is_pos && (
+                      <span className="ms-2 inline-block px-1.5 py-0.5 text-[10px] rounded border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold">
+                        كاش
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>{m.party_name}</TableCell>
                   <TableCell className="text-muted-foreground">{m.current_stock ?? "—"}</TableCell>

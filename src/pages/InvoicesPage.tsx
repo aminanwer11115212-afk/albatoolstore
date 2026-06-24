@@ -37,7 +37,7 @@ export default function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [workflowFilter, setWorkflowFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "regular" | "pos">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "regular" | "pos">("regular");
   const { data: invoices, isLoading, refetch } = useInvoicesWithCustomers();
   const { remove } = useInvoices();
   const { data: companyArr } = useCompanySettings();

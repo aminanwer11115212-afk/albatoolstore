@@ -58,7 +58,11 @@ export default function StatisticsPage() {
   const navigate = useNavigate();
   const [period, setPeriod] = useState("all");
 
-  const invoices = useMemo(() => filterByPeriod(invoicesRaw || [], period), [invoicesRaw, period]);
+  // استبعاد فواتير الكاش (POS) من إحصاءات الفواتير العامة — تقاريرها مستقلة في "إدارة فواتير الكاش"
+  const invoices = useMemo(
+    () => filterByPeriod((invoicesRaw || []).filter((inv: any) => (inv.source || "regular") !== "pos"), period),
+    [invoicesRaw, period],
+  );
   const transactions = useMemo(() => filterByPeriod(transactionsRaw || [], period), [transactionsRaw, period]);
 
   // Monthly aggregation
