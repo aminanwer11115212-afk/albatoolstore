@@ -25,6 +25,8 @@ export default function StockReturnViewPage() {
   const [loading, setLoading] = useState(true);
   const [showStatusChange, setShowStatusChange] = useState(false);
   const [newStatus, setNewStatus] = useState("pending");
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [cancelSaving, setCancelSaving] = useState(false);
   const [editingCell, setEditingCell] = useState<{ index: number; field: string } | null>(null);
   const [editValue, setEditValue] = useState("");
 
