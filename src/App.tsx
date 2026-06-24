@@ -250,6 +250,9 @@ const App = () => {
             <Route path="/invoices/view/:id" element={lazyEl(<InvoiceViewPage />, "عرض الفاتورة")} />
             <Route path="/invoices/edit/:id" element={lazyEl(<InvoiceEditWrapper />, "تعديل الفاتورة")} />
             <Route path="/invoices/cash" element={lazyEl(<InvoiceCreatePage pos />, "مبيعات كاش (نقطة بيع)")} />
+            <Route path="/invoices/cash/new" element={lazyEl(<InvoiceCreatePage pos />, "فاتورة كاش جديدة")} />
+            <Route path="/invoices/cash/edit/:id" element={lazyEl(<InvoiceCreatePage pos />, "تعديل فاتورة كاش")} />
+            <Route path="/invoices/cash/list" element={lazyEl(<CashInvoicesPage />, "إدارة فواتير الكاش")} />
             <Route path="/invoices/:id/packaging" element={lazyEl(<InvoicePackagingPage />, "تغليف الفاتورة")} />
             <Route path="/invoices/:id/transport" element={lazyEl(<InvoiceTransportPage />, "ترحيل الفاتورة")} />
             <Route path="/invoices/:id/transport-report" element={lazyEl(<TransportPackagingReportPage docType="invoice" mode="transport" />, "تقرير الترحيل")} />
