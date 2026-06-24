@@ -243,7 +243,7 @@ export default function CustomersPage() {
       if (filterActivity === "with_credit" && !(Number(c.credit_balance || 0) > 0)) return false;
     }
     return true;
-  }), [customers, search, filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity, customerTransporter, customerDestination, lastActivity]);
+  }), [customers, search, filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterWaValid, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity, customerTransporter, customerDestination, lastActivity]);
 
   const sortedFiltered = useMemo(() => {
     const arr = [...filtered];
