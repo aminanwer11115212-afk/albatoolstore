@@ -981,6 +981,10 @@ export default function QuoteCreatePage() {
       }
     }
     return true;
+    } finally {
+      savingQuoteRef.current = false;
+      setSavingQuote(false);
+    }
   }
 
 
