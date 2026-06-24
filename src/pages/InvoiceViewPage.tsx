@@ -943,7 +943,7 @@ export default function InvoiceViewPage() {
               </select>
             </div>
             <div className="flex gap-3 justify-center pt-2">
-              <Button onClick={handleStatusChange} className="bg-purple-600 hover:bg-purple-700 text-white px-8">تغيير الوضع</Button>
+              <Button onClick={handleStatusChange} disabled={statusSaving} className="bg-purple-600 hover:bg-purple-700 text-white px-8">{statusSaving ? "جارٍ الحفظ..." : "تغيير الوضع"}</Button>
               <Button variant="outline" onClick={() => setShowStatusChange(false)} className="px-8">إغلاق</Button>
             </div>
           </div>
