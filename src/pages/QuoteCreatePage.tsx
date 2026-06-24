@@ -2067,6 +2067,7 @@ export default function QuoteCreatePage() {
                       onClick={() => saveQuote("draft", { andNew: true })}
                       style={btnStyle("#0ea5e9")}
                       title="حفظ والانتقال إلى عرض سعر جديد"
+                      disabled={savingQuote}
                     >
                       + جديد
                     </button>
