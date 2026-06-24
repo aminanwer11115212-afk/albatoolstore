@@ -146,8 +146,8 @@ export default function StockReturnViewPage() {
         <Button onClick={() => setShowStatusChange(true)} className="bg-sky-500 hover:bg-sky-600 text-white gap-1.5 text-xs h-9">
           <RefreshCw size={14} /> تغيير الوضع
         </Button>
-        <Button onClick={handleDelete} className="bg-red-500 hover:bg-red-600 text-white gap-1.5 text-xs h-9">
-          <XCircle size={14} /> إلغاء
+        <Button onClick={handleDelete} disabled={cancelSaving} className="bg-red-500 hover:bg-red-600 text-white gap-1.5 text-xs h-9">
+          <XCircle size={14} /> {cancelSaving ? "..." : "إلغاء"}
         </Button>
         <Button onClick={() => navigate("/stock-return")} variant="outline" className="gap-1.5 text-xs h-9 mr-auto">
           <ArrowRight size={14} /> العودة للمرتجعات
