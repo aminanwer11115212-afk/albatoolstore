@@ -23,7 +23,7 @@ import { loadInvoiceExtras } from "@/utils/printExtras";
 import { deductStockForLines, applyStockDeltaForLines } from "@/utils/stockDeduction";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils/whatsapp";
-import { getCurrencies, getLatestRate, type Currency } from "@/utils/currency";
+import { useDocumentCurrency } from "@/hooks/document/useDocumentCurrency";
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLocked, screenColWidthsKey, migrateScreenColKeys, COLS_TOAST_SAVED, COLS_TOAST_SAVE_FAILED, COLS_TOAST_EDIT_MODE, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE } from "@/hooks/useColumnWidths";
 import { useSuggestionsWidth, SuggestionsResizeHandle } from "@/hooks/useSuggestionsWidth";
@@ -252,11 +252,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       if (data) setWarehouses(data as any);
     });
 
-    getCurrencies().then((list) => {
-      setCurrencies(list);
-      const base = list.find((c) => c.is_base);
-      if (base && !editId) setCurrencyCode(base.code);
-    });
+    loadCurrencies(editId);
+
 
     // Refetch products when stock changes elsewhere (purchase receipt,
     // invoice creation/edit) or when the user returns to this tab.
@@ -301,10 +298,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     };
   }, [editId]);
 
-  useEffect(() => {
-    if (!currencyCode) return;
-    getLatestRate(currencyCode).then(setExchangeRateToBase);
-  }, [currencyCode]);
+
+
 
   // جلب آخر دفعة للعميل المختار
   useEffect(() => {
