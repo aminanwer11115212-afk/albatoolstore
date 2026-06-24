@@ -427,12 +427,6 @@ export default function ReadyToShipPanel({
     const choice = getChoice(inv);
     const hasTransport = (inv.invoice_transports?.length ?? 0) > 0;
     const isSaving = savingRow === inv.id;
-  const renderRow = (inv: any, idx: number) => {
-    const isChecked = checked.has(inv.id);
-    const { transporters, destinations } = optionsForInvoice(inv);
-    const choice = getChoice(inv);
-    const hasTransport = (inv.invoice_transports?.length ?? 0) > 0;
-    const isSaving = savingRow === inv.id;
     return (
       <tr
         key={inv.id}
