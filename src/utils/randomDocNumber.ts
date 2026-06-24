@@ -22,8 +22,9 @@ async function exists(
   value: string,
   extra?: (q: any) => any,
 ): Promise<boolean> {
-  let q: any = (supabase as any).from(table).select(column).eq(column, value).limit(1);
+  let q: any = (supabase as any).from(table).select(column).eq(column, value);
   if (extra) q = extra(q);
+  q = q.limit(1);
   const { data } = await q;
   return !!(data && data.length);
 }
