@@ -144,7 +144,7 @@ const typeBadgeCls: Record<MoveType, string> = {
 
 const docHref = (m: Move) =>
   m.type === "sale"
-    ? `/invoices/view/${m.doc_id}`
+    ? (m.is_pos ? `/invoices/cash/edit/${m.doc_id}` : `/invoices/view/${m.doc_id}`)
     : m.type === "return"
     ? `/stock-return/view/${m.doc_id}`
     : `/purchase/edit/${m.doc_id}`;
