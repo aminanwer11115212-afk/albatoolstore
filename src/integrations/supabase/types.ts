@@ -702,6 +702,36 @@ export type Database = {
         }
         Relationships: []
       }
+      document_share_tokens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          doc_id: string
+          doc_type: string
+          expires_at: string
+          hidden_sections: Json
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          doc_id: string
+          doc_type: string
+          expires_at: string
+          hidden_sections?: Json
+          token: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          doc_id?: string
+          doc_type?: string
+          expires_at?: string
+          hidden_sections?: Json
+          token?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           created_at: string
