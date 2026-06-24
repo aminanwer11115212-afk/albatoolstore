@@ -208,7 +208,7 @@ export default function CashInvoicesPage() {
           مسح
         </button>
         <button
-          onClick={fetchData}
+          onClick={reload}
           className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-border hover:bg-muted"
         >
           <RefreshCw size={12} /> تحديث
