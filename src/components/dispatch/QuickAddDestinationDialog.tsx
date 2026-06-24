@@ -31,8 +31,11 @@ export default function QuickAddDestinationDialog({ open, onOpenChange, onCreate
         description: description.trim() || null,
       }).select().single();
       if (error) throw error;
-      toast.success("تمت إضافة الوجهة");
-      qc.invalidateQueries({ queryKey: ["table", "destinations"] });
+      toast.success("تمت إضافة الوجهة بنجاح", {
+        description: `«${data?.name ?? name.trim()}» متاحة الآن في قائمة الوجهات`,
+      });
+      await qc.invalidateQueries({ queryKey: ["table", "destinations"] });
+      try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
       onCreated?.(data);
       reset();
       onOpenChange(false);
