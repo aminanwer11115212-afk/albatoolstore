@@ -219,6 +219,13 @@ export default function CustomersPage() {
     if (filterLocality && c.locality_id !== filterLocality) return false;
     if (filterName && !startsWithMatch(c.name, filterName)) return false;
     if (filterPhone && !normalizePhone(c.whatsapp || c.phone || "").includes(normalizePhone(filterPhone))) return false;
+    if (filterWaValid) {
+      const wa = pickCustomerWhatsApp(c);
+      const hasAny = !!(c.whatsapp || c.phone);
+      if (filterWaValid === "valid" && !wa) return false;
+      if (filterWaValid === "invalid" && (wa || !hasAny)) return false;
+      if (filterWaValid === "missing" && hasAny) return false;
+    }
     if (filterAddress && !startsWithMatch(c.address, filterAddress)) return false;
     if (filterGroup && c.group_id !== filterGroup) return false;
     if (filterTransporter && customerTransporter[c.id] !== filterTransporter) return false;
