@@ -77,25 +77,39 @@ export default function QuoteViewPage() {
   const loadQuote = async () => {
     if (!id) return;
     setLoading(true);
-    const { data: q } = await supabase.from("quotes").select("*, customers(name, phone, email, address, balance)").eq("id", id).single();
-    const { data: itms } = await supabase.from("quote_items").select("*").eq("quote_id", id);
-    const { data: atts } = await supabase.from("quote_attachments").select("*").eq("quote_id", id).order("created_at", { ascending: false });
-    const { data: txs } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("reference_id", id)
-      .eq("type", "income")
-      .order("date", { ascending: false });
-    if (q && (q as any).is_side) {
-      navigate(`/quotes/side/${id}`, { replace: true });
-      return;
+    try {
+      const { data: q, error: qErr } = await supabase.from("quotes").select("*, customers(name, phone, email, address, balance)").eq("id", id).single();
+      if (qErr) {
+        console.error("[QuoteViewPage] loadQuote failed:", qErr);
+        toast.error(`تعذّر تحميل عرض السعر: ${qErr.message}`);
+        setQuote(null); setItems([]); setAttachments([]); setAdvancePayments([]);
+        return;
+      }
+      const [itmsRes, attsRes, txsRes] = await Promise.all([
+        supabase.from("quote_items").select("*").eq("quote_id", id),
+        supabase.from("quote_attachments").select("*").eq("quote_id", id).order("created_at", { ascending: false }),
+        supabase
+          .from("transactions")
+          .select("*")
+          .eq("reference_id", id)
+          .eq("type", "income")
+          .order("date", { ascending: false }),
+      ]);
+      if (itmsRes.error) { console.error(itmsRes.error); toast.error(`تعذّر تحميل البنود: ${itmsRes.error.message}`); }
+      if (attsRes.error) { console.error(attsRes.error); toast.error(`تعذّر تحميل المرفقات: ${attsRes.error.message}`); }
+      if (txsRes.error)  { console.error(txsRes.error);  toast.error(`تعذّر تحميل الدفعات: ${txsRes.error.message}`); }
+      if (q && (q as any).is_side) {
+        navigate(`/quotes/side/${id}`, { replace: true });
+        return;
+      }
+      setQuote(q);
+      setItems(itmsRes.data || []);
+      setAttachments(await resolveAttachmentSignedUrls((attsRes.data || []) as any[], "quote-attachments"));
+      setAdvancePayments(txsRes.data || []);
+      if (q) setNewStatus(q.status || "pending");
+    } finally {
+      setLoading(false);
     }
-    setQuote(q);
-    setItems(itms || []);
-    setAttachments(await resolveAttachmentSignedUrls((atts || []) as any[], "quote-attachments"));
-    setAdvancePayments(txs || []);
-    if (q) setNewStatus(q.status || "pending");
-    setLoading(false);
   };
 
   const isBankMethod = (m: string) => m === "bank" || m === "bank_transfer";
@@ -256,11 +270,15 @@ export default function QuoteViewPage() {
       }).select().single();
       if (error) throw error;
       if (newQ && items.length > 0) {
-        await supabase.from("quote_items").insert(items.map((it: any) => ({
+        const { error: itErr } = await supabase.from("quote_items").insert(items.map((it: any) => ({
           quote_id: newQ.id, product_id: it.product_id, product_name: it.product_name,
           quantity: it.quantity, unit_price: it.unit_price, discount: it.discount,
           tax_status: it.tax_status, total: it.total,
         })));
+        if (itErr) {
+          await supabase.from("quotes").delete().eq("id", newQ.id);
+          throw new Error(`فشل نسخ البنود، تم التراجع: ${itErr.message}`);
+        }
       }
       toast.success("تم نسخ عرض السعر بنجاح");
       navigate(`/quotes/view/${newQ.id}`);
@@ -271,10 +289,11 @@ export default function QuoteViewPage() {
   const handleDelete = async () => {
     if (!quote || !confirm("هل أنت متأكد من إلغاء عرض السعر؟")) return;
     try {
-      await supabase.from("quotes").update({ status: "rejected" }).eq("id", quote.id);
+      const { error } = await supabase.from("quotes").update({ status: "rejected" }).eq("id", quote.id);
+      if (error) throw error;
       toast.success("تم إلغاء عرض السعر");
       loadQuote();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { toast.error(e.message || "تعذّر إلغاء عرض السعر"); }
   };
 
   const startEdit = (index: number, field: string, value: any) => {
@@ -294,14 +313,16 @@ export default function QuoteViewPage() {
     const baseTotal = qty * price;
     updates.total = baseTotal - (baseTotal * disc / 100);
     try {
-      await supabase.from("quote_items").update(updates).eq("id", item.id);
+      const { error: itErr } = await supabase.from("quote_items").update(updates).eq("id", item.id);
+      if (itErr) throw itErr;
       const newItems = items.map((it, i) => i === index ? { ...it, ...updates } : it);
       const newSubtotal = newItems.reduce((s: number, it: any) => s + (it.quantity * it.unit_price), 0);
       const newDisc = newItems.reduce((s: number, it: any) => s + (it.quantity * it.unit_price * (it.discount || 0) / 100), 0);
       const newTotal = newSubtotal - newDisc + Number(quote.tax_amount || 0);
-      await supabase.from("quotes").update({
+      const { error: qErr } = await supabase.from("quotes").update({
         subtotal: newSubtotal, discount: newDisc, total: newTotal,
       }).eq("id", quote.id);
+      if (qErr) throw new Error(`تم حفظ البند لكن فشل تحديث إجمالي العرض: ${qErr.message}`);
       toast.success("تم التحديث");
       loadQuote();
     } catch (e: any) { toast.error(e.message); }

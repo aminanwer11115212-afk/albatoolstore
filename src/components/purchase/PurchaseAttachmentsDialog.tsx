@@ -58,29 +58,40 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
   const handleUpload = async (files: FileList | null) => {
     if (!files || !purchaseOrderId || activeTab === "trash") return;
     setUploading(true);
+    const failed: string[] = [];
+    let ok = 0;
     try {
       for (const file of Array.from(files)) {
         const ext = file.name.split(".").pop();
         const path = `${purchaseOrderId}/${activeTab}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from("purchase-attachments")
-          .upload(path, file, { contentType: file.type });
-        if (upErr) throw upErr;
-        const { data: pub } = supabase.storage.from("purchase-attachments").getPublicUrl(path);
-        const { error: insErr } = await (supabase as any).from("purchase_attachments").insert({
-          purchase_order_id: purchaseOrderId,
-          file_url: pub.publicUrl,
-          file_name: file.name,
-          file_type: file.type,
-          file_size: file.size,
-          category: activeTab,
-        });
-        if (insErr) throw insErr;
+        try {
+          const { error: upErr } = await supabase.storage
+            .from("purchase-attachments")
+            .upload(path, file, { contentType: file.type });
+          if (upErr) throw upErr;
+          const { data: pub } = supabase.storage.from("purchase-attachments").getPublicUrl(path);
+          const { error: insErr } = await (supabase as any).from("purchase_attachments").insert({
+            purchase_order_id: purchaseOrderId,
+            file_url: pub.publicUrl,
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            category: activeTab,
+          });
+          if (insErr) {
+            try { await supabase.storage.from("purchase-attachments").remove([path]); } catch {}
+            throw insErr;
+          }
+          ok++;
+        } catch (fileErr: any) {
+          console.error("[PurchaseAttachments] upload failed for", file.name, fileErr);
+          failed.push(file.name);
+        }
       }
-      toast.success("تم رفع الملفات");
+      if (ok > 0 && failed.length === 0) toast.success(`تم رفع ${ok} ملف`);
+      else if (ok > 0 && failed.length) toast.message(`نجح: ${ok} — فشل: ${failed.join(", ")}`);
+      else if (failed.length) toast.error(`فشل رفع كل الملفات: ${failed.join(", ")}`);
       load();
-    } catch (e: any) {
-      toast.error(e.message);
     } finally {
       setUploading(false);
     }

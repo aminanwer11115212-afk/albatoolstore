@@ -136,16 +136,21 @@ export default function InvoicesPage() {
       // Stock deduction: only when leaving the "new" workflow for the first time
       if (before === "new" && newStatus !== "new") {
         try {
-          const { data: items } = await supabase
+          const { data: items, error: itErr } = await supabase
             .from("invoice_items")
             .select("product_id, quantity")
             .eq("invoice_id", inv.id);
+          if (itErr) throw itErr;
           const { deductStockForInvoiceOnce } = await import("@/utils/stockDeduction");
           await deductStockForInvoiceOnce(
             inv.id,
             (items || []).map((it: any) => ({ product_id: it.product_id, quantity: it.quantity })),
           );
-        } catch (stockErr) { console.error("[InvoicesPage] stock deduction failed", stockErr); }
+        } catch (stockErr: any) {
+          console.error("[InvoicesPage] stock deduction failed", stockErr);
+          // لا نُسقط الترقية لكن نُعلم المستخدم — قد يحتاج تعديل المخزون يدوياً.
+          toast.error(`تعذّر خصم المخزون: ${stockErr?.message || "خطأ غير معروف"} — يلزم مراجعة المخزون يدوياً`);
+        }
       }
       invalidateWorkflowAutoCache(inv.id);
       toast.success("تم تحديث حالة التجهيز");

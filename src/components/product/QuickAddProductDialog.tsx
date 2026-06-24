@@ -165,8 +165,10 @@ export default function QuickAddProductDialog({
       image_url: form.image_url || null,
     };
     setSaving(true);
+    let createdId: string | null = null;
     try {
       const created: any = await insert.mutateAsync(payload);
+      createdId = created?.id || null;
 
       if (selectedCategoryIds.length > 0) {
         const links = selectedCategoryIds.map((cid) => ({
@@ -176,7 +178,13 @@ export default function QuickAddProductDialog({
         const { error: linkErr } = await (supabase as any)
           .from("product_category_links")
           .insert(links);
-        if (linkErr) throw linkErr;
+        if (linkErr) {
+          // Rollback: حذف المنتج لتفادي منتج يتيم بلا فئة.
+          if (createdId) {
+            try { await (supabase as any).from("products").delete().eq("id", createdId); } catch {}
+          }
+          throw new Error(`فشل ربط الفئات، تم التراجع عن إنشاء المنتج: ${linkErr.message}`);
+        }
       }
 
       const cats = (categories || [])
@@ -186,8 +194,6 @@ export default function QuickAddProductDialog({
       queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
       queryClient.invalidateQueries({ queryKey: ["product_category_links_all"] });
 
-      // Notify screens that use local products state (Invoice/Quote/Return create pages)
-      // so they refetch and the new product appears in suggestions immediately.
       if (typeof window !== "undefined") {
         try { window.dispatchEvent(new Event("products:changed")); } catch {}
       }

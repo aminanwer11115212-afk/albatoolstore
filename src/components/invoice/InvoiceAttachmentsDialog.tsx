@@ -68,36 +68,48 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
   const handleUpload = async (files: FileList | null) => {
     if (!files || !invoiceId || activeTab === "trash") return;
     setUploading(true);
+    const failed: string[] = [];
+    let ok = 0;
     try {
       for (const file of Array.from(files)) {
         const ext = file.name.split(".").pop();
         const path = `${invoiceId}/${activeTab}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from("invoice-attachments")
-          .upload(path, file, { contentType: file.type });
-        if (upErr) throw upErr;
-        const { data: pub } = supabase.storage.from("invoice-attachments").getPublicUrl(path);
-        const { error: insErr } = await supabase.from("invoice_attachments").insert({
-          invoice_id: invoiceId,
-          file_url: pub.publicUrl,
-          file_name: file.name,
-          file_type: file.type,
-          file_size: file.size,
-          category: activeTab,
-        } as any);
-        if (insErr) throw insErr;
+        try {
+          const { error: upErr } = await supabase.storage
+            .from("invoice-attachments")
+            .upload(path, file, { contentType: file.type });
+          if (upErr) throw upErr;
+          const { data: pub } = supabase.storage.from("invoice-attachments").getPublicUrl(path);
+          const { error: insErr } = await supabase.from("invoice_attachments").insert({
+            invoice_id: invoiceId,
+            file_url: pub.publicUrl,
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            category: activeTab,
+          } as any);
+          if (insErr) {
+            // تنظيف الملف من Storage لتفادي ملفات يتيمة بدون سجل DB.
+            try { await supabase.storage.from("invoice-attachments").remove([path]); } catch {}
+            throw insErr;
+          }
+          ok++;
+        } catch (fileErr: any) {
+          console.error("[InvoiceAttachments] upload failed for", file.name, fileErr);
+          failed.push(file.name);
+        }
       }
-      toast.success("تم رفع الملفات");
+      if (ok > 0 && failed.length === 0) toast.success(`تم رفع ${ok} ملف`);
+      else if (ok > 0 && failed.length) toast.message(`نجح: ${ok} — فشل: ${failed.join(", ")}`);
+      else if (failed.length) toast.error(`فشل رفع كل الملفات: ${failed.join(", ")}`);
       load();
-      // أتمتة: رفع إيصال → الحالة تصبح "تم" تلقائياً
-      if (activeTab === "receipt" && invoiceId) {
+      if (activeTab === "receipt" && invoiceId && ok > 0) {
         try {
           await supabase.rpc("advance_invoice_workflow" as any, {
             _invoice_id: invoiceId,
             _target: "done",
             _reason: "رفع إيصال الدفع",
           });
-          // تحقق من نجاح الترقية فعلاً
           const { data: inv } = await supabase
             .from("invoices")
             .select("workflow_status")
@@ -115,8 +127,6 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
           console.error("advance_invoice_workflow failed", err);
         }
       }
-    } catch (e: any) {
-      toast.error(e.message);
     } finally {
       setUploading(false);
     }
