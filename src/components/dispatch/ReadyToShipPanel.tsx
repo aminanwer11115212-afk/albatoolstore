@@ -431,9 +431,9 @@ export default function ReadyToShipPanel({
 
       qc.invalidateQueries({ queryKey: ["dispatch-ready-to-ship"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
-      qc.invalidateQueries({ queryKey: ["table", "customer_preferred_transporter"] });
-      qc.invalidateQueries({ queryKey: ["table", "customer_destinations"] });
-      qc.invalidateQueries({ queryKey: ["table", "customer_transporters"] });
+      qc.invalidateQueries({ queryKey: ["customer_preferred_transporter"] });
+      qc.invalidateQueries({ queryKey: ["customer_destinations"] });
+      qc.invalidateQueries({ queryKey: ["customer_transporters"] });
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
     } catch (e: any) {
