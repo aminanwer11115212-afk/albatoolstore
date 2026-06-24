@@ -473,9 +473,9 @@ export default function ReadyToShipPanel({
         className={isChecked ? "checked" : ""}
         tabIndex={0}
         data-row-id={inv.id}
-        onFocus={() => setFocusedIdx(idx)}
-        onClick={() => { setFocusedIdx(idx); toggle(inv.id); }}
-        style={focusedIdx === idx ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : undefined}
+        onFocus={() => setFocusedRowId(inv.id)}
+        onClick={() => { setFocusedRowId(inv.id); toggle(inv.id); }}
+        style={focusedRowId === inv.id ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : undefined}
       >
         <td className="cell-idx">{idx + 1}</td>
         <td className="cell-check">
