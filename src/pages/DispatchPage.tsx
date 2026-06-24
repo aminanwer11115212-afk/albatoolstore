@@ -47,6 +47,17 @@ export default function DispatchPage() {
     return out;
   }, [rowChoice, allTransporters, allDestinations]);
 
+  // Build print HTML with the same live overlay used by the preview pane,
+  // so chosen-but-not-pinned transporter/destination print exactly as previewed.
+  const buildDispatchReportHTML = useCallback(
+    async (invoices: any[], _companyArg: any) => {
+      const ids = invoices.map((i) => i.id).filter(Boolean);
+      return await buildDispatchSheetForInvoiceIds(ids, company, liveOverlay);
+    },
+    [company, liveOverlay]
+  );
+
+
   return (
     <article className="dispatch-page" dir="rtl">
       <style>{`
