@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDestinations, useTransporters } from "@/hooks/useData";
 import { Printer, Truck, X, PackageCheck } from "lucide-react";
@@ -188,9 +189,11 @@ export default function ShippingDispatchDialog({ open, onClose }: Props) {
           toast.error(`فشل تحديث الحالات: ${firstErr.message}`);
         } else {
           toast.success(`✅ تم طباعة التقرير وتحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات"`);
-          // invalidate queries
+          // invalidate queries + bust badge tooltip cache + notify other screens
           qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
           qc.invalidateQueries({ queryKey: ["invoices-with-customers", undefined] });
+          ids.forEach(id => invalidateWorkflowAutoCache(id));
+          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
           await refetch();
           // تنظيف الصفوف المطبوعة
           setRows(prev => {

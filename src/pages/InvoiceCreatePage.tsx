@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Plus, Edit, Printer, MessageCircle, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet } from "lucide-react";
 import StatusButton, { WORKFLOW_STATUS_OPTIONS, INVOICE_STATUS_OPTIONS } from "@/components/StatusButton";
+import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
 import PanelResizer from "@/components/PanelResizer";
 import RowResizer from "@/components/RowResizer";
@@ -1392,6 +1393,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           _target: "preparing",
           _reason: variant === "stocktake" ? "طباعة كشف جرد" : "طباعة الفاتورة",
         });
+        invalidateWorkflowAutoCache(editId);
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       } catch {}
       navigate(`/preview/invoice/${editId}${suffix}`);
       return;
@@ -2208,8 +2211,18 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                       onChange={async (v) => {
                         if (!editId) return;
                         const prev = workflowStatus;
+                        if (v === prev) return;
+                        const rankOf = (s: string) => WORKFLOW_STATUS_OPTIONS.findIndex(x => x.value === s);
+                        if (rankOf(v) < rankOf(prev)) {
+                          toast.error("لا يمكن تخفيض حالة التجهيز");
+                          return;
+                        }
                         setWorkflowStatus(v);
-                        const { error } = await supabase.from("invoices").update({ workflow_status: v }).eq("id", editId);
+                        const { error } = await supabase.rpc("advance_invoice_workflow" as any, {
+                          _invoice_id: editId,
+                          _target: v,
+                          _reason: `تغيير يدوي للحالة من شاشة الفاتورة: ${prev} → ${v}`,
+                        });
                         if (error) { setWorkflowStatus(prev); toast.error(error.message); return; }
                         // Stock deduction: only when leaving "new" for the first time
                         if (prev === "new" && v !== "new") {
@@ -2239,6 +2252,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                             }
                           } catch (stockErr) { console.error("[InvoiceCreatePage] stock deduction failed", stockErr); }
                         }
+                        invalidateWorkflowAutoCache(editId);
                         try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
                         toast.success("تم تحديث الحالة");
                       }}

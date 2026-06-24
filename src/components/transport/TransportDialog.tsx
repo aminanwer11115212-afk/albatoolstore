@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { useTransporters, useDestinations } from "@/hooks/useData";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import { toast } from "sonner";
@@ -353,6 +354,7 @@ ${packagingHTML ? `
           _reason: "طباعة كشف ترحيل",
         })
       ));
+      ids.forEach((id: string) => invalidateWorkflowAutoCache(id));
       toast.success(`✅ تم طباعة ${ids.length} فاتورة وتحويلها إلى "في الطريق للترحيلات"`);
       setInvoiceRows({});
       await loadAllInvoices();

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { RefreshCw, FileText, StickyNote, Search, X, Lock, Unlock, Settings2, RotateCcw } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
-import { WORKFLOW_STATUSES, getWorkflowStatus, type WorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
+import { WORKFLOW_STATUSES, getWorkflowStatus, invalidateWorkflowAutoCache, type WorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInvoicesWithCustomers, useQuotesWithCustomers } from "@/hooks/useData";
 import { useQuery } from "@tanstack/react-query";
@@ -1024,7 +1024,12 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourc
                                   disabled={s.value === ws}
                                   onClick={async () => {
                                     if (s.value === ws) return;
-                                    const prevValue = item.workflow_status;
+                                    const prevValue = item.workflow_status || "new";
+                                    const rankOf = (v: string) => WORKFLOW_STATUSES.findIndex(x => x.value === v);
+                                    if (rankOf(s.value) < rankOf(prevValue)) {
+                                      toast.error("لا يمكن تخفيض حالة التجهيز");
+                                      return;
+                                    }
                                     // Optimistic update: patch cache immediately
                                     queryClient.setQueriesData<any>({ queryKey: [queryKey] }, (old: any) => {
                                       if (!Array.isArray(old)) return old;
@@ -1032,10 +1037,11 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourc
                                         row.id === item.id ? { ...row, workflow_status: s.value } : row
                                       );
                                     });
-                                    const { error } = await (supabase as any)
-                                      .from("invoices")
-                                      .update({ workflow_status: s.value })
-                                      .eq("id", item.id);
+                                    const { error } = await (supabase as any).rpc("advance_invoice_workflow", {
+                                      _invoice_id: item.id,
+                                      _target: s.value,
+                                      _reason: "تغيير يدوي من القائمة الجانبية",
+                                    });
                                     if (error) {
                                       // Rollback
                                       queryClient.setQueriesData<any>({ queryKey: [queryKey] }, (old: any) => {
@@ -1047,8 +1053,9 @@ function RecentItemsSidebarImpl({ type, compact = false, sideOnly = false, sourc
                                       console.error("Workflow status update failed", error);
                                       toast.error(`فشل تحديث التجهيز: ${error.message}`);
                                      } else {
+                                       invalidateWorkflowAutoCache(item.id);
+                                       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
                                        toast.success("تم تحديث حالة التجهيز");
-                                       // Cache already patched optimistically; skip invalidate to preserve scroll.
                                      }
                                   }}
 

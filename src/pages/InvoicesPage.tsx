@@ -9,7 +9,7 @@ import { openWhatsAppInvoice } from "@/utils/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
-import WorkflowStatusBadge, { WORKFLOW_STATUSES, type WorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
+import WorkflowStatusBadge, { WORKFLOW_STATUSES, type WorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import ShippingDispatchDialog from "@/components/invoice/ShippingDispatchDialog";
@@ -119,7 +119,19 @@ export default function InvoicesPage() {
       (old || []).map((r: any) => r.id === inv.id ? { ...r, workflow_status: newStatus } : r)
     ));
     try {
-      const { error } = await supabase.from("invoices").update({ workflow_status: newStatus }).eq("id", inv.id);
+      // حماية ضد التخفيض: الـ RPC يرفض التخفيض صامتاً، لذا نمنعه هنا برسالة واضحة.
+      const rankOf = (s: string) => WORKFLOW_STATUSES.findIndex(x => x.value === s);
+      if (rankOf(newStatus) < rankOf(before)) {
+        snapshots.forEach(({ k, v }) => qc.setQueryData(k as any, v));
+        toast.error("لا يمكن تخفيض حالة التجهيز");
+        return;
+      }
+      // استخدام الـ RPC الموحّد (يحترم killswitch + يسجّل في invoice_revisions تلقائياً)
+      const { error } = await supabase.rpc("advance_invoice_workflow" as any, {
+        _invoice_id: inv.id,
+        _target: newStatus,
+        _reason: `تغيير يدوي للحالة من قائمة الفواتير: ${before} → ${newStatus}`,
+      });
       if (error) throw error;
       // Stock deduction: only when leaving the "new" workflow for the first time
       if (before === "new" && newStatus !== "new") {
@@ -135,12 +147,7 @@ export default function InvoicesPage() {
           );
         } catch (stockErr) { console.error("[InvoicesPage] stock deduction failed", stockErr); }
       }
-      await recordInvoiceRevision({
-        invoiceId: inv.id,
-        action: "workflow_status_change",
-        changes: { workflow_status: { before, after: newStatus } },
-        note: `حالة التجهيز: ${before} → ${newStatus}`,
-      });
+      invalidateWorkflowAutoCache(inv.id);
       toast.success("تم تحديث حالة التجهيز");
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       refetch();
