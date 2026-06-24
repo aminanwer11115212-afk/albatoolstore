@@ -795,7 +795,7 @@ export default function ReadyToShipPanel({
               <tr>
                 <th className="cell-idx">#</th>
                 <th className="cell-check">✓</th>
-                <th>اسم الزبون</th>
+                <th>{tab === "by_customer" ? "رقم الفاتورة" : "اسم الزبون"}</th>
                 <th className="cell-sel">الناقل</th>
                 <th className="cell-sel">الوجهة</th>
                 <th className="cell-act">إجراء</th>
