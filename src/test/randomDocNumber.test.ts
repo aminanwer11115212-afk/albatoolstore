@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const limitMock = vi.fn(() => Promise.resolve({ data: [] }));
 const eqMock: any = vi.fn(() => ({ limit: limitMock, eq: eqMock, neq: eqMock, or: eqMock }));
 const selectMock: any = vi.fn(() => ({ eq: eqMock, limit: limitMock }));
-const fromMock = vi.fn(() => ({ select: selectMock }));
+const fromMock: any = vi.fn(() => ({ select: selectMock }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: (table: string) => fromMock(table) },
