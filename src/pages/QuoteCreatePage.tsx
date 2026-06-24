@@ -2051,8 +2051,9 @@ export default function QuoteCreatePage() {
                       onClick={() => saveQuote("draft")}
                       style={btnStyle("#2563eb")}
                       title="حفظ عرض السعر"
+                      disabled={savingQuote}
                     >
-                      حفظ
+                      {savingQuote ? "جاري الحفظ..." : "حفظ"}
                     </button>
                   ),
                 },
