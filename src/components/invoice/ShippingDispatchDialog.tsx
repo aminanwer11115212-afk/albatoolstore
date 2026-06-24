@@ -8,7 +8,7 @@
  * 4. بعد الطباعة تتغير حالة هذه الفواتير إلى "في الطريق للترحيلات" (in_transit).
  */
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -127,6 +127,8 @@ export default function ShippingDispatchDialog({ open, onClose }: Props) {
   // حالة الصفوف: ناقل + وجهة + ملاحظات لكل فاتورة
   const [rows, setRows] = useState<Record<string, { transporterId: string; destinationId: string; notes: string }>>({});
   const [printing, setPrinting] = useState(false);
+  // ref يُستعمل في setTimeout fallback لأن state قد لا يُرى من داخل الـ closure القديم.
+  const printingRef = useRef(false);
   const { dlgRef, dlgStyle } = useDialogSize("shipping_dispatch_dialog", open, { w: "min(860px, 97vw)", h: "90vh" });
 
   const setRowField = useCallback((invoiceId: string, field: "transporterId" | "destinationId" | "notes", val: string) => {
@@ -145,8 +147,8 @@ export default function ShippingDispatchDialog({ open, onClose }: Props) {
       return;
     }
     setPrinting(true);
+    printingRef.current = true;
     try {
-      // بناء صفوف التقرير
       const printRows: DispatchRow[] = readyToPrint.map((inv: any) => ({
         invoiceId: inv.id,
         invoiceNumber: inv.invoice_number,
@@ -161,56 +163,73 @@ export default function ShippingDispatchDialog({ open, onClose }: Props) {
 
       const date = new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
       const html = buildPrintHTML(printRows, transporters as any[], destinations as any[], date);
+      const ids = printRows.map(r => r.invoiceId);
 
       // فتح نافذة الطباعة
       const win = window.open("", "_blank", "width=900,height=700");
-      if (!win) { toast.error("تعذّر فتح نافذة الطباعة — تحقق من إعدادات المتصفح"); setPrinting(false); return; }
-      win.document.write(html);
-      win.document.close();
-
-      // انتظر التحميل ثم اطبع
-      win.onload = async () => {
-        win.print();
-        win.onafterprint = () => win.close();
-
-        // بعد الطباعة: ترقية الحالة عبر RPC الموحّد (لا UPDATE مباشر)
-        const ids = printRows.map(r => r.invoiceId);
-        const results = await Promise.all(
-          ids.map(id =>
-            supabase.rpc("advance_invoice_workflow" as any, {
-              _invoice_id: id,
-              _target: "in_transit",
-              _reason: "طباعة كشف الفواتير الجاهزة",
-            })
-          )
-        );
-        const firstErr = results.find(r => (r as any).error)?.error;
-        if (firstErr) {
-          toast.error(`فشل تحديث الحالات: ${firstErr.message}`);
-        } else {
-          toast.success(`✅ تم طباعة التقرير وتحويل ${ids.length} فاتورة إلى "في الطريق للترحيلات"`);
-          // invalidate queries + bust badge tooltip cache + notify other screens
-          qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
-          qc.invalidateQueries({ queryKey: ["invoices-with-customers", undefined] });
-          ids.forEach(id => invalidateWorkflowAutoCache(id));
-          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
-          await refetch();
-          // تنظيف الصفوف المطبوعة
-          setRows(prev => {
-            const next = { ...prev };
-            ids.forEach(id => delete next[id]);
-            return next;
-          });
-        }
+      if (!win) {
+        toast.error("تعذّر فتح نافذة الطباعة — تحقق من إعدادات المتصفح");
         setPrinting(false);
+        printingRef.current = false;
+        return;
+      }
+      try {
+        win.document.write(html);
+        win.document.close();
+      } catch (e) {
+        console.error("[ShippingDispatchDialog] document.write failed:", e);
+      }
+
+      // محاولة الطباعة عبر onload — لو لم يُطلَق نُكمل عبر setTimeout fallback.
+      let printAttempted = false;
+      const tryPrint = () => {
+        if (printAttempted) return;
+        printAttempted = true;
+        try { win.print(); } catch (e) { console.error("[ShippingDispatchDialog] print() failed:", e); }
+        try { win.onafterprint = () => { try { win.close(); } catch {} }; } catch {}
       };
+      try { win.onload = tryPrint; } catch {}
+      // fallback: بعض المتصفحات لا تُطلق onload عند about:blank
+      setTimeout(tryPrint, 700);
 
-      // fallback إذا onload لم يُستدعَ (بعض المتصفحات)
-      setTimeout(() => { if (printing) setPrinting(false); }, 5000);
+      // ── مهم: ترقية الحالة لا تعتمد على win.onload لأنه قد لا يُستدعى أصلاً.
+      // نُنفّذها فوراً بعد فتح نافذة الطباعة — فالطباعة client-side
+      // والترقية تخص الـ DB المستقلة عنها.
+      const results = await Promise.all(
+        ids.map(async id => {
+          const res = await supabase.rpc("advance_invoice_workflow" as any, {
+            _invoice_id: id,
+            _target: "in_transit",
+            _reason: "طباعة كشف الفواتير الجاهزة",
+          });
+          return { id, error: (res as any).error };
+        })
+      );
+      const failed = results.filter(r => r.error);
+      const okIds = results.filter(r => !r.error).map(r => r.id);
 
+      if (failed.length > 0) {
+        toast.error(`فشل تحديث ${failed.length} من ${ids.length} فاتورة: ${(failed[0].error as any)?.message || ""}`);
+      }
+      if (okIds.length > 0) {
+        toast.success(`✅ تم تحويل ${okIds.length} فاتورة إلى "في الطريق للترحيلات"`);
+        qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+        qc.invalidateQueries({ queryKey: ["invoices-with-customers", undefined] });
+        okIds.forEach(id => invalidateWorkflowAutoCache(id));
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+        await refetch();
+        setRows(prev => {
+          const next = { ...prev };
+          okIds.forEach(id => delete next[id]);
+          return next;
+        });
+      }
     } catch (e: any) {
-      toast.error(e.message);
+      console.error("[ShippingDispatchDialog.handlePrintAndTransit] error:", e);
+      toast.error(e?.message || "خطأ غير متوقع");
+    } finally {
       setPrinting(false);
+      printingRef.current = false;
     }
   };
 
