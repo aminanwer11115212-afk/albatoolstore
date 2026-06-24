@@ -80,6 +80,7 @@ function useStockMovements(from: string, to: string) {
       const moves: Move[] = [];
 
       (inv.data || []).forEach((r: any) => {
+        const isPos = (r.invoices?.source || "") === "pos";
         moves.push({
           id: `sale-${r.id}`,
           date: r.invoices?.date,
@@ -89,8 +90,9 @@ function useStockMovements(from: string, to: string) {
           qty: -Number(r.quantity || 0),
           doc_number: r.invoices?.invoice_number || "—",
           doc_id: r.invoices?.id,
-          party_name: r.invoices?.customers?.name || "—",
+          party_name: r.invoices?.customers?.name || r.invoices?.walk_in_customer_name || (isPos ? "عميل نقدي" : "—"),
           current_stock: r.product_id ? stockMap.get(r.product_id) ?? null : null,
+          is_pos: isPos,
         });
       });
       (ret.data || []).forEach((r: any) => {
