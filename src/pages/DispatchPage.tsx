@@ -96,7 +96,7 @@ export default function DispatchPage() {
         }
       `}</style>
 
-      <DispatchEntitiesBar />
+
 
       <div className="dp-grid">
         <div className="dp-main">
