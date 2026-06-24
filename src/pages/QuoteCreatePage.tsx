@@ -1101,6 +1101,8 @@ export default function QuoteCreatePage() {
         <div className="form-column">
           {/* ============ Header: شريط واحد ============ */}
           <div className="header-bar" style={{ flexShrink: 0, height: "auto" }}>
+            {/* hidden marker للاختبارات E2E لقراءة الرقم المُولَّد */}
+            <span data-testid="doc-number" data-doc-kind={isSideMode ? "side-quote" : "quote"} style={{ display: "none" }}>{quoteNumber}</span>
             {/* Customer search (مع رقم العرض + التاريخ مدمجين في نفس المستطيل) */}
             <div className="field product-search-container" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
               <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
