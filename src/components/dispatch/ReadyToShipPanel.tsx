@@ -786,9 +786,7 @@ export default function ReadyToShipPanel({
                     onChange={toggleAll}
                   />
                 </th>
-                <th className="cell-num">رقم الفاتورة</th>
                 <th>اسم الزبون</th>
-                <th className="cell-date">التاريخ</th>
                 <th className="cell-sel">الناقل</th>
                 <th className="cell-sel">الوجهة</th>
                 <th className="cell-act">إجراء</th>
@@ -801,14 +799,13 @@ export default function ReadyToShipPanel({
             <thead>
               <tr>
                 <th className="cell-check">#</th>
-                <th className="cell-num">رقم الفاتورة</th>
                 <th>اسم الزبون</th>
-                <th className="cell-date">التاريخ</th>
                 <th className="cell-sel">الناقل</th>
                 <th className="cell-sel">الوجهة</th>
                 <th className="cell-act">إجراء</th>
               </tr>
             </thead>
+
             <tbody>
               {groups!.map((g) => {
                 const collapsed = collapsedGroups.has(g.key);
