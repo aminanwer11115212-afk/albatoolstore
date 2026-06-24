@@ -91,6 +91,15 @@ export default function ReadyToShipPanel({
   const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
 
+  // إعادة ضبط التحديد والتركيز تلقائياً عند تغيير التاب أو الفلتر
+  // لتجنّب بقاء فواتير محدَّدة لم تعد ظاهرة فتُسرَّب إلى المعاينة/الطباعة.
+  useEffect(() => {
+    setChecked(new Set());
+    setFocusedRowId(null);
+    setCollapsedGroups(new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, search]);
+
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dispatch-ready-to-ship"],
     queryFn: async () => {
