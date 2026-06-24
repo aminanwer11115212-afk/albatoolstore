@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { useTransporters, useDestinations } from "@/hooks/useData";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import { toast } from "sonner";
