@@ -167,6 +167,55 @@ export default function CashInvoicesPage() {
     });
   };
 
+  const openPayment = (r: CashInv) => {
+    const due = Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0));
+    setPayInv(r);
+    setPayAmount(String(due > 0 ? due : r.total || 0));
+    setPayMethod("cash");
+    const accs = (accounts as any[]) || [];
+    const cashAcc = accs.find((a) => /cash|نقد/i.test(a?.type || "") || /نقد|كاش/.test(a?.name || ""));
+    setPayAccount(cashAcc?.id || accs[0]?.id || "");
+    setPayDate(new Date().toISOString().slice(0, 10));
+    setPayRef("");
+    setPayNote(`دفعة لفاتورة كاش ${r.invoice_number}`);
+  };
+
+  const submitPayment = async () => {
+    if (!payInv || paySubmitting) return;
+    const raw = parseFloat(String(payAmount).trim());
+    if (!isFinite(raw) || raw <= 0) { toast.error("أدخل مبلغًا صحيحًا"); return; }
+    const isBank = payMethod === "bank" || payMethod === "bank_transfer" || payMethod === "mada";
+    if (isBank && !payRef.trim()) { toast.error("أدخل رقم العملية / المرجع"); return; }
+    if (!payAccount) { toast.error("اختر حسابًا"); return; }
+    setPaySubmitting(true);
+    try {
+      const total = Number(payInv.total) || 0;
+      const alreadyPaid = Number(payInv.paid_amount) || 0;
+      const newPaid = Math.min(total, alreadyPaid + raw);
+      const newDue = Math.max(0, total - newPaid);
+      const newSt = computePaymentStatus(newPaid, total);
+      const refSuffix = isBank && payRef.trim() ? ` - مرجع: ${payRef.trim()}` : "";
+      const note = `${payNote || ""}${refSuffix}`.trim();
+      const { error: upErr } = await supabase.from("invoices").update({
+        paid_amount: newPaid, due_amount: newDue, status: newSt, payment_method: payMethod,
+      }).eq("id", payInv.id);
+      if (upErr) throw upErr;
+      const { error: txErr } = await supabase.from("transactions").insert({
+        type: "income", amount: raw, date: payDate, description: note,
+        account_id: payAccount, reference_id: payInv.id,
+      });
+      if (txErr) throw txErr;
+      toast.success("تم تسجيل الدفعة");
+      setRows((p) => p.map((x) => x.id === payInv.id ? { ...x, paid_amount: newPaid, status: newSt } : x));
+      setPayInv(null);
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+    } catch (e: any) {
+      toast.error(`فشل تسجيل الدفعة: ${e?.message || "خطأ"}`);
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
+
   const reload = () => fetchPage(0, true);
 
 
