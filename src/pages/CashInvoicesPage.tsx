@@ -356,6 +356,13 @@ export default function CashInvoicesPage() {
                         <Printer size={14} />
                       </button>
                       <button
+                        onClick={() => openPayment(r)}
+                        className="p-1.5 rounded-md hover:bg-muted text-primary"
+                        title="تسجيل دفع (كاش / مدى / تحويل)"
+                      >
+                        <CreditCard size={14} />
+                      </button>
+                      <button
                         onClick={() => handleWhatsApp(r)}
                         className="p-1.5 rounded-md hover:bg-muted text-green-600"
                         title="إرسال رابط المعاينة عبر واتساب"
