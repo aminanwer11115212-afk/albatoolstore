@@ -134,7 +134,7 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
   return (
     <div style={wrap}>
       <div style={bar}>
-        <strong style={{ fontSize: 14, color: "#1a1a1a" }}>معاينة المستند</strong>
+        <strong style={{ fontSize: 14, color: "#1a1a1a" }}>شركة البتول لإسبارات المواتر والتكاتك</strong>
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" style={btn("#10b981")} onClick={handlePrint}>
             🖨️ طباعة

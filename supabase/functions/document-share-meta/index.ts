@@ -300,9 +300,9 @@ Deno.serve(async (req) => {
   });
 
 
-  let title = "البتول لاسبيرات المواتر والتكاتك";
+  let title = "شركة البتول لإسبارات المواتر والتكاتك";
   let description = "اضغط لفتح المستند";
-  const companyName = "اولاد جابر لاسبيرات المواتر والتكاتك";
+  const companyName = "شركة البتول لإسبارات المواتر والتكاتك";
 
   if (token) {
     try {
