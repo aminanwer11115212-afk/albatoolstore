@@ -144,8 +144,8 @@ export default function TransactionsPage() {
             <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputCls} />
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSubmit} className="bg-primary text-primary-foreground px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90">إضافة</button>
-            <button onClick={() => setShowForm(false)} className="bg-muted text-muted-foreground px-6 py-2 rounded-lg text-sm">إلغاء</button>
+            <button onClick={handleSubmit} disabled={saving} className="bg-primary text-primary-foreground px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed">{saving ? "جارٍ الحفظ..." : "إضافة"}</button>
+            <button onClick={() => setShowForm(false)} disabled={saving} className="bg-muted text-muted-foreground px-6 py-2 rounded-lg text-sm">إلغاء</button>
           </div>
         </div>
       )}
