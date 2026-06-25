@@ -1023,13 +1023,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         })();
         let attempt = 0;
         let lastError: any = null;
-        let currentNumber = invoiceNumber;
+        let currentNumber = effectiveInvoiceNumber;
         while (attempt < 5) {
           const tryPayload = { ...payload, invoice_number: currentNumber };
           const { data, error } = await supabase.from("invoices").insert(tryPayload).select("id,invoice_number").single();
           if (!error) {
             invId = data.id;
-            if (data.invoice_number !== invoiceNumber) {
+            if (data.invoice_number !== effectiveInvoiceNumber) {
               setInvoiceNumber(data.invoice_number);
               toast.message(`تم تعديل رقم الفاتورة إلى ${data.invoice_number} لتفادي التكرار`);
             }
