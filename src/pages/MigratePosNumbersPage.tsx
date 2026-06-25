@@ -142,7 +142,7 @@ export default function MigratePosNumbersPage() {
         <h1 className="text-2xl font-bold">ترحيل ترقيم فواتير الكاش (INV → POS)</h1>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link to="/invoices/cash/list">إدارة الكاش</Link>
+            <Link to="/invoices/cash/list">إدارة فواتير الكاش</Link>
           </Button>
           <Button variant="outline" onClick={() => void scan()} disabled={loading || running}>
             <RefreshCcw className="h-4 w-4 ml-1" /> إعادة المسح
