@@ -323,7 +323,8 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
             ))}
           </div>
 
-          {/* Source filter chips (POS vs regular) */}
+          {/* Source filter chips (POS vs regular) — hidden when locked to POS */}
+          {!posOnly && (
           <div className="flex flex-wrap gap-2 mb-3" dir="rtl">
             <span className="text-xs text-muted-foreground self-center ml-1">النوع:</span>
             {(["all", "regular", "pos"] as const).map((k) => {
