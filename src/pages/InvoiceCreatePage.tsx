@@ -1876,7 +1876,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                     </button>
                   ),
                 }] : []),
-                ...(!pos ? [{
+                {
                   id: "record-payment",
                   group: "1-primary",
                   node: (
@@ -1890,21 +1890,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                       <Wallet size={14} /> تسجيل دفعة
                     </button>
                   ),
-                }] : []),
-                ...(pos ? [{
-                  id: "manage-cash",
-                  group: "1-primary",
-                  node: (
-                    <button
-                      type="button"
-                      onClick={() => navigate("/invoices/cash/list")}
-                      title="إدارة فواتير الكاش"
-                      style={btnStyle("#0ea5e9")}
-                    >
-                      إدارة الكاش
-                    </button>
-                  ),
-                }] : []),
+                },
 
                 // === Group 2: Files & attachments ===
                 ...([

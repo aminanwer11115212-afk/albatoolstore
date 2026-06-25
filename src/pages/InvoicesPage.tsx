@@ -25,8 +25,8 @@ const statusMap: Record<string, { label: string; cls: string }> = {
   draft:     { label: "جديد",   cls: "st-draft" },
 };
 
-export default function InvoicesPage() {
-  usePageRenderCount("/invoices");
+export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } = {}) {
+  usePageRenderCount(posOnly ? "/invoices/cash/list" : "/invoices");
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -38,7 +38,7 @@ export default function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [workflowFilter, setWorkflowFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "regular" | "pos">("regular");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "regular" | "pos">(posOnly ? "pos" : "regular");
   const { data: invoices, isLoading, refetch } = useInvoicesWithCustomers();
   const { remove } = useInvoices();
   const { data: companyArr } = useCompanySettings();
@@ -323,7 +323,8 @@ export default function InvoicesPage() {
             ))}
           </div>
 
-          {/* Source filter chips (POS vs regular) */}
+          {/* Source filter chips (POS vs regular) — hidden when locked to POS */}
+          {!posOnly && (
           <div className="flex flex-wrap gap-2 mb-3" dir="rtl">
             <span className="text-xs text-muted-foreground self-center ml-1">النوع:</span>
             {(["all", "regular", "pos"] as const).map((k) => {
@@ -348,6 +349,7 @@ export default function InvoicesPage() {
               );
             })}
           </div>
+          )}
 
           {/* Mobile toolbar */}
           <div className="mobile-toolbar">
