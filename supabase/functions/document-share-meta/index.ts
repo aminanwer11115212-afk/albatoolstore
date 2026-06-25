@@ -261,9 +261,10 @@ Deno.serve(async (req) => {
   }
 
   if (!isPreviewBot) {
-    // Real browser: 302 to the React preview page on the app origin.
-    // That page fetches the document HTML via XHR and renders it inside
-    // an iframe (srcDoc), with Print + Download PDF buttons in the toolbar.
+    // Real browser: 302 to the standalone share page on the app origin.
+    // That page (mounted directly from main.tsx, bypassing the app shell)
+    // fetches the document HTML and shows ONLY a Print/PDF toolbar — no
+    // sidebar, no PWA install prompt, no app providers.
     logRedirectEvent({
       trace_id: traceId,
       ts: new Date().toISOString(),
@@ -281,7 +282,7 @@ Deno.serve(async (req) => {
         location: targetUrl,
         "cache-control": "no-store, must-revalidate",
         "x-share-trace-id": traceId,
-        "x-share-redirect": "browser-302-app",
+        "x-share-redirect": "browser-302-standalone",
       },
     });
   }
