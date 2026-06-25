@@ -457,6 +457,111 @@ export default function CashInvoicesPage() {
           )}
         </div>
       )}
+
+      {/* Payment dialog */}
+      <Dialog open={!!payInv} onOpenChange={(o) => !o && setPayInv(null)}>
+        <DialogContent dir="rtl" className="font-cairo max-w-md">
+          <DialogHeader>
+            <DialogTitle>تسجيل دفعة — {payInv?.invoice_number}</DialogTitle>
+          </DialogHeader>
+          {payInv && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="p-2 rounded-md bg-muted">
+                  <div className="text-muted-foreground">الإجمالي</div>
+                  <div className="font-bold">{Number(payInv.total || 0).toLocaleString("ar-EG")}</div>
+                </div>
+                <div className="p-2 rounded-md bg-muted">
+                  <div className="text-muted-foreground">المدفوع</div>
+                  <div className="font-bold">{Number(payInv.paid_amount || 0).toLocaleString("ar-EG")}</div>
+                </div>
+                <div className="p-2 rounded-md bg-muted">
+                  <div className="text-muted-foreground">المتبقي</div>
+                  <div className="font-bold">{Math.max(0, Number(payInv.total || 0) - Number(payInv.paid_amount || 0)).toLocaleString("ar-EG")}</div>
+                </div>
+              </div>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">طريقة الدفع</span>
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                  style={{ fontSize: 16 }}
+                >
+                  <option value="cash">كاش</option>
+                  <option value="mada">مدى</option>
+                  <option value="bank_transfer">تحويل بنكي</option>
+                  <option value="bank">شيك / بنك</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">المبلغ ({currency})</span>
+                <input
+                  type="number"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                  style={{ fontSize: 16 }}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">الحساب</span>
+                <select
+                  value={payAccount}
+                  onChange={(e) => setPayAccount(e.target.value)}
+                  className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                  style={{ fontSize: 16 }}
+                >
+                  <option value="">— اختر —</option>
+                  {((accounts as any[]) || []).map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">التاريخ</span>
+                  <input
+                    type="date"
+                    value={payDate}
+                    onChange={(e) => setPayDate(e.target.value)}
+                    className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                    style={{ fontSize: 16 }}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">رقم المرجع / العملية</span>
+                  <input
+                    type="text"
+                    value={payRef}
+                    onChange={(e) => setPayRef(e.target.value)}
+                    placeholder={payMethod === "mada" ? "رقم عملية مدى" : ""}
+                    className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                    style={{ fontSize: 16 }}
+                  />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">ملاحظات</span>
+                <input
+                  type="text"
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                  className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                  style={{ fontSize: 16 }}
+                />
+              </label>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPayInv(null)} disabled={paySubmitting}>إلغاء</Button>
+            <Button onClick={submitPayment} disabled={paySubmitting}>
+              {paySubmitting ? "جارٍ الحفظ…" : "حفظ الدفعة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
