@@ -422,12 +422,9 @@ export default function ProductsPage() {
     if (file.size > 5 * 1024 * 1024) { toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت"); return; }
     setUploadingImage(true);
     try {
-      const ext = file.name.split(".").pop() || "jpg";
-      const filename = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("company-assets").upload(filename, file, { upsert: false });
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from("company-assets").getPublicUrl(filename);
-      setForm(f => ({ ...f, image_url: data.publicUrl }));
+      const { uploadProductImage } = await import("@/utils/productImageUpload");
+      const url = await uploadProductImage(file);
+      setForm(f => ({ ...f, image_url: url }));
       toast.success("تم رفع الصورة");
     } catch (err: any) {
       toast.error(err.message || "فشل رفع الصورة");
@@ -2216,23 +2213,19 @@ export default function ProductsPage() {
                                 const localUrl = URL.createObjectURL(file);
                                 const rollback = patchProductCaches(p.id, { image_url: localUrl });
                                 (async () => {
-                                  try {
-                                    const ext = file.name.split(".").pop() || "jpg";
-                                    const filename = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                                    const { error: ue } = await supabase.storage.from("company-assets").upload(filename, file);
-                                    if (ue) throw ue;
-                                    const { data } = supabase.storage.from("company-assets").getPublicUrl(filename);
-                                    // استبدل الـ blob بالـ URL الحقيقي + احفظ في DB
-                                    patchProductCaches(p.id, { image_url: data.publicUrl });
-                                    await update.mutateAsync({ id: p.id, image_url: data.publicUrl });
-                                    window.dispatchEvent(new Event("products:changed"));
-                                    setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
-                                  } catch (err: any) {
-                                    rollback();
-                                    URL.revokeObjectURL(localUrl);
-                                    toast.error(err.message || "فشل الرفع");
-                                  }
-                                })();
+                                   try {
+                                     const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                     const url = await uploadProductImage(file);
+                                     patchProductCaches(p.id, { image_url: url });
+                                     await update.mutateAsync({ id: p.id, image_url: url });
+                                     window.dispatchEvent(new Event("products:changed"));
+                                     setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                                   } catch (err: any) {
+                                     rollback();
+                                     URL.revokeObjectURL(localUrl);
+                                     toast.error(err.message || "فشل الرفع");
+                                   }
+                                 })();
                               }}
                             />
                           </label>

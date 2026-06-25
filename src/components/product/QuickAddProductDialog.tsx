@@ -87,12 +87,9 @@ export default function QuickAddProductDialog({
     if (file.size > 5 * 1024 * 1024) { toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت"); return; }
     setUploadingImage(true);
     try {
-      const ext = file.name.split(".").pop() || "jpg";
-      const filename = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("company-assets").upload(filename, file, { upsert: false });
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from("company-assets").getPublicUrl(filename);
-      setForm(f => ({ ...f, image_url: data.publicUrl }));
+      const { uploadProductImage } = await import("@/utils/productImageUpload");
+      const url = await uploadProductImage(file);
+      setForm(f => ({ ...f, image_url: url }));
       toast.success("تم رفع الصورة");
     } catch (err: any) {
       toast.error(err.message || "فشل رفع الصورة");
