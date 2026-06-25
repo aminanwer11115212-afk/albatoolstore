@@ -373,6 +373,8 @@ export default function QuoteCreatePage() {
   const itemsScrollRef = useRef<HTMLDivElement>(null);
   const savedRef = useRef(false);
   const lastSavedIdRef = useRef<string | null>(null);
+  // العميل المحفوظ في آخر حفظ ناجح — لاكتشاف "تغيّر العميل ⇒ عرض سعر جديد"
+  const lastSavedCustomerRef = useRef<string | null>(null);
   // بصمة البنود كما حُمِّلت من قاعدة البيانات؛ تُستخدم لتخطّي إعادة كتابة البنود إن لم تتغيّر
   const originalItemsHashRef = useRef<string | null>(null);
   // يُرفع عند حذف العرض من قاعدة البيانات أو تحويله إلى فاتورة أثناء الجلسة الحالية،
@@ -858,7 +860,19 @@ export default function QuoteCreatePage() {
     // المعرّف الفعّال للتعديل: من URL، أو من آخر حفظ ناجح في نفس الجلسة
     // (window.history.replaceState لا يُحدِّث useParams، لذلك بدون هذا
     // الاحتياط ستُنشئ نقرة الحفظ الثانية عرض سعر جديداً مكرَّراً).
-    const effectiveEditId = editId || lastSavedIdRef.current || undefined;
+    // إذا تغيّر العميل عمّا حُفظ → عرض جديد برقم عشوائي جديد.
+    let effectiveEditId = editId || lastSavedIdRef.current || undefined;
+    if (effectiveEditId && !editId && lastSavedCustomerRef.current && lastSavedCustomerRef.current !== activeCustomer!.id) {
+      lastSavedIdRef.current = null;
+      effectiveEditId = undefined;
+      const _prefix = isSideMode ? (sideQuotePrefix || "QTS-") : (quotePrefix || "QT-");
+      const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+      const _newNum = await generateRandomDocNumber("quotes", "quote_number", _prefix, {
+        scope: (q) => (isSideMode ? q.eq("is_side", true) : q.or("is_side.is.null,is_side.eq.false")),
+      });
+      setQuoteNumber(_newNum);
+      payload.quote_number = _newNum;
+    }
     let qid: string | undefined = effectiveEditId;
     // إن كنا في وضع التعديل، احسب البصمة الحالية وقارنها بالأصلية لتقرير ما إذا كنا سنعيد كتابة البنود
     const currentItemsHash = quoteItemsHash(validRows);
@@ -956,6 +970,7 @@ export default function QuoteCreatePage() {
     if (!opts.silent) toast.success(effectiveEditId && recordExisted ? "تم تحديث عرض السعر" : "تم حفظ عرض السعر");
     savedRef.current = true;
     lastSavedIdRef.current = qid!;
+    lastSavedCustomerRef.current = activeCustomer!.id;
     // إذا كنّا في وضع الإنشاء وتم الحفظ بنجاح، بدّل العنوان لوضع التعديل
     // حتى لا يُنشئ الضغط على "حفظ" مجدداً عرض سعر جديد
     if (!editId && qid) {

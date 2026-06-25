@@ -258,6 +258,9 @@ export default function PurchaseCreatePage() {
   const [notes, setNotes] = useState("");
   const [userNote, setUserNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const isSavingRef = useRef(false);
+  // المورد المحفوظ في آخر حفظ ناجح — لاكتشاف "تغيّر المورد ⇒ أمر شراء جديد"
+  const lastSavedSupplierRef = useRef<string | null>(null);
   const [status, setStatus] = useState<string>("pending");
 
   const [defaultRate, setDefaultRate] = useState<number>(1);
@@ -550,9 +553,27 @@ export default function PurchaseCreatePage() {
     const valid = rows.filter((r) => r.product_id);
     if (valid.length === 0) { toast.error("أضف منتج واحد على الأقل"); return; }
 
+    // حارس متزامن: يمنع الإدراج المضاعف عند الضغط المتكرر على زر الحفظ
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+
+    // ميزة موحّدة "تحديث بدل التكرار" — إذا سبق الحفظ في هذه الجلسة ولم يتغيّر المورد
+    // عاملها كتعديل لنفس السجل بدل إنشاء سجل جديد بعد كل ضغطة.
+    // إذا تغيّر المورد عمّا حُفظ → سجل جديد برقم عشوائي جديد.
+    let treatAsEdit = isEdit;
+    if (!treatAsEdit && orderId && lastSavedSupplierRef.current) {
+      if (lastSavedSupplierRef.current === supplierId) {
+        treatAsEdit = true;
+      } else {
+        setOrderId(null);
+        lastSavedSupplierRef.current = null;
+        // الرقم العشوائي سيُولَّد داخل فرع الإنشاء أدناه
+      }
+    }
+
     setSaving(true);
     try {
-      let savedId = orderId;
+      let savedId = treatAsEdit ? orderId : null;
       let savedNumber = orderNumber;
 
       const payload: any = {
@@ -572,19 +593,19 @@ export default function PurchaseCreatePage() {
       // Snapshot existing state BEFORE mutating, so we can compute stock deltas correctly.
       let prevStatusInDb: string | null = null;
       let prevItems: Array<{ product_id: string | null; quantity: number }> = [];
-      if (isEdit && orderId) {
-        prevStatusInDb = await getPurchaseStatus(orderId);
+      if (savedId) {
+        prevStatusInDb = await getPurchaseStatus(savedId);
         const { data: prevItemsRows } = await supabase
           .from("purchase_order_items")
           .select("product_id, quantity")
-          .eq("purchase_order_id", orderId);
+          .eq("purchase_order_id", savedId);
         prevItems = (prevItemsRows || []).map((r: any) => ({
           product_id: r.product_id, quantity: Number(r.quantity || 0),
         }));
 
-        const { error } = await (supabase as any).from("purchase_orders").update(payload).eq("id", orderId);
+        const { error } = await (supabase as any).from("purchase_orders").update(payload).eq("id", savedId);
         if (error) throw error;
-        await supabase.from("purchase_order_items").delete().eq("purchase_order_id", orderId);
+        await supabase.from("purchase_order_items").delete().eq("purchase_order_id", savedId);
       } else {
         const prefix = company?.purchase_prefix || "PO-";
         // رقم افتراضي عشوائي لكل أمر شراء جديد لتفادي التكرار
@@ -594,7 +615,9 @@ export default function PurchaseCreatePage() {
             digits: 5 + extraDigits,
           });
         };
-        let candidate = orderNumber && orderNumber.startsWith(prefix) ? orderNumber : await buildNextNumber();
+        // إذا كانت "إعادة حفظ بعد تغيير المورد" فالرقم القديم يخص أمر آخر — ولّد جديداً
+        const reuseExisting = !!orderNumber && orderNumber.startsWith(prefix) && !!lastSavedSupplierRef.current === false;
+        let candidate = reuseExisting ? orderNumber : await buildNextNumber();
         let attempt = 0;
         let createdRow: any = null;
         while (attempt < 5) {
@@ -664,11 +687,17 @@ export default function PurchaseCreatePage() {
         toast.success(isEdit ? "تم تحديث أمر الشراء" : "تم إنشاء أمر الشراء");
       }
 
-      if (!isEdit && savedId) navigate(`/purchase/edit/${savedId}`, { replace: true });
+      // تسجيل المورد المحفوظ — يُستخدم في الضغطة التالية لتقرير "نفس المورد ⇒ تحديث"
+      lastSavedSupplierRef.current = supplierId;
+      if (!isEdit && savedId) {
+        // استبدل الرابط بدون إعادة تحميل — useParams لن يتحدّث، لذلك نعتمد على lastSavedSupplierRef في الضغطة التالية
+        window.history.replaceState({}, "", `/purchase/edit/${savedId}`);
+      }
     } catch (e: any) {
       toast.error(e.message);
     } finally {
       setSaving(false);
+      isSavingRef.current = false;
     }
   }
 

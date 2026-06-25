@@ -852,13 +852,48 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     const validRows = rows.filter((r) => r.product_id);
     if (!validRows.length) { toast.error("أضف منتجاً واحداً على الأقل"); return false; }
 
+    // ============================================================
+    // ميزة موحّدة: "تحديث بدل التكرار" + "رقم عشوائي عند تغيّر العميل"
+    //   - إذا سبق حفظ المستند في هذه الجلسة (lastSavedIdRef مضبوط)
+    //     ولم يتغيّر العميل عمّا حُفظ → عاملها كتعديل (UPDATE) لنفس السجل.
+    //   - إذا تغيّر العميل عن المحفوظ → أنشئ سجلاً جديداً برقم عشوائي جديد
+    //     لتفادي أي خلط/تكرار. (يشمل POS عند تغيّر walk-in name).
+    // هذا يمنع تكرار الإدراج عند الضغط المتكرر على زر الحفظ بعد replaceState.
+    // ============================================================
+    let effectiveEditId: string | undefined = editId;
+    let effectiveInvoiceNumber = invoiceNumber;
+    const newCustomerKey = pos
+      ? `pos:${(walkInName || "").trim() || "_"}`
+      : (activeCustomer ? `c:${activeCustomer.id}` : "_none_");
+    const savedCustomerKey = pos
+      ? `pos:${(walkInName || "").trim() || "_"}` // POS: المفتاح هو اسم walk-in
+      : (savedCustomerId ? `c:${savedCustomerId}` : "_none_");
+    if (!effectiveEditId && lastSavedIdRef.current) {
+      if (savedCustomerKey === newCustomerKey) {
+        effectiveEditId = lastSavedIdRef.current;
+      } else {
+        // عميل مختلف → فاتورة جديدة برقم عشوائي جديد
+        lastSavedIdRef.current = null;
+        setSavedInvoiceId(null);
+        savedRef.current = false;
+        const _prefix = pos
+          ? ((company as any)?.pos_invoice_prefix || "POS-")
+          : (company?.invoice_prefix || "INV-");
+        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+        effectiveInvoiceNumber = await generateRandomDocNumber("invoices", "invoice_number", _prefix, {
+          scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+        });
+        setInvoiceNumber(effectiveInvoiceNumber);
+      }
+    }
+
     setSaving(true);
     try {
       // احسب حالة الدفع بناءً على المبلغ المدفوع المحفوظ والإجمالي الجديد
       // - كاش: مدفوع بالكامل
       // - غير ذلك: حافظ على paid_amount السابق (إن وُجد)، ثم احسب الحالة:
       //   paid >= total => paid، paid > 0 => partially_paid، وإلا pending
-      const prevPaid = editId ? Math.max(0, Number(savedPaid) || 0) : 0;
+      const prevPaid = effectiveEditId ? Math.max(0, Number(savedPaid) || 0) : 0;
       const computedPaid = isCash ? totals.total : prevPaid;
       const computedDue = Math.max(0, Number(totals.total || 0) - computedPaid);
       // هامش تسامح 0.01 لمنع أخطاء التقريب في تحديد الحالة
@@ -868,7 +903,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         : computedPaid > 0.01 ? "partial" : "pending";
 
       const payload: any = {
-        invoice_number: invoiceNumber,
+        invoice_number: effectiveInvoiceNumber,
         customer_id: pos ? null : (activeCustomer ? activeCustomer.id : null),
         type: (isCash || pos) ? "cash" : "sale",
         date: invoiceDate,
@@ -888,14 +923,14 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         ...(pos ? { source: "pos", walk_in_customer_name: walkInName.trim() || "عميل نقدي" } : {}),
       };
 
-      let invId = editId;
+      let invId = effectiveEditId;
       let oldItems: Array<{ product_id: string | null; quantity: number }> = [];
       // احسب البصمة الحالية للبنود وقارنها بالأصلية المحمَّلة من قاعدة البيانات
       const currentItemsHash = invoiceItemsHash(validRows);
-      const itemsUnchanged = !!editId && originalItemsHashRef.current !== null && originalItemsHashRef.current === currentItemsHash;
+      const itemsUnchanged = !!effectiveEditId && originalItemsHashRef.current !== null && originalItemsHashRef.current === currentItemsHash;
       let recordExisted = true;
 
-      if (editId) {
+      if (effectiveEditId) {
         // منع التكرار في وضع التعديل: لو التعديل يطابق فاتورة أخرى لنفس العميل/اليوم/البنود
         if (activeCustomer?.id) {
           const itemsForHash = validRows.map((r) => ({
@@ -907,7 +942,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
               _customer_id: activeCustomer.id,
               _date: invoiceDate,
               _items: itemsForHash,
-              _exclude_invoice_id: editId,
+              _exclude_invoice_id: effectiveEditId,
             });
             const dupRow = Array.isArray(dup) ? dup[0] : dup;
             if (dupRow?.id) {
@@ -928,7 +963,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         const { data: updated, error } = await supabase
           .from("invoices")
           .update(payload)
-          .eq("id", editId)
+          .eq("id", effectiveEditId)
           .select("id");
         if (error) throw error;
         if (!updated || updated.length === 0) {
@@ -940,9 +975,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           const { data: prev } = await supabase
             .from("invoice_items")
             .select("product_id, quantity")
-            .eq("invoice_id", editId);
+            .eq("invoice_id", effectiveEditId);
           oldItems = (prev || []).map((p: any) => ({ product_id: p.product_id, quantity: p.quantity }));
-          await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: editId });
+          await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: effectiveEditId });
         }
       }
 
@@ -988,13 +1023,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         })();
         let attempt = 0;
         let lastError: any = null;
-        let currentNumber = invoiceNumber;
+        let currentNumber = effectiveInvoiceNumber;
         while (attempt < 5) {
           const tryPayload = { ...payload, invoice_number: currentNumber };
           const { data, error } = await supabase.from("invoices").insert(tryPayload).select("id,invoice_number").single();
           if (!error) {
             invId = data.id;
-            if (data.invoice_number !== invoiceNumber) {
+            if (data.invoice_number !== effectiveInvoiceNumber) {
               setInvoiceNumber(data.invoice_number);
               toast.message(`تم تعديل رقم الفاتورة إلى ${data.invoice_number} لتفادي التكرار`);
             }
@@ -1085,7 +1120,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       }
 
       if (!opts.silent) {
-        toast.success(editId ? "تم تحديث الفاتورة" : "تم حفظ الفاتورة");
+        toast.success(effectiveEditId ? "تم تحديث الفاتورة" : "تم حفظ الفاتورة");
       }
       savedRef.current = true;
       lastSavedIdRef.current = invId!;
@@ -1099,12 +1134,12 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       setSavedCustomerId(activeCustomer ? activeCustomer.id : null);
       // إذا كنّا في وضع الإنشاء وتم الحفظ بنجاح، بدّل العنوان لوضع التعديل
       // حتى لا يُنشئ الضغط على "حفظ" مجدداً فاتورة جديدة
-      if (!editId && invId) {
+      if (!effectiveEditId && invId) {
         const editPath = isCash ? `/invoices/cash/edit/${invId}` : `/invoices/edit/${invId}`;
         window.history.replaceState({}, "", editPath);
       }
       // تحديث dbId للصفوف المحلية لتتوافق مع الواقع في قاعدة البيانات
-      if (!editId && invId) {
+      if (!effectiveEditId && invId) {
         // بعد الإنشاء: اقرأ البنود المحفوظة لتحديث dbId
         supabase.from("invoice_items").select("id,product_id").eq("invoice_id", invId).then(({ data: dbItems }) => {
           if (dbItems) {
