@@ -22,13 +22,17 @@ export default function AccountsPage() {
   const typeMap: Record<string, string> = { bank: "بنكي", cash: "نقدي", mobile: "محفظة إلكترونية" };
 
   const handleSubmit = async () => {
-    if (!form.name) { toast.error("اسم الحساب مطلوب"); return; }
+    if (savingRef.current) return;
+    if (!form.name.trim()) { toast.error("اسم الحساب مطلوب"); return; }
+    if (form.account_type === "bank" && !form.bank_name.trim()) { toast.error("اسم البنك مطلوب للحساب البنكي"); return; }
+    savingRef.current = true; setSaving(true);
     try {
       if (editId) { await update.mutateAsync({ id: editId, ...form }); toast.success("تم التحديث"); }
       else { await insert.mutateAsync(form); toast.success("تم الإضافة"); }
       setShowForm(false); setEditId(null);
       setForm({ name: "", account_number: "", account_type: "bank", bank_name: "", description: "" });
     } catch (e: any) { toast.error(e.message); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   const inputCls = "bg-muted rounded-lg px-4 py-2.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary w-full";
