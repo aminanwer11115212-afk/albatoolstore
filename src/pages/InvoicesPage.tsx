@@ -502,7 +502,7 @@ export default function InvoicesPage() {
                         <button
                           type="button"
                           className="btn-xs btn-success"
-                          onClick={() => navigate(`/invoices/view/${inv.id}`)}
+                          onClick={() => navigate((inv.source === "pos") ? `/invoices/cash/edit/${inv.id}` : `/invoices/view/${inv.id}`)}
                           title="عرض"
                         >
                           📄 عرض
@@ -518,7 +518,7 @@ export default function InvoicesPage() {
                         <button
                           type="button"
                           className="btn-xs btn-warning"
-                          onClick={() => navigate(`/invoices/edit/${inv.id}`)}
+                          onClick={() => navigate((inv.source === "pos") ? `/invoices/cash/edit/${inv.id}` : `/invoices/edit/${inv.id}`)}
                           title="تعديل"
                         >
                           ✎ تعديل

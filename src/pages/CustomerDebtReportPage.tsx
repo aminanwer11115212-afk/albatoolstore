@@ -36,7 +36,8 @@ export default function CustomerDebtReportPage() {
       const { data: invs, error: iErr } = await supabase
         .from("invoices")
         .select("customer_id, total, paid_amount")
-        .in("customer_id", ids);
+        .in("customer_id", ids)
+        .neq("source", "pos");
       if (iErr) throw iErr;
 
       const map = new Map<string, { due: number; count: number }>();

@@ -2327,7 +2327,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
 
                     setClearConfirmOpen(false);
                     setClearing(false);
-                    navigate("/invoices/create", { replace: true });
+                    navigate(pos ? "/invoices/cash/list" : "/invoices/create", { replace: true });
                     return;
                   }
 
