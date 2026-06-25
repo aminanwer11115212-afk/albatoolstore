@@ -923,14 +923,14 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         ...(pos ? { source: "pos", walk_in_customer_name: walkInName.trim() || "عميل نقدي" } : {}),
       };
 
-      let invId = editId;
+      let invId = effectiveEditId;
       let oldItems: Array<{ product_id: string | null; quantity: number }> = [];
       // احسب البصمة الحالية للبنود وقارنها بالأصلية المحمَّلة من قاعدة البيانات
       const currentItemsHash = invoiceItemsHash(validRows);
-      const itemsUnchanged = !!editId && originalItemsHashRef.current !== null && originalItemsHashRef.current === currentItemsHash;
+      const itemsUnchanged = !!effectiveEditId && originalItemsHashRef.current !== null && originalItemsHashRef.current === currentItemsHash;
       let recordExisted = true;
 
-      if (editId) {
+      if (effectiveEditId) {
         // منع التكرار في وضع التعديل: لو التعديل يطابق فاتورة أخرى لنفس العميل/اليوم/البنود
         if (activeCustomer?.id) {
           const itemsForHash = validRows.map((r) => ({
