@@ -20,14 +20,12 @@ const LOGO_URL =
 const DEFAULT_APP_ORIGIN = "https://albatoolstore.lovable.app";
 
 // Allowlist of origins permitted as redirect targets. Anything else falls back to DEFAULT_APP_ORIGIN.
-// Also allows any *.lovable.app preview origin so that share links opened from
-// the in-app preview route to the correct preview host.
+// Customer links must never redirect to Lovable preview hosts because those can
+// require a Lovable login. Only the public published app origin is allowed by default.
 const ALLOWED_APP_ORIGINS = new Set<string>(
   [
     DEFAULT_APP_ORIGIN,
     "https://albatool.lovable.app",
-    "https://preview--albatoolstore.lovable.app",
-    "https://preview--albatool.lovable.app",
     Deno.env.get("PUBLIC_APP_URL"),
   ].filter((v): v is string => !!v).map((v) => v.replace(/\/$/, "")),
 );
@@ -36,11 +34,6 @@ function pickAppOriginLoose(raw: string | null): string {
   const candidate = (raw || "").replace(/\/$/, "");
   if (!candidate) return DEFAULT_APP_ORIGIN;
   if (ALLOWED_APP_ORIGINS.has(candidate)) return candidate;
-  // Accept any *.lovable.app sub-origin to support dynamic preview hosts.
-  try {
-    const u = new URL(candidate);
-    if (u.protocol === "https:" && /\.lovable\.app$/i.test(u.hostname)) return candidate;
-  } catch { /* ignore */ }
   return DEFAULT_APP_ORIGIN;
 }
 
