@@ -687,11 +687,17 @@ export default function PurchaseCreatePage() {
         toast.success(isEdit ? "تم تحديث أمر الشراء" : "تم إنشاء أمر الشراء");
       }
 
-      if (!isEdit && savedId) navigate(`/purchase/edit/${savedId}`, { replace: true });
+      // تسجيل المورد المحفوظ — يُستخدم في الضغطة التالية لتقرير "نفس المورد ⇒ تحديث"
+      lastSavedSupplierRef.current = supplierId;
+      if (!isEdit && savedId) {
+        // استبدل الرابط بدون إعادة تحميل — useParams لن يتحدّث، لذلك نعتمد على lastSavedSupplierRef في الضغطة التالية
+        window.history.replaceState({}, "", `/purchase/edit/${savedId}`);
+      }
     } catch (e: any) {
       toast.error(e.message);
     } finally {
       setSaving(false);
+      isSavingRef.current = false;
     }
   }
 
