@@ -25,8 +25,8 @@ const statusMap: Record<string, { label: string; cls: string }> = {
   draft:     { label: "جديد",   cls: "st-draft" },
 };
 
-export default function InvoicesPage() {
-  usePageRenderCount("/invoices");
+export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } = {}) {
+  usePageRenderCount(posOnly ? "/invoices/cash/list" : "/invoices");
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -38,7 +38,7 @@ export default function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [workflowFilter, setWorkflowFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "regular" | "pos">("regular");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "regular" | "pos">(posOnly ? "pos" : "regular");
   const { data: invoices, isLoading, refetch } = useInvoicesWithCustomers();
   const { remove } = useInvoices();
   const { data: companyArr } = useCompanySettings();
