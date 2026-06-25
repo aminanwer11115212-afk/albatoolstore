@@ -373,6 +373,8 @@ export default function QuoteCreatePage() {
   const itemsScrollRef = useRef<HTMLDivElement>(null);
   const savedRef = useRef(false);
   const lastSavedIdRef = useRef<string | null>(null);
+  // العميل المحفوظ في آخر حفظ ناجح — لاكتشاف "تغيّر العميل ⇒ عرض سعر جديد"
+  const lastSavedCustomerRef = useRef<string | null>(null);
   // بصمة البنود كما حُمِّلت من قاعدة البيانات؛ تُستخدم لتخطّي إعادة كتابة البنود إن لم تتغيّر
   const originalItemsHashRef = useRef<string | null>(null);
   // يُرفع عند حذف العرض من قاعدة البيانات أو تحويله إلى فاتورة أثناء الجلسة الحالية،
