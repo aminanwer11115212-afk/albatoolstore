@@ -615,7 +615,9 @@ export default function PurchaseCreatePage() {
             digits: 5 + extraDigits,
           });
         };
-        let candidate = orderNumber && orderNumber.startsWith(prefix) ? orderNumber : await buildNextNumber();
+        // إذا كانت "إعادة حفظ بعد تغيير المورد" فالرقم القديم يخص أمر آخر — ولّد جديداً
+        const reuseExisting = !!orderNumber && orderNumber.startsWith(prefix) && !!lastSavedSupplierRef.current === false;
+        let candidate = reuseExisting ? orderNumber : await buildNextNumber();
         let attempt = 0;
         let createdRow: any = null;
         while (attempt < 5) {
