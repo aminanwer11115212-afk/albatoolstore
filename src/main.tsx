@@ -24,8 +24,18 @@ if (!rootEl) {
   throw new Error("Root element #root not found in document");
 }
 
-createRoot(rootEl).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
-);
+// رابط العميل: مسار مستقل تماماً — يُركَّب بدون App ولا Providers
+// (لا Sidebar، لا React Query، لا Router، لا PWA install prompt).
+// فقط: صفحة واحدة فيها معاينة المستند + زر طباعة + زر تحميل PDF.
+const shareMatch = window.location.pathname.match(/^\/share\/document\/([^/?#]+)/);
+if (shareMatch) {
+  import("./pages/StandaloneShareDocument").then(({ default: Standalone }) => {
+    createRoot(rootEl).render(<Standalone token={decodeURIComponent(shareMatch[1])} />);
+  });
+} else {
+  createRoot(rootEl).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
