@@ -261,79 +261,30 @@ Deno.serve(async (req) => {
   }
 
   if (!isPreviewBot) {
-    // Real browser: proxy the full standalone HTML from `document-share`
-    // server-side and return it directly. This gives the customer a single
-    // self-contained page (header + items + totals + print button) with NO
-    // connection to the React app — no sidebar, no PWA install prompt, no
-    // app routing. We fetch with the apikey + Authorization headers so the
-    // Supabase gateway doesn't downgrade the response to sandboxed
-    // text/plain (which is what made the customer see raw code).
-    const proxyUrl =
-      `${supabaseUrlEnv.replace(/\/$/, "")}/functions/v1/document-share?token=${encodeURIComponent(token)}`;
-    try {
-      const upstream = await fetch(proxyUrl, {
-        method: "GET",
-        headers: {
-          "apikey": anonKey,
-          "Authorization": `Bearer ${anonKey}`,
-          "Accept": "text/html",
-          "User-Agent": "document-share-meta-proxy/1.0",
-        },
-      });
-      let html = await upstream.text();
-      // Inject a Print button into the document toolbar so every doc type
-      // has one (some templates only ship the PDF button). We insert
-      // immediately after the opening `<div class="toolbar">` tag.
-      const printBtn =
-        `<button type="button" onclick="window.print()" style="background:#10b981;color:#fff;border:0;padding:10px 22px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;min-width:160px;">🖨️ طباعة</button>`;
-      if (/<div class="toolbar"[^>]*>/.test(html)) {
-        html = html.replace(/<div class="toolbar"([^>]*)>/, `<div class="toolbar"$1>${printBtn}`);
-      }
-      logRedirectEvent({
-        trace_id: traceId,
-        ts: new Date().toISOString(),
-        kind: "browser-redirect",
-        status: upstream.status,
-        token_present: !!token,
-        target: proxyUrl,
-        user_agent: userAgent.slice(0, 200),
-        is_bot: false,
-      });
-      return new Response(new TextEncoder().encode(html), {
-        status: upstream.status,
-        headers: {
-          ...corsHeaders,
-          "content-type": "text/html; charset=UTF-8",
-          "cache-control": "no-store, must-revalidate",
-          "x-content-type-options": "nosniff",
-          "x-share-trace-id": traceId,
-          "x-share-redirect": "browser-proxy",
-        },
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      logRedirectEvent({
-        trace_id: traceId,
-        ts: new Date().toISOString(),
-        kind: "error",
-        status: 502,
-        token_present: !!token,
-        target: proxyUrl,
-        user_agent: userAgent.slice(0, 200),
-        is_bot: false,
-        error: msg,
-      });
-      const errHtml = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تعذّر فتح المستند</title><style>body{font-family:Tahoma,sans-serif;background:#f3f4f6;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:12px;padding:32px;text-align:center;max-width:480px;box-shadow:0 4px 16px rgba(0,0,0,.08)}h1{color:#b91c1c;font-size:18px;margin:0 0 12px}p{color:#555;font-size:14px;margin:0 0 8px}</style></head><body><div class="card"><h1>تعذّر فتح المستند</h1><p>قد يكون الرابط منتهي الصلاحية أو أن هناك مشكلة مؤقتة.</p><p style="color:#888;font-size:12px">${escapeHtml(traceId)}</p></div></body></html>`;
-      return new Response(new TextEncoder().encode(errHtml), {
-        status: 502,
-        headers: {
-          ...corsHeaders,
-          "content-type": "text/html; charset=UTF-8",
-          "cache-control": "no-store",
-          "x-share-trace-id": traceId,
-        },
-      });
-    }
+    // Real browser: 302 to the standalone share page on the app origin.
+    // That page (mounted directly from main.tsx, bypassing the app shell)
+    // fetches the document HTML and shows ONLY a Print/PDF toolbar — no
+    // sidebar, no PWA install prompt, no app providers.
+    logRedirectEvent({
+      trace_id: traceId,
+      ts: new Date().toISOString(),
+      kind: "browser-redirect",
+      status: 302,
+      token_present: !!token,
+      target: targetUrl,
+      user_agent: userAgent.slice(0, 200),
+      is_bot: false,
+    });
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders,
+        location: targetUrl,
+        "cache-control": "no-store, must-revalidate",
+        "x-share-trace-id": traceId,
+        "x-share-redirect": "browser-302-standalone",
+      },
+    });
   }
 
 
