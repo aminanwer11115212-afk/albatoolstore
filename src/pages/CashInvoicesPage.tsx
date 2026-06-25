@@ -1,11 +1,14 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Printer, Trash2, RefreshCw, Search, ArrowRight, MessageCircle } from "lucide-react";
+import { Plus, Printer, Trash2, RefreshCw, Search, ArrowRight, MessageCircle, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useInvoices, useCompanySettings } from "@/hooks/useData";
+import { useInvoices, useCompanySettings, useAccounts } from "@/hooks/useData";
 import { startsWithMatch } from "@/utils/searchMatch";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { computePaymentStatus } from "@/utils/paymentValidation";
 
 type CashInv = {
   id: string;
