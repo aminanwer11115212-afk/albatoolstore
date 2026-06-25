@@ -549,7 +549,10 @@ export default function ReadyToShipPanel({
           }
           lastAnchorIdRef.current = inv.id;
         }}
-        style={focusedRowId === inv.id ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : undefined}
+        style={{
+          ...(focusedRowId === inv.id ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : {}),
+          ...(inv.source === "pos" ? { background: "hsl(38 92% 50% / 0.08)", borderRight: "3px solid hsl(38 92% 50%)" } : {}),
+        }}
       >
         <td className="cell-idx">{idx + 1}</td>
         <td className="cell-check">
@@ -570,9 +573,27 @@ export default function ReadyToShipPanel({
           />
         </td>
         <td className="cell-name">
-          {tab === "by_customer"
-            ? (inv.invoice_number || "—")
-            : (inv.customers?.name || "كاش")}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {inv.source === "pos" && (
+              <span
+                style={{
+                  background: "hsl(38 92% 50%)",
+                  color: "hsl(0 0% 100%)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: "1px 5px",
+                  borderRadius: 4,
+                  letterSpacing: 0.3,
+                }}
+                title="فاتورة كاش (نقطة بيع)"
+              >
+                POS
+              </span>
+            )}
+            {tab === "by_customer"
+              ? (inv.invoice_number || "—")
+              : (inv.customers?.name || "كاش")}
+          </span>
         </td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
           <SearchableSelect
