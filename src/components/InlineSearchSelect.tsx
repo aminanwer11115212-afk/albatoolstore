@@ -184,6 +184,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
         };
         return createPortal(
           <div
+            ref={menuRef}
             className="bg-card border-2 border-primary rounded shadow-lg ring-2 ring-primary/40"
             style={style}
             onKeyDown={handleMenuKey}
