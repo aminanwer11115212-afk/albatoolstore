@@ -1047,7 +1047,7 @@ export default function StockReturnCreatePage() {
                     >
                       <span>{p.name}</span>
                       <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
-                        {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                        {Number(p.stock_quantity).toLocaleString()}
                       </span>
                     </div>
                   ))}
@@ -1220,7 +1220,7 @@ export default function StockReturnCreatePage() {
                                 >
                                   <span>{p.name}</span>
                                   <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
-                                    {Number(p.stock_quantity) > 0 ? Number(p.stock_quantity).toLocaleString() : "0"}
+                                    {Number(p.stock_quantity).toLocaleString()}
                                   </span>
                                 </div>
                               ))}
