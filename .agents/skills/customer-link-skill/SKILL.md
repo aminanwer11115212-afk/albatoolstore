@@ -23,10 +23,9 @@ The customer must never see raw HTML or a code page. Every share link must open 
    - `document-share-meta` returns OG meta tags to bots and **302-redirects real browsers** to `<appOrigin>/share/document/<tok>` (the React `PublicDocumentSharePage`).
    - Never point WhatsApp at `/functions/v1/document-share` directly: the Supabase gateway forces sandbox CSP + `text/plain` on browser hits, which is what makes the customer see raw code.
 
-3. **React preview page** — `src/pages/PublicDocumentSharePage.tsx` (route `/share/document/:token`):
-   - Fetches HTML from `document-share` with `apikey` + `Authorization: Bearer <anon>` headers.
-   - Renders the HTML in an `<iframe srcDoc>` (so the gateway content-type does not matter).
-   - Toolbar has **طباعة (Print)** via `iframe.contentWindow.print()` and **تحميل PDF** via `html2pdf.js`.
+3. **Standalone share page** — `src/pages/StandaloneShareDocument.tsx`, mounted by `src/main.tsx` when `window.location.pathname` matches `/share/document/:token`. It is rendered **before/instead of `<App />`**, so it has NO QueryClient, NO BrowserRouter, NO Sidebar/Header, NO PWA install prompt, NO Toaster — just a tiny inline toolbar (Print + Download PDF) and an `<iframe srcDoc>` with the document HTML fetched from `document-share` (with `apikey` + `Authorization: Bearer <anon>` headers).
+   - **Do NOT** route this path through `App.tsx` providers — that's what made the customer see the app shell.
+   - `src/pages/PublicDocumentSharePage.tsx` is legacy; the main.tsx short-circuit wins.
 
 4. **document-share edge function** builds the actual document HTML matching the in-app preview (header, items table, totals, account summary, notes) — keep parity with `src/utils/printTemplate.ts` and statement preview templates.
 
