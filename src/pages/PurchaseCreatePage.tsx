@@ -603,9 +603,9 @@ export default function PurchaseCreatePage() {
           product_id: r.product_id, quantity: Number(r.quantity || 0),
         }));
 
-        const { error } = await (supabase as any).from("purchase_orders").update(payload).eq("id", orderId);
+        const { error } = await (supabase as any).from("purchase_orders").update(payload).eq("id", savedId);
         if (error) throw error;
-        await supabase.from("purchase_order_items").delete().eq("purchase_order_id", orderId);
+        await supabase.from("purchase_order_items").delete().eq("purchase_order_id", savedId);
       } else {
         const prefix = company?.purchase_prefix || "PO-";
         // رقم افتراضي عشوائي لكل أمر شراء جديد لتفادي التكرار
