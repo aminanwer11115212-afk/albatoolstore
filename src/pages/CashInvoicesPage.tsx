@@ -422,6 +422,12 @@ export default function CashInvoicesPage() {
                     <MessageCircle size={12} /> واتساب
                   </button>
                   <button
+                    onClick={() => openPayment(r)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                  >
+                    <CreditCard size={12} /> تسجيل دفع
+                  </button>
+                  <button
                     onClick={() => handleDelete(r.id)}
                     className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                   >
