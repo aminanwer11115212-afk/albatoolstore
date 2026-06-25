@@ -41,7 +41,7 @@ export default function TransactionsPage() {
   const resetForm = () => setForm({ type: "income", amount: "", description: "", category: "", bank_name: "", account_id: "", customer_id: "", supplier_id: "", method: "cash", reference_no: "", date: new Date().toISOString().split("T")[0], debit: "", credit: "" });
 
   const handleSubmit = async () => {
-    // Only the amount is required — all other fields are optional
+    if (savingRef.current) return;
     const amount = parseFloat(form.amount);
     if (!amount || amount <= 0) { toast.error("الرجاء إدخال المبلغ"); return; }
     if (form.method === "bank") {
@@ -49,6 +49,13 @@ export default function TransactionsPage() {
       const err = validateBankTransferPayment({ method: "bank", account: selectedAcc, referenceNo: form.reference_no });
       if (err) { toast.error(err); return; }
     }
+    // Pre-flight balance check for expense
+    if (form.type === "expense" && form.account_id) {
+      const acc = (accounts as any[])?.find((a: any) => a.id === form.account_id);
+      const bal = Number(acc?.balance || 0);
+      if (bal < amount) { toast.error(`الرصيد غير كافٍ — المتاح: ${bal.toLocaleString()}`); return; }
+    }
+    savingRef.current = true; setSaving(true);
     try {
       const refSuffix = form.method === "bank" && form.reference_no.trim() ? ` - رقم العملية: ${form.reference_no.trim()}` : "";
       const finalDescription = `${form.description || (form.type === "income" ? "شحن رصيد" : "خصم رصيد")}${refSuffix}`;
@@ -69,6 +76,7 @@ export default function TransactionsPage() {
       setShowForm(false);
       resetForm();
     } catch (e: any) { toast.error(e.message); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   const inputCls = "bg-muted rounded-lg px-4 py-2.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary w-full";
