@@ -2234,6 +2234,48 @@ export type Database = {
         }
         Relationships: []
       }
+      share_link_events: {
+        Row: {
+          actor: string | null
+          created_at: string
+          doc_id: string | null
+          doc_type: string
+          event: string
+          id: string
+          ip: string | null
+          meta: Json
+          referer: string | null
+          token: string
+          user_agent: string | null
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          doc_id?: string | null
+          doc_type: string
+          event: string
+          id?: string
+          ip?: string | null
+          meta?: Json
+          referer?: string | null
+          token: string
+          user_agent?: string | null
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          doc_id?: string | null
+          doc_type?: string
+          event?: string
+          id?: string
+          ip?: string | null
+          meta?: Json
+          referer?: string | null
+          token?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       states: {
         Row: {
           created_at: string

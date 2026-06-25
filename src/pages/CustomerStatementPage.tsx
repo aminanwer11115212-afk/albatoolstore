@@ -54,6 +54,7 @@ export default function CustomerStatementPage() {
         .from("invoices")
         .select("*")
         .eq("customer_id", selectedCustomerId)
+        .neq("source", "pos")
         .order("date", { ascending: false });
       if (error) throw error;
       return data;

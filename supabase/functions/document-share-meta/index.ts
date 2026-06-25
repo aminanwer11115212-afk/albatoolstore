@@ -253,11 +253,36 @@ Deno.serve(async (req) => {
     });
   }
 
+  // سجِّل الحدث في DB (لا نوقف الاستجابة عند الفشل)
+  async function persistEvent(kind: "viewed" | "bot_meta") {
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const admin = createClient(supabaseUrl, serviceKey);
+      const { data: tk } = await admin
+        .from("document_share_tokens")
+        .select("doc_type, doc_id")
+        .eq("token", token)
+        .maybeSingle();
+      const ip =
+        req.headers.get("cf-connecting-ip") ||
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        req.headers.get("x-real-ip") || "";
+      await admin.from("share_link_events").insert({
+        token,
+        doc_type: tk?.doc_type || "unknown",
+        doc_id: tk?.doc_id || null,
+        event: kind,
+        user_agent: userAgent.slice(0, 500),
+        ip: ip.slice(0, 64),
+        referer: (req.headers.get("referer") || "").slice(0, 500),
+        meta: { trace_id: traceId },
+      });
+    } catch { /* ignore */ }
+  }
+
   if (!isPreviewBot) {
-    // Real browser: 302 to the standalone share page on the app origin.
-    // That page (mounted directly from main.tsx, bypassing the app shell)
-    // fetches the document HTML and shows ONLY a Print/PDF toolbar — no
-    // sidebar, no PWA install prompt, no app providers.
+    if (token) await persistEvent("viewed");
     logRedirectEvent({
       trace_id: traceId,
       ts: new Date().toISOString(),
@@ -280,7 +305,7 @@ Deno.serve(async (req) => {
     });
   }
 
-
+  if (token) await persistEvent("bot_meta");
   logRedirectEvent({
     trace_id: traceId,
     ts: new Date().toISOString(),

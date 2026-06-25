@@ -37,9 +37,27 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
       .finally(() => setLoading(false));
   }, [token]);
 
+  function logEvent(event: "viewed" | "printed" | "downloaded") {
+    try {
+      fetch(`${SUPABASE_URL}/functions/v1/log-share-event`, {
+        method: "POST",
+        headers: { "content-type": "application/json", apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
+        body: JSON.stringify({ token, event }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch { /* ignore */ }
+  }
+
+  // سجِّل أن العميل فتح الصفحة فعلياً (مكمّل لحدث viewed عند الـ redirect)
+  useEffect(() => {
+    if (!loading && !error && html) logEvent("viewed");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, html]);
+
   const handlePrint = () => {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
+    logEvent("printed");
     win.focus();
     win.print();
   };
@@ -52,6 +70,7 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
       const body = doc?.body?.cloneNode(true) as HTMLElement | undefined;
       if (!body) throw new Error("تعذّر قراءة المحتوى");
       const html2pdf = (await import("html2pdf.js")).default;
+      logEvent("downloaded");
       await html2pdf()
         .set({
           margin: 10,
