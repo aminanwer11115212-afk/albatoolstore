@@ -970,6 +970,7 @@ export default function QuoteCreatePage() {
     if (!opts.silent) toast.success(effectiveEditId && recordExisted ? "تم تحديث عرض السعر" : "تم حفظ عرض السعر");
     savedRef.current = true;
     lastSavedIdRef.current = qid!;
+    lastSavedCustomerRef.current = activeCustomer!.id;
     // إذا كنّا في وضع الإنشاء وتم الحفظ بنجاح، بدّل العنوان لوضع التعديل
     // حتى لا يُنشئ الضغط على "حفظ" مجدداً عرض سعر جديد
     if (!editId && qid) {
