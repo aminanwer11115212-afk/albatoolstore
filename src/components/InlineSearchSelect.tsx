@@ -41,6 +41,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useImperativeHandle(ref, () => ({
     focus: () => btnRef.current?.focus(),
@@ -56,7 +57,11 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: Event) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      // القائمة مرسومة عبر portal إلى body، فلا تكفي wrapRef وحدها
+      if (wrapRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("touchstart", onDoc);
@@ -179,6 +184,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
         };
         return createPortal(
           <div
+            ref={menuRef}
             className="bg-card border-2 border-primary rounded shadow-lg ring-2 ring-primary/40"
             style={style}
             onKeyDown={handleMenuKey}
