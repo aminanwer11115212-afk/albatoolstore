@@ -80,6 +80,14 @@ export default function TrialBalancePage() {
     <article className="content">
       <div className="legacy-card card-block">
         <h5>ميزان المراجعة {baseSymbol && `(${baseSymbol})`}</h5>
+        <div
+          className="legacy-alert legacy-alert-info"
+          style={{ marginBottom: 8, fontSize: 13 }}
+        >
+          ℹ️ يعتمد على حركات «المعاملات» على <strong>الأساس النقدي</strong>.
+          الفواتير والمشتريات غير المدفوعة لا تُدرَج كالتزامات هنا — راجع
+          تقرير المبالغ المستحقة وكشوف الموردين للذمم المعلَّقة.
+        </div>
         <hr />
         <div className="legacy-form-horizontal" style={{ marginBottom: "1rem" }}>
           <div className="legacy-form-row"><label className="legacy-form-label">من</label><div className="legacy-form-control-wrap"><input type="date" className="legacy-control" value={from} onChange={(e) => setFrom(e.target.value)} /></div></div>
