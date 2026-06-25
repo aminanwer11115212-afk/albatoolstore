@@ -1120,7 +1120,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       }
 
       if (!opts.silent) {
-        toast.success(editId ? "تم تحديث الفاتورة" : "تم حفظ الفاتورة");
+        toast.success(effectiveEditId ? "تم تحديث الفاتورة" : "تم حفظ الفاتورة");
       }
       savedRef.current = true;
       lastSavedIdRef.current = invId!;
@@ -1134,12 +1134,12 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       setSavedCustomerId(activeCustomer ? activeCustomer.id : null);
       // إذا كنّا في وضع الإنشاء وتم الحفظ بنجاح، بدّل العنوان لوضع التعديل
       // حتى لا يُنشئ الضغط على "حفظ" مجدداً فاتورة جديدة
-      if (!editId && invId) {
+      if (!effectiveEditId && invId) {
         const editPath = isCash ? `/invoices/cash/edit/${invId}` : `/invoices/edit/${invId}`;
         window.history.replaceState({}, "", editPath);
       }
       // تحديث dbId للصفوف المحلية لتتوافق مع الواقع في قاعدة البيانات
-      if (!editId && invId) {
+      if (!effectiveEditId && invId) {
         // بعد الإنشاء: اقرأ البنود المحفوظة لتحديث dbId
         supabase.from("invoice_items").select("id,product_id").eq("invoice_id", invId).then(({ data: dbItems }) => {
           if (dbItems) {
