@@ -60,6 +60,6 @@ curl -sI "https://<supabase>/functions/v1/document-share-meta?token=<tok>&origin
 - ❌ Pointing WhatsApp at `/functions/v1/document-share` (sandbox CSP → raw code).
 - ❌ Building the share URL client-side instead of using the server response.
 - ❌ Forgetting to add a new doc_type to ALL FOUR files (token creator, share renderer, meta wrapper, client util).
-- ❌ Allowing `origin` to be an arbitrary host — `pickAppOriginLoose` only accepts `*.lovable.app` or the env `PUBLIC_APP_URL`.
+- ❌ Allowing `origin` to be an arbitrary host — `pickAppOriginLoose` only accepts the published app origin or the env `PUBLIC_APP_URL`.
 - ❌ Allowing preview origins for customers — `id-preview--*.lovable.app` / `preview--*.lovable.app` can trigger Lovable login.
 - ❌ Setting TTL > 720h — server clamps but client should pass ≤ 24 for "expires after a day".

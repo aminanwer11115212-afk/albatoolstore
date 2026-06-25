@@ -93,7 +93,7 @@ describe("shareDocumentViaWhatsApp", () => {
     expect(url).toBe(SHARE_URL);
     expect(lastFetchUrl()).toBe(`${SUPA_URL}/functions/v1/create-document-share-token`);
     const body = lastFetchBody();
-    expect(body).toMatchObject({ doc_type: "invoice", doc_id: "inv-1", ttl_hours: 168 });
+    expect(body).toMatchObject({ doc_type: "invoice", doc_id: "inv-1", ttl_hours: 24 });
     expect(body.hidden_sections).toBeUndefined();
 
     expect(openWhatsApp).toHaveBeenCalledTimes(1);
@@ -236,8 +236,8 @@ describe("shareDocumentViaWhatsApp", () => {
     expect(toastErr).toHaveBeenCalled();
   });
 
-  it("ttlHours الافتراضي = 168 ساعة (7 أيام) عند عدم تمريره", async () => {
+  it("ttlHours الافتراضي = 24 ساعة عند عدم تمريره", async () => {
     await shareDocumentViaWhatsApp({ docType: "invoice", docId: "x" });
-    expect(lastFetchBody().ttl_hours).toBe(168);
+    expect(lastFetchBody().ttl_hours).toBe(24);
   });
 });
