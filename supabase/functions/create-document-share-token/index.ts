@@ -79,6 +79,18 @@ Deno.serve(async (req) => {
     });
     if (insErr) throw insErr;
 
+    // سجِّل حدث "إنشاء" لمعرفة من ولّد الرابط ومتى.
+    const ua = req.headers.get("user-agent") || "";
+    const ip =
+      req.headers.get("cf-connecting-ip") ||
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") || "";
+    await admin.from("share_link_events").insert({
+      token: tok, doc_type: docType, doc_id: docId, event: "created",
+      actor: userId, user_agent: ua.slice(0, 500), ip: ip.slice(0, 64),
+      meta: { ttl_hours: ttlHours, expires_at: expiresAt },
+    }).then(() => {}, () => {});
+
     // روابط العملاء يجب أن تفتح على الرابط المنشور العام فقط.
     // لا نستخدم Origin القادم من واجهة المعاينة لأنه قد يكون id-preview/preview
     // ويتطلب تسجيل دخول في Lovable عند فتحه خارج جلسة المطوّر.
