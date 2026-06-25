@@ -893,7 +893,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       // - كاش: مدفوع بالكامل
       // - غير ذلك: حافظ على paid_amount السابق (إن وُجد)، ثم احسب الحالة:
       //   paid >= total => paid، paid > 0 => partially_paid، وإلا pending
-      const prevPaid = editId ? Math.max(0, Number(savedPaid) || 0) : 0;
+      const prevPaid = effectiveEditId ? Math.max(0, Number(savedPaid) || 0) : 0;
       const computedPaid = isCash ? totals.total : prevPaid;
       const computedDue = Math.max(0, Number(totals.total || 0) - computedPaid);
       // هامش تسامح 0.01 لمنع أخطاء التقريب في تحديد الحالة
