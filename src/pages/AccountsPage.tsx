@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useAccounts } from "@/hooks/useData";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ export default function AccountsPage() {
   const [form, setForm] = useState({ name: "", account_number: "", account_type: "bank", bank_name: "", description: "" });
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const { data: accounts, isLoading, insert, update, remove } = useAccounts();
 
   const filtered = (accounts || []).filter((a: any) => !search || startsWithAny([a.name, a.account_number], search));
