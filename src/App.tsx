@@ -253,7 +253,7 @@ const App = () => {
             <Route path="/invoices/cash" element={lazyEl(<InvoiceCreatePage pos />, "مبيعات كاش (نقطة بيع)")} />
             <Route path="/invoices/cash/new" element={lazyEl(<InvoiceCreatePage pos />, "فاتورة كاش جديدة")} />
             <Route path="/invoices/cash/edit/:id" element={lazyEl(<InvoiceCreatePage pos />, "تعديل فاتورة كاش")} />
-            <Route path="/invoices/cash/list" element={lazyEl(<CashInvoicesPage />, "إدارة فواتير الكاش")} />
+            <Route path="/invoices/cash/list" element={lazyEl(<InvoicesPage posOnly />, "إدارة فواتير الكاش")} />
             <Route path="/invoices/cash/migrate-numbers" element={lazyEl(<MigratePosNumbersPage />, "ترحيل ترقيم فواتير الكاش")} />
             <Route path="/invoices/:id/packaging" element={lazyEl(<InvoicePackagingPage />, "تغليف الفاتورة")} />
             <Route path="/invoices/:id/transport" element={lazyEl(<InvoiceTransportPage />, "ترحيل الفاتورة")} />
