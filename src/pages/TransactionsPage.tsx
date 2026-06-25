@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Search, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTransactionsWithAccounts, useAccounts, useTransactions, useCustomers, useSuppliers } from "@/hooks/useData";
 import { toast } from "sonner";
@@ -13,6 +13,8 @@ export default function TransactionsPage() {
   const [form, setForm] = useState({ type: "income", amount: "", description: "", category: "", bank_name: "", account_id: "", customer_id: "", supplier_id: "", method: "cash", reference_no: "", date: new Date().toISOString().split("T")[0], debit: "", credit: "" });
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const { data: transactions, isLoading } = useTransactionsWithAccounts();
   const { data: accounts } = useAccounts();
