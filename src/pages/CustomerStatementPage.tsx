@@ -66,13 +66,25 @@ export default function CustomerStatementPage() {
     queryKey: ["customer-transactions", selectedCustomerId],
     queryFn: async () => {
       if (!selectedCustomerId) return [];
+      // 1) IDs of POS (cash) invoices for this customer — used to exclude
+      //    their linked payment transactions from the regular statement.
+      const { data: posInvs } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("customer_id", selectedCustomerId)
+        .eq("source", "pos");
+      const posIds = new Set((posInvs || []).map((r: any) => r.id));
+
       const { data, error } = await supabase
         .from("transactions")
         .select("*")
         .eq("customer_id", selectedCustomerId)
         .order("date", { ascending: false });
       if (error) throw error;
-      return data;
+      // Exclude any transaction whose reference_id points to a POS invoice
+      // (payments / cash-credit رصيد) so cash sales never bleed into the
+      // regular customer statement.
+      return (data || []).filter((t: any) => !t.reference_id || !posIds.has(t.reference_id));
     },
     enabled: !!selectedCustomerId,
   });

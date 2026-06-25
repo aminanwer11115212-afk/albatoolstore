@@ -108,6 +108,17 @@ export default function IncomeStatementPage() {
           title={`قائمة الدخل ${baseSymbol ? `(${baseSymbol})` : ""}`}
           periodText={`من ${from} إلى ${to}`}
         />
+        <div
+          data-section="basis-note"
+          data-section-label="ملاحظة الأساس"
+          className="legacy-alert legacy-alert-info"
+          style={{ marginBottom: 12, fontSize: 13 }}
+        >
+          ℹ️ هذا التقرير على <strong>الأساس النقدي</strong> — يعتمد على
+          المعاملات الفعلية في «المعاملات» فقط (إيرادات/مصروفات مُسجَّلة).
+          الفواتير غير المدفوعة لا تُحتسب كإيراد هنا؛ راجع كشف حساب العميل
+          أو تقرير المبالغ المستحقة لمعرفة الذمم المعلَّقة.
+        </div>
         <div data-section="filters" data-section-label="الفلاتر" className="legacy-form-horizontal" style={{ marginBottom: "1rem" }}>
           <div className="legacy-form-row"><label className="legacy-form-label">من</label><div className="legacy-form-control-wrap"><input type="date" className="legacy-control" value={from} onChange={(e) => setFrom(e.target.value)} /></div></div>
           <div className="legacy-form-row"><label className="legacy-form-label">إلى</label><div className="legacy-form-control-wrap"><input type="date" className="legacy-control" value={to} onChange={(e) => setTo(e.target.value)} /></div></div>
