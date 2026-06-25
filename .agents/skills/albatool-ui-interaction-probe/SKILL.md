@@ -46,12 +46,27 @@ description: "تشغيل سَبر تفاعلي حقيقي عبر Playwright لك
 
 ### مصفوفة الصفحات الأساسية (الترتيب الموصى به)
 
-1. `/customers` — Dialog عميل: ولاية/مدينة/منطقة/مجموعة/ناقل/وجهة (cascading + quick-add).
-2. `/products` — Dialog منتج: فئة/ماركة/شركة.
-3. `/quotes/new` و `/invoices/new` — جدول بنود + InlineSearchSelect لكل خلية.
-4. `/dispatch` — التابات + اختيار ناقل/وجهة في الصف.
-5. `/suppliers`, `/employees`, `/warehouses` — Dialogs مماثلة.
-6. `/finance/*` — حقول التواريخ والحسابات.
+| # | المسار | زر الإضافة | الحاوية | ملاحظات |
+|---|---|---|---|---|
+| 1 | `/customers` | **«عميل جديد»** (ليس «إضافة عميل») — `src/pages/CustomersPage.tsx:783` | **`Sheet`** على الموبايل، panel inline على الديسكتوب (ليس `[role="dialog"]`) — أيضاً اختصار **F9** يفتحها | حقول cascading: ولاية→مدينة→منطقة + مجموعة/ناقل/وجهة. F9 = طريق احتياطي مضمون. |
+| 2 | `/products` | **«+ منتج جديد»** — `ProductsPage.tsx:1173` | `[role="dialog"]` قياسي | فئة/ماركة/شركة |
+| 3 | `/invoices/create` و `/quotes/create` | الصفحة نفسها نموذج (no-Dialog) | inline | جدول بنود + InlineSearchSelect لكل خلية |
+| 4 | `/invoices/cash/new` | inline | inline | POS — تأكد من عزل الدفعات |
+| 5 | `/purchase/create` و `/stock-return/create` | inline | inline | InlineSearchSelect للمورد/المنتج |
+| 6 | `/dispatch` | تابات + اختيار صف | inline | راجع `albatool-dispatch-page-audit` |
+| 7 | `/suppliers`, `/employees`, `/warehouses` | Dialog | `[role="dialog"]` | |
+| 8 | `/finance/*` | — | — | حقول تواريخ وحسابات فقط |
+
+### قاعدة كشف زر الإضافة (لتجنّب الالتباس مع "Add")
+
+استخدم محاولات مرتّبة، أولها يفلح أوّلاً:
+
+1. مطابقة دقيقة بالاسم العربي المُوثَّق أعلاه (مثل `name="عميل جديد"`).
+2. fallback: `page.locator('button:visible:has-text("جديد"), button:visible:has-text("إضافة")').first`.
+3. fallback أخير على الصفحات ذات الاختصار: أرسل `F9` (للعملاء) — هذا هو المسار الرسمي وموثّق في `CustomersPage.tsx:128`.
+4. بعد النقر، تحقّق من ظهور إحدى الحاويات الثلاث: `[role="dialog"]:visible`, `[role="alertdialog"]:visible`, أو `[data-state="open"][role="region"]:visible` (Sheet). إن لم تظهر أيٌّ منها → ابحث عن نموذج inline يحوي `input[name],[placeholder*="اسم"]` ظهر حديثاً.
+
+
 
 ### Skeleton الجاهز
 
