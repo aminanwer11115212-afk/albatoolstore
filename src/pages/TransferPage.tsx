@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAccounts, useTransactions } from "@/hooks/useData";
 import { toast } from "sonner";
 
@@ -6,8 +6,11 @@ export default function TransferPage() {
   const { data: accounts } = useAccounts();
   const { insert } = useTransactions();
   const [form, setForm] = useState({ from_account: "", to_account: "", amount: "", description: "", date: new Date().toISOString().split("T")[0] });
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const submit = async () => {
+    if (savingRef.current) return;
     if (!form.from_account || !form.to_account || !form.amount) { toast.error("جميع الحقول مطلوبة"); return; }
     if (form.from_account === form.to_account) { toast.error("لا يمكن التحويل لنفس الحساب"); return; }
     const amount = parseFloat(form.amount);
@@ -18,11 +21,14 @@ export default function TransferPage() {
       toast.error(`الرصيد غير كافٍ — المتاح: ${fromBalance.toLocaleString()}`);
       return;
     }
+    savingRef.current = true; setSaving(true);
     try {
-      await insert.mutateAsync({ type: "transfer", amount, description: form.description || "تحويل بين حسابات", account_id: form.from_account, to_account_id: form.to_account, date: form.date, debit: amount, credit: 0 });
+      // type='transfer' + both account ids → recompute_account_balance handles both sides
+      await insert.mutateAsync({ type: "transfer", amount, description: form.description || "تحويل بين حسابات", account_id: form.from_account, to_account_id: form.to_account, date: form.date, debit: 0, credit: 0 });
       toast.success("تم التحويل بنجاح");
       setForm({ from_account: "", to_account: "", amount: "", description: "", date: new Date().toISOString().split("T")[0] });
     } catch (e: any) { toast.error(e.message); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   return (
@@ -63,7 +69,7 @@ export default function TransferPage() {
           </div>
           <div className="legacy-form-row">
             <label className="legacy-form-label"></label>
-            <div className="legacy-form-control-wrap"><button onClick={submit} className="legacy-btn legacy-btn-success">حفظ التحويل</button></div>
+            <div className="legacy-form-control-wrap"><button onClick={submit} disabled={saving} className="legacy-btn legacy-btn-success" style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "جارٍ الحفظ..." : "حفظ التحويل"}</button></div>
           </div>
         </div>
       </div>
