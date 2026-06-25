@@ -942,7 +942,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
               _customer_id: activeCustomer.id,
               _date: invoiceDate,
               _items: itemsForHash,
-              _exclude_invoice_id: editId,
+              _exclude_invoice_id: effectiveEditId,
             });
             const dupRow = Array.isArray(dup) ? dup[0] : dup;
             if (dupRow?.id) {
