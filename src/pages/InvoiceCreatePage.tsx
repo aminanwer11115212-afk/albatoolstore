@@ -903,7 +903,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         : computedPaid > 0.01 ? "partial" : "pending";
 
       const payload: any = {
-        invoice_number: invoiceNumber,
+        invoice_number: effectiveInvoiceNumber,
         customer_id: pos ? null : (activeCustomer ? activeCustomer.id : null),
         type: (isCash || pos) ? "cash" : "sale",
         date: invoiceDate,
