@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useAccounts } from "@/hooks/useData";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ export default function AccountsPage() {
   const [form, setForm] = useState({ name: "", account_number: "", account_type: "bank", bank_name: "", description: "" });
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const { data: accounts, isLoading, insert, update, remove } = useAccounts();
 
   const filtered = (accounts || []).filter((a: any) => !search || startsWithAny([a.name, a.account_number], search));
@@ -20,13 +22,17 @@ export default function AccountsPage() {
   const typeMap: Record<string, string> = { bank: "بنكي", cash: "نقدي", mobile: "محفظة إلكترونية" };
 
   const handleSubmit = async () => {
-    if (!form.name) { toast.error("اسم الحساب مطلوب"); return; }
+    if (savingRef.current) return;
+    if (!form.name.trim()) { toast.error("اسم الحساب مطلوب"); return; }
+    if (form.account_type === "bank" && !form.bank_name.trim()) { toast.error("اسم البنك مطلوب للحساب البنكي"); return; }
+    savingRef.current = true; setSaving(true);
     try {
       if (editId) { await update.mutateAsync({ id: editId, ...form }); toast.success("تم التحديث"); }
       else { await insert.mutateAsync(form); toast.success("تم الإضافة"); }
       setShowForm(false); setEditId(null);
       setForm({ name: "", account_number: "", account_type: "bank", bank_name: "", description: "" });
     } catch (e: any) { toast.error(e.message); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   const inputCls = "bg-muted rounded-lg px-4 py-2.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary w-full";
@@ -56,8 +62,8 @@ export default function AccountsPage() {
             <input placeholder="وصف" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inputCls} />
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSubmit} className="bg-primary text-primary-foreground px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90">{editId ? "تحديث" : "إضافة"}</button>
-            <button onClick={() => setShowForm(false)} className="bg-muted text-muted-foreground px-6 py-2 rounded-lg text-sm">إلغاء</button>
+            <button onClick={handleSubmit} disabled={saving} className="bg-primary text-primary-foreground px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed">{saving ? "جارٍ الحفظ..." : (editId ? "تحديث" : "إضافة")}</button>
+            <button onClick={() => setShowForm(false)} disabled={saving} className="bg-muted text-muted-foreground px-6 py-2 rounded-lg text-sm">إلغاء</button>
           </div>
         </div>
       )}

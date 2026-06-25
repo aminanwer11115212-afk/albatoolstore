@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Search, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTransactionsWithAccounts, useAccounts, useTransactions, useCustomers, useSuppliers } from "@/hooks/useData";
 import { toast } from "sonner";
@@ -13,6 +13,8 @@ export default function TransactionsPage() {
   const [form, setForm] = useState({ type: "income", amount: "", description: "", category: "", bank_name: "", account_id: "", customer_id: "", supplier_id: "", method: "cash", reference_no: "", date: new Date().toISOString().split("T")[0], debit: "", credit: "" });
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const { data: transactions, isLoading } = useTransactionsWithAccounts();
   const { data: accounts } = useAccounts();
@@ -39,7 +41,7 @@ export default function TransactionsPage() {
   const resetForm = () => setForm({ type: "income", amount: "", description: "", category: "", bank_name: "", account_id: "", customer_id: "", supplier_id: "", method: "cash", reference_no: "", date: new Date().toISOString().split("T")[0], debit: "", credit: "" });
 
   const handleSubmit = async () => {
-    // Only the amount is required — all other fields are optional
+    if (savingRef.current) return;
     const amount = parseFloat(form.amount);
     if (!amount || amount <= 0) { toast.error("الرجاء إدخال المبلغ"); return; }
     if (form.method === "bank") {
@@ -47,6 +49,13 @@ export default function TransactionsPage() {
       const err = validateBankTransferPayment({ method: "bank", account: selectedAcc, referenceNo: form.reference_no });
       if (err) { toast.error(err); return; }
     }
+    // Pre-flight balance check for expense
+    if (form.type === "expense" && form.account_id) {
+      const acc = (accounts as any[])?.find((a: any) => a.id === form.account_id);
+      const bal = Number(acc?.balance || 0);
+      if (bal < amount) { toast.error(`الرصيد غير كافٍ — المتاح: ${bal.toLocaleString()}`); return; }
+    }
+    savingRef.current = true; setSaving(true);
     try {
       const refSuffix = form.method === "bank" && form.reference_no.trim() ? ` - رقم العملية: ${form.reference_no.trim()}` : "";
       const finalDescription = `${form.description || (form.type === "income" ? "شحن رصيد" : "خصم رصيد")}${refSuffix}`;
@@ -67,6 +76,7 @@ export default function TransactionsPage() {
       setShowForm(false);
       resetForm();
     } catch (e: any) { toast.error(e.message); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   const inputCls = "bg-muted rounded-lg px-4 py-2.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary w-full";
@@ -134,8 +144,8 @@ export default function TransactionsPage() {
             <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputCls} />
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSubmit} className="bg-primary text-primary-foreground px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90">إضافة</button>
-            <button onClick={() => setShowForm(false)} className="bg-muted text-muted-foreground px-6 py-2 rounded-lg text-sm">إلغاء</button>
+            <button onClick={handleSubmit} disabled={saving} className="bg-primary text-primary-foreground px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed">{saving ? "جارٍ الحفظ..." : "إضافة"}</button>
+            <button onClick={() => setShowForm(false)} disabled={saving} className="bg-muted text-muted-foreground px-6 py-2 rounded-lg text-sm">إلغاء</button>
           </div>
         </div>
       )}
