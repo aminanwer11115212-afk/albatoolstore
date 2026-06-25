@@ -1,11 +1,14 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Printer, Trash2, RefreshCw, Search, ArrowRight, MessageCircle } from "lucide-react";
+import { Plus, Printer, Trash2, RefreshCw, Search, ArrowRight, MessageCircle, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useInvoices, useCompanySettings } from "@/hooks/useData";
+import { useInvoices, useCompanySettings, useAccounts } from "@/hooks/useData";
 import { startsWithMatch } from "@/utils/searchMatch";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { computePaymentStatus } from "@/utils/paymentValidation";
 
 type CashInv = {
   id: string;
@@ -24,8 +27,18 @@ export default function CashInvoicesPage() {
   const navigate = useNavigate();
   const { remove } = useInvoices();
   const { data: companyArr } = useCompanySettings();
+  const { data: accounts } = useAccounts();
   const currency = companyArr?.[0]?.currency || "SDG";
   const [rows, setRows] = useState<CashInv[]>([]);
+  // Payment dialog state
+  const [payInv, setPayInv] = useState<CashInv | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState<string>("cash");
+  const [payAccount, setPayAccount] = useState<string>("");
+  const [payDate, setPayDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [payRef, setPayRef] = useState("");
+  const [payNote, setPayNote] = useState("");
+  const [paySubmitting, setPaySubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -154,6 +167,55 @@ export default function CashInvoicesPage() {
     });
   };
 
+  const openPayment = (r: CashInv) => {
+    const due = Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0));
+    setPayInv(r);
+    setPayAmount(String(due > 0 ? due : r.total || 0));
+    setPayMethod("cash");
+    const accs = (accounts as any[]) || [];
+    const cashAcc = accs.find((a) => /cash|نقد/i.test(a?.type || "") || /نقد|كاش/.test(a?.name || ""));
+    setPayAccount(cashAcc?.id || accs[0]?.id || "");
+    setPayDate(new Date().toISOString().slice(0, 10));
+    setPayRef("");
+    setPayNote(`دفعة لفاتورة كاش ${r.invoice_number}`);
+  };
+
+  const submitPayment = async () => {
+    if (!payInv || paySubmitting) return;
+    const raw = parseFloat(String(payAmount).trim());
+    if (!isFinite(raw) || raw <= 0) { toast.error("أدخل مبلغًا صحيحًا"); return; }
+    const isBank = payMethod === "bank" || payMethod === "bank_transfer" || payMethod === "mada";
+    if (isBank && !payRef.trim()) { toast.error("أدخل رقم العملية / المرجع"); return; }
+    if (!payAccount) { toast.error("اختر حسابًا"); return; }
+    setPaySubmitting(true);
+    try {
+      const total = Number(payInv.total) || 0;
+      const alreadyPaid = Number(payInv.paid_amount) || 0;
+      const newPaid = Math.min(total, alreadyPaid + raw);
+      const newDue = Math.max(0, total - newPaid);
+      const newSt = computePaymentStatus(newPaid, total);
+      const refSuffix = isBank && payRef.trim() ? ` - مرجع: ${payRef.trim()}` : "";
+      const note = `${payNote || ""}${refSuffix}`.trim();
+      const { error: upErr } = await supabase.from("invoices").update({
+        paid_amount: newPaid, due_amount: newDue, status: newSt, payment_method: payMethod,
+      }).eq("id", payInv.id);
+      if (upErr) throw upErr;
+      const { error: txErr } = await supabase.from("transactions").insert({
+        type: "income", amount: raw, date: payDate, description: note,
+        account_id: payAccount, reference_id: payInv.id,
+      });
+      if (txErr) throw txErr;
+      toast.success("تم تسجيل الدفعة");
+      setRows((p) => p.map((x) => x.id === payInv.id ? { ...x, paid_amount: newPaid, status: newSt } : x));
+      setPayInv(null);
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+    } catch (e: any) {
+      toast.error(`فشل تسجيل الدفعة: ${e?.message || "خطأ"}`);
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
+
   const reload = () => fetchPage(0, true);
 
 
@@ -267,7 +329,7 @@ export default function CashInvoicesPage() {
               <th className="p-2 text-right">التاريخ</th>
               <th className="p-2 text-right">العميل النقدي</th>
               <th className="p-2 text-right">الإجمالي</th>
-              <th className="p-2 text-center" style={{ width: 140 }}>إجراءات</th>
+              <th className="p-2 text-center" style={{ width: 200 }}>إجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -292,6 +354,13 @@ export default function CashInvoicesPage() {
                         title="طباعة / معاينة"
                       >
                         <Printer size={14} />
+                      </button>
+                      <button
+                        onClick={() => openPayment(r)}
+                        className="p-1.5 rounded-md hover:bg-muted text-primary"
+                        title="تسجيل دفع (كاش / مدى / تحويل)"
+                      >
+                        <CreditCard size={14} />
                       </button>
                       <button
                         onClick={() => handleWhatsApp(r)}
@@ -353,6 +422,12 @@ export default function CashInvoicesPage() {
                     <MessageCircle size={12} /> واتساب
                   </button>
                   <button
+                    onClick={() => openPayment(r)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                  >
+                    <CreditCard size={12} /> تسجيل دفع
+                  </button>
+                  <button
                     onClick={() => handleDelete(r.id)}
                     className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                   >
@@ -382,6 +457,111 @@ export default function CashInvoicesPage() {
           )}
         </div>
       )}
+
+      {/* Payment dialog */}
+      <Dialog open={!!payInv} onOpenChange={(o) => !o && setPayInv(null)}>
+        <DialogContent dir="rtl" className="font-cairo max-w-md">
+          <DialogHeader>
+            <DialogTitle>تسجيل دفعة — {payInv?.invoice_number}</DialogTitle>
+          </DialogHeader>
+          {payInv && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="p-2 rounded-md bg-muted">
+                  <div className="text-muted-foreground">الإجمالي</div>
+                  <div className="font-bold">{Number(payInv.total || 0).toLocaleString("ar-EG")}</div>
+                </div>
+                <div className="p-2 rounded-md bg-muted">
+                  <div className="text-muted-foreground">المدفوع</div>
+                  <div className="font-bold">{Number(payInv.paid_amount || 0).toLocaleString("ar-EG")}</div>
+                </div>
+                <div className="p-2 rounded-md bg-muted">
+                  <div className="text-muted-foreground">المتبقي</div>
+                  <div className="font-bold">{Math.max(0, Number(payInv.total || 0) - Number(payInv.paid_amount || 0)).toLocaleString("ar-EG")}</div>
+                </div>
+              </div>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">طريقة الدفع</span>
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                  style={{ fontSize: 16 }}
+                >
+                  <option value="cash">كاش</option>
+                  <option value="mada">مدى</option>
+                  <option value="bank_transfer">تحويل بنكي</option>
+                  <option value="bank">شيك / بنك</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">المبلغ ({currency})</span>
+                <input
+                  type="number"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                  style={{ fontSize: 16 }}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">الحساب</span>
+                <select
+                  value={payAccount}
+                  onChange={(e) => setPayAccount(e.target.value)}
+                  className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                  style={{ fontSize: 16 }}
+                >
+                  <option value="">— اختر —</option>
+                  {((accounts as any[]) || []).map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">التاريخ</span>
+                  <input
+                    type="date"
+                    value={payDate}
+                    onChange={(e) => setPayDate(e.target.value)}
+                    className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                    style={{ fontSize: 16 }}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">رقم المرجع / العملية</span>
+                  <input
+                    type="text"
+                    value={payRef}
+                    onChange={(e) => setPayRef(e.target.value)}
+                    placeholder={payMethod === "mada" ? "رقم عملية مدى" : ""}
+                    className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                    style={{ fontSize: 16 }}
+                  />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-xs text-muted-foreground">ملاحظات</span>
+                <input
+                  type="text"
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                  className="w-full mt-1 px-2 py-2 rounded-md border border-border bg-background text-foreground"
+                  style={{ fontSize: 16 }}
+                />
+              </label>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPayInv(null)} disabled={paySubmitting}>إلغاء</Button>
+            <Button onClick={submitPayment} disabled={paySubmitting}>
+              {paySubmitting ? "جارٍ الحفظ…" : "حفظ الدفعة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
