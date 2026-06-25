@@ -852,6 +852,41 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     const validRows = rows.filter((r) => r.product_id);
     if (!validRows.length) { toast.error("أضف منتجاً واحداً على الأقل"); return false; }
 
+    // ============================================================
+    // ميزة موحّدة: "تحديث بدل التكرار" + "رقم عشوائي عند تغيّر العميل"
+    //   - إذا سبق حفظ المستند في هذه الجلسة (lastSavedIdRef مضبوط)
+    //     ولم يتغيّر العميل عمّا حُفظ → عاملها كتعديل (UPDATE) لنفس السجل.
+    //   - إذا تغيّر العميل عن المحفوظ → أنشئ سجلاً جديداً برقم عشوائي جديد
+    //     لتفادي أي خلط/تكرار. (يشمل POS عند تغيّر walk-in name).
+    // هذا يمنع تكرار الإدراج عند الضغط المتكرر على زر الحفظ بعد replaceState.
+    // ============================================================
+    let effectiveEditId: string | undefined = editId;
+    let effectiveInvoiceNumber = invoiceNumber;
+    const newCustomerKey = pos
+      ? `pos:${(walkInName || "").trim() || "_"}`
+      : (activeCustomer ? `c:${activeCustomer.id}` : "_none_");
+    const savedCustomerKey = pos
+      ? `pos:${(walkInName || "").trim() || "_"}` // POS: المفتاح هو اسم walk-in
+      : (savedCustomerId ? `c:${savedCustomerId}` : "_none_");
+    if (!effectiveEditId && lastSavedIdRef.current) {
+      if (savedCustomerKey === newCustomerKey) {
+        effectiveEditId = lastSavedIdRef.current;
+      } else {
+        // عميل مختلف → فاتورة جديدة برقم عشوائي جديد
+        lastSavedIdRef.current = null;
+        setSavedInvoiceId(null);
+        savedRef.current = false;
+        const _prefix = pos
+          ? ((company as any)?.pos_invoice_prefix || "POS-")
+          : (company?.invoice_prefix || "INV-");
+        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+        effectiveInvoiceNumber = await generateRandomDocNumber("invoices", "invoice_number", _prefix, {
+          scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+        });
+        setInvoiceNumber(effectiveInvoiceNumber);
+      }
+    }
+
     setSaving(true);
     try {
       // احسب حالة الدفع بناءً على المبلغ المدفوع المحفوظ والإجمالي الجديد
