@@ -115,7 +115,7 @@ export default function ReadyToShipPanel({
     queryFn: async () => {
       // الأعمدة المُحتملة في جدول invoices — نُصفّيها حسب ما هو موجود فعلاً
       // لتفادي فشل الاستعلام بصمت عند إضافة/حذف عمود في القاعدة.
-      const wanted = "id, invoice_number, date, total, currency_code, workflow_status, paid_amount, customer_id, packaging_total_pieces";
+      const wanted = "id, invoice_number, date, total, currency_code, workflow_status, paid_amount, customer_id, packaging_total_pieces, source";
       const safeCols = await filterSelectColumns("invoices", wanted);
       // ملاحظة: لا نستخدم embed لـ invoice_transports لأنه لا توجد FK مُعرّفة بينه
       // وبين invoices في القاعدة (PostgREST PGRST200). نجلبه بطلب منفصل ونُدمجه يدوياً.
