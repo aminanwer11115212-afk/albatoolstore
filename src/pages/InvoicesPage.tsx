@@ -349,6 +349,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
               );
             })}
           </div>
+          )}
 
           {/* Mobile toolbar */}
           <div className="mobile-toolbar">
