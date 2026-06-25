@@ -329,7 +329,7 @@ export default function CashInvoicesPage() {
               <th className="p-2 text-right">التاريخ</th>
               <th className="p-2 text-right">العميل النقدي</th>
               <th className="p-2 text-right">الإجمالي</th>
-              <th className="p-2 text-center" style={{ width: 140 }}>إجراءات</th>
+              <th className="p-2 text-center" style={{ width: 200 }}>إجراءات</th>
             </tr>
           </thead>
           <tbody>
