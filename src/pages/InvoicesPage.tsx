@@ -234,7 +234,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
   const fmtMoney = (n: any) => Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <article className="content invoices-compact">
+    <article className={`content invoices-compact ${posOnly ? "invoices-cash-theme" : "invoices-regular-theme"}`}>
       <style>{`
         .invoices-compact { font-size: 11px; }
         .invoices-compact .legacy-card { padding: 6px; }
@@ -253,13 +253,29 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
         .invoices-compact .st-paid, .invoices-compact .st-partial, .invoices-compact .st-due,
         .invoices-compact .st-overdue, .invoices-compact .st-canceled, .invoices-compact .st-draft { padding: 1px 6px; font-size: 10px; }
         .invoices-compact .workflow-select { height: 22px; font-size: 10px; padding: 1px 4px; }
+        /* === Visual theme: regular invoices (blue/primary) === */
+        .invoices-regular-theme .legacy-card { border-top: 3px solid hsl(var(--primary)); }
+        /* === Visual theme: cash invoices (amber) === */
+        .invoices-cash-theme .legacy-card { border-top: 3px solid hsl(38 92% 50%); background: hsl(38 92% 50% / 0.03); }
+        .invoices-cash-theme .legacy-table tbody tr:hover { background: hsl(38 92% 50% / 0.08) !important; }
+        .invoices-cash-theme .page-badge {
+          background: hsl(38 92% 50%); color: hsl(0 0% 100%);
+          font-size: 10px; font-weight: 700; padding: 2px 8px;
+          border-radius: 6px; letter-spacing: 0.5px;
+        }
+        .invoices-regular-theme .page-badge {
+          background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+          font-size: 10px; font-weight: 700; padding: 2px 8px;
+          border-radius: 6px; letter-spacing: 0.5px;
+        }
         ${mobileDocListCSS}
       `}</style>
       <div className="legacy-card">
         <div className="grid_3 grid_4 table-responsive">
           <h5 style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              الفواتير
+              <span className="page-badge">{posOnly ? "🛒 كاش" : "📄 حسابات"}</span>
+              {posOnly ? "إدارة فواتير الكاش" : "إدارة الفواتير"}
               <button
                 type="button"
                 id="btn-open-dispatch"
@@ -278,6 +294,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
             </span>
           </h5>
           <hr />
+
 
           {/* Workflow status filter chips */}
           <div className="flex flex-wrap gap-2 mb-3" dir="rtl">

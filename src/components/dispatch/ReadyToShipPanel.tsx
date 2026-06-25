@@ -115,7 +115,7 @@ export default function ReadyToShipPanel({
     queryFn: async () => {
       // الأعمدة المُحتملة في جدول invoices — نُصفّيها حسب ما هو موجود فعلاً
       // لتفادي فشل الاستعلام بصمت عند إضافة/حذف عمود في القاعدة.
-      const wanted = "id, invoice_number, date, total, currency_code, workflow_status, paid_amount, customer_id, packaging_total_pieces";
+      const wanted = "id, invoice_number, date, total, currency_code, workflow_status, paid_amount, customer_id, packaging_total_pieces, source";
       const safeCols = await filterSelectColumns("invoices", wanted);
       // ملاحظة: لا نستخدم embed لـ invoice_transports لأنه لا توجد FK مُعرّفة بينه
       // وبين invoices في القاعدة (PostgREST PGRST200). نجلبه بطلب منفصل ونُدمجه يدوياً.
@@ -549,7 +549,10 @@ export default function ReadyToShipPanel({
           }
           lastAnchorIdRef.current = inv.id;
         }}
-        style={focusedRowId === inv.id ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : undefined}
+        style={{
+          ...(focusedRowId === inv.id ? { outline: "2px solid hsl(var(--primary))", outlineOffset: -2 } : {}),
+          ...(inv.source === "pos" ? { background: "hsl(38 92% 50% / 0.08)", borderRight: "3px solid hsl(38 92% 50%)" } : {}),
+        }}
       >
         <td className="cell-idx">{idx + 1}</td>
         <td className="cell-check">
@@ -570,9 +573,27 @@ export default function ReadyToShipPanel({
           />
         </td>
         <td className="cell-name">
-          {tab === "by_customer"
-            ? (inv.invoice_number || "—")
-            : (inv.customers?.name || "كاش")}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {inv.source === "pos" && (
+              <span
+                style={{
+                  background: "hsl(38 92% 50%)",
+                  color: "hsl(0 0% 100%)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: "1px 5px",
+                  borderRadius: 4,
+                  letterSpacing: 0.3,
+                }}
+                title="فاتورة كاش (نقطة بيع)"
+              >
+                POS
+              </span>
+            )}
+            {tab === "by_customer"
+              ? (inv.invoice_number || "—")
+              : (inv.customers?.name || "كاش")}
+          </span>
         </td>
         <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
           <SearchableSelect
