@@ -79,7 +79,10 @@ Deno.serve(async (req) => {
     });
     if (insErr) throw insErr;
 
-    const appOrigin = (req.headers.get("origin") || Deno.env.get("PUBLIC_APP_URL") || "").replace(/\/$/, "");
+    // روابط العملاء يجب أن تفتح على الرابط المنشور العام فقط.
+    // لا نستخدم Origin القادم من واجهة المعاينة لأنه قد يكون id-preview/preview
+    // ويتطلب تسجيل دخول في Lovable عند فتحه خارج جلسة المطوّر.
+    const appOrigin = (Deno.env.get("PUBLIC_APP_URL") || "https://albatoolstore.lovable.app").replace(/\/$/, "");
     // Use the meta wrapper edge function so messaging apps (WhatsApp, etc.)
     // get our custom Open Graph preview (logo + customer name) instead of
     // the generic Lovable preview. Real browsers are redirected to the

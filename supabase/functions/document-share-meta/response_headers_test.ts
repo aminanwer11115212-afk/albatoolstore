@@ -16,7 +16,8 @@ const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_PUBLISHABLE_KEY")!;
 
 const FN_URL = `${SUPABASE_URL}/functions/v1/document-share-meta`;
 const TEST_TOKEN = "test-headers-token-does-not-need-to-exist";
-const TEST_ORIGIN = "https://example.test";
+const TEST_ORIGIN = "https://albatoolstore.lovable.app";
+const PREVIEW_ORIGIN = "https://id-preview--6bb54d5d-228c-4959-ae23-8bb1b02bd990.lovable.app";
 
 const WHATSAPP_UA =
   "WhatsApp/2.23.20.0 A";
@@ -29,6 +30,19 @@ async function callFn(userAgent: string): Promise<Response> {
   return await fetch(url, {
     method: "GET",
     redirect: "manual", // لا تتبع 302 — نريد فحص رؤوسه
+    headers: {
+      "user-agent": userAgent,
+      "apikey": SUPABASE_ANON_KEY,
+      "authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+}
+
+async function callFnWithOrigin(userAgent: string, origin: string): Promise<Response> {
+  const url = `${FN_URL}?token=${encodeURIComponent(TEST_TOKEN)}&origin=${encodeURIComponent(origin)}`;
+  return await fetch(url, {
+    method: "GET",
+    redirect: "manual",
     headers: {
       "user-agent": userAgent,
       "apikey": SUPABASE_ANON_KEY,
@@ -97,5 +111,20 @@ Deno.test("Regular browser: 302 redirect to /share/document/<token>", async () =
   assert(
     !contentType.includes("text/html"),
     `browser redirect should not be text/html, got: ${contentType}`,
+  );
+});
+
+Deno.test("Regular browser: preview origins are forced to published public app", async () => {
+  const res = await callFnWithOrigin(BROWSER_UA, PREVIEW_ORIGIN);
+  await res.text();
+
+  assertEquals(res.status, 302, "expected 302 for regular browser");
+
+  const location = res.headers.get("location") || "";
+  const expected = `https://albatoolstore.lovable.app/share/document/${encodeURIComponent(TEST_TOKEN)}`;
+  assertEquals(
+    location,
+    expected,
+    `expected preview origin to be replaced with published app, got: ${location}`,
   );
 });
