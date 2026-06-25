@@ -963,7 +963,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         const { data: updated, error } = await supabase
           .from("invoices")
           .update(payload)
-          .eq("id", editId)
+          .eq("id", effectiveEditId)
           .select("id");
         if (error) throw error;
         if (!updated || updated.length === 0) {
@@ -975,9 +975,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           const { data: prev } = await supabase
             .from("invoice_items")
             .select("product_id, quantity")
-            .eq("invoice_id", editId);
+            .eq("invoice_id", effectiveEditId);
           oldItems = (prev || []).map((p: any) => ({ product_id: p.product_id, quantity: p.quantity }));
-          await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: editId });
+          await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: effectiveEditId });
         }
       }
 
