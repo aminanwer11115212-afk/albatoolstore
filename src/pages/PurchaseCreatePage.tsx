@@ -258,6 +258,9 @@ export default function PurchaseCreatePage() {
   const [notes, setNotes] = useState("");
   const [userNote, setUserNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const isSavingRef = useRef(false);
+  // المورد المحفوظ في آخر حفظ ناجح — لاكتشاف "تغيّر المورد ⇒ أمر شراء جديد"
+  const lastSavedSupplierRef = useRef<string | null>(null);
   const [status, setStatus] = useState<string>("pending");
 
   const [defaultRate, setDefaultRate] = useState<number>(1);
