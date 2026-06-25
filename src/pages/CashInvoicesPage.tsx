@@ -27,8 +27,18 @@ export default function CashInvoicesPage() {
   const navigate = useNavigate();
   const { remove } = useInvoices();
   const { data: companyArr } = useCompanySettings();
+  const { data: accounts } = useAccounts();
   const currency = companyArr?.[0]?.currency || "SDG";
   const [rows, setRows] = useState<CashInv[]>([]);
+  // Payment dialog state
+  const [payInv, setPayInv] = useState<CashInv | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState<string>("cash");
+  const [payAccount, setPayAccount] = useState<string>("");
+  const [payDate, setPayDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [payRef, setPayRef] = useState("");
+  const [payNote, setPayNote] = useState("");
+  const [paySubmitting, setPaySubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
