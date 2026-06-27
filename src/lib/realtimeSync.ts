@@ -99,6 +99,26 @@ const FAMILIES: Record<string, Family> = {
   stock_return_items: {
     keys: [["stock_return_items"], ["stock_returns"]],
   },
+  product_categories: {
+    events: ["product-categories:changed", "products:changed"],
+    keys: [["product_categories"], ["products-with-details"]],
+  },
+  product_companies: {
+    events: ["product-companies:changed", "products:changed"],
+    keys: [["product_companies"], ["products-with-details"]],
+  },
+  warehouses: {
+    events: ["warehouses:changed", "products:changed"],
+    keys: [["warehouses"], ["products-with-details"]],
+  },
+  product_category_links: {
+    events: ["products:changed"],
+    keys: [["product_category_links_all"], ["products"], ["products-with-details"]],
+  },
+  product_brand_links: {
+    events: ["products:changed"],
+    keys: [["product_brand_links_all"], ["products"], ["products-with-details"]],
+  },
 };
 
 export function startRealtimeSync(queryClient: QueryClient): () => void {
