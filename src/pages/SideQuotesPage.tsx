@@ -331,6 +331,34 @@ export default function SideQuotesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile cards list */}
+          <div className="mobile-doc-list">
+            {isLoading ? (
+              <div style={{ textAlign: "center", padding: 30 }}>جاري التحميل...</div>
+            ) : filtered.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا توجد عروض جانبية</div>
+            ) : filtered.map((q: any, idx: number) => (
+              <MobileDocCard
+                key={q.id}
+                index={idx + 1}
+                number={q.quote_number}
+                party={q.customers?.name || "-"}
+                date={fmtDate(q.date)}
+                amount={`${fmtMoney(q.total)} ${q.currency_code || currency}`}
+                status={<span className="side-badge">{ownerName(q.created_by_uid)}</span>}
+                onOpen={() => navigate(`/quotes/side/${q.id}`)}
+                actions={
+                  <>
+                    <button className="btn-xs btn-warning" onClick={() => navigate(`/quotes/side/edit/${q.id}`)}>✎ تعديل</button>
+                    <button className="btn-xs btn-info" onClick={() => handlePrintSide(q)}>🖨 طباعة</button>
+                    <button className="btn-xs btn-primary" onClick={() => handleConvert(q)}>→ فاتورة</button>
+                    <button className="btn-xs btn-danger" onClick={() => handleDelete(q.id)}>🗑 حذف</button>
+                  </>
+                }
+              />
+            ))}
+          </div>
         </div>
       </div>
     </article>
