@@ -106,24 +106,8 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     setDate(new Date().toISOString().slice(0, 10));
   }
 
-  async function createShareToken(docType: string, docId: string): Promise<string | null> {
-    try {
-      const { data: sess } = await supabase.auth.getSession();
-      const accessToken = sess?.session?.access_token;
-      if (!accessToken) return null;
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-document-share-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}`, apikey: ANON },
-        body: JSON.stringify({ doc_type: docType, doc_id: docId, ttl_hours: 24 }),
-      });
-      const json = await resp.json().catch(() => ({}));
-      return resp.ok ? (json.url as string) : null;
-    } catch {
-      return null;
-    }
-  }
+  // (تمت إزالة إنشاء رابط المشاركة من رسالة شحن الرصيد — يبقى رابط العميل في كشف الحساب فقط.)
+
 
   async function handleSave() {
     if (!customerId) return toast.error("اختر العميل");
