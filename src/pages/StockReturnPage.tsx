@@ -90,6 +90,7 @@ export default function StockReturnPage() {
         .returns-compact .legacy-dt-info { font-size: 11px; padding: 4px 0; }
         .returns-compact .st-draft, .returns-compact .st-pending, .returns-compact .st-sent,
         .returns-compact .st-accepted, .returns-compact .st-rejected { padding: 1px 6px; font-size: 10px; }
+        ${mobileDocListCSS}
       `}</style>
       <div className="legacy-card">
         <div className="grid_3 grid_4 table-responsive">
