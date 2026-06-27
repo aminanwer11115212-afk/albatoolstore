@@ -270,7 +270,7 @@ export default function EmployeesPage() {
 
       <div className="legacy-card card-block">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ minWidth: 720, whiteSpace: "nowrap" }}>
+          <table className="w-full text-sm mobile-stack-table sm:min-w-[720px] sm:whitespace-nowrap">
             <thead><tr className="bg-muted">
               <th className="text-right px-3 py-3 font-semibold text-muted-foreground whitespace-nowrap">#</th>
               <th className="text-right px-3 py-3 font-semibold text-muted-foreground whitespace-nowrap">الاسم</th>
@@ -287,17 +287,17 @@ export default function EmployeesPage() {
                 const r = roleMap[emp.id];
                 return (
                 <tr key={emp.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                  <td className="px-5 py-3 text-muted-foreground">{i + 1}</td>
-                  <td className="px-5 py-3 text-foreground font-medium">{emp.name}</td>
-                  <td className="px-5 py-3 text-foreground">{roleLabels[emp.role] || emp.role}</td>
-                  <td className="px-5 py-3 text-foreground">{emp.phone || "-"}</td>
-                  <td className="px-5 py-3">
+                  <td data-label="#" className="px-5 py-3 text-muted-foreground">{i + 1}</td>
+                  <td data-label="الاسم" className="px-5 py-3 text-foreground font-medium">{emp.name}</td>
+                  <td data-label="الدور" className="px-5 py-3 text-foreground">{roleLabels[emp.role] || emp.role}</td>
+                  <td data-label="الهاتف" className="px-5 py-3 text-foreground">{emp.phone || "-"}</td>
+                  <td data-label="الحالة" className="px-5 py-3">
                     <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${emp.status === "active" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
                       {emp.status === "active" ? <UserCheck size={12} /> : <UserX size={12} />}
                       {emp.status === "active" ? "نشط" : "غير نشط"}
                     </span>
                   </td>
-                  <td className="px-5 py-3">
+                  <td data-label="الدخول" className="px-5 py-3">
                     {r ? <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">{r.role}</span> : <span className="text-xs text-muted-foreground">بدون</span>}
                   </td>
                   <td className="px-5 py-3">
