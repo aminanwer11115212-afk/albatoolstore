@@ -21,6 +21,9 @@ import { toast } from "sonner";
 interface Props {
   invoices: any[];
   isLoading: boolean;
+  variant?: "regular" | "pos";
+  /** أقصى عدد صفوف للعرض. الافتراضي 50. */
+  limit?: number;
 }
 
 const statusStyles: Record<string, { label: string; className: string }> = {
@@ -33,12 +36,18 @@ const statusStyles: Record<string, { label: string; className: string }> = {
 
 // Default column widths (px) for: الفاتورة#، العميل، حالة الدفع، التجهيز، التاريخ، المبلغ، الملاحظة
 const DEFAULT_COL_WIDTHS: (number | null)[] = [56, 110, 64, 78, 64, 80, 130];
-const STORAGE_KEY = userScopedLegacyKey("dashboard:recentInvoices:colWidths:v1");
-const LOCK_KEY = userScopedLegacyKey("dashboard:recentInvoices:colsLocked:v1");
 
-export default function DashboardRecentInvoices({ invoices, isLoading }: Props) {
+export default function DashboardRecentInvoices({ invoices, isLoading, variant = "regular", limit = 50 }: Props) {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isPos = variant === "pos";
+
+  const STORAGE_KEY = userScopedLegacyKey(
+    isPos ? "dashboard:recentInvoicesPos:colWidths:v1" : "dashboard:recentInvoices:colWidths:v1"
+  );
+  const LOCK_KEY = userScopedLegacyKey(
+    isPos ? "dashboard:recentInvoicesPos:colsLocked:v1" : "dashboard:recentInvoices:colsLocked:v1"
+  );
 
   const [colsLocked, setColsLocked] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
@@ -71,11 +80,28 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
     }
   };
 
+  const title = isPos ? "🛒 آخر فواتير الكاش" : "📄 الفواتير الأخيرة";
+  const addLabel = isPos ? "إضافة فاتورة كاش" : "إضافة بيع";
+  const manageLabel = isPos ? "إدارة فواتير الكاش" : "إدارة الفواتير";
+  const addPath = isPos ? "/invoices/cash/new" : "/invoices/create";
+  const managePath = isPos ? "/invoices/cash/list" : "/invoices";
+  const rowPath = (id: string) => isPos ? `/invoices/cash/edit/${id}` : `/invoices/view/${id}`;
+  const headerClass = isPos ? "text-base font-bold text-amber-700" : "text-base font-bold";
+  const manageBtnClass = isPos
+    ? "text-xs h-7 rounded-full bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+    : "text-xs h-7 rounded-full bg-green-600 text-white border-green-600 hover:bg-green-700";
+  const addBtnClass = isPos
+    ? "text-xs h-7 rounded-full bg-amber-500 hover:bg-amber-600 text-white"
+    : "text-xs h-7 rounded-full";
+  const cardClass = isPos
+    ? "flex flex-col border-amber-300/60"
+    : "flex flex-col";
+
   return (
-    <Card className="flex flex-col" style={{ height: "var(--invoices-card-height, 500px)" }}>
+    <Card className={cardClass} style={{ height: "var(--invoices-card-height, 500px)" }}>
       <CardHeader className="p-4 pb-2 border-b border-border">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-base font-bold">الفواتير الأخيرة</CardTitle>
+          <CardTitle className={headerClass}>{title}</CardTitle>
           <div className="flex gap-1.5">
             <Button
               size="sm"
@@ -86,16 +112,16 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
             >
               {colsLocked ? COLS_BTN_EDIT_LABEL : COLS_BTN_SAVE_LABEL} الأعمدة
             </Button>
-            <Button size="sm" className="text-xs h-7 rounded-full" onClick={() => navigate("/invoices/create")}>
-              إضافة بيع
+            <Button size="sm" className={addBtnClass} onClick={() => navigate(addPath)}>
+              {addLabel}
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="text-xs h-7 rounded-full bg-green-600 text-white border-green-600 hover:bg-green-700"
-              onClick={() => navigate("/invoices")}
+              className={manageBtnClass}
+              onClick={() => navigate(managePath)}
             >
-              إدارة الفواتير
+              {manageLabel}
             </Button>
           </div>
         </div>
@@ -164,26 +190,27 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
                   <td colSpan={7} className="text-center py-6 text-muted-foreground text-xs">
                     لا توجد فواتير بعد -{" "}
                     <button
-                      onClick={() => navigate("/invoices/create")}
+                      onClick={() => navigate(addPath)}
                       className="text-primary hover:underline"
                     >
-                      أضف فاتورة جديدة
+                      {addLabel}
                     </button>
                   </td>
                 </tr>
               ) : (
-                (invoices || []).slice(0, 10).map((inv: any, idx: number) => {
+                (invoices || []).slice(0, limit).map((inv: any, idx: number) => {
                   const st = statusStyles[inv.status] || statusStyles.pending;
                   const note = inv.user_note || inv.notes || "";
                   const cellBase =
                     "px-1.5 py-1 text-[10.5px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis";
+                  const rowExtra = isPos ? "bg-amber-50/40 dark:bg-amber-500/5" : "";
                   return (
                     <tr
                       key={inv.id}
-                      onClick={() => navigate(`/invoices/view/${inv.id}`)}
+                      onClick={() => navigate(rowPath(inv.id))}
                       className={`border-b border-border hover:bg-muted/50 transition-colors cursor-pointer ${
                         idx % 2 === 1 ? "bg-muted/10" : ""
-                      }`}
+                      } ${rowExtra}`}
                     >
                       <td className={`${cellBase} font-medium`}>{inv.invoice_number}</td>
                       <td className={cellBase} title={inv.customers?.name || inv.walk_in_customer_name || ""}>
