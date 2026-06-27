@@ -71,6 +71,23 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     };
   }, [open]);
 
+  // أوقف انتشار pointer/mouse/touch على القائمة عند مستوى DOM الأصلي
+  // حتى لا يلتقطها Radix Dialog/Popover ويغلق نفسه قبل تثبيت الاختيار.
+  useEffect(() => {
+    if (!open) return;
+    const el = menuRef.current;
+    if (!el) return;
+    const stop = (e: Event) => e.stopPropagation();
+    const types: Array<keyof DocumentEventMap> = [
+      "pointerdown", "pointerdowncapture" as any,
+      "mousedown", "touchstart", "click",
+    ];
+    types.forEach((t) => el.addEventListener(t as string, stop, true));
+    return () => {
+      types.forEach((t) => el.removeEventListener(t as string, stop, true));
+    };
+  }, [open]);
+
   const openMenu = () => {
     if (disabled) return;
     setOpen(true);
