@@ -172,6 +172,31 @@ const queryClient = new QueryClient({
   },
 });
 
+// Overrides لمفاتيح حسّاسة للوقت: staleTime قصير + إعادة جلب عند العودة للصفحة.
+// يبقى refetchOnWindowFocus=false عالمياً لكن هذه القوائم تُحدَّث عند كل mount.
+[
+  ["invoices"],
+  ["invoices-with-customers"],
+  ["quotes"],
+  ["quotes-with-customers"],
+  ["transactions"],
+  ["transactions-with-accounts"],
+  ["recent-transactions"],
+  ["recent-invoices"],
+  ["today-invoices"],
+  ["dashboard-stats"],
+  ["accounts"],
+  ["customers"],
+  ["suppliers"],
+  ["products"],
+  ["products-with-details"],
+].forEach((key) => {
+  queryClient.setQueryDefaults(key, {
+    staleTime: 30_000,
+    refetchOnMount: "always",
+  });
+});
+
 // Wrappers تُجبر unmount نظيف عند تغيير :id (انتقال بين سجلات نفس النوع)
 const QuoteEditWrapper = () => {
   const { id } = useParams();
