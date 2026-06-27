@@ -237,18 +237,38 @@ export function useCurrencies() { return useTable("currencies"); }
 export function useExchangeRates() { return useTable("exchange_rates"); }
 
 // Specialized queries
-export function useInvoicesWithCustomers(limit?: number) {
+/**
+ * جلب الفواتير مع بيانات العميل.
+ * - channel="regular" يستثني صراحةً أي صف source='pos' (يقبل null/regular فقط).
+ * - channel="pos" يقصر النتائج على source='pos' فقط.
+ * - channel="all" (الافتراضي) يجلب الكل بدون تصفية.
+ * كل قناة لها queryKey مستقل لمنع أي تسريب من الكاش بين القناتين.
+ */
+export function useInvoicesWithCustomers(
+  limit?: number,
+  channel: "regular" | "pos" | "all" = "all",
+) {
   return useQuery({
-    queryKey: ["invoices-with-customers", limit],
+    queryKey: ["invoices-with-customers", channel, limit ?? null],
     queryFn: async () => {
       let query = supabase
         .from("invoices")
         .select("*, customers(name, phone, whatsapp, balance)")
         .order("created_at", { ascending: false });
+      if (channel === "pos") {
+        query = query.eq("source", "pos");
+      } else if (channel === "regular") {
+        // استبعاد صارم لأي فاتورة كاش حتى لو وُجدت قيم source غير قياسية
+        query = query.or("source.is.null,source.eq.regular");
+      }
       if (limit) query = query.limit(limit);
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      // طبقة دفاع ثانية على العميل: تصفية أي صف لا يطابق القناة
+      const rows = data || [];
+      if (channel === "pos") return rows.filter((r: any) => r.source === "pos");
+      if (channel === "regular") return rows.filter((r: any) => (r.source ?? "regular") !== "pos");
+      return rows;
     },
   });
 }
