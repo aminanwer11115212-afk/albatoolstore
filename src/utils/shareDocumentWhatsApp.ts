@@ -11,7 +11,8 @@ export type ShareDocType =
   | "packaging-invoice"
   | "packaging-quote"
   | "unavailable-invoice"
-  | "unavailable-quote";
+  | "unavailable-quote"
+  | "credit-charge";   // إيصال شحن رصيد العميل (doc_id = transaction.id)
 
 export interface ShareDocOptions {
   docType: ShareDocType;
@@ -45,6 +46,7 @@ function docLabelDefault(t: ShareDocType): string {
     case "packaging-quote": return "كشف تغليف";
     case "unavailable-invoice":
     case "unavailable-quote": return "أصناف غير متوفّرة";
+    case "credit-charge": return "إيصال شحن رصيد";
   }
 }
 

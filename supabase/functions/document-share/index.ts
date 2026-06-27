@@ -737,6 +737,89 @@ Deno.serve(async (req) => {
   <tbody>${bodyHTML}</tbody></table>
   <div class="footer-note">نأسف لعدم توفر هذه الأصناف حالياً، نرجو إفادتنا بالبدائل المناسبة أو الموافقة على استبعادها من الطلب.</div>
 </div></body></html>`;
+    } else if (tk.doc_type === "credit-charge") {
+      const { data: tx } = await supabase
+        .from("transactions")
+        .select("id, amount, date, method, description, allocation, customers(name, phone, address, balance)")
+        .eq("id", tk.doc_id)
+        .maybeSingle();
+      if (!tx) return buildErrorHTML("الإيصال غير موجود", 404);
+      const c = (tx as any).customers;
+      const cust = c ? { name: c.name, phone: c.phone, address: c.address } : { name: "—" };
+      const alloc = (tx as any).allocation || {};
+      const amount = Number((tx as any).amount || 0);
+      const balanceBefore = Number(alloc.balance_before ?? 0);
+      const balanceAfter = Number(alloc.balance_after ?? Math.max(0, balanceBefore - amount));
+      const methodTxt = (tx as any).method === "bank_transfer" ? "تحويل بنكي" : (tx as any).method === "card" ? "بطاقة" : "نقدي";
+      const items: Array<{ invoice_number: string; applied: number }> = Array.isArray(alloc.items) ? alloc.items : [];
+      const leftover = Number(alloc.leftover || 0);
+      const logoURL = company?.logo_url || "";
+      const logoHTML = logoURL ? `<div class="header-logo"><img src="${attr(logoURL)}" alt="Logo"/></div>` : "";
+      const allocRows = items.length === 0
+        ? `<tr><td colspan="2" style="padding:14px;color:#666;text-align:center">لا توجد فواتير مسدّدة — أُضيف المبلغ كرصيد دائن.</td></tr>`
+        : items.map((r, i) => `<tr>
+            <td style="width:60px">${i + 1}</td>
+            <td>#${attr(r.invoice_number)}</td>
+            <td style="width:160px;font-weight:700">${Number(r.applied || 0).toLocaleString()}</td>
+          </tr>`).join("");
+      statementHtml = `<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>إيصال شحن رصيد - ${attr(cust.name)}</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:20px;line-height:1.55;font-size:14px}
+  .toolbar{position:fixed;top:0;right:0;left:0;z-index:999;background:linear-gradient(135deg,#15803d,#16a34a);color:#fff;padding:10px;display:flex;justify-content:center;gap:12px}
+  .toolbar button{background:#fff;color:#15803d;border:0;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px}
+  .page{max-width:800px;margin:70px auto 0}
+  .header{text-align:center;padding-bottom:10px;border-bottom:3px solid #15803d;margin-bottom:12px}
+  .header-logos{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .header-logo img{height:75px;object-fit:contain}
+  .header-title{font-size:22px;font-weight:900;color:#15803d;margin-bottom:4px}
+  .header-address{font-size:13px;color:#333;line-height:1.6}
+  .doc-title{text-align:center;margin:12px 0 14px}
+  .doc-title h1{font-size:22px;color:#15803d;font-weight:800;display:inline-block;border-bottom:3px solid #15803d;padding-bottom:3px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin:10px 0 16px;font-size:14px}
+  .info-grid .lbl{color:#555;font-weight:700}
+  .info-grid .val{color:#15803d;font-weight:800}
+  .amount-box{margin:14px 0;padding:18px;border:2px dashed #15803d;background:#f0fdf4;border-radius:10px;text-align:center}
+  .amount-box .lbl{font-size:14px;color:#15803d;font-weight:700;margin-bottom:6px}
+  .amount-box .val{font-size:30px;font-weight:900;color:#15803d}
+  table{width:100%;border-collapse:collapse;margin:8px 0;border:2px solid #1a1a1a}
+  thead th{background:#15803d;color:#fff;padding:8px 10px;font-size:13px;font-weight:700;text-align:center;border:1px solid #1a1a1a}
+  tbody td{padding:7px 10px;text-align:center;font-size:13px;border:1px solid #999}
+  tbody tr:nth-child(even){background:#f7fff9}
+  .balance-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;margin:8px 0;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;font-size:14px}
+  .balance-row.after{background:#f0fdf4;border-color:#86efac}
+  .footer-note{margin-top:16px;padding:10px;text-align:center;font-size:12px;color:#555}
+  @media print{.toolbar{display:none!important}body{padding:0}.page{margin-top:0}}
+</style></head><body>
+<div class="toolbar"><button onclick="window.print()">🖨️ طباعة / حفظ PDF</button></div>
+<div class="page">
+  <div class="header"><div class="header-logos">${logoHTML}<div>
+    <div class="header-title">${attr(company?.company_name || "")}</div>
+    <div class="header-address">${attr(company?.address || "")}</div>
+    <div class="header-address">${attr(company?.phone || "")}</div>
+  </div>${logoHTML}</div></div>
+  <div class="doc-title"><h1>إيصال شحن رصيد</h1></div>
+  <div class="info-grid">
+    <div><span class="lbl">العميل:</span> <span class="val">${attr(cust.name)}</span></div>
+    <div><span class="lbl">التاريخ:</span> <span class="val">${attr((tx as any).date || "")}</span></div>
+    <div><span class="lbl">طريقة الدفع:</span> <span class="val">${attr(methodTxt)}</span></div>
+    <div><span class="lbl">رقم الإيصال:</span> <span class="val">${attr(String((tx as any).id).slice(0, 8).toUpperCase())}</span></div>
+  </div>
+  <div class="amount-box">
+    <div class="lbl">المبلغ المشحون</div>
+    <div class="val">${amount.toLocaleString()}</div>
+  </div>
+  <div class="balance-row"><span>الرصيد قبل الشحن</span><strong>${balanceBefore.toLocaleString()}</strong></div>
+  <h3 style="margin:14px 0 6px;color:#15803d">الفواتير المسدّدة من هذه الدفعة</h3>
+  <table><thead><tr><th>#</th><th>رقم الفاتورة</th><th>المبلغ المخصّص</th></tr></thead>
+  <tbody>${allocRows}</tbody></table>
+  ${leftover > 0 ? `<div style="margin:8px 0;padding:10px;border-radius:8px;background:#fefce8;border:1px solid #fde047;text-align:center;font-weight:700">رصيد دائن متبقٍ لصالحك: ${leftover.toLocaleString()}</div>` : ""}
+  <div class="balance-row after"><span>الرصيد بعد الشحن</span><strong>${balanceAfter.toLocaleString()}</strong></div>
+  <div class="footer-note">شكراً لتعاملكم معنا — هذا الإيصال صادر إلكترونياً ومعتمد بدون توقيع.</div>
+</div></body></html>`;
     } else {
       return buildErrorHTML("نوع المستند غير مدعوم", 400);
     }

@@ -9,7 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ALLOWED_TYPES = new Set(["invoice", "quote", "return", "statement-customer", "statement-supplier", "packaging-invoice", "packaging-quote", "unavailable-invoice", "unavailable-quote"]);
+const ALLOWED_TYPES = new Set(["invoice", "quote", "return", "statement-customer", "statement-supplier", "packaging-invoice", "packaging-quote", "unavailable-invoice", "unavailable-quote", "credit-charge"]);
 
 function makeToken(): string {
   const bytes = new Uint8Array(24);
