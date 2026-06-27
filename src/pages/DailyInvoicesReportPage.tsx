@@ -85,7 +85,7 @@ export default function DailyInvoicesReportPage() {
       {/* Table */}
       <div className="legacy-card card-block" data-section="table" data-section-label="جدول الفواتير">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm mobile-stack-table">
             <thead><tr className="bg-muted">
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground">#</th>
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground">رقم الفاتورة</th>
