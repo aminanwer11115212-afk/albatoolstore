@@ -235,7 +235,7 @@ export default function SideQuotesPage() {
             <span style={{ color: "#666" }}>{filtered.length} من {totalCount}</span>
           </div>
 
-          <div style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>
+          <div className="desktop-table-wrap" style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>
             <table className="legacy-table" cellSpacing={0} width="100%">
               <thead style={{ position: "sticky", top: 0, zIndex: 5 }}>
                 <tr>
