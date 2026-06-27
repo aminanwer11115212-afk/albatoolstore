@@ -106,26 +106,10 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     setDate(new Date().toISOString().slice(0, 10));
   }
 
-  async function createShareToken(docType: string, docId: string): Promise<string | null> {
-    try {
-      const { data: sess } = await supabase.auth.getSession();
-      const accessToken = sess?.session?.access_token;
-      if (!accessToken) return null;
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-document-share-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}`, apikey: ANON },
-        body: JSON.stringify({ doc_type: docType, doc_id: docId, ttl_hours: 24 }),
-      });
-      const json = await resp.json().catch(() => ({}));
-      return resp.ok ? (json.url as string) : null;
-    } catch {
-      return null;
-    }
-  }
+  // (تمت إزالة إنشاء رابط المشاركة من رسالة شحن الرصيد — يبقى رابط العميل في كشف الحساب فقط.)
 
-  async function handleSave() {
+
+  async function handleSave(sendWhatsApp: boolean = false) {
     if (!customerId) return toast.error("اختر العميل");
     const amt = Number(amount);
     if (!amt || amt <= 0) return toast.error("أدخل مبلغاً صحيحاً");
@@ -198,41 +182,34 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
 
       toast.success("تم شحن الرصيد بنجاح");
 
-      // 4) رسالة واتساب فيها رابطان: إيصال الشحن + كشف الحساب
-      if (txId && selectedCustomer?.phone) {
-        // اقرأ الرصيد الفعلي بعد عمل التريغر للحصول على «صافي المطلوب» أو «الرصيد الدائن»
-        const { data: freshCust } = await supabase
-          .from("customers")
-          .select("balance, credit_balance")
-          .eq("id", customerId)
-          .maybeSingle();
-        const fBal = Number((freshCust as any)?.balance || 0);
-        const fCred = Number((freshCust as any)?.credit_balance || 0);
-        const net = fBal - fCred;
-        const netLine =
-          net > 0.001
-            ? `💰 صافي المطلوب منكم: ${net.toLocaleString()}`
-            : net < -0.001
-              ? `🎁 رصيد دائن لكم: ${Math.abs(net).toLocaleString()}`
-              : `✨ حسابك مسدّد بالكامل`;
+      // 4) (اختياري) رسالة واتساب نصية مختصرة — بدون أي روابط للعميل
+      if (sendWhatsApp && txId) {
+        if (!selectedCustomer?.phone) {
+          toast.info("لا يوجد رقم واتساب للعميل — لم تُرسل الرسالة.");
+        } else {
+          // اقرأ الرصيد الفعلي بعد التريغر لمعرفة صافي المتبقي
+          const { data: freshCust } = await supabase
+            .from("customers")
+            .select("balance, credit_balance")
+            .eq("id", customerId)
+            .maybeSingle();
+          const fBal = Number((freshCust as any)?.balance || 0);
+          const fCred = Number((freshCust as any)?.credit_balance || 0);
+          const net = fBal - fCred;
+          const netLine =
+            net > 0.001
+              ? `صافي المتبقي عليكم: ${net.toLocaleString()}`
+              : net < -0.001
+                ? `رصيدكم الدائن: ${Math.abs(net).toLocaleString()}`
+                : `الحساب مسدّد بالكامل`;
 
-        const [chargeUrl, stmtUrl] = await Promise.all([
-          createShareToken("credit-charge", txId),
-          createShareToken("statement-customer", customerId),
-        ]);
-        const lines = [
-          `مرحباً ${selectedCustomer.name} 👋`,
-          `✅ تم شحن رصيدك بمبلغ ${amt.toLocaleString()}`,
-          netLine,
-        ];
-        if (allocItems.length) {
-          lines.push(`📄 سُدِّدت ${allocItems.length} فاتورة من هذه الدفعة.`);
+          const msg = [
+            `مرحباً ${selectedCustomer.name}`,
+            `تم شحن رصيدكم بمبلغ ${amt.toLocaleString()}`,
+            netLine,
+          ].join("\n");
+          openWhatsApp(selectedCustomer.phone, msg);
         }
-        if (chargeUrl) lines.push("", "🧾 إيصال الشحن:", chargeUrl);
-        if (stmtUrl) lines.push("", "📊 كشف الحساب:", stmtUrl);
-        openWhatsApp(selectedCustomer.phone, lines.join("\n"));
-      } else if (txId && !selectedCustomer?.phone) {
-        toast.info("لا يوجد رقم واتساب للعميل — لم تُرسل الرسالة.");
       }
 
       reset();
@@ -412,9 +389,23 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>إلغاء</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white">
+          <Button
+            onClick={() => handleSave(true)}
+            disabled={saving}
+            variant="outline"
+            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+            title="حفظ الشحن وإرسال رسالة واتساب نصية مختصرة بدون روابط"
+          >
+            {saving ? "..." : "شحن + واتساب نصي"}
+          </Button>
+          <Button
+            onClick={() => handleSave(false)}
+            disabled={saving}
+            className="bg-green-600 hover:bg-green-700 text-white"
+            title="حفظ الشحن فقط بدون إرسال أي رسالة"
+          >
             {saving ? "جاري الحفظ..." : "شحن الرصيد"}
           </Button>
         </DialogFooter>
