@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { startsWithAny } from "@/utils/searchMatch";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompanySettings } from "@/hooks/useData";
-import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 
 function useSideQuotes() {
   return useQuery({
