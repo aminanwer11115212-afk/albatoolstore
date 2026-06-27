@@ -832,6 +832,7 @@ Deno.serve(async (req) => {
   <tbody>${allocRows}</tbody></table>
   ${leftover > 0 ? `<div style="margin:8px 0;padding:10px;border-radius:8px;background:#fefce8;border:1px solid #fde047;text-align:center;font-weight:700">رصيد دائن متبقٍ لصالحك: ${leftover.toLocaleString()}</div>` : ""}
   <div class="balance-row after"><span>الرصيد بعد الشحن</span><strong>${balanceAfter.toLocaleString()}</strong></div>
+  <div style="margin:14px 0 4px;padding:16px 20px;border:2px solid ${netColor};border-radius:12px;background:#fafafa;display:flex;justify-content:space-between;align-items:center"><span style="font-weight:800;font-size:15px;color:${netColor}">${netLabel}</span><strong style="font-size:24px;color:${netColor}">${netValue.toLocaleString()}</strong></div>
   <div class="footer-note">شكراً لتعاملكم معنا — هذا الإيصال صادر إلكترونياً ومعتمد بدون توقيع.</div>
 </div></body></html>`;
     } else {
