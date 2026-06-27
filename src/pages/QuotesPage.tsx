@@ -13,6 +13,7 @@ import { deductStockForLines } from "@/utils/stockDeduction";
 
 import { useQuoteConvertedDialog } from "@/hooks/useQuoteConvertedDialog";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { StatusChip } from "@/components/ui/status-chip";
 
 export const QUOTE_STATUS_KEYS = ["draft", "sent", "accepted", "rejected"] as const;
 
