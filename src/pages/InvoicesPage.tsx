@@ -13,6 +13,7 @@ import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import WorkflowStatusBadge, { WORKFLOW_STATUSES, type WorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { StatusChip } from "@/components/ui/status-chip";
 import ShippingDispatchDialog from "@/components/invoice/ShippingDispatchDialog";
 
 // Status label map matching old system (custom.css .st-* classes)
