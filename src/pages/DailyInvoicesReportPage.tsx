@@ -5,6 +5,7 @@ import { Search, ChevronLeft, ChevronRight, Eye, FileText } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import { StatusChip } from "@/components/ui/status-chip";
 
 export default function DailyInvoicesReportPage() {
   const navigate = useNavigate();
