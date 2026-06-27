@@ -11,7 +11,8 @@ export type ShareDocType =
   | "packaging-invoice"
   | "packaging-quote"
   | "unavailable-invoice"
-  | "unavailable-quote";
+  | "unavailable-quote"
+  | "credit-charge";   // إيصال شحن رصيد العميل (doc_id = transaction.id)
 
 export interface ShareDocOptions {
   docType: ShareDocType;
