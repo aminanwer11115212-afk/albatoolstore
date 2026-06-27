@@ -46,8 +46,8 @@ describe("InlineSearchSelect", () => {
   it("يستدعي onChange ويُغلق القائمة عند النقر بالماوس على خيار", () => {
     render(<InlineSearchSelect value="" options={opts} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button"));
-    const item = screen.getByText("مرسيدس");
-    fireEvent.click(item);
+    const itemBtn = screen.getByText("مرسيدس").closest("button")!;
+    fireEvent.click(itemBtn);
     expect(onChange).toHaveBeenCalledWith("3");
     expect(screen.queryByPlaceholderText("ابحث أو اكتب اسم جديد...")).not.toBeInTheDocument();
   });
