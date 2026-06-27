@@ -588,7 +588,7 @@ Deno.serve(async (req) => {
       }));
     } else if (tk.doc_type === "statement-customer") {
       const [customerRes, invoicesRes, quotesRes, returnsRes, transactionsRes] = await Promise.all([
-        supabase.from("customers").select("name, phone, address, balance").eq("id", tk.doc_id).maybeSingle(),
+        supabase.from("customers").select("name, phone, address, balance, credit_balance").eq("id", tk.doc_id).maybeSingle(),
         supabase.from("invoices").select("invoice_number, date, total, paid_amount").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
         supabase.from("quotes").select("quote_number, date, total, status").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
         supabase.from("stock_returns").select("return_number, date, total, status").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
