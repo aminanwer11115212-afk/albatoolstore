@@ -109,7 +109,7 @@ export default function StockReturnPage() {
           </h5>
           <hr />
 
-          <div className="legacy-dt-toolbar">
+          <div className="legacy-dt-toolbar desktop-toolbar">
             <label>
               عرض
               <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(1); }}>
