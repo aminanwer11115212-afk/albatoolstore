@@ -228,8 +228,36 @@ export default function StockReturnPage() {
                 );
               })}
             </tbody>
-          </table>
+            </table>
           </div>
+
+          {/* Mobile cards list */}
+          <div className="mobile-doc-list">
+            {isLoading ? (
+              <div style={{ textAlign: "center", padding: 30 }}>Processing...</div>
+            ) : paginated.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا توجد مرتجعات</div>
+            ) : paginated.map((r: any, idx: number) => (
+              <MobileDocCard
+                key={r.id}
+                index={start + idx + 1}
+                number={r.return_number}
+                party={r.customers?.name || "-"}
+                date={fmtDate(r.date)}
+                amount={`${fmtMoney(r.total)} ${currency}`}
+                status={<StatusChip kind="return" value={r.status || "pending"} />}
+                onOpen={() => navigate(`/stock-return/view/${r.id}`)}
+                actions={
+                  <>
+                    <button className="btn-xs btn-warning" onClick={() => navigate(`/stock-return/edit/${r.id}`)}>✎ تعديل</button>
+                    <button className="btn-xs btn-info" onClick={() => navigate(`/preview/return/${r.id}`)} title="طباعة">🖨 طباعة</button>
+                    <button className="btn-xs btn-danger" onClick={() => handleDelete(r.id)}>🗑 حذف</button>
+                  </>
+                }
+              />
+            ))}
+          </div>
+
 
           {!isLoading && filtered.length > 0 && (
             <>
