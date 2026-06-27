@@ -78,10 +78,9 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     const el = menuRef.current;
     if (!el) return;
     const stop = (e: Event) => e.stopPropagation();
-    const types: Array<keyof DocumentEventMap> = [
-      "pointerdown", "pointerdowncapture" as any,
-      "mousedown", "touchstart", "click",
-    ];
+    // ⚠️ لا نضيف "click" هنا — React 17+ يعتمد على delegation على root،
+    // ووقف الانتشار في طور capture سيمنع onClick من العمل أصلاً.
+    const types: string[] = ["pointerdown", "mousedown", "touchstart"];
     types.forEach((t) => el.addEventListener(t as string, stop, true));
     return () => {
       types.forEach((t) => el.removeEventListener(t as string, stop, true));
