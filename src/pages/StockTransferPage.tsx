@@ -128,7 +128,7 @@ export default function StockTransferPage() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm mobile-stack-table">
             <thead>
               <tr className="bg-muted">
                 <th className="text-right px-5 py-3 font-semibold text-muted-foreground">#</th>
@@ -147,13 +147,13 @@ export default function StockTransferPage() {
                 <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد تحويلات</td></tr>
               ) : filtered.map((t: any, i: number) => (
                 <tr key={t.id} className="border-b border-border hover:bg-muted/50">
-                  <td className="px-5 py-3 text-muted-foreground">{i + 1}</td>
-                  <td className="px-5 py-3 font-medium text-foreground">{t.product_name}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{t.from_warehouse_name}</td>
-                  <td className="px-5 py-3 text-muted-foreground flex items-center gap-1"><ArrowLeftRight size={14} className="text-primary" /> {t.to_warehouse_name}</td>
-                  <td className="px-5 py-3 font-semibold text-foreground">{t.quantity}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{t.date}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{t.notes || "-"}</td>
+                  <td data-label="#" className="px-5 py-3 text-muted-foreground">{i + 1}</td>
+                  <td data-label="المنتج" className="px-5 py-3 font-medium text-foreground">{t.product_name}</td>
+                  <td data-label="من" className="px-5 py-3 text-muted-foreground">{t.from_warehouse_name}</td>
+                  <td data-label="إلى" className="px-5 py-3 text-muted-foreground flex items-center gap-1"><ArrowLeftRight size={14} className="text-primary" /> {t.to_warehouse_name}</td>
+                  <td data-label="الكمية" className="px-5 py-3 font-semibold text-foreground">{t.quantity}</td>
+                  <td data-label="التاريخ" className="px-5 py-3 text-muted-foreground">{t.date}</td>
+                  <td data-label="ملاحظات" className="px-5 py-3 text-muted-foreground">{t.notes || "-"}</td>
                 </tr>
               ))}
             </tbody>

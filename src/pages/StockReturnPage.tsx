@@ -6,12 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
-
-const statusMap: Record<string, { label: string; cls: string }> = {
-  pending:   { label: "معلق",  cls: "st-pending" },
-  completed: { label: "مكتمل", cls: "st-accepted" },
-  cancelled: { label: "ملغي",  cls: "st-rejected" },
-};
+import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { StatusChip } from "@/components/ui/status-chip";
 
 function useReturnsFullList() {
   return useQuery({
@@ -94,6 +90,7 @@ export default function StockReturnPage() {
         .returns-compact .legacy-dt-info { font-size: 11px; padding: 4px 0; }
         .returns-compact .st-draft, .returns-compact .st-pending, .returns-compact .st-sent,
         .returns-compact .st-accepted, .returns-compact .st-rejected { padding: 1px 6px; font-size: 10px; }
+        ${mobileDocListCSS}
       `}</style>
       <div className="legacy-card">
         <div className="grid_3 grid_4 table-responsive">
@@ -112,7 +109,7 @@ export default function StockReturnPage() {
           </h5>
           <hr />
 
-          <div className="legacy-dt-toolbar">
+          <div className="legacy-dt-toolbar desktop-toolbar">
             <label>
               عرض
               <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(1); }}>
@@ -161,7 +158,7 @@ export default function StockReturnPage() {
             </label>
           </div>
 
-          <div style={{ maxHeight: "calc(100vh - 260px)", overflowY: "auto", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>
+          <div className="desktop-table-wrap" style={{ maxHeight: "calc(100vh - 260px)", overflowY: "auto", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>
           <table className="legacy-table" cellSpacing={0} width="100%">
             <thead style={{ position: "sticky", top: 0, zIndex: 5, background: "hsl(var(--card))" }}>
               <tr>
@@ -181,7 +178,6 @@ export default function StockReturnPage() {
               ) : paginated.length === 0 ? (
                 <tr><td colSpan={8} style={{ textAlign: "center", padding: 30 }}>لا توجد مرتجعات</td></tr>
               ) : paginated.map((r: any, idx: number) => {
-                const st = statusMap[r.status || "pending"] || statusMap.pending;
                 const rowCls = (start + idx) % 2 === 0 ? "odd" : "even";
                 return (
                   <tr key={r.id} className={rowCls}>
@@ -190,7 +186,7 @@ export default function StockReturnPage() {
                     <td>{r.customers?.name || "-"}</td>
                     <td>{fmtDate(r.date)}</td>
                     <td>{fmtMoney(r.total)} {currency}</td>
-                    <td><span className={st.cls}>{st.label}</span></td>
+                    <td><StatusChip kind="return" value={r.status || "pending"} /></td>
                     <td>{r.reason || "-"}</td>
                     <td>
                       <span className="legacy-actions">
@@ -232,8 +228,36 @@ export default function StockReturnPage() {
                 );
               })}
             </tbody>
-          </table>
+            </table>
           </div>
+
+          {/* Mobile cards list */}
+          <div className="mobile-doc-list">
+            {isLoading ? (
+              <div style={{ textAlign: "center", padding: 30 }}>Processing...</div>
+            ) : paginated.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا توجد مرتجعات</div>
+            ) : paginated.map((r: any, idx: number) => (
+              <MobileDocCard
+                key={r.id}
+                index={start + idx + 1}
+                number={r.return_number}
+                party={r.customers?.name || "-"}
+                date={fmtDate(r.date)}
+                amount={`${fmtMoney(r.total)} ${currency}`}
+                status={<StatusChip kind="return" value={r.status || "pending"} />}
+                onOpen={() => navigate(`/stock-return/view/${r.id}`)}
+                actions={
+                  <>
+                    <button className="btn-xs btn-warning" onClick={() => navigate(`/stock-return/edit/${r.id}`)}>✎ تعديل</button>
+                    <button className="btn-xs btn-info" onClick={() => navigate(`/preview/return/${r.id}`)} title="طباعة">🖨 طباعة</button>
+                    <button className="btn-xs btn-danger" onClick={() => handleDelete(r.id)}>🗑 حذف</button>
+                  </>
+                }
+              />
+            ))}
+          </div>
+
 
           {!isLoading && filtered.length > 0 && (
             <>

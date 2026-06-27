@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { StatusChip } from "@/components/ui/status-chip";
 import { receiveStockForPurchaseOnce } from "@/utils/stockReceive";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 
@@ -306,7 +307,7 @@ export default function PurchasePage() {
                     <td>{fmtDate(o.date)}</td>
                     <td>{fmtDate(o.expected_delivery_date)}</td>
                     <td>{fmtMoney(o.total)} {o.currency_code || currency}</td>
-                    <td><span className={st.cls}>{st.label}</span></td>
+                    <td><StatusChip kind="purchase" value={o.status || "pending"} /></td>
                     <td>{o.created_by || ""}</td>
                     <td>
                       <span className="legacy-actions">
@@ -376,7 +377,6 @@ export default function PurchasePage() {
             ) : paginated.length === 0 ? (
               <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا توجد أوامر شراء</div>
             ) : paginated.map((o: any, idx: number) => {
-              const st = statusMap[o.status || "pending"] || statusMap.pending;
               const supplier = supplierMap.get(o.supplier_id);
               return (
                 <MobileDocCard
@@ -386,7 +386,7 @@ export default function PurchasePage() {
                   party={supplier?.name || "-"}
                   date={fmtDate(o.date)}
                   amount={`${fmtMoney(o.total)} ${o.currency_code || currency}`}
-                  status={<span className={st.cls}>{st.label}</span>}
+                  status={<StatusChip kind="purchase" value={o.status || "pending"} />}
                   onOpen={() => navigate(`/purchase/edit/${o.id}`)}
                   actions={
                     <>

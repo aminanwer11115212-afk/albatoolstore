@@ -125,7 +125,7 @@ export default function ProductCompaniesPage() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm mobile-stack-table">
             <thead>
               <tr className="bg-muted">
                 <th className="text-right px-5 py-3 font-semibold text-muted-foreground">#</th>
@@ -145,14 +145,14 @@ export default function ProductCompaniesPage() {
                 const s = stats?.[c.id] || { totalProducts: 0, stockQty: 0, stockValue: 0 };
                 return (
                   <tr key={c.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="px-5 py-3 text-muted-foreground">{i + 1}</td>
-                    <td className="px-5 py-3 font-medium text-foreground flex items-center gap-2">
-                      <Building2 size={16} className="text-primary" /> {c.name}
+                    <td data-label="#" className="px-5 py-3 text-muted-foreground">{i + 1}</td>
+                    <td data-label="الاسم" className="px-5 py-3 font-medium text-foreground">
+                      <span className="inline-flex items-center gap-2"><Building2 size={16} className="text-primary" /> {c.name}</span>
                     </td>
-                    <td className="px-5 py-3 text-muted-foreground">{s.totalProducts}</td>
-                    <td className="px-5 py-3 text-muted-foreground">{s.stockQty}</td>
-                    <td className="px-5 py-3 text-muted-foreground">{s.stockValue.toLocaleString()}</td>
-                    <td className="px-5 py-3">
+                    <td data-label="إجمالي المنتجات" className="px-5 py-3 text-muted-foreground">{s.totalProducts}</td>
+                    <td data-label="كمية المخزون" className="px-5 py-3 text-muted-foreground">{s.stockQty}</td>
+                    <td data-label="القيمة" className="px-5 py-3 text-muted-foreground">{s.stockValue.toLocaleString()}</td>
+                    <td data-label="الإعدادات" className="px-5 py-3">
                       <div className="flex items-center gap-1">
                         <button onClick={() => { setEditId(c.id); setForm({ name: c.name, description: c.description || "" }); setShowForm(true); }} className="p-1.5 text-yellow-500 hover:bg-yellow-500/10 rounded"><Edit size={15} /></button>
                         <button onClick={async () => { if (!confirm("حذف الماركة؟")) return; try { await remove.mutateAsync(c.id); toast.success("تم الحذف"); } catch (e: any) { toast.error(e.message); } }} className="p-1.5 text-destructive hover:bg-destructive/10 rounded"><Trash2 size={15} /></button>
