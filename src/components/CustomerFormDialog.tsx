@@ -371,24 +371,37 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
           {(() => { const k = idx(); return (
             <div>
               <label className={lbl}>الاتجاه</label>
-              <select ref={el => refs.current[k] = el} value={form.region_id || ""}
-                onChange={e => setForm({ ...form, region_id: e.target.value || null, state_id: null, locality_id: null, city_id: null })}
-                onKeyDown={handleEnter(k)} className={inp}>
-                <option value="">— اختر —</option>
-                {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
+              <div className={`${inp} !p-0`} style={{ minHeight: 38 }}>
+                <InlineSearchSelect
+                  ref={(h) => { refs.current[k] = h as Focusable; }}
+                  value={form.region_id || ""}
+                  options={regions.map(r => ({ value: r.id, label: r.name }))}
+                  onChange={(v) => setForm({ ...form, region_id: v || null, state_id: null, locality_id: null, city_id: null })}
+                  onNavigateNext={() => focusAt(k + 1)}
+                  placeholder="— اختر —"
+                  className="bg-transparent border-0 outline-none px-3 text-sm w-full h-full text-right truncate"
+                  title="اختر الاتجاه"
+                />
+              </div>
             </div>
           ); })()}
 
           {(() => { const k = idx(); return (
             <div>
               <label className={lbl}>الولاية</label>
-              <select ref={el => refs.current[k] = el} value={form.state_id || ""}
-                onChange={e => setForm({ ...form, state_id: e.target.value || null, city_id: null, locality_id: null })}
-                onKeyDown={handleEnter(k)} className={inp} disabled={!form.region_id}>
-                <option value="">— اختر —</option>
-                {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <div className={`${inp} !p-0 ${!form.region_id ? "opacity-50 pointer-events-none" : ""}`} style={{ minHeight: 38 }}>
+                <InlineSearchSelect
+                  ref={(h) => { refs.current[k] = h as Focusable; }}
+                  value={form.state_id || ""}
+                  options={states.map(s => ({ value: s.id, label: s.name }))}
+                  onChange={(v) => setForm({ ...form, state_id: v || null, city_id: null, locality_id: null })}
+                  onNavigateNext={() => focusAt(k + 1)}
+                  placeholder="— اختر —"
+                  disabled={!form.region_id}
+                  className="bg-transparent border-0 outline-none px-3 text-sm w-full h-full text-right truncate"
+                  title="اختر الولاية"
+                />
+              </div>
             </div>
           ); })()}
 
