@@ -85,7 +85,7 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
   const manageLabel = isPos ? "إدارة فواتير الكاش" : "إدارة الفواتير";
   const addPath = isPos ? "/invoices/cash/new" : "/invoices/create";
   const managePath = isPos ? "/invoices/cash/list" : "/invoices";
-  const rowPath = (id: string) => isPos ? `/invoices/cash/edit/${id}` : `/invoices/view/${id}`;
+  const rowPath = (inv: any) => (inv.source === "pos") ? `/invoices/cash/edit/${inv.id}` : `/invoices/view/${inv.id}`;
   const headerClass = isPos ? "text-base font-bold text-amber-700" : "text-base font-bold";
   const manageBtnClass = isPos
     ? "text-xs h-7 rounded-full bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
@@ -203,11 +203,12 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
                   const note = inv.user_note || inv.notes || "";
                   const cellBase =
                     "px-1.5 py-1 text-[10.5px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis";
-                  const rowExtra = isPos ? "bg-amber-50/40 dark:bg-amber-500/5" : "";
+                  const isRowPos = inv.source === "pos";
+                  const rowExtra = isRowPos ? "bg-amber-50/40 dark:bg-amber-500/5" : "";
                   return (
                     <tr
                       key={inv.id}
-                      onClick={() => navigate(rowPath(inv.id))}
+                      onClick={() => navigate(rowPath(inv))}
                       className={`border-b border-border hover:bg-muted/50 transition-colors cursor-pointer ${
                         idx % 2 === 1 ? "bg-muted/10" : ""
                       } ${rowExtra}`}
