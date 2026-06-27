@@ -269,7 +269,7 @@ export default function QuotesPage() {
                     <td>{fmtDate(q.date)}</td>
                     
                     <td>{fmtMoney(q.total)} {q.currency_code || currency}</td>
-                    <td><span className={st.cls}>{st.label}</span></td>
+                    <td><StatusChip kind="quote" value={q.status || "draft"} /></td>
                     <td>{q.created_by || ""}</td>
                     <td>
                       <span className="legacy-actions">
