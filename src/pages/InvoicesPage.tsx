@@ -552,7 +552,6 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
             ) : paginated.map((inv: any, idx: number) => {
               const ws = (inv.workflow_status || "new") as WorkflowStatus;
               const ps = getPaymentStatus(inv);
-              const pmeta = PAYMENT_META[ps];
               return (
                 <MobileDocCard
                   key={inv.id}
@@ -564,9 +563,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                   status={
                     <span className="inline-flex items-center gap-1 flex-wrap">
                       <WorkflowStatusBadge status={ws} invoiceId={inv.id} />
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium border ${pmeta.cls}`}>
-                        {pmeta.label}
-                      </span>
+                      <StatusChip kind="payment" value={ps} />
                       <span className="text-[10px] text-muted-foreground tabular-nums">
                         مدفوع: {fmtMoney(inv.paid_amount)}
                       </span>
