@@ -390,11 +390,12 @@ export default function PurchasePage() {
                   onOpen={() => navigate(`/purchase/edit/${o.id}`)}
                   actions={
                     <>
-                      <button className="btn-xs btn-info" onClick={() => navigate(`/preview/purchase/${o.id}`)} title="طباعة">🖨 طباعة</button>
                       {o.status !== "received" && (
-                        <button className="btn-xs btn-primary" onClick={() => handleConvertToInvoice(o)}>→ استلام</button>
+                        <button className="btn-xs btn-primary" onClick={() => handleConvertToInvoice(o)} aria-label="استلام">→ استلام</button>
                       )}
-                      <button className="btn-xs btn-danger" onClick={() => handleDelete(o.id)}>🗑 حذف</button>
+                      <button className="btn-xs btn-info" onClick={() => navigate(`/preview/purchase/${o.id}`)} aria-label="طباعة">🖨 طباعة</button>
+                      <button className="btn-xs btn-success" onClick={() => navigate(`/purchase/edit/${o.id}`)} aria-label="تعديل">📄 تعديل</button>
+                      <button className="btn-xs btn-danger" onClick={() => handleDelete(o.id)} aria-label="حذف">🗑 حذف</button>
                     </>
                   }
                 />
