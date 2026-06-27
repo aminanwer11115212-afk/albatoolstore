@@ -51,9 +51,27 @@ const QUOTE_MAP: Record<string, { label: string; tone: string }> = {
   rejected: { label: "مرفوض", tone: "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30" },
 };
 
+const PURCHASE_MAP: Record<string, { label: string; tone: string }> = {
+  pending:   { label: "معلق",    tone: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30" },
+  received:  { label: "مستلَم",  tone: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30" },
+  cancelled: { label: "ملغي",   tone: "bg-muted text-muted-foreground border-border" },
+};
+
+const RETURN_MAP: Record<string, { label: string; tone: string }> = {
+  pending:   { label: "معلق",   tone: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30" },
+  completed: { label: "مكتمل", tone: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30" },
+  cancelled: { label: "ملغي",  tone: "bg-muted text-muted-foreground border-border" },
+};
+
 export function StatusChip({ kind, value, label, icon, size = "sm", count, className }: StatusChipProps) {
   const key = String(value ?? "").toLowerCase();
-  const map = kind === "payment" ? PAYMENT_MAP : kind === "workflow" ? WORKFLOW_MAP : kind === "quote" ? QUOTE_MAP : null;
+  const map =
+    kind === "payment" ? PAYMENT_MAP :
+    kind === "workflow" ? WORKFLOW_MAP :
+    kind === "quote" ? QUOTE_MAP :
+    kind === "purchase" ? PURCHASE_MAP :
+    kind === "return" ? RETURN_MAP :
+    null;
   const entry = map?.[key];
   const finalLabel = label ?? entry?.label ?? value ?? "—";
   const tone = entry?.tone ?? "bg-muted text-muted-foreground border-border";
