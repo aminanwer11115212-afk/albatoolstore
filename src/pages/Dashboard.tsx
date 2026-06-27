@@ -24,7 +24,9 @@ import ExchangeRateDialog from "@/components/dashboard/ExchangeRateDialog";
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: invoices, isLoading: invLoading } = useInvoicesWithCustomers();
+  // قناتان مستقلتان تمامًا: استعلام منفصل لكل واحدة + حدّ 50 على مستوى الخادم
+  const { data: regularInvoices, isLoading: regInvLoading } = useInvoicesWithCustomers(50, "regular");
+  const { data: posInvoices, isLoading: posInvLoading } = useInvoicesWithCustomers(50, "pos");
   const { data: lowStock } = useLowStockProducts();
   const { data: recentTx } = useRecentTransactions();
   const { data: quotes, isLoading: quotesLoading } = useQuotesWithCustomers();
@@ -119,16 +121,16 @@ export default function Dashboard() {
         <div className="order-1 lg:order-2">
           <DashboardRecentInvoices
             variant="regular"
-            invoices={(invoices || []).filter((i: any) => (i.source || "regular") !== "pos")}
-            isLoading={invLoading}
+            invoices={regularInvoices || []}
+            isLoading={regInvLoading}
             limit={50}
           />
         </div>
         <div className="order-2 lg:order-3">
           <DashboardRecentInvoices
             variant="pos"
-            invoices={(invoices || []).filter((i: any) => (i.source || "regular") === "pos")}
-            isLoading={invLoading}
+            invoices={posInvoices || []}
+            isLoading={posInvLoading}
             limit={50}
           />
         </div>
