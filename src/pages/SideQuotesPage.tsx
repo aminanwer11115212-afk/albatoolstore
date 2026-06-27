@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { startsWithAny } from "@/utils/searchMatch";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompanySettings } from "@/hooks/useData";
-import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 
 function useSideQuotes() {
   return useQuery({
@@ -235,7 +235,7 @@ export default function SideQuotesPage() {
             <span style={{ color: "#666" }}>{filtered.length} من {totalCount}</span>
           </div>
 
-          <div style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>
+          <div className="desktop-table-wrap" style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto", border: "1px solid hsl(var(--border))", borderRadius: 4 }}>
             <table className="legacy-table" cellSpacing={0} width="100%">
               <thead style={{ position: "sticky", top: 0, zIndex: 5 }}>
                 <tr>
@@ -330,6 +330,34 @@ export default function SideQuotesPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards list */}
+          <div className="mobile-doc-list">
+            {isLoading ? (
+              <div style={{ textAlign: "center", padding: 30 }}>جاري التحميل...</div>
+            ) : filtered.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا توجد عروض جانبية</div>
+            ) : filtered.map((q: any, idx: number) => (
+              <MobileDocCard
+                key={q.id}
+                index={idx + 1}
+                number={q.quote_number}
+                party={q.customers?.name || "-"}
+                date={fmtDate(q.date)}
+                amount={`${fmtMoney(q.total)} ${q.currency_code || currency}`}
+                status={<span className="side-badge">{ownerName(q.created_by_uid)}</span>}
+                onOpen={() => navigate(`/quotes/side/${q.id}`)}
+                actions={
+                  <>
+                    <button className="btn-xs btn-warning" onClick={() => navigate(`/quotes/side/edit/${q.id}`)}>✎ تعديل</button>
+                    <button className="btn-xs btn-info" onClick={() => handlePrintSide(q)}>🖨 طباعة</button>
+                    <button className="btn-xs btn-primary" onClick={() => handleConvert(q)}>→ فاتورة</button>
+                    <button className="btn-xs btn-danger" onClick={() => handleDelete(q.id)}>🗑 حذف</button>
+                  </>
+                }
+              />
+            ))}
           </div>
         </div>
       </div>

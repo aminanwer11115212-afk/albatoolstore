@@ -13,6 +13,7 @@ import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import WorkflowStatusBadge, { WORKFLOW_STATUSES, type WorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { StatusChip } from "@/components/ui/status-chip";
 import ShippingDispatchDialog from "@/components/invoice/ShippingDispatchDialog";
 
 // Status label map matching old system (custom.css .st-* classes)
@@ -464,14 +465,11 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                     <td>
                       {(() => {
                         const ps = getPaymentStatus(inv);
-                        const meta = PAYMENT_META[ps];
                         const paid = Number(inv.paid_amount || 0);
                         const total = Number(inv.total || 0);
                         return (
                           <div className="flex flex-col items-start gap-0.5">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium border ${meta.cls}`}>
-                              {meta.label}
-                            </span>
+                            <StatusChip kind="payment" value={ps} />
                             <span className="text-[10px] text-muted-foreground tabular-nums" title="المدفوع / الإجمالي">
                               {fmtMoney(paid)} / {fmtMoney(total)}
                             </span>
@@ -554,7 +552,6 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
             ) : paginated.map((inv: any, idx: number) => {
               const ws = (inv.workflow_status || "new") as WorkflowStatus;
               const ps = getPaymentStatus(inv);
-              const pmeta = PAYMENT_META[ps];
               return (
                 <MobileDocCard
                   key={inv.id}
@@ -566,9 +563,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                   status={
                     <span className="inline-flex items-center gap-1 flex-wrap">
                       <WorkflowStatusBadge status={ws} invoiceId={inv.id} />
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium border ${pmeta.cls}`}>
-                        {pmeta.label}
-                      </span>
+                      <StatusChip kind="payment" value={ps} />
                       <span className="text-[10px] text-muted-foreground tabular-nums">
                         مدفوع: {fmtMoney(inv.paid_amount)}
                       </span>

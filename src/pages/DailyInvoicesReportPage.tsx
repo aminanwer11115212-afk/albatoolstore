@@ -5,6 +5,7 @@ import { Search, ChevronLeft, ChevronRight, Eye, FileText } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import { StatusChip } from "@/components/ui/status-chip";
 
 export default function DailyInvoicesReportPage() {
   const navigate = useNavigate();
@@ -84,7 +85,7 @@ export default function DailyInvoicesReportPage() {
       {/* Table */}
       <div className="legacy-card card-block" data-section="table" data-section-label="جدول الفواتير">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm mobile-stack-table">
             <thead><tr className="bg-muted">
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground">#</th>
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground">رقم الفاتورة</th>
@@ -98,16 +99,15 @@ export default function DailyInvoicesReportPage() {
               {isLoading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               : paginated.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد فواتير في هذا التاريخ</td></tr>
               : paginated.map((inv: any, i: number) => {
-                const st = statusMap[inv.status] || { label: inv.status, color: "bg-muted text-foreground" };
                 return (
                   <tr key={inv.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="px-4 py-3 text-muted-foreground">{(page - 1) * perPage + i + 1}</td>
-                    <td className="px-4 py-3 font-medium text-foreground">{inv.invoice_number}</td>
-                    <td className="px-4 py-3 text-foreground">{(inv.customers as any)?.name || "كاش"}</td>
-                    <td className="px-4 py-3 font-bold text-foreground">{Number(inv.total || 0).toLocaleString()}</td>
-                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span></td>
-                    <td className="px-4 py-3 text-foreground text-xs">{new Date(inv.created_at).toLocaleTimeString("ar-SA")}</td>
-                    <td className="px-4 py-3">
+                    <td data-label="#" className="px-4 py-3 text-muted-foreground">{(page - 1) * perPage + i + 1}</td>
+                    <td data-label="رقم الفاتورة" className="px-4 py-3 font-medium text-foreground">{inv.invoice_number}</td>
+                    <td data-label="اسم العميل" className="px-4 py-3 text-foreground">{(inv.customers as any)?.name || "كاش"}</td>
+                    <td data-label="مبلغ الفاتورة" className="px-4 py-3 font-bold text-foreground">{Number(inv.total || 0).toLocaleString()}</td>
+                    <td data-label="حالة الفاتورة" className="px-4 py-3"><StatusChip kind="payment" value={inv.status} /></td>
+                    <td data-label="وقت الإنشاء" className="px-4 py-3 text-foreground text-xs">{new Date(inv.created_at).toLocaleTimeString("ar-SA")}</td>
+                    <td data-label="الإجراءات" className="px-4 py-3">
                       <button
                         onClick={() => navigate(`/invoices/${inv.id}`)}
                         className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 transition-colors min-h-[32px] min-w-[32px] inline-flex items-center justify-center"

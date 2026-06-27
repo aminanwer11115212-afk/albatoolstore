@@ -13,6 +13,7 @@ import { deductStockForLines } from "@/utils/stockDeduction";
 
 import { useQuoteConvertedDialog } from "@/hooks/useQuoteConvertedDialog";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { StatusChip } from "@/components/ui/status-chip";
 
 export const QUOTE_STATUS_KEYS = ["draft", "sent", "accepted", "rejected"] as const;
 
@@ -268,7 +269,7 @@ export default function QuotesPage() {
                     <td>{fmtDate(q.date)}</td>
                     
                     <td>{fmtMoney(q.total)} {q.currency_code || currency}</td>
-                    <td><span className={st.cls}>{st.label}</span></td>
+                    <td><StatusChip kind="quote" value={q.status || "draft"} /></td>
                     <td>{q.created_by || ""}</td>
                     <td>
                       <span className="legacy-actions">
@@ -369,7 +370,6 @@ export default function QuotesPage() {
             ) : paginated.length === 0 ? (
               <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا توجد عروض أسعار</div>
             ) : paginated.map((q: any, idx: number) => {
-              const st = statusMap[q.status || "draft"] || statusMap.draft;
               return (
                 <MobileDocCard
                   key={q.id}
@@ -378,7 +378,7 @@ export default function QuotesPage() {
                   party={q.customers?.name || "-"}
                   date={fmtDate(q.date)}
                   amount={`${fmtMoney(q.total)} ${q.currency_code || currency}`}
-                  status={<span className={st.cls}>{st.label}</span>}
+                  status={<StatusChip kind="quote" value={q.status || "draft"} />}
                   onOpen={() => navigate(`/quotes/view/${q.id}`)}
                   actions={
                     <>
