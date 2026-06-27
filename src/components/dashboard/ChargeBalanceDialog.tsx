@@ -389,9 +389,23 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>إلغاء</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white">
+          <Button
+            onClick={() => handleSave(true)}
+            disabled={saving}
+            variant="outline"
+            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+            title="حفظ الشحن وإرسال رسالة واتساب نصية مختصرة بدون روابط"
+          >
+            {saving ? "..." : "شحن + واتساب نصي"}
+          </Button>
+          <Button
+            onClick={() => handleSave(false)}
+            disabled={saving}
+            className="bg-green-600 hover:bg-green-700 text-white"
+            title="حفظ الشحن فقط بدون إرسال أي رسالة"
+          >
             {saving ? "جاري الحفظ..." : "شحن الرصيد"}
           </Button>
         </DialogFooter>
