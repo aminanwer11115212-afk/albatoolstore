@@ -465,14 +465,11 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                     <td>
                       {(() => {
                         const ps = getPaymentStatus(inv);
-                        const meta = PAYMENT_META[ps];
                         const paid = Number(inv.paid_amount || 0);
                         const total = Number(inv.total || 0);
                         return (
                           <div className="flex flex-col items-start gap-0.5">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium border ${meta.cls}`}>
-                              {meta.label}
-                            </span>
+                            <StatusChip kind="payment" value={ps} />
                             <span className="text-[10px] text-muted-foreground tabular-nums" title="المدفوع / الإجمالي">
                               {fmtMoney(paid)} / {fmtMoney(total)}
                             </span>
