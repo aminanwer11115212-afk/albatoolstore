@@ -305,7 +305,7 @@ export default function CustomerStatementPage() {
           <div data-section="invoices" data-section-label="الفواتير" className="legacy-card card-block">
             <h3 className="px-5 py-3 font-semibold text-foreground border-b border-border">الفواتير ({filteredInvoices.length})</h3>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm mobile-stack-table">
                 <thead><tr className="bg-muted">
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">رقم الفاتورة</th>
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
@@ -318,11 +318,11 @@ export default function CustomerStatementPage() {
                   : !filteredInvoices.length ? <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد فواتير مطابقة</td></tr>
                   : filteredInvoices.map((inv: any) => (
                     <tr key={inv.id} className="border-b border-border hover:bg-muted/50">
-                      <td className="px-5 py-3 text-foreground">{inv.invoice_number}</td>
-                      <td className="px-5 py-3 text-foreground">{inv.date}</td>
-                      <td className="px-5 py-3 text-foreground">{Number(inv.total).toLocaleString()}</td>
-                      <td className="px-5 py-3 text-success">{Number(inv.paid_amount).toLocaleString()}</td>
-                      <td className="px-5 py-3 text-destructive">{(Number(inv.total) - Number(inv.paid_amount)).toLocaleString()}</td>
+                      <td data-label="رقم الفاتورة" className="px-5 py-3 text-foreground">{inv.invoice_number}</td>
+                      <td data-label="التاريخ" className="px-5 py-3 text-foreground">{inv.date}</td>
+                      <td data-label="المبلغ" className="px-5 py-3 text-foreground">{Number(inv.total).toLocaleString()}</td>
+                      <td data-label="المدفوع" className="px-5 py-3 text-success">{Number(inv.paid_amount).toLocaleString()}</td>
+                      <td data-label="المتبقي" className="px-5 py-3 text-destructive">{(Number(inv.total) - Number(inv.paid_amount)).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -334,7 +334,7 @@ export default function CustomerStatementPage() {
             <div data-section="transactions" data-section-label="المعاملات" className="legacy-card card-block">
               <h3 className="px-5 py-3 font-semibold text-foreground border-b border-border">المعاملات ({filteredTransactions.length})</h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm mobile-stack-table">
                   <thead><tr className="bg-muted">
                     <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
                     <th className="text-right px-5 py-3 font-semibold text-muted-foreground">النوع</th>
@@ -344,10 +344,10 @@ export default function CustomerStatementPage() {
                   <tbody>
                     {filteredTransactions.map((t: any) => (
                       <tr key={t.id} className="border-b border-border hover:bg-muted/50">
-                        <td className="px-5 py-3 text-foreground">{t.date}</td>
-                        <td className="px-5 py-3 text-foreground">{t.type === "income" ? "إيراد" : "مصروف"}</td>
-                        <td className="px-5 py-3 text-foreground">{Number(t.amount).toLocaleString()}</td>
-                        <td className="px-5 py-3 text-muted-foreground">{t.description || "-"}</td>
+                        <td data-label="التاريخ" className="px-5 py-3 text-foreground">{t.date}</td>
+                        <td data-label="النوع" className="px-5 py-3 text-foreground">{t.type === "income" ? "إيراد" : "مصروف"}</td>
+                        <td data-label="المبلغ" className="px-5 py-3 text-foreground">{Number(t.amount).toLocaleString()}</td>
+                        <td data-label="الوصف" className="px-5 py-3 text-muted-foreground">{t.description || "-"}</td>
                       </tr>
                     ))}
                   </tbody>
