@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import { startsWithAny } from "@/utils/searchMatch";
+import { openWhatsApp } from "@/utils/whatsapp";
 
 type Customer = { id: string; name: string; phone: string | null; balance: number | null };
 type Account = { id: string; name: string; bank_name: string | null; account_type: string | null };
