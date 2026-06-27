@@ -57,6 +57,7 @@ function docTypeLabel(t: string): string {
     case "return": return "مرتجع";
     case "statement-customer": return "كشف حساب عميل";
     case "statement-supplier": return "كشف حساب مورد";
+    case "credit-charge": return "إيصال شحن رصيد";
     default: return "مستند";
   }
 }
