@@ -71,9 +71,17 @@ export default function DashboardCashFlow({ stats }: Props) {
             </div>
           </TabsContent>
           <TabsContent value="sales">
-            <div className="text-center py-3">
-              <p className="text-2xl font-bold text-primary">{sales.toLocaleString()} </p>
-              <p className="text-xs text-muted-foreground mt-1">إجمالي المبيعات</p>
+            <div className="grid grid-cols-2 gap-3 py-2">
+              <div className="text-center rounded-lg border border-primary/30 p-3">
+                <p className="text-[11px] text-muted-foreground mb-1">📄 مبيعات الحسابات</p>
+                <p className="text-xl font-bold text-primary">{regularSales.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">هذا العام: {regularSalesYear.toLocaleString()}</p>
+              </div>
+              <div className="text-center rounded-lg border border-amber-400/50 bg-amber-50/40 dark:bg-amber-500/5 p-3">
+                <p className="text-[11px] text-amber-700 mb-1">🛒 مبيعات الكاش</p>
+                <p className="text-xl font-bold text-amber-600">{posSales.toLocaleString()}</p>
+                <p className="text-[10px] text-amber-700/80 mt-1">هذا العام: {posSalesYear.toLocaleString()}</p>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
