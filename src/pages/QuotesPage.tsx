@@ -370,7 +370,6 @@ export default function QuotesPage() {
             ) : paginated.length === 0 ? (
               <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا توجد عروض أسعار</div>
             ) : paginated.map((q: any, idx: number) => {
-              const st = statusMap[q.status || "draft"] || statusMap.draft;
               return (
                 <MobileDocCard
                   key={q.id}
@@ -379,7 +378,7 @@ export default function QuotesPage() {
                   party={q.customers?.name || "-"}
                   date={fmtDate(q.date)}
                   amount={`${fmtMoney(q.total)} ${q.currency_code || currency}`}
-                  status={<span className={st.cls}>{st.label}</span>}
+                  status={<StatusChip kind="quote" value={q.status || "draft"} />}
                   onOpen={() => navigate(`/quotes/view/${q.id}`)}
                   actions={
                     <>
