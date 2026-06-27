@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useProducts, useProductCategories, useWarehouses } from "@/hooks/useData";
 import { useDialogSize } from "@/hooks/useDialogSize";
+import InlineSearchSelect from "@/components/InlineSearchSelect";
 
 export interface QuickAddProductDialogProps {
   open: boolean;
@@ -236,16 +237,16 @@ export default function QuickAddProductDialog({
             <div className="col-span-2">
               <label className={labelClass}>الفئات (يمكن اختيار أكثر من فئة)</label>
               <div className="flex items-center gap-2">
-                <select
-                  value={categoryToAdd}
-                  onChange={(e) => addCategoryToSelection(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">-- اختر فئة لإضافتها --</option>
-                  {availableCategories.map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <div className={inputClass + " !p-0"} style={{ minHeight: 38 }}>
+                  <InlineSearchSelect
+                    value=""
+                    options={availableCategories.map((c: any) => ({ value: c.id, label: c.name }))}
+                    onChange={(v) => addCategoryToSelection(v)}
+                    placeholder="— اختر فئة لإضافتها —"
+                    className="bg-transparent border-0 outline-none px-3 text-sm w-full h-full text-right truncate"
+                    title="اختر فئة"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={() => setCatDialogOpen(true)}
@@ -280,10 +281,16 @@ export default function QuickAddProductDialog({
             <div>
               <label className={labelClass}>الماركة</label>
               <div className="flex items-center gap-2">
-                <select value={form.company_id} onChange={e => setForm({ ...form, company_id: e.target.value })} className={inputClass}>
-                  <option value="">-- الماركة --</option>
-                  {(companies || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <div className={inputClass + " !p-0"} style={{ minHeight: 38 }}>
+                  <InlineSearchSelect
+                    value={form.company_id}
+                    options={(companies || []).map((c: any) => ({ value: c.id, label: c.name }))}
+                    onChange={(v) => setForm({ ...form, company_id: v })}
+                    placeholder="— الماركة —"
+                    className="bg-transparent border-0 outline-none px-3 text-sm w-full h-full text-right truncate"
+                    title="اختر الماركة"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={() => setCompanyDialogOpen(true)}
@@ -299,10 +306,16 @@ export default function QuickAddProductDialog({
             {/* الصف 3: المستودع + الوحدة + (فراغ) */}
             <div>
               <label className={labelClass}>مستودع</label>
-              <select value={form.warehouse_id} onChange={e => setForm({ ...form, warehouse_id: e.target.value })} className={inputClass}>
-                <option value="">-- المستودع --</option>
-                {(warehouses || []).map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
+              <div className={inputClass + " !p-0"} style={{ minHeight: 38 }}>
+                <InlineSearchSelect
+                  value={form.warehouse_id}
+                  options={(warehouses || []).map((w: any) => ({ value: w.id, label: w.name }))}
+                  onChange={(v) => setForm({ ...form, warehouse_id: v })}
+                  placeholder="— المستودع —"
+                  className="bg-transparent border-0 outline-none px-3 text-sm w-full h-full text-right truncate"
+                  title="اختر المستودع"
+                />
+              </div>
             </div>
             <div>
               <label className={labelClass}>الوحدة</label>
