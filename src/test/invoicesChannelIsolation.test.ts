@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { QueryClient } from "@tanstack/react-query";
+
 
 /**
  * عزل قنوات الفواتير (حساب/كاش) على مستوى الاستعلام:
@@ -59,26 +59,10 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-import { useInvoicesWithCustomers } from "@/hooks/useData";
-
-async function runHook(limit: number | undefined, channel: "regular" | "pos" | "all") {
-  // استدعاء مباشر للـ queryFn عبر QueryClient لتفادي حاجة renderer
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const opts: any = (useInvoicesWithCustomers as any)(limit, channel);
-  // useQuery نفسه يحتاج React؛ بدلاً منه ننفّذ queryFn يدوياً عبر إعادة إنشاء نفس المنطق:
-  // نستخرج queryFn من النداء الفعلي للـ hook لكن hooks تتطلّب renderer.
-  // لذا نستدعي الدالة بتكرار سلوكها عبر استدعاء داخلي: نستخدم prefetchQuery.
-  // البديل: ننفّذ queryFn بتمرير نفس البارامترات يدوياً.
-  await qc.prefetchQuery(opts);
-  return qc.getQueryData(opts.queryKey) as Row[];
-}
-
-// نظراً لأن useInvoicesWithCustomers يستدعي useQuery داخلياً، نختبر سلوكه
-// بإعادة استخدام نفس الدوال عبر استدعاء مباشر للاستعلام الذي يبنيه.
-// لتفادي تعقيد renderHook، نختبر السلوك على مستوى queryFn المُجمَّعة:
 import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import { useInvoicesWithCustomers } from "@/hooks/useData";
 
 function wrapperFactory() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
