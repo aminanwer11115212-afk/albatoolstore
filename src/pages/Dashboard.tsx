@@ -121,16 +121,16 @@ export default function Dashboard() {
         <div className="order-1 lg:order-2">
           <DashboardRecentInvoices
             variant="regular"
-            invoices={(invoices || []).filter((i: any) => (i.source || "regular") !== "pos")}
-            isLoading={invLoading}
+            invoices={regularInvoices || []}
+            isLoading={regInvLoading}
             limit={50}
           />
         </div>
         <div className="order-2 lg:order-3">
           <DashboardRecentInvoices
             variant="pos"
-            invoices={(invoices || []).filter((i: any) => (i.source || "regular") === "pos")}
-            isLoading={invLoading}
+            invoices={posInvoices || []}
+            isLoading={posInvLoading}
             limit={50}
           />
         </div>
