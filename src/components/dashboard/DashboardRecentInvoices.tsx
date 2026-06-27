@@ -37,9 +37,17 @@ const statusStyles: Record<string, { label: string; className: string }> = {
 // Default column widths (px) for: الفاتورة#، العميل، حالة الدفع، التجهيز، التاريخ، المبلغ، الملاحظة
 const DEFAULT_COL_WIDTHS: (number | null)[] = [56, 110, 64, 78, 64, 80, 130];
 
-export default function DashboardRecentInvoices({ invoices, isLoading }: Props) {
+export default function DashboardRecentInvoices({ invoices, isLoading, variant = "regular", limit = 50 }: Props) {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isPos = variant === "pos";
+
+  const STORAGE_KEY = userScopedLegacyKey(
+    isPos ? "dashboard:recentInvoicesPos:colWidths:v1" : "dashboard:recentInvoices:colWidths:v1"
+  );
+  const LOCK_KEY = userScopedLegacyKey(
+    isPos ? "dashboard:recentInvoicesPos:colsLocked:v1" : "dashboard:recentInvoices:colsLocked:v1"
+  );
 
   const [colsLocked, setColsLocked] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
@@ -72,11 +80,28 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
     }
   };
 
+  const title = isPos ? "🛒 آخر فواتير الكاش" : "📄 الفواتير الأخيرة";
+  const addLabel = isPos ? "إضافة فاتورة كاش" : "إضافة بيع";
+  const manageLabel = isPos ? "إدارة فواتير الكاش" : "إدارة الفواتير";
+  const addPath = isPos ? "/invoices/cash/new" : "/invoices/create";
+  const managePath = isPos ? "/invoices/cash/list" : "/invoices";
+  const rowPath = (id: string) => isPos ? `/invoices/cash/edit/${id}` : `/invoices/view/${id}`;
+  const headerClass = isPos ? "text-base font-bold text-amber-700" : "text-base font-bold";
+  const manageBtnClass = isPos
+    ? "text-xs h-7 rounded-full bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+    : "text-xs h-7 rounded-full bg-green-600 text-white border-green-600 hover:bg-green-700";
+  const addBtnClass = isPos
+    ? "text-xs h-7 rounded-full bg-amber-500 hover:bg-amber-600 text-white"
+    : "text-xs h-7 rounded-full";
+  const cardClass = isPos
+    ? "flex flex-col border-amber-300/60"
+    : "flex flex-col";
+
   return (
-    <Card className="flex flex-col" style={{ height: "var(--invoices-card-height, 500px)" }}>
+    <Card className={cardClass} style={{ height: "var(--invoices-card-height, 500px)" }}>
       <CardHeader className="p-4 pb-2 border-b border-border">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-base font-bold">الفواتير الأخيرة</CardTitle>
+          <CardTitle className={headerClass}>{title}</CardTitle>
           <div className="flex gap-1.5">
             <Button
               size="sm"
@@ -87,16 +112,16 @@ export default function DashboardRecentInvoices({ invoices, isLoading }: Props) 
             >
               {colsLocked ? COLS_BTN_EDIT_LABEL : COLS_BTN_SAVE_LABEL} الأعمدة
             </Button>
-            <Button size="sm" className="text-xs h-7 rounded-full" onClick={() => navigate("/invoices/create")}>
-              إضافة بيع
+            <Button size="sm" className={addBtnClass} onClick={() => navigate(addPath)}>
+              {addLabel}
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="text-xs h-7 rounded-full bg-green-600 text-white border-green-600 hover:bg-green-700"
-              onClick={() => navigate("/invoices")}
+              className={manageBtnClass}
+              onClick={() => navigate(managePath)}
             >
-              إدارة الفواتير
+              {manageLabel}
             </Button>
           </div>
         </div>
