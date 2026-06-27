@@ -71,6 +71,22 @@
     justify-content: flex-end;
     flex-wrap: wrap;
   }
+  /* أزرار الأكشن داخل الجدول المكدّس: touch target ≥40px وتباعد مريح */
+  .mobile-stack-table td:not([data-label]) > div,
+  .mobile-stack-table td:not([data-label]) > span {
+    gap: 8px !important;
+    flex-wrap: wrap;
+  }
+  .mobile-stack-table td:not([data-label]) button,
+  .mobile-stack-table td:not([data-label]) a {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 6px 10px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+  }
 }
 
 /* منع تداخل/التفاف/تراكب النصوص على شاشات الهاتف (≤640px) — يطبَّق على كل صفحات التطبيق */
