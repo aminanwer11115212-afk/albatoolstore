@@ -1,0 +1,10 @@
+ALTER TABLE public.product_categories REPLICA IDENTITY FULL;
+ALTER TABLE public.product_companies REPLICA IDENTITY FULL;
+ALTER TABLE public.warehouses REPLICA IDENTITY FULL;
+ALTER TABLE public.product_category_links REPLICA IDENTITY FULL;
+ALTER TABLE public.product_brand_links REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.product_categories;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.product_companies;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.warehouses;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.product_category_links;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.product_brand_links;
