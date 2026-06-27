@@ -14,8 +14,8 @@ type PurchaseValue = "pending" | "received" | "cancelled";
 type ReturnValue = "pending" | "completed" | "cancelled";
 
 export interface StatusChipProps {
-  kind: "payment" | "workflow" | "quote" | "custom";
-  value?: PaymentValue | WorkflowValue | QuoteValue | string;
+  kind: "payment" | "workflow" | "quote" | "purchase" | "return" | "custom";
+  value?: PaymentValue | WorkflowValue | QuoteValue | PurchaseValue | ReturnValue | string;
   /** نص مخصص يعرض داخل الشارة (يتجاوز خريطة الترجمة الافتراضية). */
   label?: ReactNode;
   /** أيقونة اختيارية قبل النص. */
