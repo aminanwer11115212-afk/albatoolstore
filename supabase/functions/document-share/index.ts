@@ -748,7 +748,7 @@ Deno.serve(async (req) => {
     } else if (tk.doc_type === "credit-charge") {
       const { data: tx } = await supabase
         .from("transactions")
-        .select("id, amount, date, method, description, allocation, customers(name, phone, address, balance)")
+        .select("id, amount, date, method, description, allocation, customers(name, phone, address, balance, credit_balance)")
         .eq("id", tk.doc_id)
         .maybeSingle();
       if (!tx) return buildErrorHTML("الإيصال غير موجود", 404);
@@ -758,6 +758,12 @@ Deno.serve(async (req) => {
       const amount = Number((tx as any).amount || 0);
       const balanceBefore = Number(alloc.balance_before ?? 0);
       const balanceAfter = Number(alloc.balance_after ?? Math.max(0, balanceBefore - amount));
+      const freshBalance = Number(c?.balance || 0);
+      const freshCredit = Number(c?.credit_balance || 0);
+      const netNow = freshBalance - freshCredit;
+      const netLabel = netNow > 0.001 ? "صافي المطلوب منكم بعد الشحن" : netNow < -0.001 ? "رصيد دائن لكم بعد الشحن" : "تم تسديد الحساب بالكامل ✅";
+      const netColor = netNow > 0.001 ? "#c0392b" : "#15803d";
+      const netValue = Math.abs(netNow);
       const methodTxt = (tx as any).method === "bank_transfer" ? "تحويل بنكي" : (tx as any).method === "card" ? "بطاقة" : "نقدي";
       const items: Array<{ invoice_number: string; applied: number }> = Array.isArray(alloc.items) ? alloc.items : [];
       const leftover = Number(alloc.leftover || 0);
