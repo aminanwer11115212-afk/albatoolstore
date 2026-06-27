@@ -183,7 +183,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
           maxWidth: `calc(100vw - 16px)`,
           zIndex: 9999,
         };
-        return createPortal(
+        return (
           <div
             ref={menuRef}
             className="bg-card border-2 border-primary rounded shadow-lg ring-2 ring-primary/40"
@@ -258,8 +258,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
                 );
               })}
             </div>
-          </div>,
-          document.body
+          </div>
         );
       })()}
     </div>
