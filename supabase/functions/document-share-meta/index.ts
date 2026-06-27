@@ -372,6 +372,14 @@ Deno.serve(async (req) => {
           const { data } = await admin
             .from("suppliers").select("name").eq("id", tk.doc_id).maybeSingle();
           partyName = (data as any)?.name || "";
+        } else if (tk.doc_type === "credit-charge") {
+          const { data } = await admin
+            .from("transactions")
+            .select("amount, customers(name)")
+            .eq("id", tk.doc_id)
+            .maybeSingle();
+          partyName = (data as any)?.customers?.name || "";
+          docNumber = String((data as any)?.amount ?? "");
         }
 
         title = `${docLabel}${docNumber ? " #" + docNumber : ""}${partyName ? " - " + partyName : ""}`;
