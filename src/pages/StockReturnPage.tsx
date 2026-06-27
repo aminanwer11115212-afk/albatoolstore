@@ -6,12 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
-
-const statusMap: Record<string, { label: string; cls: string }> = {
-  pending:   { label: "معلق",  cls: "st-pending" },
-  completed: { label: "مكتمل", cls: "st-accepted" },
-  cancelled: { label: "ملغي",  cls: "st-rejected" },
-};
+import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { StatusChip } from "@/components/ui/status-chip";
 
 function useReturnsFullList() {
   return useQuery({
