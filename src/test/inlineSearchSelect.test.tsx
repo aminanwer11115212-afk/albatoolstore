@@ -74,7 +74,8 @@ describe("InlineSearchSelect", () => {
     // useEffect يلصق capture-listeners توقف الانتشار.
     act(() => {
       item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-      item.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      // jsdom لا يوفّر PointerEvent دائماً — نستخدم Event عام مع bubbles.
+      item.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     });
 
     expect(docListener).not.toHaveBeenCalled();
