@@ -218,7 +218,7 @@ export default function SuppliersPage() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm mobile-stack-table">
             <thead><tr className="bg-muted">
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground w-10">#</th>
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الاسم</th>
@@ -233,12 +233,12 @@ export default function SuppliersPage() {
               : paginated.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا يوجد موردين</td></tr>
               : paginated.map((s: any, i: number) => (
                 <tr key={s.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                  <td className="px-4 py-3 text-muted-foreground">{(page - 1) * perPage + i + 1}</td>
-                  <td className="px-4 py-3 font-medium text-primary cursor-pointer hover:underline" onClick={() => setViewSupplier(s)}>{s.name}</td>
-                  <td className="px-4 py-3 text-foreground">{s.company || "-"}</td>
-                  <td className="px-4 py-3 text-foreground" dir="ltr">{s.phone || "-"}</td>
-                  <td className="px-4 py-3 text-foreground" dir="ltr">{s.email || "-"}</td>
-                  <td className="px-4 py-3 font-semibold text-foreground">{Number(s.balance || 0).toLocaleString()}</td>
+                  <td data-label="#" className="px-4 py-3 text-muted-foreground">{(page - 1) * perPage + i + 1}</td>
+                  <td data-label="الاسم" className="px-4 py-3 font-medium text-primary cursor-pointer hover:underline" onClick={() => setViewSupplier(s)}>{s.name}</td>
+                  <td data-label="الشركة" className="px-4 py-3 text-foreground">{s.company || "-"}</td>
+                  <td data-label="الهاتف" className="px-4 py-3 text-foreground" dir="ltr">{s.phone || "-"}</td>
+                  <td data-label="البريد" className="px-4 py-3 text-foreground" dir="ltr">{s.email || "-"}</td>
+                  <td data-label="الرصيد" className="px-4 py-3 font-semibold text-foreground">{Number(s.balance || 0).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button onClick={() => setViewSupplier(s)} className="px-2 py-1 bg-blue-500/10 text-blue-600 rounded text-xs hover:bg-blue-500/20 flex items-center gap-1"><Eye size={12} /> عرض</button>
