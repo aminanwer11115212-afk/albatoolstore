@@ -1952,6 +1952,23 @@ input[type="number"] {
   .mobile-doc-card { padding: 8px !important; margin-bottom: 6px !important; gap: 4px !important; }
   .mobile-doc-list { padding: 0 !important; }
 
+  /* أزرار بطاقة الموبايل: touch target ≥40px، تباعد ولفّ نظيف، حذف على اليسار */
+  .mobile-doc-card > div:last-child > .btn-xs {
+    min-height: 40px !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    border-radius: 6px !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+  }
+  .mobile-doc-card > div:last-child {
+    gap: 8px !important;
+    padding-top: 8px !important;
+  }
+  .mobile-doc-card .btn-danger { margin-inline-start: auto; }
+
   /* الـ pagination في الأسفل: صغّر النص واجعله متعدد الأسطر بهدوء */
   .legacy-pagination .page-link {
     font-size: 11px !important;
