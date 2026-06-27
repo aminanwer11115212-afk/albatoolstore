@@ -623,13 +623,16 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
             <ZoomIn size={15} />
           </button>
 
-          {/* Dark Mode Toggle */}
-          <button onClick={toggleTheme} className="p-1.5 hover:bg-primary/20 rounded-md transition-colors" title="تبديل المظهر">
+          {/* Dark Mode Toggle — مخفي على الموبايل (متاح من قائمة الملف الشخصي) */}
+          <button onClick={toggleTheme} className="hidden sm:flex p-1.5 hover:bg-primary/20 rounded-md transition-colors" title="تبديل المظهر">
             {isDark ? <Sun size={15} /> : <Moon size={15} />}
           </button>
 
-          {/* مؤشر المستخدمين المتصلين */}
-          <OnlineUsersIndicator />
+          {/* مؤشر المستخدمين المتصلين — مخفي على الموبايل لتقليل الازدحام */}
+          <div className="hidden sm:flex">
+            <OnlineUsersIndicator />
+          </div>
+
 
 
           {outCount > 0 && (
