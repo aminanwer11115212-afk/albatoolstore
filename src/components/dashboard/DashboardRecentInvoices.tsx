@@ -190,26 +190,27 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
                   <td colSpan={7} className="text-center py-6 text-muted-foreground text-xs">
                     لا توجد فواتير بعد -{" "}
                     <button
-                      onClick={() => navigate("/invoices/create")}
+                      onClick={() => navigate(addPath)}
                       className="text-primary hover:underline"
                     >
-                      أضف فاتورة جديدة
+                      {addLabel}
                     </button>
                   </td>
                 </tr>
               ) : (
-                (invoices || []).slice(0, 10).map((inv: any, idx: number) => {
+                (invoices || []).slice(0, limit).map((inv: any, idx: number) => {
                   const st = statusStyles[inv.status] || statusStyles.pending;
                   const note = inv.user_note || inv.notes || "";
                   const cellBase =
                     "px-1.5 py-1 text-[10.5px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis";
+                  const rowExtra = isPos ? "bg-amber-50/40 dark:bg-amber-500/5" : "";
                   return (
                     <tr
                       key={inv.id}
-                      onClick={() => navigate(`/invoices/view/${inv.id}`)}
+                      onClick={() => navigate(rowPath(inv.id))}
                       className={`border-b border-border hover:bg-muted/50 transition-colors cursor-pointer ${
                         idx % 2 === 1 ? "bg-muted/10" : ""
-                      }`}
+                      } ${rowExtra}`}
                     >
                       <td className={`${cellBase} font-medium`}>{inv.invoice_number}</td>
                       <td className={cellBase} title={inv.customers?.name || inv.walk_in_customer_name || ""}>
