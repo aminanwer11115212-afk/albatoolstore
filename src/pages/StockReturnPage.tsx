@@ -249,9 +249,10 @@ export default function StockReturnPage() {
                 onOpen={() => navigate(`/stock-return/view/${r.id}`)}
                 actions={
                   <>
-                    <button className="btn-xs btn-warning" onClick={() => navigate(`/stock-return/edit/${r.id}`)}>✎ تعديل</button>
-                    <button className="btn-xs btn-info" onClick={() => navigate(`/preview/return/${r.id}`)} title="طباعة">🖨 طباعة</button>
-                    <button className="btn-xs btn-danger" onClick={() => handleDelete(r.id)}>🗑 حذف</button>
+                    <button className="btn-xs btn-success" onClick={() => navigate(`/stock-return/view/${r.id}`)} aria-label="عرض">📄 عرض</button>
+                    <button className="btn-xs btn-info" onClick={() => navigate(`/preview/return/${r.id}`)} aria-label="طباعة">🖨 طباعة</button>
+                    <button className="btn-xs btn-warning" onClick={() => navigate(`/stock-return/edit/${r.id}`)} aria-label="تعديل">✎ تعديل</button>
+                    <button className="btn-xs btn-danger" onClick={() => handleDelete(r.id)} aria-label="حذف">🗑 حذف</button>
                   </>
                 }
               />
