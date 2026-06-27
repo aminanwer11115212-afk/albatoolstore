@@ -12,8 +12,8 @@ type WorkflowValue = "new" | "preparing" | "ready_to_ship" | "in_transit" | "don
 type QuoteValue = "draft" | "sent" | "accepted" | "rejected";
 
 export interface StatusChipProps {
-  kind: "payment" | "workflow" | "custom";
-  value?: PaymentValue | WorkflowValue | string;
+  kind: "payment" | "workflow" | "quote" | "custom";
+  value?: PaymentValue | WorkflowValue | QuoteValue | string;
   /** نص مخصص يعرض داخل الشارة (يتجاوز خريطة الترجمة الافتراضية). */
   label?: ReactNode;
   /** أيقونة اختيارية قبل النص. */
