@@ -220,6 +220,7 @@ const App = () => {
   return (
   <QueryClientProvider client={queryClient}>
     <ProductsCacheSync />
+    <RealtimeSync />
     <TooltipProvider>
       <Toaster />
       <Sonner />
