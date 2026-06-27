@@ -106,6 +106,25 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     setDate(new Date().toISOString().slice(0, 10));
   }
 
+  async function createShareToken(docType: string, docId: string): Promise<string | null> {
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const accessToken = sess?.session?.access_token;
+      if (!accessToken) return null;
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-document-share-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}`, apikey: ANON },
+        body: JSON.stringify({ doc_type: docType, doc_id: docId, ttl_hours: 24 }),
+      });
+      const json = await resp.json().catch(() => ({}));
+      return resp.ok ? (json.url as string) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function handleSave() {
     if (!customerId) return toast.error("اختر العميل");
     const amt = Number(amount);
@@ -120,45 +139,89 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     try {
       const targetAccountId = method === "bank_transfer" ? bankAccountId : (accountId || null);
 
-      // 1) Insert payment transaction
+      // ── حساب توزيع FIFO قبل التنفيذ ──
+      const allocItems: { invoice_id: string; invoice_number: string; applied: number }[] = [];
+      let remaining = amt;
+      for (const inv of dueInvoices) {
+        if (remaining <= 0) break;
+        const applied = Math.min(remaining, Number(inv.due_amount || 0));
+        allocItems.push({ invoice_id: inv.id, invoice_number: inv.invoice_number, applied });
+        remaining -= applied;
+      }
+      const leftover = Math.max(0, remaining);
+      const balanceBefore = Number(selectedCustomer?.balance || totalDue || 0);
+      const balanceAfter = Math.max(0, balanceBefore - (amt - leftover));
+
       const description =
         method === "bank_transfer"
           ? `شحن رصيد - تحويل بنكي - إشعار: ${referenceNo}${notes ? ` - ${notes}` : ""}`
           : `شحن رصيد - ${method === "cash" ? "نقدي" : "بطاقة"}${notes ? ` - ${notes}` : ""}`;
 
-      const { error: txErr } = await supabase.from("transactions").insert({
-        type: "income",
-        category: "payment",
-        amount: amt,
-        credit: amt,
-        method,
-        date,
-        customer_id: customerId,
-        account_id: targetAccountId,
-        description,
-      });
+      // 1) Insert payment transaction (with allocation snapshot)
+      const { data: txRow, error: txErr } = await supabase
+        .from("transactions")
+        .insert({
+          type: "income",
+          category: "payment",
+          amount: amt,
+          credit: amt,
+          method,
+          date,
+          customer_id: customerId,
+          account_id: targetAccountId,
+          description,
+          allocation: {
+            items: allocItems.map((x) => ({ invoice_number: x.invoice_number, applied: x.applied })),
+            leftover,
+            balance_before: balanceBefore,
+            balance_after: balanceAfter,
+            method,
+          },
+        } as any)
+        .select("id")
+        .single();
       if (txErr) throw txErr;
+      const txId = (txRow as any)?.id as string | undefined;
 
       // 2) FIFO allocate to oldest unpaid invoices
-      let remaining = amt;
-      for (const inv of dueInvoices) {
-        if (remaining <= 0) break;
-        const due = Number(inv.due_amount || 0);
-        const applied = Math.min(remaining, due);
-        const newPaid = Number(inv.paid_amount || 0) + applied;
+      for (const a of allocItems) {
+        const inv = dueInvoices.find((d) => d.id === a.invoice_id)!;
+        const newPaid = Number(inv.paid_amount || 0) + a.applied;
         const newDue = Math.max(0, Number(inv.total || 0) - newPaid);
         const newStatus = newDue <= 0.001 ? "paid" : "partial";
-        await supabase
-          .from("invoices")
+        await supabase.from("invoices")
           .update({ paid_amount: newPaid, due_amount: newDue, status: newStatus })
           .eq("id", inv.id);
-        remaining -= applied;
       }
 
-      // 3) رصيد العميل يُعاد حسابه تلقائياً عبر trigger trg_invoices_recompute_cust_balance
-      //    بعد تحديث paid_amount على الفواتير أعلاه — لا تحديث يدوي.
+      // 3) رصيد العميل يُعاد حسابه تلقائياً عبر trigger trg_invoices_recompute_cust_balance.
 
       toast.success("تم شحن الرصيد بنجاح");
+
+      // 4) رسالة واتساب فيها رابطان: إيصال الشحن + كشف الحساب
+      if (txId && selectedCustomer?.phone) {
+        const [chargeUrl, stmtUrl] = await Promise.all([
+          createShareToken("credit-charge", txId),
+          createShareToken("statement-customer", customerId),
+        ]);
+        const lines = [
+          `مرحباً ${selectedCustomer.name} 👋`,
+          `✅ تم شحن رصيدك بمبلغ ${amt.toLocaleString()}`,
+          `💼 رصيدك الآن: ${balanceAfter.toLocaleString()}`,
+        ];
+        if (allocItems.length) {
+          lines.push(`📄 سُدِّدت ${allocItems.length} فاتورة من هذه الدفعة.`);
+        }
+        if (leftover > 0) {
+          lines.push(`🎁 رصيد دائن متبقٍ لصالحك: ${leftover.toLocaleString()}`);
+        }
+        if (chargeUrl) lines.push("", "🧾 إيصال الشحن:", chargeUrl);
+        if (stmtUrl) lines.push("", "📊 كشف الحساب:", stmtUrl);
+        openWhatsApp(selectedCustomer.phone, lines.join("\n"));
+      } else if (txId && !selectedCustomer?.phone) {
+        toast.info("لا يوجد رقم واتساب للعميل — لم تُرسل الرسالة.");
+      }
+
       reset();
       onOpenChange(false);
       onSaved?.();
