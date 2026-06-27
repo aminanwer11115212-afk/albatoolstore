@@ -292,6 +292,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
 
       toast.success(form.id ? "تم تحديث العميل" : "تم إضافة العميل");
       try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+      try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
       onSaved(saved);
       onClose();
     } catch (e: any) {

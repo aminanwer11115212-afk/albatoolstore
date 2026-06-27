@@ -140,35 +140,47 @@ export default function CustomersPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [isFullscreen]);
 
+  const reloadCustomerLogisticsMaps = async () => {
+    const [cpt, cd] = await Promise.all([
+      (supabase as any).from("customer_preferred_transporter").select("customer_id,transporter_id"),
+      (supabase as any).from("customer_destinations").select("customer_id,destination_id,is_default"),
+    ]);
+    const tMap: Record<string, string> = {};
+    (cpt.data || []).forEach((row: any) => { if (row.customer_id) tMap[row.customer_id] = row.transporter_id; });
+    setCustomerTransporter(tMap);
+    const dMap: Record<string, string> = {};
+    (cd.data || []).forEach((row: any) => {
+      if (!row.customer_id) return;
+      if (row.is_default || !dMap[row.customer_id]) dMap[row.customer_id] = row.destination_id;
+    });
+    setCustomerDestination(dMap);
+  };
+
+  const reloadTransportersAndDestinations = async () => {
+    const [t, d] = await Promise.all([
+      (supabase as any).from("transporters").select("id,name").order("name"),
+      (supabase as any).from("destinations").select("id,name").order("name"),
+    ]);
+    setTransporters(t.data || []);
+    setDestinations(d.data || []);
+  };
+
   useEffect(() => {
     (async () => {
-      const [r, s, ci, l, g, t, d, cpt, cd] = await Promise.all([
+      const [r, s, ci, l, g] = await Promise.all([
         (supabase as any).from("regions").select("id,name").order("name"),
         (supabase as any).from("states").select("id,name,region_id").order("name"),
         (supabase as any).from("cities").select("id,name,state_id").order("name"),
         (supabase as any).from("localities").select("id,name,city_id").order("name"),
         (supabase as any).from("customer_groups").select("id,name").order("name"),
-        (supabase as any).from("transporters").select("id,name").order("name"),
-        (supabase as any).from("destinations").select("id,name").order("name"),
-        (supabase as any).from("customer_preferred_transporter").select("customer_id,transporter_id"),
-        (supabase as any).from("customer_destinations").select("customer_id,destination_id,is_default"),
       ]);
       setRegions(r.data || []);
       setStates(s.data || []);
       setCities(ci.data || []);
       setLocalities(l.data || []);
       setGroups(g.data || []);
-      setTransporters(t.data || []);
-      setDestinations(d.data || []);
-      const tMap: Record<string, string> = {};
-      (cpt.data || []).forEach((row: any) => { if (row.customer_id) tMap[row.customer_id] = row.transporter_id; });
-      setCustomerTransporter(tMap);
-      const dMap: Record<string, string> = {};
-      (cd.data || []).forEach((row: any) => {
-        if (!row.customer_id) return;
-        if (row.is_default || !dMap[row.customer_id]) dMap[row.customer_id] = row.destination_id;
-      });
-      setCustomerDestination(dMap);
+      await reloadTransportersAndDestinations();
+      await reloadCustomerLogisticsMaps();
 
       const { data: invs } = await (supabase as any)
         .from("invoices").select("customer_id, date").not("customer_id", "is", null);
@@ -179,6 +191,20 @@ export default function CustomersPage() {
       });
       setLastActivity(map);
     })();
+  }, []);
+
+  // تحديث فوري لخرائط الناقل/الوجهة عند أي تغيير من أي شاشة
+  useEffect(() => {
+    const onLogisticsChanged = () => {
+      reloadTransportersAndDestinations();
+      reloadCustomerLogisticsMaps();
+    };
+    window.addEventListener("customer-logistics:changed", onLogisticsChanged);
+    window.addEventListener("customers:changed", onLogisticsChanged);
+    return () => {
+      window.removeEventListener("customer-logistics:changed", onLogisticsChanged);
+      window.removeEventListener("customers:changed", onLogisticsChanged);
+    };
   }, []);
 
   const normalizePhone = (p: string) => (p || "").replace(/\D/g, "");
