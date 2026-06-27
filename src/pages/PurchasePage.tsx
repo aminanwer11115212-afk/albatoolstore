@@ -377,7 +377,6 @@ export default function PurchasePage() {
             ) : paginated.length === 0 ? (
               <div style={{ textAlign: "center", padding: 30, color: "hsl(var(--muted-foreground))" }}>لا توجد أوامر شراء</div>
             ) : paginated.map((o: any, idx: number) => {
-              const st = statusMap[o.status || "pending"] || statusMap.pending;
               const supplier = supplierMap.get(o.supplier_id);
               return (
                 <MobileDocCard
@@ -387,7 +386,7 @@ export default function PurchasePage() {
                   party={supplier?.name || "-"}
                   date={fmtDate(o.date)}
                   amount={`${fmtMoney(o.total)} ${o.currency_code || currency}`}
-                  status={<span className={st.cls}>{st.label}</span>}
+                  status={<StatusChip kind="purchase" value={o.status || "pending"} />}
                   onOpen={() => navigate(`/purchase/edit/${o.id}`)}
                   actions={
                     <>
