@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useProducts, useProductCategories, useWarehouses } from "@/hooks/useData";
 import { useDialogSize } from "@/hooks/useDialogSize";
+import InlineSearchSelect from "@/components/InlineSearchSelect";
 
 export interface QuickAddProductDialogProps {
   open: boolean;
