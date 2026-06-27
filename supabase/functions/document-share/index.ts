@@ -212,7 +212,7 @@ function buildDocHTML(args: {
 
 function buildStatementHTML(args: {
   kind: "customer" | "supplier";
-  party: { name?: string; phone?: string; address?: string; balance?: number } | null;
+  party: { name?: string; phone?: string; address?: string; balance?: number; credit_balance?: number } | null;
   company: any;
   invoices?: Array<{ invoice_number: string; date: string; total: number; paid_amount: number }>;
   quotes?: Array<{ quote_number: string; date: string; total: number; status?: string }>;
@@ -231,6 +231,13 @@ function buildStatementHTML(args: {
   const paidTotal = invoices.reduce((s, r) => s + Number(r.paid_amount || 0), 0);
   const ordersTotal = orders.reduce((s, r) => s + Number(r.total || 0), 0);
   const balance = Number(party?.balance || (kind === "customer" ? invoiceTotal - paidTotal : ordersTotal));
+  const credit = Number(party?.credit_balance || 0);
+  const net = balance - credit; // >0 owes, <0 has credit
+  const netLabel = kind === "customer"
+    ? (net > 0.001 ? "صافي المطلوب منكم" : net < -0.001 ? "رصيد دائن لكم" : "الحساب مسدّد بالكامل")
+    : (net > 0.001 ? "صافي المستحق لكم" : net < -0.001 ? "مدفوع زيادة" : "الحساب مسدّد");
+  const netColor = net > 0.001 ? "#c0392b" : net < -0.001 ? "#15803d" : "#1a1a1a";
+  const netValue = Math.abs(net);
 
   const rows = (items: any[], cols: string[], render: (r: any, i: number) => string) => items.length
     ? `<table><thead><tr><th>#</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${items.map(render).join("")}</tbody></table>`
@@ -278,7 +285,8 @@ function buildStatementHTML(args: {
   <div class="doc-title"><h1>${attr(title)}</h1></div>
   <div class="info-row"><div><span class="info-label">${partyLabel}:</span> <span class="info-value">${attr(party?.name || "")}</span></div><div><span class="info-label">الرصيد:</span> <span class="info-value">${fmt(balance)}</span></div></div>
   <div class="info-row"><div>${party?.phone ? `<span class="info-label">الهاتف:</span> <span class="info-value">${attr(party.phone)}</span>` : ""}</div><div>${party?.address ? `<span class="info-label">العنوان:</span> <span class="info-value">${attr(party.address)}</span>` : ""}</div></div>
-  <div class="summary-row">${kind === "customer" ? `<div class="summary-box"><div class="summary-box-title">إجمالي الفواتير</div><div class="summary-box-value">${fmt(invoiceTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المدفوع</div><div class="summary-box-value">${fmt(paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المتبقي</div><div class="summary-box-value">${fmt(invoiceTotal - paidTotal)}</div></div>` : `<div class="summary-box"><div class="summary-box-title">إجمالي أوامر الشراء</div><div class="summary-box-value">${fmt(ordersTotal)}</div></div><div class="summary-box"><div class="summary-box-title">الرصيد</div><div class="summary-box-value">${fmt(balance)}</div></div>`}</div>
+  <div style="margin:10px 0 14px;padding:14px 18px;border:2px solid ${netColor};border-radius:10px;background:#fafafa;display:flex;justify-content:space-between;align-items:center;font-size:15px"><span style="font-weight:800;color:${netColor}">${netLabel}</span><strong style="font-size:22px;color:${netColor}">${fmt(netValue)}</strong></div>
+  <div class="summary-row">${kind === "customer" ? `<div class="summary-box"><div class="summary-box-title">إجمالي الفواتير</div><div class="summary-box-value">${fmt(invoiceTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المدفوع</div><div class="summary-box-value">${fmt(paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المتبقي</div><div class="summary-box-value">${fmt(invoiceTotal - paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">رصيد دائن</div><div class="summary-box-value">${fmt(credit)}</div></div>` : `<div class="summary-box"><div class="summary-box-title">إجمالي أوامر الشراء</div><div class="summary-box-value">${fmt(ordersTotal)}</div></div><div class="summary-box"><div class="summary-box-title">الرصيد</div><div class="summary-box-value">${fmt(balance)}</div></div>`}</div>
   ${kind === "customer" ? `<div class="section-title">الفواتير</div>${rows(invoices, ["رقم الفاتورة", "التاريخ", "الإجمالي", "المدفوع", "المتبقي"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.invoice_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${fmt(r.paid_amount)}</td><td>${fmt(Number(r.total || 0) - Number(r.paid_amount || 0))}</td></tr>`)}<div class="section-title">عروض الأسعار</div>${rows(quotes, ["رقم العرض", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.quote_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}<div class="section-title">المرتجعات</div>${rows(returns, ["رقم المرتجع", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.return_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}` : `<div class="section-title">أوامر الشراء</div>${rows(orders, ["رقم الأمر", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.order_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}`}
   <div class="section-title">المعاملات</div>${rows(transactions, ["التاريخ", "النوع", "المبلغ", "الوصف"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.date)}</td><td>${attr(r.type || "-")}</td><td>${fmt(r.amount)}</td><td>${attr(r.description || "-")}</td></tr>`)}
 </div>
@@ -580,7 +588,7 @@ Deno.serve(async (req) => {
       }));
     } else if (tk.doc_type === "statement-customer") {
       const [customerRes, invoicesRes, quotesRes, returnsRes, transactionsRes] = await Promise.all([
-        supabase.from("customers").select("name, phone, address, balance").eq("id", tk.doc_id).maybeSingle(),
+        supabase.from("customers").select("name, phone, address, balance, credit_balance").eq("id", tk.doc_id).maybeSingle(),
         supabase.from("invoices").select("invoice_number, date, total, paid_amount").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
         supabase.from("quotes").select("quote_number, date, total, status").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
         supabase.from("stock_returns").select("return_number, date, total, status").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
@@ -740,7 +748,7 @@ Deno.serve(async (req) => {
     } else if (tk.doc_type === "credit-charge") {
       const { data: tx } = await supabase
         .from("transactions")
-        .select("id, amount, date, method, description, allocation, customers(name, phone, address, balance)")
+        .select("id, amount, date, method, description, allocation, customers(name, phone, address, balance, credit_balance)")
         .eq("id", tk.doc_id)
         .maybeSingle();
       if (!tx) return buildErrorHTML("الإيصال غير موجود", 404);
@@ -750,6 +758,12 @@ Deno.serve(async (req) => {
       const amount = Number((tx as any).amount || 0);
       const balanceBefore = Number(alloc.balance_before ?? 0);
       const balanceAfter = Number(alloc.balance_after ?? Math.max(0, balanceBefore - amount));
+      const freshBalance = Number(c?.balance || 0);
+      const freshCredit = Number(c?.credit_balance || 0);
+      const netNow = freshBalance - freshCredit;
+      const netLabel = netNow > 0.001 ? "صافي المطلوب منكم بعد الشحن" : netNow < -0.001 ? "رصيد دائن لكم بعد الشحن" : "تم تسديد الحساب بالكامل ✅";
+      const netColor = netNow > 0.001 ? "#c0392b" : "#15803d";
+      const netValue = Math.abs(netNow);
       const methodTxt = (tx as any).method === "bank_transfer" ? "تحويل بنكي" : (tx as any).method === "card" ? "بطاقة" : "نقدي";
       const items: Array<{ invoice_number: string; applied: number }> = Array.isArray(alloc.items) ? alloc.items : [];
       const leftover = Number(alloc.leftover || 0);
@@ -818,6 +832,7 @@ Deno.serve(async (req) => {
   <tbody>${allocRows}</tbody></table>
   ${leftover > 0 ? `<div style="margin:8px 0;padding:10px;border-radius:8px;background:#fefce8;border:1px solid #fde047;text-align:center;font-weight:700">رصيد دائن متبقٍ لصالحك: ${leftover.toLocaleString()}</div>` : ""}
   <div class="balance-row after"><span>الرصيد بعد الشحن</span><strong>${balanceAfter.toLocaleString()}</strong></div>
+  <div style="margin:14px 0 4px;padding:16px 20px;border:2px solid ${netColor};border-radius:12px;background:#fafafa;display:flex;justify-content:space-between;align-items:center"><span style="font-weight:800;font-size:15px;color:${netColor}">${netLabel}</span><strong style="font-size:24px;color:${netColor}">${netValue.toLocaleString()}</strong></div>
   <div class="footer-note">شكراً لتعاملكم معنا — هذا الإيصال صادر إلكترونياً ومعتمد بدون توقيع.</div>
 </div></body></html>`;
     } else {

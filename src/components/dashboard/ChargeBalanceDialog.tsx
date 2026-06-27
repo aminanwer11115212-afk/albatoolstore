@@ -200,6 +200,22 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
 
       // 4) رسالة واتساب فيها رابطان: إيصال الشحن + كشف الحساب
       if (txId && selectedCustomer?.phone) {
+        // اقرأ الرصيد الفعلي بعد عمل التريغر للحصول على «صافي المطلوب» أو «الرصيد الدائن»
+        const { data: freshCust } = await supabase
+          .from("customers")
+          .select("balance, credit_balance")
+          .eq("id", customerId)
+          .maybeSingle();
+        const fBal = Number((freshCust as any)?.balance || 0);
+        const fCred = Number((freshCust as any)?.credit_balance || 0);
+        const net = fBal - fCred;
+        const netLine =
+          net > 0.001
+            ? `💰 صافي المطلوب منكم: ${net.toLocaleString()}`
+            : net < -0.001
+              ? `🎁 رصيد دائن لكم: ${Math.abs(net).toLocaleString()}`
+              : `✨ حسابك مسدّد بالكامل`;
+
         const [chargeUrl, stmtUrl] = await Promise.all([
           createShareToken("credit-charge", txId),
           createShareToken("statement-customer", customerId),
@@ -207,13 +223,10 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
         const lines = [
           `مرحباً ${selectedCustomer.name} 👋`,
           `✅ تم شحن رصيدك بمبلغ ${amt.toLocaleString()}`,
-          `💼 رصيدك الآن: ${balanceAfter.toLocaleString()}`,
+          netLine,
         ];
         if (allocItems.length) {
           lines.push(`📄 سُدِّدت ${allocItems.length} فاتورة من هذه الدفعة.`);
-        }
-        if (leftover > 0) {
-          lines.push(`🎁 رصيد دائن متبقٍ لصالحك: ${leftover.toLocaleString()}`);
         }
         if (chargeUrl) lines.push("", "🧾 إيصال الشحن:", chargeUrl);
         if (stmtUrl) lines.push("", "📊 كشف الحساب:", stmtUrl);
