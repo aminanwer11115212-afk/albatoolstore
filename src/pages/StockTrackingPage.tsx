@@ -245,7 +245,7 @@ export default function StockTrackingPage() {
       {/* Table */}
       <Card>
         <CardContent className="p-0 overflow-x-auto">
-          <Table>
+          <Table className="mobile-stack-table">
             <TableHeader>
               <TableRow>
                 <TableHead className="text-right">التاريخ</TableHead>
@@ -266,11 +266,11 @@ export default function StockTrackingPage() {
               )}
               {filtered.map((m) => (
                 <TableRow key={m.id}>
-                  <TableCell className="whitespace-nowrap">{arDate(m.date)}</TableCell>
-                  <TableCell>
+                  <TableCell data-label="التاريخ" className="whitespace-nowrap">{arDate(m.date)}</TableCell>
+                  <TableCell data-label="النوع">
                     <Badge variant="outline" className={typeBadgeCls[m.type]}>{typeLabel[m.type]}</Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="المنتج">
                     <button
                       className="text-primary hover:underline text-right"
                       onClick={() => setQ(m.product_name)}
@@ -278,10 +278,10 @@ export default function StockTrackingPage() {
                       {m.product_name}
                     </button>
                   </TableCell>
-                  <TableCell className={m.qty < 0 ? "text-destructive font-bold" : "text-emerald-600 dark:text-emerald-400 font-bold"}>
+                  <TableCell data-label="الكمية" className={m.qty < 0 ? "text-destructive font-bold" : "text-emerald-600 dark:text-emerald-400 font-bold"}>
                     {m.qty > 0 ? `+${m.qty}` : m.qty}
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="المستند">
                     <Link to={docHref(m)} className="text-primary hover:underline">{m.doc_number}</Link>
                     {m.is_pos && (
                       <span className="ms-2 inline-block px-1.5 py-0.5 text-[10px] rounded border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold">
@@ -289,8 +289,8 @@ export default function StockTrackingPage() {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell>{m.party_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{m.current_stock ?? "—"}</TableCell>
+                  <TableCell data-label="الجهة">{m.party_name}</TableCell>
+                  <TableCell data-label="المخزون" className="text-muted-foreground">{m.current_stock ?? "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
