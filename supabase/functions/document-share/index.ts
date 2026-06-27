@@ -212,7 +212,7 @@ function buildDocHTML(args: {
 
 function buildStatementHTML(args: {
   kind: "customer" | "supplier";
-  party: { name?: string; phone?: string; address?: string; balance?: number } | null;
+  party: { name?: string; phone?: string; address?: string; balance?: number; credit_balance?: number } | null;
   company: any;
   invoices?: Array<{ invoice_number: string; date: string; total: number; paid_amount: number }>;
   quotes?: Array<{ quote_number: string; date: string; total: number; status?: string }>;
@@ -231,6 +231,13 @@ function buildStatementHTML(args: {
   const paidTotal = invoices.reduce((s, r) => s + Number(r.paid_amount || 0), 0);
   const ordersTotal = orders.reduce((s, r) => s + Number(r.total || 0), 0);
   const balance = Number(party?.balance || (kind === "customer" ? invoiceTotal - paidTotal : ordersTotal));
+  const credit = Number(party?.credit_balance || 0);
+  const net = balance - credit; // >0 owes, <0 has credit
+  const netLabel = kind === "customer"
+    ? (net > 0.001 ? "صافي المطلوب منكم" : net < -0.001 ? "رصيد دائن لكم" : "الحساب مسدّد بالكامل")
+    : (net > 0.001 ? "صافي المستحق لكم" : net < -0.001 ? "مدفوع زيادة" : "الحساب مسدّد");
+  const netColor = net > 0.001 ? "#c0392b" : net < -0.001 ? "#15803d" : "#1a1a1a";
+  const netValue = Math.abs(net);
 
   const rows = (items: any[], cols: string[], render: (r: any, i: number) => string) => items.length
     ? `<table><thead><tr><th>#</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${items.map(render).join("")}</tbody></table>`
