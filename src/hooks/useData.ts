@@ -374,19 +374,39 @@ export function useDashboardStats() {
       const [customers, products, invoices, transactions] = await Promise.all([
         supabase.from("customers").select("id", { count: "exact", head: true }),
         supabase.from("products").select("id", { count: "exact", head: true }),
-        supabase.from("invoices").select("total, paid_amount, status"),
+        supabase.from("invoices").select("total, paid_amount, status, source, date"),
         supabase.from("transactions").select("type, amount"),
       ]);
-      
-      const totalSales = (invoices.data || []).reduce((sum: number, inv: any) => sum + Number(inv.total || 0), 0);
+
+      const invRows = (invoices.data || []) as any[];
+      const isPos = (r: any) => (r.source || "regular") === "pos";
+      const yearStart = `${new Date().getFullYear()}-01-01`;
+      const inThisYear = (r: any) => !!r.date && String(r.date) >= yearStart;
+
+      const sumTotal = (arr: any[]) => arr.reduce((s, r) => s + Number(r.total || 0), 0);
+      const regularRows = invRows.filter((r) => !isPos(r));
+      const posRows = invRows.filter(isPos);
+
+      const totalSales = sumTotal(invRows);
+      const regularSales = sumTotal(regularRows);
+      const posSales = sumTotal(posRows);
+      const regularSalesYear = sumTotal(regularRows.filter(inThisYear));
+      const posSalesYear = sumTotal(posRows.filter(inThisYear));
+
       const totalIncome = (transactions.data || []).filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
       const totalExpenses = (transactions.data || []).filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
 
       return {
         customersCount: customers.count || 0,
         productsCount: products.count || 0,
-        invoicesCount: (invoices.data || []).length,
+        invoicesCount: invRows.length,
+        regularInvoicesCount: regularRows.length,
+        posInvoicesCount: posRows.length,
         totalSales,
+        regularSales,
+        posSales,
+        regularSalesYear,
+        posSalesYear,
         totalIncome,
         totalExpenses,
       };
