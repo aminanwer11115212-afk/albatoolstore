@@ -300,7 +300,8 @@ export default function EmployeesPage() {
                   <td data-label="الدخول" className="px-5 py-3">
                     {r ? <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">{r.role}</span> : <span className="text-xs text-muted-foreground">بدون</span>}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-3 actions-cell">
+                    <span className="hidden sm:inline text-xs text-muted-foreground ms-2">إجراءات</span>
                     <div className="flex items-center gap-1">
                       <button onClick={() => openAccess(emp)} title="صلاحيات الدخول" disabled={isPending(emp)} className="p-1.5 text-primary hover:bg-primary/10 rounded disabled:opacity-40"><KeyRound size={15} /></button>
                       {r && <button onClick={() => toggleLogin(emp)} title="تفعيل/تعطيل الدخول" disabled={busy || isPending(emp)} className="p-1.5 text-warning hover:bg-warning/10 rounded disabled:opacity-40"><Power size={15} /></button>}
