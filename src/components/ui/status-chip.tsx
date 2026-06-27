@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 type PaymentValue = "paid" | "partial" | "unpaid" | "pending" | "overdue" | "cancelled";
 type WorkflowValue = "new" | "preparing" | "ready_to_ship" | "in_transit" | "done";
+type QuoteValue = "draft" | "sent" | "accepted" | "rejected";
 
 export interface StatusChipProps {
   kind: "payment" | "workflow" | "custom";
