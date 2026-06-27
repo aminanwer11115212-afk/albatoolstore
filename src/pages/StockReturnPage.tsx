@@ -178,7 +178,6 @@ export default function StockReturnPage() {
               ) : paginated.length === 0 ? (
                 <tr><td colSpan={8} style={{ textAlign: "center", padding: 30 }}>لا توجد مرتجعات</td></tr>
               ) : paginated.map((r: any, idx: number) => {
-                const st = statusMap[r.status || "pending"] || statusMap.pending;
                 const rowCls = (start + idx) % 2 === 0 ? "odd" : "even";
                 return (
                   <tr key={r.id} className={rowCls}>
@@ -187,7 +186,7 @@ export default function StockReturnPage() {
                     <td>{r.customers?.name || "-"}</td>
                     <td>{fmtDate(r.date)}</td>
                     <td>{fmtMoney(r.total)} {currency}</td>
-                    <td><span className={st.cls}>{st.label}</span></td>
+                    <td><StatusChip kind="return" value={r.status || "pending"} /></td>
                     <td>{r.reason || "-"}</td>
                     <td>
                       <span className="legacy-actions">
