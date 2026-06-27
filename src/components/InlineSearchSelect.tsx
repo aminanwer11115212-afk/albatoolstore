@@ -1,5 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { startsWithMatch, normalizeAr } from "@/utils/searchMatch";
 
 export type InlineOption = { value: string; label: string };
@@ -71,21 +70,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     };
   }, [open]);
 
-  // أوقف انتشار pointer/mouse/touch على القائمة عند مستوى DOM الأصلي
-  // حتى لا يلتقطها Radix Dialog/Popover ويغلق نفسه قبل تثبيت الاختيار.
-  useEffect(() => {
-    if (!open) return;
-    const el = menuRef.current;
-    if (!el) return;
-    const stop = (e: Event) => e.stopPropagation();
-    // ⚠️ لا نضيف "click" هنا — React 17+ يعتمد على delegation على root،
-    // ووقف الانتشار في طور capture سيمنع onClick من العمل أصلاً.
-    const types: string[] = ["pointerdown", "mousedown", "touchstart"];
-    types.forEach((t) => el.addEventListener(t as string, stop, true));
-    return () => {
-      types.forEach((t) => el.removeEventListener(t as string, stop, true));
-    };
-  }, [open]);
+  // (تم حذف capture-listener القديم — القائمة الآن داخل شجرة DOM لا تتسرّب لـ Radix)
 
   const openMenu = () => {
     if (disabled) return;
@@ -198,7 +183,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
           maxWidth: `calc(100vw - 16px)`,
           zIndex: 9999,
         };
-        return createPortal(
+        return (
           <div
             ref={menuRef}
             className="bg-card border-2 border-primary rounded shadow-lg ring-2 ring-primary/40"
@@ -273,8 +258,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
                 );
               })}
             </div>
-          </div>,
-          document.body
+          </div>
         );
       })()}
     </div>

@@ -61,26 +61,13 @@ describe("InlineSearchSelect", () => {
     expect(onChange).toHaveBeenCalledWith("2"); // الخيار الثاني (highlight بدأ من 0 ثم +1)
   });
 
-  it("يوقف انتشار mousedown/pointerdown على القائمة (لمنع إغلاق Radix Dialog قبل التثبيت)", () => {
-    render(<InlineSearchSelect value="" options={opts} onChange={onChange} />);
+  it("القائمة تُرسم داخل شجرة DOM للـ wrapper (وليس portal خارجي) — يمنع إغلاق Radix Dialog قبل التثبيت", () => {
+    const { container } = render(
+      <InlineSearchSelect value="" options={opts} onChange={onChange} />,
+    );
     fireEvent.click(screen.getByRole("button"));
-
-    const docListener = vi.fn();
-    document.addEventListener("mousedown", docListener);
-    document.addEventListener("pointerdown", docListener);
-
-    const item = screen.getByText("زويتش");
-    // أحداث native ترتفع من العنصر؛ يجب ألا تصل لـ document لأن
-    // useEffect يلصق capture-listeners توقف الانتشار.
-    act(() => {
-      item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-      // jsdom لا يوفّر PointerEvent دائماً — نستخدم Event عام مع bubbles.
-      item.dispatchEvent(new Event("pointerdown", { bubbles: true }));
-    });
-
-    expect(docListener).not.toHaveBeenCalled();
-
-    document.removeEventListener("mousedown", docListener);
-    document.removeEventListener("pointerdown", docListener);
+    const item = screen.getByText("زويتش").closest("button")!;
+    // العنصر يجب أن يكون داخل container (شجرة المكوّن)، لا خارجها عبر portal لـ body.
+    expect(container.contains(item)).toBe(true);
   });
 });
