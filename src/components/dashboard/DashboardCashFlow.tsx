@@ -10,7 +10,10 @@ interface Props {
 export default function DashboardCashFlow({ stats }: Props) {
   const income = Number(stats?.totalIncome || 0);
   const expenses = Number(stats?.totalExpenses || 0);
-  const sales = Number(stats?.totalSales || 0);
+  const regularSales = Number(stats?.regularSales ?? stats?.totalSales ?? 0);
+  const posSales = Number(stats?.posSales || 0);
+  const regularSalesYear = Number(stats?.regularSalesYear || 0);
+  const posSalesYear = Number(stats?.posSalesYear || 0);
   const { data: chartData } = useCashFlowChart();
 
   const formatDate = (date: string) => {
