@@ -307,7 +307,7 @@ export default function PurchasePage() {
                     <td>{fmtDate(o.date)}</td>
                     <td>{fmtDate(o.expected_delivery_date)}</td>
                     <td>{fmtMoney(o.total)} {o.currency_code || currency}</td>
-                    <td><span className={st.cls}>{st.label}</span></td>
+                    <td><StatusChip kind="purchase" value={o.status || "pending"} /></td>
                     <td>{o.created_by || ""}</td>
                     <td>
                       <span className="legacy-actions">
