@@ -127,7 +127,7 @@ export default function SupplierStatementPage() {
           <div data-section="orders" data-section-label="أوامر الشراء" className="legacy-card card-block">
             <h3 className="px-5 py-3 font-semibold text-foreground border-b border-border">أوامر الشراء</h3>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm mobile-stack-table">
                 <thead><tr className="bg-muted">
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">رقم الأمر</th>
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
@@ -139,10 +139,10 @@ export default function SupplierStatementPage() {
                   : !(orders || []).length ? <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">لا توجد أوامر شراء</td></tr>
                   : (orders || []).map((o: any) => (
                     <tr key={o.id} className="border-b border-border hover:bg-muted/50">
-                      <td className="px-5 py-3 text-foreground">{o.order_number}</td>
-                      <td className="px-5 py-3 text-foreground">{o.date}</td>
-                      <td className="px-5 py-3 text-foreground">{Number(o.total).toLocaleString()}</td>
-                      <td className="px-5 py-3 text-foreground">{o.status}</td>
+                      <td data-label="رقم الأمر" className="px-5 py-3 text-foreground">{o.order_number}</td>
+                      <td data-label="التاريخ" className="px-5 py-3 text-foreground">{o.date}</td>
+                      <td data-label="المبلغ" className="px-5 py-3 text-foreground">{Number(o.total).toLocaleString()}</td>
+                      <td data-label="الحالة" className="px-5 py-3 text-foreground">{o.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -154,7 +154,7 @@ export default function SupplierStatementPage() {
             <div data-section="transactions" data-section-label="المعاملات" className="legacy-card card-block">
               <h3 className="px-5 py-3 font-semibold text-foreground border-b border-border">المعاملات</h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm mobile-stack-table">
                   <thead><tr className="bg-muted">
                     <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
                     <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المبلغ</th>
@@ -163,9 +163,9 @@ export default function SupplierStatementPage() {
                   <tbody>
                     {(transactions || []).map((t: any) => (
                       <tr key={t.id} className="border-b border-border hover:bg-muted/50">
-                        <td className="px-5 py-3 text-foreground">{t.date}</td>
-                        <td className="px-5 py-3 text-foreground">{Number(t.amount).toLocaleString()}</td>
-                        <td className="px-5 py-3 text-muted-foreground">{t.description || "-"}</td>
+                        <td data-label="التاريخ" className="px-5 py-3 text-foreground">{t.date}</td>
+                        <td data-label="المبلغ" className="px-5 py-3 text-foreground">{Number(t.amount).toLocaleString()}</td>
+                        <td data-label="الوصف" className="px-5 py-3 text-muted-foreground">{t.description || "-"}</td>
                       </tr>
                     ))}
                   </tbody>

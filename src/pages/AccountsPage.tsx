@@ -82,7 +82,7 @@ export default function AccountsPage() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm mobile-stack-table">
             <thead><tr className="bg-muted">
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground w-10">#</th>
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground">اسم الحساب</th>
@@ -96,11 +96,11 @@ export default function AccountsPage() {
               : paginated.length === 0 ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا يوجد حسابات</td></tr>
               : paginated.map((a: any, i: number) => (
                 <tr key={a.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                  <td className="px-4 py-3 text-muted-foreground">{(page-1)*perPage + i + 1}</td>
-                  <td className="px-4 py-3 font-medium text-foreground">{a.name} {a.is_default && <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs mr-1">افتراضي</span>}</td>
-                  <td className="px-4 py-3 text-foreground">{a.account_number || "-"}</td>
-                  <td className="px-4 py-3 text-foreground">{typeMap[a.account_type] || a.account_type}</td>
-                  <td className="px-4 py-3 font-bold text-foreground">{Number(a.balance || 0).toLocaleString()}</td>
+                  <td data-label="#" className="px-4 py-3 text-muted-foreground">{(page-1)*perPage + i + 1}</td>
+                  <td data-label="اسم الحساب" className="px-4 py-3 font-medium text-foreground">{a.name} {a.is_default && <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs mr-1">افتراضي</span>}</td>
+                  <td data-label="رقم الحساب" className="px-4 py-3 text-foreground">{a.account_number || "-"}</td>
+                  <td data-label="النوع" className="px-4 py-3 text-foreground">{typeMap[a.account_type] || a.account_type}</td>
+                  <td data-label="الرصيد" className="px-4 py-3 font-bold text-foreground">{Number(a.balance || 0).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button onClick={() => { setEditId(a.id); setForm({ name: a.name, account_number: a.account_number || "", account_type: a.account_type || "bank", bank_name: a.bank_name || "", description: a.description || "" }); setShowForm(true); }}

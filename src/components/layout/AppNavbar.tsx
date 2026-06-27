@@ -623,13 +623,16 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
             <ZoomIn size={15} />
           </button>
 
-          {/* Dark Mode Toggle */}
-          <button onClick={toggleTheme} className="p-1.5 hover:bg-primary/20 rounded-md transition-colors" title="تبديل المظهر">
+          {/* Dark Mode Toggle — مخفي على الموبايل (متاح من قائمة الملف الشخصي) */}
+          <button onClick={toggleTheme} className="hidden sm:flex p-1.5 hover:bg-primary/20 rounded-md transition-colors" title="تبديل المظهر">
             {isDark ? <Sun size={15} /> : <Moon size={15} />}
           </button>
 
-          {/* مؤشر المستخدمين المتصلين */}
-          <OnlineUsersIndicator />
+          {/* مؤشر المستخدمين المتصلين — مخفي على الموبايل لتقليل الازدحام */}
+          <div className="hidden sm:flex">
+            <OnlineUsersIndicator />
+          </div>
+
 
 
           {outCount > 0 && (
@@ -781,6 +784,11 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
                   </button>
                   <button onClick={() => { navigate("/settings/company"); setShowProfile(false); }} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors">
                     <Settings size={14} className="text-muted-foreground" /> الإعدادات
+                  </button>
+                  {/* Dark Mode متاح هنا للموبايل (مخفي من شريط الأيقونات أعلاه) */}
+                  <button onClick={() => { toggleTheme(); }} className="sm:hidden flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors">
+                    {isDark ? <Sun size={14} className="text-muted-foreground" /> : <Moon size={14} className="text-muted-foreground" />}
+                    {isDark ? "الوضع النهاري" : "الوضع الليلي"}
                   </button>
                 </div>
                 <div className="border-t border-border py-1">

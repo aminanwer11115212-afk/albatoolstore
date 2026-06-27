@@ -13,6 +13,66 @@
   }
 }
 
+/* ── متغيّرات تصميم الموبايل الموحّدة (Wave 1) ─────────────────────────
+ * توحّد المسافات وأحجام العناصر في كل صفحات الموبايل. لا تستخدم ألواناً —
+ * فقط أبعاد/أحجام لتقليل التكرار وضمان التناسق البصري.
+ */
+:root {
+  --m-card-padding: 12px;
+  --m-card-radius: 12px;
+  --m-gap: 10px;
+  --m-chip-h: 24px;
+  --m-btn-h: 44px;
+  --m-fs-h1: 1.125rem;
+  --m-fs-h2: 1.0625rem;
+  --m-fs-body: 0.875rem;
+  --m-fs-caption: 0.75rem;
+}
+
+/* جدول بنمط بطاقات على الموبايل: يحوّل أي <table> يحمل class="mobile-stack-table"
+ * إلى بطاقات عمودية مكدّسة. يعتمد على وجود attr data-label على كل <td> غير الأكشن
+ * (الخلية الأخيرة عادةً تحوي أزرار — تترك دون data-label فتُعرض كصف أكشن سفلي).
+ */
+@media (max-width: 640px) {
+  .mobile-stack-table { display: block; width: 100%; }
+  .mobile-stack-table thead { display: none; }
+  .mobile-stack-table tbody, .mobile-stack-table tr { display: block; width: 100%; }
+  .mobile-stack-table tr {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--m-card-radius);
+    padding: var(--m-card-padding);
+    margin-bottom: var(--m-gap);
+    box-shadow: 0 1px 0 0 hsl(var(--border) / 0.5);
+  }
+  .mobile-stack-table td {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0 !important;
+    border: 0 !important;
+    text-align: right !important;
+    font-size: var(--m-fs-body);
+  }
+  .mobile-stack-table td[data-label]::before {
+    content: attr(data-label);
+    color: hsl(var(--muted-foreground));
+    font-weight: 600;
+    font-size: var(--m-fs-caption);
+    margin-left: 8px;
+    flex-shrink: 0;
+  }
+  /* خلية الأكشن (آخر td عادةً وبدون data-label) تظهر بصف كامل */
+  .mobile-stack-table td:not([data-label]) {
+    border-top: 1px dashed hsl(var(--border)) !important;
+    padding-top: 8px !important;
+    margin-top: 4px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
+
 /* منع تداخل/التفاف/تراكب النصوص على شاشات الهاتف (≤640px) — يطبَّق على كل صفحات التطبيق */
 @media (max-width: 640px) {
   /* التسميات لا تكسر الكلمات حرفاً حرفاً (تجنّب ظاهرة "سج\nل") */

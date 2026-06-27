@@ -104,7 +104,8 @@ export default function FloatingSideTools() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div data-floating-tools className="fixed left-0 top-1/2 -translate-y-1/2 z-50 flex items-center">
+      <div data-floating-tools className="fixed left-0 top-1/2 -translate-y-1/2 z-50 hidden sm:flex items-center">
+        {/* مخفي على الموبايل (≤640px) لتقليل التداخل مع المحتوى — متاح من الهامبرغر */}
         {expanded && (
           <div
             className="bg-background/95 backdrop-blur-md border border-border rounded-r-xl shadow-xl p-1.5 flex flex-col gap-1 animate-slide-in-right"
