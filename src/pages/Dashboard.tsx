@@ -111,13 +111,26 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Row 1: Recent Quotes (left) + Recent Invoices (right) - side by side on desktop. On mobile: Invoices first, then Quotes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="order-2 lg:order-1">
+      {/* Row 1: Recent Quotes + Recent Invoices (Regular + Cash, each isolated) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="order-3 lg:order-1">
           <DashboardRecentQuotes quotes={quotes || []} isLoading={quotesLoading} />
         </div>
         <div className="order-1 lg:order-2">
-          <DashboardRecentInvoices invoices={(invoices || []).filter((i: any) => (i.source || "regular") !== "pos")} isLoading={invLoading} />
+          <DashboardRecentInvoices
+            variant="regular"
+            invoices={(invoices || []).filter((i: any) => (i.source || "regular") !== "pos")}
+            isLoading={invLoading}
+            limit={50}
+          />
+        </div>
+        <div className="order-2 lg:order-3">
+          <DashboardRecentInvoices
+            variant="pos"
+            invoices={(invoices || []).filter((i: any) => (i.source || "regular") === "pos")}
+            isLoading={invLoading}
+            limit={50}
+          />
         </div>
       </div>
 
