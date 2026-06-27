@@ -785,6 +785,11 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
                   <button onClick={() => { navigate("/settings/company"); setShowProfile(false); }} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors">
                     <Settings size={14} className="text-muted-foreground" /> الإعدادات
                   </button>
+                  {/* Dark Mode متاح هنا للموبايل (مخفي من شريط الأيقونات أعلاه) */}
+                  <button onClick={() => { toggleTheme(); }} className="sm:hidden flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors">
+                    {isDark ? <Sun size={14} className="text-muted-foreground" /> : <Moon size={14} className="text-muted-foreground" />}
+                    {isDark ? "الوضع النهاري" : "الوضع الليلي"}
+                  </button>
                 </div>
                 <div className="border-t border-border py-1">
                   <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-destructive hover:bg-muted transition-colors">
