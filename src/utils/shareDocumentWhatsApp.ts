@@ -46,6 +46,7 @@ function docLabelDefault(t: ShareDocType): string {
     case "packaging-quote": return "كشف تغليف";
     case "unavailable-invoice":
     case "unavailable-quote": return "أصناف غير متوفّرة";
+    case "credit-charge": return "إيصال شحن رصيد";
   }
 }
 
