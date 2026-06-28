@@ -205,14 +205,14 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
         if (!selectedCustomer?.phone) {
           toast.info("لا يوجد رقم واتساب للعميل — لم تُرسل الرسالة.");
         } else {
+          const [yy, mm, dd] = date.split("-");
+          const dateFmt = `${dd}/${mm}/${yy}`;
           const msg = [
-            `مرحباً ${selectedCustomer.name}`,
-            `تم شحن رصيدكم بمبلغ ${amt.toLocaleString()}`,
-            net > 0.001
-              ? `صافي المتبقي عليكم: ${net.toLocaleString()}`
-              : net < -0.001
-                ? `رصيدكم الدائن: ${Math.abs(net).toLocaleString()}`
-                : `الحساب مسدّد بالكامل`,
+            `مرحبا ${selectedCustomer.name}`,
+            `الحساب القديم ${balanceBefore.toLocaleString()}`,
+            `تم خصم مبلغ ${amt.toLocaleString()}`,
+            `المتبقى ${Math.max(0, net).toLocaleString()}`,
+            `تاريخ ${dateFmt}`,
           ].join("\n");
           openWhatsApp(selectedCustomer.phone, msg);
         }
