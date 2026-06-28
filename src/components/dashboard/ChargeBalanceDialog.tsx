@@ -180,33 +180,39 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
 
       // 3) رصيد العميل يُعاد حسابه تلقائياً عبر trigger trg_invoices_recompute_cust_balance.
 
-      toast.success("تم شحن الرصيد بنجاح");
+      // اقرأ الرصيد الفعلي بعد التريغر لمعرفة صافي المتبقي (لكلا الزرين)
+      const { data: freshCust } = await supabase
+        .from("customers")
+        .select("balance, credit_balance")
+        .eq("id", customerId)
+        .maybeSingle();
+      const fBal = Number((freshCust as any)?.balance || 0);
+      const fCred = Number((freshCust as any)?.credit_balance || 0);
+      const net = fBal - fCred;
+      const netLine =
+        net > 0.001
+          ? `صافي المتبقي: ${net.toLocaleString()}`
+          : net < -0.001
+            ? `رصيد دائن: ${Math.abs(net).toLocaleString()}`
+            : `الحساب مسدّد بالكامل`;
+
+      toast.success(`تم شحن ${amt.toLocaleString()} بنجاح`, {
+        description: netLine,
+      });
 
       // 4) (اختياري) رسالة واتساب نصية مختصرة — بدون أي روابط للعميل
       if (sendWhatsApp && txId) {
         if (!selectedCustomer?.phone) {
           toast.info("لا يوجد رقم واتساب للعميل — لم تُرسل الرسالة.");
         } else {
-          // اقرأ الرصيد الفعلي بعد التريغر لمعرفة صافي المتبقي
-          const { data: freshCust } = await supabase
-            .from("customers")
-            .select("balance, credit_balance")
-            .eq("id", customerId)
-            .maybeSingle();
-          const fBal = Number((freshCust as any)?.balance || 0);
-          const fCred = Number((freshCust as any)?.credit_balance || 0);
-          const net = fBal - fCred;
-          const netLine =
+          const msg = [
+            `مرحباً ${selectedCustomer.name}`,
+            `تم شحن رصيدكم بمبلغ ${amt.toLocaleString()}`,
             net > 0.001
               ? `صافي المتبقي عليكم: ${net.toLocaleString()}`
               : net < -0.001
                 ? `رصيدكم الدائن: ${Math.abs(net).toLocaleString()}`
-                : `الحساب مسدّد بالكامل`;
-
-          const msg = [
-            `مرحباً ${selectedCustomer.name}`,
-            `تم شحن رصيدكم بمبلغ ${amt.toLocaleString()}`,
-            netLine,
+                : `الحساب مسدّد بالكامل`,
           ].join("\n");
           openWhatsApp(selectedCustomer.phone, msg);
         }
