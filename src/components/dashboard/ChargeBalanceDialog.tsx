@@ -100,6 +100,23 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
   const bankOnly = bankAccounts.filter((a) => (a.account_type || "").toLowerCase() === "bank" && isAllowedBank(a));
   const cashOnly = bankAccounts.filter((a) => (a.account_type || "").toLowerCase() !== "bank");
 
+  const selectedCustomerPreview = customers.find((c) => c.id === customerId);
+  const whatsappPreview = useMemo(() => {
+    if (!selectedCustomerPreview) return "";
+    const amt = Number(amount) || 0;
+    const balanceBefore = Number(selectedCustomerPreview.balance || totalDue || 0);
+    const net = Math.max(0, balanceBefore - amt);
+    const [yy, mm, dd] = (date || "").split("-");
+    const dateFmt = yy && mm && dd ? `${dd}/${mm}/${yy}` : date;
+    return [
+      `مرحبا ${selectedCustomerPreview.name}`,
+      `الحساب القديم ${balanceBefore.toLocaleString()}`,
+      `تم خصم مبلغ ${amt.toLocaleString()}`,
+      `المتبقى ${net.toLocaleString()}`,
+      `تاريخ ${dateFmt}`,
+    ].join("\n");
+  }, [selectedCustomerPreview, amount, date, totalDue]);
+
   function reset() {
     setCustomerId(""); setCustomerSearch(""); setAmount(""); setMethod("cash");
     setBankAccountId(""); setReferenceNo(""); setNotes("");
