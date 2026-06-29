@@ -112,19 +112,20 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Row 1: Recent Invoices (عرض كامل العرض بترتيب Excel) */}
-      <div className="grid grid-cols-1 gap-4">
-        <DashboardRecentInvoices
-          invoices={invoices || []}
-          isLoading={invLoading}
-          limit={50}
-        />
+      {/* Row 1: Recent Quotes (يمين) + Recent Invoices (يسار) — مقسومة في المنتصف */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="order-2 lg:order-1">
+          <DashboardRecentQuotes quotes={quotes || []} isLoading={quotesLoading} />
+        </div>
+        <div className="order-1 lg:order-2">
+          <DashboardRecentInvoices
+            invoices={invoices || []}
+            isLoading={invLoading}
+            limit={50}
+          />
+        </div>
       </div>
 
-      {/* Row 1b: Recent Quotes (كامل العرض) */}
-      <div className="grid grid-cols-1 gap-4">
-        <DashboardRecentQuotes quotes={quotes || []} isLoading={quotesLoading} />
-      </div>
 
 
       {/* Row 2: Cash Flow / Transactions (8 cols) + Stock Alert (4 cols) */}
