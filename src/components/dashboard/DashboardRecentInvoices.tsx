@@ -131,7 +131,7 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
       <CardContent className="p-0 flex-1 overflow-hidden">
         <div ref={scrollRef} className="overflow-auto h-full">
           <table
-            className="w-full text-[10.5px]"
+            className="w-full text-[12px]"
             style={{ tableLayout: "fixed", borderCollapse: "collapse" }}
             {...tableProps}
           >
@@ -166,7 +166,7 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
 
                   <th
                     key={i}
-                    className="text-right px-1.5 py-1 font-semibold text-muted-foreground text-[10px] whitespace-nowrap"
+                    className="text-right px-1.5 py-1 font-semibold text-muted-foreground text-[11.5px] whitespace-nowrap"
                     style={{ position: "relative", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
                     {label}
@@ -204,7 +204,7 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
                 (invoices || []).slice(0, limit).map((inv: any, idx: number) => {
                   const st = statusStyles[inv.status] || statusStyles.pending;
                   const cellBase =
-                    "px-1.5 py-1 text-[10.5px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis";
+                    "px-1.5 py-1 text-[12px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis";
                   const isRowPos = inv.source === "pos";
                   const rowExtra = isRowPos ? "bg-amber-50/40 dark:bg-amber-500/5" : "";
                   return (
@@ -221,7 +221,7 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
                       </td>
                       <td className="px-1.5 py-1 whitespace-nowrap overflow-hidden text-ellipsis">
                         <span
-                          className={`inline-block px-1.5 py-0 rounded text-[9.5px] font-medium whitespace-nowrap ${st.className}`}
+                          className={`inline-block px-1.5 py-0 rounded text-[11px] font-medium whitespace-nowrap ${st.className}`}
                         >
                           {st.label}
                         </span>
