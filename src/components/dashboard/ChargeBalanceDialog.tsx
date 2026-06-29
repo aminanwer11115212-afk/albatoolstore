@@ -410,7 +410,27 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
               لا توجد فواتير غير مسددة — سيُضاف المبلغ كرصيد دائن للعميل.
             </div>
           )}
+
+          {/* WhatsApp message preview */}
+          {whatsappPreview && (
+            <div className="md:col-span-2 border border-emerald-600/40 rounded-md p-3 bg-emerald-50/60 dark:bg-emerald-950/30">
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-semibold text-sm text-emerald-800 dark:text-emerald-200">
+                  معاينة رسالة الواتساب
+                </div>
+                {selectedCustomerPreview?.phone ? (
+                  <span className="text-xs text-muted-foreground font-mono">{selectedCustomerPreview.phone}</span>
+                ) : (
+                  <span className="text-xs text-amber-600">لا يوجد رقم واتساب للعميل</span>
+                )}
+              </div>
+              <pre className="text-xs whitespace-pre-wrap font-sans leading-6 text-foreground">
+{whatsappPreview}
+              </pre>
+            </div>
+          )}
         </div>
+
 
         <DialogFooter className="gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>إلغاء</Button>
