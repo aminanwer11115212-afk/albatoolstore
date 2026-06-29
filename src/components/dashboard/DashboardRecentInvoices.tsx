@@ -34,8 +34,10 @@ const statusStyles: Record<string, { label: string; className: string }> = {
   cancelled: { label: "ملغاة", className: "bg-muted text-muted-foreground" },
 };
 
-// Default column widths (px) for: الفاتورة#، العميل، حالة الدفع، التجهيز، التاريخ، المبلغ، الملاحظة
-const DEFAULT_COL_WIDTHS: (number | null)[] = [56, 110, 64, 78, 64, 80, 130];
+// Default column widths (px) for: الفاتورة#، العميل، حالة الدفع، التجهيز، التاريخ، المبلغ
+// null = auto/flex so all columns fit the container like Excel.
+const DEFAULT_COL_WIDTHS: (number | null)[] = [70, null, 80, 90, 80, 95];
+
 
 export default function DashboardRecentInvoices({ invoices, isLoading, variant = "regular", limit = 50 }: Props) {
   const navigate = useNavigate();
