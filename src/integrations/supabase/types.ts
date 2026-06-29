@@ -2802,6 +2802,7 @@ export type Database = {
           invoice_number: string
         }[]
       }
+      get_customer_balance_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
