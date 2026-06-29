@@ -995,44 +995,139 @@ export default function CustomersPage() {
       </Sheet>
 
 
-      {/* لوحة تحكم — ملخص مستحقات العملاء */}
+      {/* لوحة تحكم — ملخص مستحقات العملاء (Excel-style) */}
       {showDashboard && (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className="bg-card border border-border rounded-xl p-4">
-          <div className="text-xs text-muted-foreground mb-1 flex items-center justify-between gap-2">
-            <span>{hasActiveFilter ? "العملاء (مفلتر)" : "إجمالي العملاء"}</span>
-            {hasActiveFilter && <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">فلتر</span>}
+      <div className="space-y-3">
+        {/* جدول إحصائيات بأسلوب Excel */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
+            <div className="text-xs font-bold text-foreground">
+              📊 ملخص أرصدة العملاء {hasActiveFilter && <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded mr-1">حسب الفلتر</span>}
+            </div>
+            <div className="text-[10px] text-muted-foreground">المستحق = الديون − السلف</div>
           </div>
-          <div className="text-xl font-bold text-foreground">{stats.count.toLocaleString()}</div>
-        </div>
-        <button
-          onClick={() => { setBalanceSheetView("debt"); setBalanceSheetOpen(true); }}
-          className="bg-card border border-border rounded-xl p-4 text-right hover:border-destructive/50 transition-colors"
-        >
-          <div className="text-xs text-muted-foreground mb-1">إجمالي الديون (لي على العملاء)</div>
-          <div className="text-xl font-bold text-destructive">{stats.totalDebt.toLocaleString()}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">{stats.debtors} عميل مدين</div>
-        </button>
-        <button
-          onClick={() => { setBalanceSheetView("credit"); setBalanceSheetOpen(true); }}
-          className="bg-card border border-border rounded-xl p-4 text-right hover:border-emerald-500/50 transition-colors"
-        >
-          <div className="text-xs text-muted-foreground mb-1">سلف/دفعات مقدمة (لهم عليّ)</div>
-          <div className="text-xl font-bold text-emerald-600">{stats.totalCredit.toLocaleString()}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">{stats.creditors} عميل دائن</div>
-        </button>
-        <div className="bg-card border border-border rounded-xl p-4 col-span-2 lg:col-span-2">
-          <div className="text-xs text-muted-foreground mb-1">صافي المستحقات</div>
-          <div className={`text-xl font-bold ${stats.net >= 0 ? "text-destructive" : "text-emerald-600"}`}>
-            {Math.abs(stats.net).toLocaleString()}
-            <span className="text-xs font-normal text-muted-foreground mr-2">
-              {stats.net >= 0 ? "مستحق لي" : "مستحق عليّ"}
-            </span>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs" style={{ tableLayout: "fixed", borderCollapse: "collapse" }}>
+              <colgroup>
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+              </colgroup>
+              <thead className="bg-muted/40">
+                <tr className="border-b border-border">
+                  <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px] whitespace-nowrap">البند</th>
+                  <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px] whitespace-nowrap">إجمالي العملاء</th>
+                  <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px] whitespace-nowrap">عدد المدينين</th>
+                  <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px] whitespace-nowrap">عدد الدائنين</th>
+                  <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px] whitespace-nowrap">الرصيد المستحق (لي)</th>
+                  <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px] whitespace-nowrap">الرصيد المتاح (لهم)</th>
+                  <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px] whitespace-nowrap">الصافي</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-border hover:bg-muted/30">
+                  <td className="px-2 py-1.5 font-bold text-foreground whitespace-nowrap">
+                    {hasActiveFilter ? "النتائج المفلترة" : "إجمالي النظام"}
+                  </td>
+                  <td className="px-2 py-1.5 font-bold text-foreground tabular-nums whitespace-nowrap">
+                    {stats.count.toLocaleString()}
+                  </td>
+                  <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">
+                    <span className="inline-block px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-semibold">
+                      {stats.debtors.toLocaleString()}
+                    </span>
+                  </td>
+                  <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">
+                    <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold">
+                      {stats.creditors.toLocaleString()}
+                    </span>
+                  </td>
+                  <td className="px-2 py-1.5 font-bold text-destructive tabular-nums whitespace-nowrap">
+                    <button
+                      onClick={() => { setBalanceSheetView("debt"); setBalanceSheetOpen(true); }}
+                      className="hover:underline"
+                      title="عرض كشف المدينين"
+                    >
+                      {stats.totalDebt.toLocaleString()}
+                    </button>
+                  </td>
+                  <td className="px-2 py-1.5 font-bold text-emerald-600 tabular-nums whitespace-nowrap">
+                    <button
+                      onClick={() => { setBalanceSheetView("credit"); setBalanceSheetOpen(true); }}
+                      className="hover:underline"
+                      title="عرض كشف الدائنين"
+                    >
+                      {stats.totalCredit.toLocaleString()}
+                    </button>
+                  </td>
+                  <td className={`px-2 py-1.5 font-bold tabular-nums whitespace-nowrap ${stats.net >= 0 ? "text-destructive" : "text-emerald-600"}`}>
+                    {Math.abs(stats.net).toLocaleString()}
+                    <span className="text-[9.5px] font-normal text-muted-foreground mr-1">
+                      {stats.net >= 0 ? "مستحق لي" : "مستحق عليّ"}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div className="text-[11px] text-muted-foreground mt-1">= الديون − السلف</div>
         </div>
+
+        {/* أعلى 10 مدينين (من السيرفر) */}
+        {!hasActiveFilter && top10Debtors.length > 0 && (
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-3 py-2 border-b border-border bg-muted/30 text-xs font-bold text-foreground">
+              🔝 أعلى 10 عملاء مديونية
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs" style={{ tableLayout: "fixed", borderCollapse: "collapse" }}>
+                <colgroup>
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "40%" }} />
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "17%" }} />
+                  <col style={{ width: "17%" }} />
+                </colgroup>
+                <thead className="bg-muted/40">
+                  <tr className="border-b border-border">
+                    <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px]">#</th>
+                    <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px]">العميل</th>
+                    <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px]">المستحق</th>
+                    <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px]">المتاح</th>
+                    <th className="text-right px-2 py-1.5 font-semibold text-muted-foreground text-[10.5px]">الصافي</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {top10Debtors.map((c: any, i: number) => (
+                    <tr
+                      key={c.id}
+                      onClick={() => goToCustomer(c.id)}
+                      className={`border-b border-border hover:bg-muted/50 cursor-pointer ${i % 2 === 1 ? "bg-muted/10" : ""}`}
+                    >
+                      <td className="px-2 py-1 text-muted-foreground tabular-nums">{i + 1}</td>
+                      <td className="px-2 py-1 font-medium text-foreground truncate" title={c.name}>{c.name}</td>
+                      <td className="px-2 py-1 font-bold text-destructive tabular-nums whitespace-nowrap">
+                        {Number(c._debt || c.debt || 0).toLocaleString()}
+                      </td>
+                      <td className="px-2 py-1 text-emerald-600 tabular-nums whitespace-nowrap">
+                        {Number(c.credit || 0).toLocaleString()}
+                      </td>
+                      <td className={`px-2 py-1 font-bold tabular-nums whitespace-nowrap ${Number(c._net || c.net || 0) >= 0 ? "text-destructive" : "text-emerald-600"}`}>
+                        {Math.abs(Number(c._net || c.net || 0)).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
       )}
+
 
 
       {showForm && (
