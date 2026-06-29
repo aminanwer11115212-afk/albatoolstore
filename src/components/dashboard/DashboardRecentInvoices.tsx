@@ -203,7 +203,6 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
 
                 (invoices || []).slice(0, limit).map((inv: any, idx: number) => {
                   const st = statusStyles[inv.status] || statusStyles.pending;
-                  const note = inv.user_note || inv.notes || "";
                   const cellBase =
                     "px-1.5 py-1 text-[10.5px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis";
                   const isRowPos = inv.source === "pos";
@@ -234,16 +233,10 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
                       <td className={`${cellBase} font-semibold`}>
                         {Number(inv.total || 0).toLocaleString()}
                       </td>
-                      <td
-                        className={cellBase}
-                        title={note}
-                        style={{ color: note ? undefined : "hsl(var(--muted-foreground))" }}
-                      >
-                        {note || "—"}
-                      </td>
                     </tr>
                   );
                 })
+
               )}
             </tbody>
           </table>
