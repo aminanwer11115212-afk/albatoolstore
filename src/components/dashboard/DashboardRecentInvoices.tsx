@@ -34,8 +34,10 @@ const statusStyles: Record<string, { label: string; className: string }> = {
   cancelled: { label: "ملغاة", className: "bg-muted text-muted-foreground" },
 };
 
-// Default column widths (px) for: الفاتورة#، العميل، حالة الدفع، التجهيز، التاريخ، المبلغ، الملاحظة
-const DEFAULT_COL_WIDTHS: (number | null)[] = [56, 110, 64, 78, 64, 80, 130];
+// Default column widths (px) for: الفاتورة#، العميل، حالة الدفع، التجهيز، التاريخ، المبلغ
+// null = auto/flex so all columns fit the container like Excel.
+const DEFAULT_COL_WIDTHS: (number | null)[] = [70, null, 80, 90, 80, 95];
+
 
 export default function DashboardRecentInvoices({ invoices, isLoading, variant = "regular", limit = 50 }: Props) {
   const navigate = useNavigate();
@@ -160,8 +162,8 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
                   "التجهيز",
                   "التاريخ",
                   "المبلغ",
-                  "الملاحظة",
                 ].map((label, i) => (
+
                   <th
                     key={i}
                     className="text-right px-1.5 py-1 font-semibold text-muted-foreground text-[10px] whitespace-nowrap"
@@ -181,13 +183,13 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-6 text-muted-foreground text-xs">
+                  <td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">
                     جاري التحميل...
                   </td>
                 </tr>
               ) : (invoices || []).length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-6 text-muted-foreground text-xs">
+                  <td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">
                     لا توجد فواتير بعد -{" "}
                     <button
                       onClick={() => navigate(addPath)}
@@ -198,9 +200,9 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
                   </td>
                 </tr>
               ) : (
+
                 (invoices || []).slice(0, limit).map((inv: any, idx: number) => {
                   const st = statusStyles[inv.status] || statusStyles.pending;
-                  const note = inv.user_note || inv.notes || "";
                   const cellBase =
                     "px-1.5 py-1 text-[10.5px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis";
                   const isRowPos = inv.source === "pos";
@@ -231,16 +233,10 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
                       <td className={`${cellBase} font-semibold`}>
                         {Number(inv.total || 0).toLocaleString()}
                       </td>
-                      <td
-                        className={cellBase}
-                        title={note}
-                        style={{ color: note ? undefined : "hsl(var(--muted-foreground))" }}
-                      >
-                        {note || "—"}
-                      </td>
                     </tr>
                   );
                 })
+
               )}
             </tbody>
           </table>
