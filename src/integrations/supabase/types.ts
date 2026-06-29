@@ -2777,6 +2777,10 @@ export type Database = {
         Returns: undefined
       }
       advance_invoke_safe: { Args: { _id: string }; Returns: undefined }
+      apply_stock_delta: {
+        Args: { _delta: number; _product_id: string }
+        Returns: undefined
+      }
       current_user_login_status: { Args: never; Returns: string }
       decrement_product_stock: {
         Args: { _product_id: string; _qty: number }

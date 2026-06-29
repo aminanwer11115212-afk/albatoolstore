@@ -137,7 +137,7 @@ export default function ExchangeRateDialog({ open, onOpenChange, onSaved }: Prop
     let invoicesCount = 0;
     const { data: draftInvoices } = await supabase
       .from("invoices")
-      .select("id, discount, shipping")
+      .select("id, discount, shipping, paid_amount")
       .or("workflow_status.eq.quote,workflow_status.eq.preparing,status.eq.draft")
       .eq("currency_code", foreignCode);
     for (const inv of draftInvoices || []) {
@@ -160,9 +160,12 @@ export default function ExchangeRateDialog({ open, onOpenChange, onSaved }: Prop
           .eq("id", it.id);
       }
       const total = subtotal - Number(inv.discount || 0) + Number(inv.shipping || 0);
+      const paid = Number((inv as any).paid_amount || 0);
+      const due = Math.max(0, total - paid);
       await supabase.from("invoices")
-        .update({ exchange_rate_to_base: newRateNum, subtotal, total, due_amount: total })
+        .update({ exchange_rate_to_base: newRateNum, subtotal, total, due_amount: due })
         .eq("id", inv.id);
+
       invoicesCount++;
     }
 

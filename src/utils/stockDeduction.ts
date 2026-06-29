@@ -30,31 +30,22 @@ async function applyDeltas(deltas: Map<string, number>): Promise<void> {
   const entries = Array.from(deltas.entries()).filter(([, d]) => d !== 0);
   if (!entries.length) return;
 
-  // تحديث تسلسلي: نقرأ القيمة الحالية ونحدّثها مباشرة لكل منتج
-  // لتقليل نافذة السباق (race condition) مقارنة بالتحديث المتوازي.
+  // تحديث ذرّي عبر RPC على قاعدة البيانات (UPDATE ... SET qty = qty + delta)
+  // لمنع race condition بين الجلسات المتوازية.
   const failures: Array<{ id: string; error: string }> = [];
-  for (const [id, delta] of entries) {
-    const { data: prod, error: readErr } = await supabase
-      .from("products")
-      .select("stock_quantity")
-      .eq("id", id)
-      .maybeSingle();
-    if (readErr) {
-      console.error("[stockDeduction] failed to read product", id, readErr);
-      failures.push({ id, error: readErr.message });
-      continue;
-    }
-    const currentQty = Number(prod?.stock_quantity || 0);
-    const newQty = currentQty + delta;
-    const { error: upErr } = await supabase
-      .from("products")
-      .update({ stock_quantity: newQty })
-      .eq("id", id);
-    if (upErr) {
-      console.error("[stockDeduction] update failed for", id, upErr);
-      failures.push({ id, error: upErr.message });
-    }
-  }
+  await Promise.all(
+    entries.map(async ([id, delta]) => {
+      const { error } = await (supabase as any).rpc("apply_stock_delta", {
+        _product_id: id,
+        _delta: delta,
+      });
+      if (error) {
+        console.error("[stockDeduction] rpc apply_stock_delta failed for", id, error);
+        failures.push({ id, error: error.message });
+      }
+    }),
+  );
+
 
   // Notify the rest of the app (Products page, open Invoice/Quote create pages)
   // so they invalidate caches and reflect the new stock immediately.
