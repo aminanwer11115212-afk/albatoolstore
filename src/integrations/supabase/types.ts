@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      _e2e_results: {
+        Row: {
+          check_name: string
+          created_at: string | null
+          details: string | null
+          verdict: string | null
+        }
+        Insert: {
+          check_name: string
+          created_at?: string | null
+          details?: string | null
+          verdict?: string | null
+        }
+        Update: {
+          check_name?: string
+          created_at?: string | null
+          details?: string | null
+          verdict?: string | null
+        }
+        Relationships: []
+      }
       accounts: {
         Row: {
           account_number: string | null
