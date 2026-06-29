@@ -1931,18 +1931,22 @@ export default function QuoteCreatePage() {
                   ),
                 },
 
-                // === تحويل لفاتورة ===
+                // === تحويل لفاتورة (ظاهر دائماً، لا يعمل إلا بعد الحفظ) ===
                 {
                   id: "convert-to-invoice",
                   group: "2-files",
-                  node: editId ? (
+                  node: (
                     <button
                       type="button"
                       data-toolbar-id="convert-to-invoice"
+                      disabled={!editId}
                       onClick={async (e) => {
+                        if (!editId) {
+                          toast.error("احفظ عرض السعر أولاً ثم اضغط على \"تحويل لفاتورة\"");
+                          return;
+                        }
                         // حارس التراكب: تحقّق أن مركز هذا الزر هو فعلاً
                         // أعلى عنصر قابل للنقر، وإلا فهو متراكب مع زر آخر
-                        // (مثل الطباعة) — أوقف التنفيذ مع رسالة واضحة.
                         const btn = e.currentTarget as HTMLElement;
                         const r = btn.getBoundingClientRect();
                         const cx = r.left + r.width / 2;
@@ -1973,22 +1977,24 @@ export default function QuoteCreatePage() {
                         try {
                           const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
                           const { invoiceId, invoiceNumber, alreadyConverted } = await convertQuoteToInvoice(editId);
-                          // ملاحظة: لا نحذف العرض — convertQuoteToInvoice يعلِّمه accepted/converted
-                          // مع converted_to_invoice_id للحفاظ على السجل وإمكانية التتبع.
-                          // علِّم العرض كمنتهٍ في الجلسة لإيقاف أي حفظ خلفي لاحق
                           quoteGoneRef.current = true;
                           showConverted({ invoiceId, invoiceNumber, alreadyConverted, quoteId: editId });
                         } catch (e: any) {
                           toast.error(e.message || "فشل تحويل العرض إلى فاتورة");
                         }
                       }}
-                      title="تحويل عرض السعر إلى فاتورة"
-                      style={btnStyle("#7c3aed")}
+                      title={editId ? "تحويل عرض السعر إلى فاتورة" : "احفظ عرض السعر أولاً لتفعيل التحويل"}
+                      style={{
+                        ...btnStyle("#7c3aed"),
+                        opacity: editId ? 1 : 0.5,
+                        cursor: editId ? "pointer" : "not-allowed",
+                      }}
                     >
                       <FileText size={14} /> تحويل لفاتورة
                     </button>
-                  ) : null,
+                  ),
                 },
+
 
 
                 // === تغيير حالة العرض ===
