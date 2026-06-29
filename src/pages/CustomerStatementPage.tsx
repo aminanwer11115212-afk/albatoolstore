@@ -375,7 +375,8 @@ export default function CustomerStatementPage() {
             </div>
           )}
         </>
-      )}
+        );
+      })()}
       </div>
     </div>
   );
