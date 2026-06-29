@@ -281,9 +281,24 @@ export default function CustomerStatementPage() {
         )}
       </div>
 
-      {selectedCustomer && (
+      {selectedCustomer && (() => {
+        const netBalance = Number(selectedCustomer.balance || 0) - Number(selectedCustomer.credit_balance || 0);
+        const isDebtor = netBalance > 0;   // عليه — أحمر
+        const isCreditor = netBalance < 0; // له — أخضر
+        const balanceLabel = isDebtor ? "عليه" : isCreditor ? "له" : "مسوّى";
+        const balanceColor = isDebtor
+          ? "text-destructive"
+          : isCreditor
+          ? "text-success"
+          : "text-muted-foreground";
+        const balanceDisplay = isDebtor
+          ? `- ${Math.abs(netBalance).toLocaleString()}`
+          : isCreditor
+          ? Math.abs(netBalance).toLocaleString()
+          : "0";
+        return (
         <>
-          <div data-section="summary" data-section-label="صناديق الملخص" className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div data-section="summary" data-section-label="صناديق الملخص" className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <p className="text-sm text-muted-foreground">العميل</p>
               <p className="text-lg font-bold text-foreground">{selectedCustomer.name}</p>
@@ -299,6 +314,10 @@ export default function CustomerStatementPage() {
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <p className="text-sm text-muted-foreground">المتبقي</p>
               <p className="text-lg font-bold text-destructive">{(totalInvoices - totalPaid).toLocaleString()}</p>
+            </div>
+            <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
+              <p className="text-sm text-muted-foreground">الرصيد الحالي ({balanceLabel})</p>
+              <p className={`text-lg font-bold ${balanceColor}`}>{balanceDisplay}</p>
             </div>
           </div>
 
@@ -356,7 +375,8 @@ export default function CustomerStatementPage() {
             </div>
           )}
         </>
-      )}
+        );
+      })()}
       </div>
     </div>
   );
