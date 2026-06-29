@@ -27,29 +27,18 @@ async function applyDeltas(deltas: Map<string, number>): Promise<void> {
   const entries = Array.from(deltas.entries()).filter(([, d]) => d !== 0);
   if (!entries.length) return;
 
-  // تحديث تسلسلي: نقرأ القيمة الحالية ونحدّثها مباشرة لكل منتج
-  // لتقليل نافذة السباق (race condition) مقارنة بالتحديث المتوازي.
+  // تحديث ذرّي عبر RPC على قاعدة البيانات لمنع race condition.
   const failures: Array<{ id: string; error: string }> = [];
-  for (const [id, delta] of entries) {
-    const { data: prod, error: readErr } = await supabase
-      .from("products")
-      .select("stock_quantity")
-      .eq("id", id)
-      .maybeSingle();
-    if (readErr) {
-      failures.push({ id, error: readErr.message });
-      continue;
-    }
-    const currentQty = Number(prod?.stock_quantity || 0);
-    const newQty = currentQty + delta;
-    const { error: upErr } = await supabase
-      .from("products")
-      .update({ stock_quantity: newQty })
-      .eq("id", id);
-    if (upErr) {
-      failures.push({ id, error: upErr.message });
-    }
-  }
+  await Promise.all(
+    entries.map(async ([id, delta]) => {
+      const { error } = await (supabase as any).rpc("apply_stock_delta", {
+        _product_id: id,
+        _delta: delta,
+      });
+      if (error) failures.push({ id, error: error.message });
+    }),
+  );
+
 
   if (typeof window !== "undefined") {
     try { window.dispatchEvent(new Event("products:changed")); } catch {}
