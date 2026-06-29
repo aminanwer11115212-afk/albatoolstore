@@ -100,6 +100,23 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
   const bankOnly = bankAccounts.filter((a) => (a.account_type || "").toLowerCase() === "bank" && isAllowedBank(a));
   const cashOnly = bankAccounts.filter((a) => (a.account_type || "").toLowerCase() !== "bank");
 
+  const selectedCustomerPreview = customers.find((c) => c.id === customerId);
+  const whatsappPreview = useMemo(() => {
+    if (!selectedCustomerPreview) return "";
+    const amt = Number(amount) || 0;
+    const balanceBefore = Number(selectedCustomerPreview.balance || totalDue || 0);
+    const net = Math.max(0, balanceBefore - amt);
+    const [yy, mm, dd] = (date || "").split("-");
+    const dateFmt = yy && mm && dd ? `${dd}/${mm}/${yy}` : date;
+    return [
+      `مرحبا ${selectedCustomerPreview.name}`,
+      `الحساب القديم ${balanceBefore.toLocaleString()}`,
+      `تم خصم مبلغ ${amt.toLocaleString()}`,
+      `المتبقى ${net.toLocaleString()}`,
+      `تاريخ ${dateFmt}`,
+    ].join("\n");
+  }, [selectedCustomerPreview, amount, date, totalDue]);
+
   function reset() {
     setCustomerId(""); setCustomerSearch(""); setAmount(""); setMethod("cash");
     setBankAccountId(""); setReferenceNo(""); setNotes("");
@@ -393,7 +410,27 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
               لا توجد فواتير غير مسددة — سيُضاف المبلغ كرصيد دائن للعميل.
             </div>
           )}
+
+          {/* WhatsApp message preview */}
+          {whatsappPreview && (
+            <div className="md:col-span-2 border border-emerald-600/40 rounded-md p-3 bg-emerald-50/60 dark:bg-emerald-950/30">
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-semibold text-sm text-emerald-800 dark:text-emerald-200">
+                  معاينة رسالة الواتساب
+                </div>
+                {selectedCustomerPreview?.phone ? (
+                  <span className="text-xs text-muted-foreground font-mono">{selectedCustomerPreview.phone}</span>
+                ) : (
+                  <span className="text-xs text-amber-600">لا يوجد رقم واتساب للعميل</span>
+                )}
+              </div>
+              <pre className="text-xs whitespace-pre-wrap font-sans leading-6 text-foreground">
+{whatsappPreview}
+              </pre>
+            </div>
+          )}
         </div>
+
 
         <DialogFooter className="gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>إلغاء</Button>
