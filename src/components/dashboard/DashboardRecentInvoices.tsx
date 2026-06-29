@@ -162,8 +162,8 @@ export default function DashboardRecentInvoices({ invoices, isLoading, variant =
                   "التجهيز",
                   "التاريخ",
                   "المبلغ",
-                  "الملاحظة",
                 ].map((label, i) => (
+
                   <th
                     key={i}
                     className="text-right px-1.5 py-1 font-semibold text-muted-foreground text-[10px] whitespace-nowrap"
