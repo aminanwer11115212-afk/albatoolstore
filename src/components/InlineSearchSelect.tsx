@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { startsWithMatch, normalizeAr } from "@/utils/searchMatch";
 
 export type InlineOption = { value: string; label: string };
@@ -167,30 +168,35 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
         const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
         const vw = window.innerWidth;
         const vh = window.innerHeight;
-        const desiredWidth = isMobile ? Math.min(vw - 16, 360) : Math.max(rect.width, 220);
-        // Clamp horizontally inside viewport (RTL: anchor by right)
-        const rightOffset = Math.max(8, Math.min(vw - rect.right, vw - desiredWidth - 8));
-        // If not enough space below, open upward
+        const desiredWidth = isMobile ? Math.min(vw - 16, 360) : Math.max(rect.width, 240);
+        // Clamp horizontally inside viewport (RTL: anchor by right edge of trigger)
+        const rightEdge = vw - rect.right;
+        const rightOffset = Math.max(8, Math.min(rightEdge, vw - desiredWidth - 8));
+        // Decide direction by available space (open up if not enough below)
         const spaceBelow = vh - rect.bottom;
-        const openUp = spaceBelow < 240 && rect.top > spaceBelow;
+        const spaceAbove = rect.top;
+        const menuMax = isMobile ? Math.min(vh * 0.7, 420) : 320;
+        const openUp = spaceBelow < menuMax && spaceAbove > spaceBelow;
         const style: React.CSSProperties = {
           position: "fixed",
           ...(openUp
-            ? { bottom: vh - rect.top + 2 }
-            : { top: rect.bottom + 2 }),
+            ? { bottom: vh - rect.top + 4 }
+            : { top: rect.bottom + 4 }),
           right: rightOffset,
           width: desiredWidth,
           maxWidth: `calc(100vw - 16px)`,
-          zIndex: 9999,
+          maxHeight: menuMax,
+          zIndex: 10000, // above Radix Dialog (z-50) and any overlay
         };
-        return (
+        const menu = (
           <div
             ref={menuRef}
-            className="bg-card border-2 border-primary rounded shadow-lg ring-2 ring-primary/40"
+            className="bg-popover text-popover-foreground border border-border rounded-lg shadow-xl overflow-hidden flex flex-col"
             style={style}
             onKeyDown={handleMenuKey}
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
+            dir="rtl"
           >
             <input
               ref={inputRef}
@@ -203,24 +209,24 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
               autoCapitalize="off"
               spellCheck={false}
               inputMode="text"
-              className="w-full bg-background border-b border-border px-3 py-2 text-base sm:text-[11px] sm:px-2 sm:py-1 outline-none"
+              className="w-full bg-background border-b border-border px-3 py-2.5 text-base sm:text-sm outline-none focus:bg-background"
               dir="rtl"
             />
-            <div className="max-h-[60vh] sm:max-h-48 overflow-y-auto overscroll-contain">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
               {canAdd && (
                 <button
                   type="button"
                   onClick={doAdd}
                   disabled={adding}
                   onMouseEnter={() => setHighlight(0)}
-                  className={`w-full text-right px-3 py-2.5 sm:px-2 sm:py-1 text-sm sm:text-[11px] flex items-center gap-1 border-b border-border ${highlight === 0 ? "bg-primary/15" : "hover:bg-muted"}`}
+                  className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-2 border-b border-border ${highlight === 0 ? "bg-primary/15" : "hover:bg-muted"}`}
                 >
-                  <span className="text-primary font-bold">＋</span>
+                  <span className="text-primary font-bold text-base">＋</span>
                   <span className="truncate">{adding ? "جاري الإضافة..." : `${addLabel || "إضافة"}: "${query.trim()}"`}</span>
                 </button>
               )}
               {filtered.length === 0 && !canAdd && (
-                <div className="px-2 py-2 text-sm sm:text-[11px] text-muted-foreground text-center">لا نتائج</div>
+                <div className="px-3 py-3 text-sm text-muted-foreground text-center">لا نتائج</div>
               )}
               {filtered.map((o, i) => {
                 const idx = canAdd ? i + 1 : i;
@@ -234,7 +240,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
                     <button
                       type="button"
                       onClick={() => { onChange(o.value); closeAndFocus(true); }}
-                      className={`flex-1 text-right px-3 py-2.5 sm:px-2 sm:py-1 text-sm sm:text-[11px] truncate ${o.value === value ? "font-semibold text-primary" : ""}`}
+                      className={`flex-1 text-right px-3 py-2.5 text-sm truncate ${o.value === value ? "font-semibold text-primary" : ""}`}
                     >
                       {o.label}
                     </button>
@@ -249,7 +255,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
                           const ok = await onDelete(o);
                           if (ok && o.value === value) onChange("");
                         }}
-                        className="px-3 py-2.5 sm:px-2 sm:py-1 text-sm sm:text-[11px] text-destructive hover:bg-destructive/10"
+                        className="px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10"
                       >
                         ✕
                       </button>
@@ -260,6 +266,12 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
             </div>
           </div>
         );
+        // Portal to body so the menu escapes any ancestor with `transform`
+        // (Radix Dialog wraps content in translate(-50%,-50%) which would otherwise
+        //  trap our position:fixed inside the dialog box and misplace the menu).
+        return typeof document !== "undefined"
+          ? createPortal(menu, document.body)
+          : menu;
       })()}
     </div>
   );
