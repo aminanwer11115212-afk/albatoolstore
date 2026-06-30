@@ -187,6 +187,11 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
           maxWidth: `calc(100vw - 16px)`,
           maxHeight: menuMax,
           zIndex: 10000, // above Radix Dialog (z-50) and any overlay
+          // Radix Dialog sets `body { pointer-events: none }` while open and
+          // `pointer-events` IS inherited. Since this menu is portaled to
+          // <body>, we must re-enable pointer events explicitly — otherwise
+          // mouse clicks fall through to the dialog footer below.
+          pointerEvents: "auto",
         };
         const menu = (
           <div
