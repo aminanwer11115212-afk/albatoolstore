@@ -136,6 +136,50 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     })();
   }, [form.city_id]);
 
+  const addRegion = async (name: string): Promise<string | null> => {
+    const nextSort = (regions.reduce((m, r) => Math.max(m, r.sort_order || 0), 0) || 0) + 1;
+    const { data, error } = await (supabase as any).from("regions")
+      .insert({ name: name.trim(), sort_order: nextSort }).select("id,name,sort_order").single();
+    if (error) { toast.error(error.message); return null; }
+    setRegions(prev => [...prev, data].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
+    setForm(f => ({ ...f, region_id: data.id, state_id: null, city_id: null, locality_id: null }));
+    toast.success(`تمت إضافة الاتجاه: ${data.name}`);
+    return data.id;
+  };
+
+  const removeRegion = async (id: string): Promise<boolean> => {
+    const hasStates = states.some(s => s.region_id === id);
+    if (hasStates) { toast.error("لا يمكن حذف الاتجاه — يحتوي ولايات"); return false; }
+    const { error } = await (supabase as any).from("regions").delete().eq("id", id);
+    if (error) { toast.error(error.message); return false; }
+    setRegions(prev => prev.filter(r => r.id !== id));
+    if (form.region_id === id) setForm(f => ({ ...f, region_id: null, state_id: null, city_id: null, locality_id: null }));
+    toast.success("تم حذف الاتجاه");
+    return true;
+  };
+
+  const addState = async (name: string): Promise<string | null> => {
+    if (!form.region_id) { toast.error("اختر الاتجاه أولاً"); return null; }
+    const { data, error } = await (supabase as any).from("states")
+      .insert({ name: name.trim(), region_id: form.region_id }).select("id,name,region_id").single();
+    if (error) { toast.error(error.message); return null; }
+    setStates(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    setForm(f => ({ ...f, state_id: data.id, city_id: null, locality_id: null }));
+    toast.success(`تمت إضافة الولاية: ${data.name}`);
+    return data.id;
+  };
+
+  const removeState = async (id: string): Promise<boolean> => {
+    const hasCities = cities.some(c => c.state_id === id);
+    if (hasCities) { toast.error("لا يمكن حذف الولاية — تحتوي مدن"); return false; }
+    const { error } = await (supabase as any).from("states").delete().eq("id", id);
+    if (error) { toast.error(error.message); return false; }
+    setStates(prev => prev.filter(s => s.id !== id));
+    if (form.state_id === id) setForm(f => ({ ...f, state_id: null, city_id: null, locality_id: null }));
+    toast.success("تم حذف الولاية");
+    return true;
+  };
+
   const addCity = async (name: string): Promise<string | null> => {
     if (!form.state_id) { toast.error("اختر الولاية أولاً"); return null; }
     const { data, error } = await (supabase as any).from("cities")
