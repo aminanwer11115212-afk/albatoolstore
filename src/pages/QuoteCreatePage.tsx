@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { notifyDuplicateItem } from "@/utils/duplicateItemToast";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -300,6 +301,7 @@ export default function QuoteCreatePage() {
   usePageRenderCount("/quotes/create");
   
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { id: editId } = useParams();
   const [searchParams] = useSearchParams();
   const isSideMode = searchParams.get("side") === "1";
@@ -974,6 +976,9 @@ export default function QuoteCreatePage() {
     savedRef.current = true;
     lastSavedIdRef.current = qid!;
     lastSavedCustomerRef.current = activeCustomer!.id;
+    // حدّث الشريط الجانبي (آخر العروض) فوراً بعد الحفظ حتى تظهر العرض الجديد/المحدّث
+    queryClient.invalidateQueries({ queryKey: ["quotes-with-customers"] });
+    queryClient.invalidateQueries({ queryKey: ["quotes"] });
     // إذا كنّا في وضع الإنشاء وتم الحفظ بنجاح، بدّل العنوان لوضع التعديل
     // حتى لا يُنشئ الضغط على "حفظ" مجدداً عرض سعر جديد
     if (!editId && qid) {
@@ -998,7 +1003,7 @@ export default function QuoteCreatePage() {
       lastSavedIdRef.current = null;
       lastSavedCustomerRef.current = null;
       originalItemsHashRef.current = null;
-      const createPath = isSideMode ? "/quotes/side/new" : "/quotes/new";
+      const createPath = isSideMode ? "/quotes/side/new" : "/quotes/create";
       window.history.replaceState({}, "", createPath);
       setTimeout(() => customerInputRef.current?.focus(), 0);
     }
@@ -2218,7 +2223,7 @@ export default function QuoteCreatePage() {
                       { duration: 5000, description: "تم حذف البنود والمرفقات والتغليف والنقل" }
                     );
                     setClearConfirmOpen(false);
-                    navigate(isSideMode ? "/quotes/side/new" : "/quotes/new");
+                    navigate(isSideMode ? "/quotes/side/new" : "/quotes/create");
                     return;
                   }
                   setRows([]);
