@@ -15,6 +15,7 @@ import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { StatusChip } from "@/components/ui/status-chip";
 import ShippingDispatchDialog from "@/components/invoice/ShippingDispatchDialog";
+import HomeButton from "@/components/HomeButton";
 
 // Status label map matching old system (custom.css .st-* classes)
 const statusMap: Record<string, { label: string; cls: string }> = {
