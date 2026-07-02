@@ -254,6 +254,7 @@ const App = () => {
         <NavigationPerfTracker />
         <ColumnResizeDebugHud />
         <ColumnsResetFloatingButton />
+        <HomeButton />
         <StaffGuard>
         <AppLayout>
           <Routes>
