@@ -88,6 +88,88 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
     },
     true,
   );
+
+  // ============ مؤشر بصري لوضع Space (تنقّل/تعديل) ============
+  // يعمل فقط على الحقول داخل جدول البنود (data-nav-table).
+  const badge = document.createElement("div");
+  badge.setAttribute("data-space-mode-badge", "");
+  badge.style.cssText = [
+    "position:fixed","z-index:9999","pointer-events:none",
+    "font-family:inherit","font-size:10px","font-weight:700",
+    "padding:1px 6px","border-radius:9999px","line-height:1.4",
+    "box-shadow:0 1px 2px rgba(0,0,0,.15)","display:none","color:#fff",
+  ].join(";");
+  const attachBadge = () => {
+    if (!badge.isConnected && document.body) document.body.appendChild(badge);
+  };
+
+  const isTextLike = (el: HTMLElement) => {
+    const tag = el.tagName;
+    if (tag === "TEXTAREA" || el.isContentEditable) return true;
+    if (tag === "INPUT") {
+      const type = ((el as HTMLInputElement).type || "text").toLowerCase();
+      return ["text","search","email","tel","url","password"].includes(type);
+    }
+    return false;
+  };
+
+  const computeMode = (el: HTMLElement): "nav" | "edit" | null => {
+    if (!el.closest?.("[data-nav-table]")) return null;
+    const tag = el.tagName;
+    if (tag === "SELECT") return "nav";
+    if (tag === "INPUT") {
+      const type = ((el as HTMLInputElement).type || "text").toLowerCase();
+      if (type === "number") return "nav";
+    }
+    if (!isTextLike(el)) return null;
+    if (editingElements.has(el)) return "edit";
+    if (tag === "INPUT" || tag === "TEXTAREA") {
+      const inp = el as HTMLInputElement | HTMLTextAreaElement;
+      const val = inp.value ?? "";
+      const start = inp.selectionStart ?? 0;
+      const end = inp.selectionEnd ?? 0;
+      const fullySelected = val.length > 0 && start === 0 && end === val.length;
+      if (val.length > 0 && !fullySelected) return "edit";
+    }
+    return "nav";
+  };
+
+  const refresh = () => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el) { badge.style.display = "none"; return; }
+    const mode = computeMode(el);
+    document.querySelectorAll("[data-space-mode]").forEach((n) => {
+      if (n !== el) (n as HTMLElement).removeAttribute("data-space-mode");
+    });
+    if (!mode) {
+      el.removeAttribute("data-space-mode");
+      badge.style.display = "none";
+      return;
+    }
+    el.setAttribute("data-space-mode", mode);
+    attachBadge();
+    const rect = el.getBoundingClientRect();
+    badge.textContent = mode === "edit" ? "تعديل" : "تنقّل";
+    badge.style.background = mode === "edit" ? "hsl(142 71% 40%)" : "hsl(38 92% 45%)";
+    badge.style.top = `${Math.max(2, rect.top - 10)}px`;
+    badge.style.left = `${Math.max(2, rect.left - 4)}px`;
+    badge.style.display = "block";
+  };
+
+  const scheduleRefresh = () => requestAnimationFrame(refresh);
+  window.addEventListener("focusin", scheduleRefresh, true);
+  window.addEventListener("focusout", () => {
+    requestAnimationFrame(() => {
+      if (!document.activeElement || document.activeElement === document.body) {
+        badge.style.display = "none";
+      } else refresh();
+    });
+  }, true);
+  window.addEventListener("keyup", scheduleRefresh, true);
+  window.addEventListener("mouseup", scheduleRefresh, true);
+  window.addEventListener("input", scheduleRefresh, true);
+  window.addEventListener("scroll", scheduleRefresh, true);
+  window.addEventListener("resize", scheduleRefresh, true);
 }
 
 
