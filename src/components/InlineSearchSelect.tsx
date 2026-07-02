@@ -93,14 +93,15 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     // أن inputRef.current صار مربوطاً (React 18 batching).
   };
 
-  // بعد فتح القائمة وضمان mount للـ input، ركّز عليه وحدّد نصه.
+  // بعد فتح القائمة وضمان mount للـ input، ركّز عليه بعد تأخير يتجاوز
+  // FocusScope الخاص بـ Radix Dialog (الذي يعيد الفوكس داخل الـ scope).
   useEffect(() => {
     if (!open) return;
-    const id = requestAnimationFrame(() => {
+    const t = setTimeout(() => {
       const el = inputRef.current;
       if (el) { el.focus(); el.select(); }
-    });
-    return () => cancelAnimationFrame(id);
+    }, 60);
+    return () => clearTimeout(t);
   }, [open]);
 
   const closeAndFocus = (advance = false) => {
