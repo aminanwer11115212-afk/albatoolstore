@@ -139,8 +139,6 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
       // الحقول الرقمية/الاختيار في وضع التنقّل: Space يُحدِّد/يحذف الصف.
       e.preventDefault();
 
-      e.preventDefault();
-
       const now = Date.now();
       const isDoublePress =
         lastPressUidRef.current === uid &&
