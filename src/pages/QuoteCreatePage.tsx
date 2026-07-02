@@ -976,6 +976,9 @@ export default function QuoteCreatePage() {
     savedRef.current = true;
     lastSavedIdRef.current = qid!;
     lastSavedCustomerRef.current = activeCustomer!.id;
+    // حدّث الشريط الجانبي (آخر العروض) فوراً بعد الحفظ حتى تظهر العرض الجديد/المحدّث
+    queryClient.invalidateQueries({ queryKey: ["quotes-with-customers"] });
+    queryClient.invalidateQueries({ queryKey: ["quotes"] });
     // إذا كنّا في وضع الإنشاء وتم الحفظ بنجاح، بدّل العنوان لوضع التعديل
     // حتى لا يُنشئ الضغط على "حفظ" مجدداً عرض سعر جديد
     if (!editId && qid) {
