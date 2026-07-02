@@ -864,7 +864,7 @@ export default function QuoteCreatePage() {
     // (window.history.replaceState لا يُحدِّث useParams، لذلك بدون هذا
     // الاحتياط ستُنشئ نقرة الحفظ الثانية عرض سعر جديداً مكرَّراً).
     // إذا تغيّر العميل عمّا حُفظ → عرض جديد برقم عشوائي جديد.
-    let effectiveEditId = editId || lastSavedIdRef.current || undefined;
+    let effectiveEditId = (newSessionRef.current ? undefined : editId) || lastSavedIdRef.current || undefined;
     if (effectiveEditId && !editId && lastSavedCustomerRef.current && lastSavedCustomerRef.current !== activeCustomer!.id) {
       lastSavedIdRef.current = null;
       effectiveEditId = undefined;
