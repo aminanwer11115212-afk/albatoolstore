@@ -301,6 +301,7 @@ export default function QuoteCreatePage() {
   usePageRenderCount("/quotes/create");
   
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { id: editId } = useParams();
   const [searchParams] = useSearchParams();
   const isSideMode = searchParams.get("side") === "1";
