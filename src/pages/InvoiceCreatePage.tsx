@@ -160,6 +160,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     isSavingRef,
     originalItemsHashRef,
   } = useDocumentSave();
+  // يُرفع بعد "+ حفظ وجديد" لتجاهل editId القادم من useParams في الجلسة الجديدة.
+  const newSessionRef = useRef(false);
   useContainerFit(itemsScrollRef, clampWidthsToContainer, { locked: colsLocked });
   const prevRowsLen = useRef(1);
   useEffect(() => {
