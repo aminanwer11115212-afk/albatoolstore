@@ -17,6 +17,7 @@ type Focusable = { focus: () => void } | null;
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
 import { userScopedLegacyKey } from "@/lib/userScopedKey";
 import { useRowHeights } from "@/hooks/useRowHeights";
+import HomeButton from "@/components/HomeButton";
 
 // تطبيع إدخال الأرقام: يحوّل الأرقام العربية/الفارسية إلى لاتينية ويزيل المسافات
 function normalizeNumStr(v: string): string {
@@ -1595,6 +1596,7 @@ export default function ProductsPage() {
 
       {/* Products table */}
       <div className="legacy-card card-block">
+        <HomeButton />
         {!showFilters && !isAllProducts && (
           <div className="p-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center bg-muted rounded-lg px-3 py-2 max-w-sm w-full min-w-0">

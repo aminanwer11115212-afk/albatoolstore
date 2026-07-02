@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, UserCheck, UserX, KeyRound, ShieldCheck, Power } fr
 import { toast } from "sonner";
 import { useEmployees } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
+import HomeButton from "@/components/HomeButton";
 
 const PERMS = [
   { key: "create_invoice", label: "إنشاء فواتير" },
@@ -269,6 +270,7 @@ export default function EmployeesPage() {
       )}
 
       <div className="legacy-card card-block">
+        <HomeButton />
         <div className="overflow-x-auto">
           <table className="w-full text-sm mobile-stack-table sm:min-w-[720px] sm:whitespace-nowrap">
             <thead><tr className="bg-muted">

@@ -6,6 +6,7 @@ import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { StatusChip } from "@/components/ui/status-chip";
+import HomeButton from "@/components/HomeButton";
 
 export default function DailyInvoicesReportPage() {
   const navigate = useNavigate();
@@ -84,6 +85,7 @@ export default function DailyInvoicesReportPage() {
 
       {/* Table */}
       <div className="legacy-card card-block" data-section="table" data-section-label="جدول الفواتير">
+        <HomeButton />
         <div className="overflow-x-auto">
           <table className="w-full text-sm mobile-stack-table">
             <thead><tr className="bg-muted">

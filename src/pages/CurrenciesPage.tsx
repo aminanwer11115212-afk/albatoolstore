@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import HomeButton from "@/components/HomeButton";
 
 export default function CurrenciesPage() {
   const [currencies, setCurrencies] = useState<any[]>([]);
@@ -64,6 +65,7 @@ export default function CurrenciesPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
+        <HomeButton />
         <h5>العملات المعتمدة {baseCur && `— الأساسية: ${baseCur.code}`}</h5>
         <hr />
         <div style={{ marginBottom: "1rem" }}>
