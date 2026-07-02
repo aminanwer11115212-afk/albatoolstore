@@ -23,7 +23,7 @@ export function normalizeAr(s: unknown): string {
 }
 
 /**
- * يُرجِع true إذا أي "كلمة" داخل haystack تبدأ بـ query (بعد التطبيع).
+ * يُرجِع true إذا haystack يبدأ بـ query (بعد التطبيع) من أول النص فقط.
  * بحث فارغ ⇒ true دائماً.
  */
 export function startsWithMatch(haystack: unknown, query: unknown): boolean {
@@ -31,14 +31,9 @@ export function startsWithMatch(haystack: unknown, query: unknown): boolean {
   if (!q) return true;
   const h = normalizeAr(haystack);
   if (!h) return false;
-  if (h.startsWith(q)) return true;
-  // مطابقة بداية أي كلمة داخل النص
-  const tokens = h.split(" ");
-  for (const t of tokens) {
-    if (t.startsWith(q)) return true;
-  }
-  return false;
+  return h.startsWith(q);
 }
+
 
 /** يُرجِع true إذا أي حقل من الحقول يطابق startsWithMatch. */
 export function startsWithAny(fields: Array<unknown>, query: unknown): boolean {
