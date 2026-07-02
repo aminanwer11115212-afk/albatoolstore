@@ -2343,3 +2343,45 @@ input[type="number"] {
     font-size: 13px !important;
   }
 }
+
+/* ============ HomeButton (زر لوحة التحكم) ============ */
+.home-quick-btn {
+  position: absolute;
+  top: 8px;
+  inset-inline-start: 8px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  min-height: 32px;
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  transition: background-color .15s ease, transform .15s ease;
+}
+.home-quick-btn:hover { background: hsl(var(--accent)); }
+.home-quick-btn:active { transform: translateY(1px); }
+.home-quick-btn:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+
+/* على الكارد يحوي الزر: نترك مساحة أعلى لتفادي التداخل مع العنوان */
+.legacy-card:has(> .home-quick-btn) { padding-top: 48px; }
+
+@media (max-width: 640px) {
+  .home-quick-btn {
+    top: 6px;
+    inset-inline-start: 6px;
+    padding: 8px 10px;
+    min-height: 40px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+  .home-quick-btn__label { display: inline; }
+  .legacy-card:has(> .home-quick-btn) { padding-top: 54px; }
+}
