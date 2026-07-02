@@ -10,6 +10,7 @@ import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocLi
 import { StatusChip } from "@/components/ui/status-chip";
 import { receiveStockForPurchaseOnce } from "@/utils/stockReceive";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import HomeButton from "@/components/HomeButton";
 
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },
