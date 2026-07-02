@@ -5,7 +5,10 @@ import { startsWithMatch, normalizeAr } from "@/utils/searchMatch";
 export type InlineOption = { value: string; label: string };
 
 export type InlineSearchSelectHandle = {
+  /** يركّز الزر ويفتح القائمة تلقائياً — يستخدم عند التنقّل بلوحة المفاتيح */
   focus: () => void;
+  /** يركّز الزر فقط دون فتح القائمة */
+  focusOnly: () => void;
 };
 
 interface Props {
