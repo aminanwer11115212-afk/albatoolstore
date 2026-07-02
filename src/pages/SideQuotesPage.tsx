@@ -7,6 +7,7 @@ import { startsWithAny } from "@/utils/searchMatch";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompanySettings } from "@/hooks/useData";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import HomeButton from "@/components/HomeButton";
 
 function useSideQuotes() {
   return useQuery({
