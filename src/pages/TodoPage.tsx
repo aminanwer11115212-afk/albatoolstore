@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useTodos } from "@/hooks/useData";
-import HomeButton from "@/components/HomeButton";
-
 export default function TodoPage() {
   const { data: todos, isLoading, insert, update, remove } = useTodos();
   const [title, setTitle] = useState("");
@@ -30,7 +28,6 @@ export default function TodoPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
-        <HomeButton />
         <h5>قائمة المهام</h5>
         <hr />
         <div className="legacy-form-horizontal">

@@ -1,8 +1,6 @@
 import { useRef, useState } from "react";
 import { useAccounts, useTransactions } from "@/hooks/useData";
 import { toast } from "sonner";
-import HomeButton from "@/components/HomeButton";
-
 export default function TransferPage() {
   const { data: accounts } = useAccounts();
   const { insert } = useTransactions();
@@ -35,7 +33,6 @@ export default function TransferPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
-        <HomeButton />
         <h5>تحويل بين الحسابات</h5>
         <hr />
         <div className="legacy-form-horizontal">

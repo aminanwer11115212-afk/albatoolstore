@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import HomeButton from "@/components/HomeButton";
-
 interface CalendarEvent { id: string; title: string; date: string; color: string; }
 const COLORS = ["#e67e22", "#27ae60", "#2980b9", "#8e44ad", "#e74c3c", "#1abc9c"];
 
@@ -36,7 +34,6 @@ export default function CalendarPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
-        <HomeButton />
         <h5>التقويم — {monthNames[month]} {year}</h5>
         <hr />
         <div style={{ marginBottom: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>

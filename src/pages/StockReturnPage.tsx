@@ -8,8 +8,6 @@ import { toast } from "sonner";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { StatusChip } from "@/components/ui/status-chip";
-import HomeButton from "@/components/HomeButton";
-
 function useReturnsFullList() {
   return useQuery({
     queryKey: ["stock-returns-full"],
@@ -94,8 +92,6 @@ export default function StockReturnPage() {
         ${mobileDocListCSS}
       `}</style>
       <div className="legacy-card" style={{ position: "relative" }}>
-        <HomeButton />
-
         <div className="grid_3 grid_4 table-responsive">
           <h5>
             <span>المرتجعات</span>

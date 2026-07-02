@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import HomeButton from "@/components/HomeButton";
-
 export default function DeletedItemsPage() {
   const [tab, setTab] = useState<"invoices" | "quotes">("invoices");
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
@@ -52,7 +50,6 @@ export default function DeletedItemsPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
-        <HomeButton />
         <h5>سجل المنتجات المحذوفة</h5>
         <hr />
         <div style={{ marginBottom: "1rem" }}>

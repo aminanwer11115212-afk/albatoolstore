@@ -7,8 +7,6 @@ import { startsWithAny } from "@/utils/searchMatch";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompanySettings } from "@/hooks/useData";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
-import HomeButton from "@/components/HomeButton";
-
 function useSideQuotes() {
   return useQuery({
     queryKey: ["side-quotes"],
@@ -199,8 +197,6 @@ export default function SideQuotesPage() {
         ${mobileDocListCSS}
       `}</style>
       <div className="legacy-card" style={{ position: "relative" }}>
-        <HomeButton />
-
         <div className="grid_3 grid_4 table-responsive">
           <h5>
             <span className="side-badge">آخر {limit} عروض أسعار جانبية</span>

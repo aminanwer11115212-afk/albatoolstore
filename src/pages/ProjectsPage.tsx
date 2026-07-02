@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Plus, Edit, Trash2, Eye, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useProjects, useCustomers } from "@/hooks/useData";
 import { toast } from "sonner";
-import HomeButton from "@/components/HomeButton";
-
 const statusMap: Record<string, string> = { active: "نشط", completed: "مكتمل", on_hold: "معلق", cancelled: "ملغي" };
 const statusColors: Record<string, string> = { active: "bg-success/10 text-success", completed: "bg-primary/10 text-primary", on_hold: "bg-warning/10 text-warning", cancelled: "bg-destructive/10 text-destructive" };
 const priorityMap: Record<string, string> = { high: "عالية", medium: "متوسطة", low: "منخفضة" };
@@ -73,7 +71,6 @@ export default function ProjectsPage() {
       )}
 
       <div className="legacy-card card-block">
-        <HomeButton />
         <div className="p-4 border-b border-border flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">عرض</span>

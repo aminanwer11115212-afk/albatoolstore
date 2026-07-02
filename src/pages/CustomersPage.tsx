@@ -21,8 +21,6 @@ import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect from "@/components/InlineSearchSelect";
 import GeoStructurePanel from "@/components/customers/GeoStructurePanel";
 import CustomerLogisticsTable from "@/components/customers/CustomerLogisticsTable";
-import HomeButton from "@/components/HomeButton";
-
 const emptyForm = { name: "", phone: "", address: "", notes: "", city: "", region_id: "" as string | null | "", state_id: "" as string | null | "", locality_id: "" as string | null | "", city_id: "" as string | null | "" };
 
 type ActivityFilter = "all" | "active_30" | "active_90" | "inactive_90" | "no_activity" | "with_balance" | "with_credit";
@@ -1260,7 +1258,6 @@ export default function CustomersPage() {
           .invoices-compact .legacy-dt-info { font-size: 14px; padding: 4px 0; font-weight: 600; }
         `}</style>
         <div className="legacy-card">
-        <HomeButton />
           <div className="grid_3 grid_4 table-responsive">
             <h5>العملاء</h5>
             <hr />

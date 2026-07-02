@@ -6,8 +6,6 @@ import { validateBankTransferPayment, isAllowedBank } from "@/lib/bankTransferVa
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
-import HomeButton from "@/components/HomeButton";
-
 export default function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -171,7 +169,6 @@ export default function TransactionsPage() {
         />
 
         <div className="legacy-card card-block">
-        <HomeButton />
           <div className="p-4 border-b border-border flex flex-wrap gap-3 items-center justify-between" data-section="filters" data-section-label="الفلاتر">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">عرض</span>

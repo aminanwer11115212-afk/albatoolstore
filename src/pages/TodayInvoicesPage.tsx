@@ -3,8 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { StatusChip } from "@/components/ui/status-chip";
-import HomeButton from "@/components/HomeButton";
-
 export default function TodayInvoicesPage() {
   const navigate = useNavigate();
   const today = new Date().toISOString().split("T")[0];
@@ -47,7 +45,6 @@ export default function TodayInvoicesPage() {
       </div>
 
       <div className="legacy-card card-block">
-        <HomeButton />
         <div className="overflow-x-auto">
           <table className="w-full text-sm mobile-stack-table">
             <thead><tr className="bg-muted">
