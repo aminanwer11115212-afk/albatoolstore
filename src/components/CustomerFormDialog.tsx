@@ -422,8 +422,11 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                   value={form.region_id || ""}
                   options={regions.map(r => ({ value: r.id, label: r.name }))}
                   onChange={(v) => setForm({ ...form, region_id: v || null, state_id: null, locality_id: null, city_id: null })}
+                  onAdd={addRegion}
+                  onDelete={async (o) => await removeRegion(o.value)}
                   onNavigateNext={() => focusAt(k + 1)}
-                  placeholder="— اختر —"
+                  placeholder="— اختر أو اكتب —"
+                  addLabel="إضافة اتجاه"
                   className="bg-transparent border-0 outline-none px-3 text-sm w-full h-full text-right truncate"
                   title="اختر الاتجاه"
                 />
