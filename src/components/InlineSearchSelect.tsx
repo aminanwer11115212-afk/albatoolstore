@@ -87,16 +87,21 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     if (disabled) return;
     setOpen(true);
     setQuery(selectedLabel);
-    // تحديد الكلمة الحالية في القائمة
     const currentIndex = options.findIndex(o => o.value === value);
     setHighlight(currentIndex >= 0 ? currentIndex : 0);
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        inputRef.current.select();
-      }
-    }, 0);
+    // input focus حصراً عبر useEffect بعد الـ commit — setTimeout(...,0) لا يضمن
+    // أن inputRef.current صار مربوطاً (React 18 batching).
   };
+
+  // بعد فتح القائمة وضمان mount للـ input، ركّز عليه وحدّد نصه.
+  useEffect(() => {
+    if (!open) return;
+    const id = requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) { el.focus(); el.select(); }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open]);
 
   const closeAndFocus = (advance = false) => {
     setOpen(false);
