@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, Search } from "luci
 import { useAccounts } from "@/hooks/useData";
 import { toast } from "sonner";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import HomeButton from "@/components/HomeButton";
 
 export default function AccountsPage() {
   const [showForm, setShowForm] = useState(false);
@@ -69,6 +70,7 @@ export default function AccountsPage() {
       )}
 
       <div className="legacy-card card-block">
+        <HomeButton />
         <div className="p-4 border-b border-border flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">عرض</span>

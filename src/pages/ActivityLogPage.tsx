@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import HomeButton from "@/components/HomeButton";
 
 const ACTION_LABELS: Record<string, string> = { INSERT: "إضافة", UPDATE: "تعديل", DELETE: "حذف" };
 const ACTION_CLS: Record<string, string> = { INSERT: "st-paid", UPDATE: "st-sent", DELETE: "st-due" };
@@ -39,6 +40,7 @@ export default function ActivityLogPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
+        <HomeButton />
         <h5>سجل النشاط الشامل ({filtered.length})</h5>
         <hr />
         <div className="legacy-form-horizontal" style={{ marginBottom: "1rem" }}>

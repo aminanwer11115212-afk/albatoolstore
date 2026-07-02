@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Bell, AlertTriangle, FileText, Wallet, Activity, Search, RefreshCw, Pin, EyeOff, RotateCcw, Clock, CheckSquare, FileClock } from "lucide-react";
 import { useUserScopedLegacyKey } from "@/lib/userScopedKey";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import HomeButton from "@/components/HomeButton";
 
 
 type Severity = "out" | "low";
@@ -525,6 +526,7 @@ export default function NotificationsPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
+        <HomeButton />
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h5 className="flex items-center gap-2 m-0">
             <Bell size={18} /> كل الإشعارات

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useGoals } from "@/hooks/useData";
+import HomeButton from "@/components/HomeButton";
 
 export default function GoalsPage() {
   const { data: goals, isLoading, insert, update, remove } = useGoals();
@@ -23,6 +24,7 @@ export default function GoalsPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
+        <HomeButton />
         <h5>حدد الأهداف</h5>
         <hr />
         <div style={{ marginBottom: "1rem" }}>

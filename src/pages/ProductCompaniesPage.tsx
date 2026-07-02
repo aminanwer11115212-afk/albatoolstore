@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ZoomControls from "@/components/ZoomControls";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import HomeButton from "@/components/HomeButton";
 
 function useProductCompanies() {
   const queryClient = useQueryClient();
@@ -118,6 +119,7 @@ export default function ProductCompaniesPage() {
       )}
 
       <div className="legacy-card card-block">
+        <HomeButton />
         <div className="p-4 border-b border-border flex items-center gap-3">
           <div className="flex items-center bg-muted rounded-lg px-3 py-2 max-w-sm w-full">
             <Search size={16} className="text-muted-foreground ml-2" />

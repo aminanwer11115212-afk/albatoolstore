@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import HomeButton from "@/components/HomeButton";
 
 interface Ticket { id: string; subject: string; message: string; priority: string; status: string; createdAt: string; }
 
@@ -25,6 +26,7 @@ export default function SupportTicketsPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
+        <HomeButton />
         <h5>تذاكر الدعم الفني</h5>
         <hr />
         <div style={{ marginBottom: "1rem" }}>

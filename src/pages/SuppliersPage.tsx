@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SupplierDetailView from "@/components/SupplierDetailView";
 import { startsWithAny } from "@/utils/searchMatch";
+import HomeButton from "@/components/HomeButton";
 
 const emptyForm = { name: "", phone: "", email: "", address: "", company: "", notes: "", balance: "" };
 
@@ -205,6 +206,7 @@ export default function SuppliersPage() {
       )}
 
       <div className="legacy-card card-block">
+        <HomeButton />
         <div className="p-4 border-b border-border flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">عرض</span>
