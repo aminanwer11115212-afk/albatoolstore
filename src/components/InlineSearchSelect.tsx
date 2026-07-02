@@ -87,16 +87,15 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     if (disabled) return;
     setOpen(true);
     setQuery(selectedLabel);
-    // تحديد الكلمة الحالية في القائمة
     const currentIndex = options.findIndex(o => o.value === value);
     setHighlight(currentIndex >= 0 ? currentIndex : 0);
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        inputRef.current.select();
-      }
-    }, 0);
+    // input focus حصراً عبر useEffect بعد الـ commit — setTimeout(...,0) لا يضمن
+    // أن inputRef.current صار مربوطاً (React 18 batching).
   };
+
+  // ملاحظة: لا نُحرّك الفوكس إلى input داخل القائمة (Radix FocusScope يعيده
+  // للزر). بدلاً من ذلك نتعامل مع لوحة المفاتيح على الزر مباشرة أعلاه.
+
 
   const closeAndFocus = (advance = false) => {
     setOpen(false);
@@ -177,7 +176,50 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openMenu())}
         onKeyDown={(e) => {
-          if (open) return;
+          // القائمة مفتوحة والفوكس بقي على الزر (Radix FocusScope داخل Dialog
+          // يعيد الفوكس هنا لأن القائمة portaled خارج DialogContent). لذا
+          // نعالج مفاتيح الملاحة والكتابة على الزر مباشرة.
+          if (open) {
+            if (["ArrowDown","ArrowUp","Enter","Escape","Tab","Backspace"].includes(e.key)) {
+              e.stopPropagation();
+            }
+            if (e.key === "ArrowDown") { e.preventDefault(); setHighlight(h => Math.min(Math.max(0, totalItems - 1), h + 1)); return; }
+            if (e.key === "ArrowUp")   { e.preventDefault(); setHighlight(h => Math.max(0, h - 1)); return; }
+            if (e.key === "Escape")    { e.preventDefault(); closeAndFocus(false); return; }
+            if (e.key === "Backspace") {
+              e.preventDefault();
+              if (query.length === 0) closeAndFocus(false);
+              else { setQuery(q => q.slice(0, -1)); setHighlight(0); }
+              return;
+            }
+            if (e.key === "Tab") {
+              commitHighlighted();
+              setOpen(false);
+              return;
+            }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (selectAllOnEnter && onSelectAll) {
+                onSelectAll(options.map(o => o.value));
+                closeAndFocus(true);
+              } else if (canAdd && highlight === 0) {
+                doAdd();
+              } else {
+                const i2 = canAdd ? highlight - 1 : highlight;
+                const opt = filtered[i2];
+                if (opt) { onChange(opt.value); closeAndFocus(true); }
+              }
+              return;
+            }
+            // كتابة أحرف عادية أو أرقام → أضف إلى query
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+              e.preventDefault();
+              setQuery(q => q + e.key);
+              setHighlight(0);
+              return;
+            }
+            return;
+          }
           if (e.key === "Enter" || e.key === "F2") {
             e.preventDefault();
             e.stopPropagation();
@@ -237,7 +279,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
               value={query}
               onChange={(e) => { setQuery(e.target.value); setHighlight(0); }}
               placeholder="ابحث أو اكتب اسم جديد..."
-              autoFocus
+              onKeyDown={handleMenuKey}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
