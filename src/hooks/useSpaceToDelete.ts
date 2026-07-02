@@ -124,13 +124,30 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
       // → اترك Space يعمل عادياً ويكتب مسافة (لا تحديد ولا حذف).
       if (isEditing(t)) return;
 
-      // "وضع التنقّل": في الحقول النصية (اسم الصنف …) لا نُفعّل التحديد ولا الحذف
-      // — يجب أوّلاً ضغط Enter أو النقر لبدء التعديل.
-      if (tag === "TEXTAREA" || t.isContentEditable) return;
-      if (tag === "INPUT") {
-        const type = ((t as HTMLInputElement).type || "text").toLowerCase();
-        const textLike = ["text", "search", "email", "tel", "url", "password"];
-        if (textLike.includes(type)) return;
+      // الحقول النصية في وضع التنقّل:
+      // - إذا كان الحقل يحتوي على نص سابق (بيانات قديمة/محفوظة) والمؤشر
+      //   في موضع محدَّد داخل النص (وليس تحديدًا كاملًا) → اعتبره وضع
+      //   تحرير واترك المسطرة تكتب مسافة عادية.
+      // - وإلا (فارغ أو النص كامل محدَّد بعد Tab/سهم) → لا تحديد ولا حذف؛
+      //   يجب أولاً ضغط Enter أو النقر لبدء التعديل.
+      const isTextTag =
+        tag === "TEXTAREA" || t.isContentEditable ||
+        (tag === "INPUT" && ["text","search","email","tel","url","password"].includes(
+          ((t as HTMLInputElement).type || "text").toLowerCase()
+        ));
+      if (isTextTag) {
+        if (tag === "INPUT" || tag === "TEXTAREA") {
+          const inp = t as HTMLInputElement | HTMLTextAreaElement;
+          const val = inp.value ?? "";
+          const start = inp.selectionStart ?? 0;
+          const end = inp.selectionEnd ?? 0;
+          const fullySelected = val.length > 0 && start === 0 && end === val.length;
+          if (val.length > 0 && !fullySelected) {
+            editingElements.add(t);
+            return;
+          }
+        }
+        return;
       }
 
       const isInput = tag === "INPUT" || tag === "SELECT";
