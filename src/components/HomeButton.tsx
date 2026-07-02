@@ -1,13 +1,22 @@
 import { Home } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+
+const HIDDEN_PATTERNS = [
+  /^\/$/,
+  /^\/login/,
+  /^\/signup/,
+  /^\/share\//,
+];
 
 /**
- * زر عودة سريع إلى لوحة التحكم (الشاشة الرئيسية).
- * يوضع في طرف الصفحة (أعلى بداية الاتجاه = يمين في RTL) داخل عنصر مضيف position:relative.
- * التنسيق يعتمد على كلاس .home-quick-btn المعرف في index.css للاستجابة على الموبايل.
+ * زر عائم أيقونة فقط للعودة إلى لوحة التحكم.
+ * يظهر مثبتاً (position: fixed) في طرف الصفحة على كل المسارات
+ * ما عدا الشاشة الرئيسية وشاشات تسجيل الدخول والمشاركة العامة.
  */
 export function HomeButton({ to = "/", label = "لوحة التحكم" }: { to?: string; label?: string }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  if (HIDDEN_PATTERNS.some((re) => re.test(pathname))) return null;
   return (
     <button
       type="button"
@@ -16,8 +25,7 @@ export function HomeButton({ to = "/", label = "لوحة التحكم" }: { to?:
       aria-label={label}
       className="home-quick-btn"
     >
-      <Home size={14} aria-hidden />
-      <span className="home-quick-btn__label">{label}</span>
+      <Home size={16} aria-hidden />
     </button>
   );
 }
