@@ -38,8 +38,6 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
 
       const t = e.target as HTMLElement;
       const tag = t.tagName;
-      const isInput = tag === "INPUT" || tag === "SELECT";
-      if (!isInput) return;
 
       // إذا كان الحقل نصياً (text/search/email/tel/url/textarea) أو contentEditable
       // → اترك المسطرة تعمل بشكل طبيعي (كتابة مسافة) ولا تُفعّل تحديد الصف.
@@ -49,6 +47,9 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
         const textLike = ["text", "search", "email", "tel", "url", "password"];
         if (textLike.includes(type)) return;
       }
+
+      const isInput = tag === "INPUT" || tag === "SELECT";
+      if (!isInput) return;
 
       // موحَّد لحقول رقمية/اختيار: Space يُحدِّد فقط، لا يكتب ولا يغيّر القيمة.
       e.preventDefault();
