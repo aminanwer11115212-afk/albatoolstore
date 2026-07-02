@@ -1003,7 +1003,7 @@ export default function QuoteCreatePage() {
       lastSavedIdRef.current = null;
       lastSavedCustomerRef.current = null;
       originalItemsHashRef.current = null;
-      const createPath = isSideMode ? "/quotes/side/new" : "/quotes/new";
+      const createPath = isSideMode ? "/quotes/side/new" : "/quotes/create";
       window.history.replaceState({}, "", createPath);
       setTimeout(() => customerInputRef.current?.focus(), 0);
     }
