@@ -167,7 +167,9 @@ export default function QuotesPage() {
         .quotes-compact .st-accepted, .quotes-compact .st-rejected { padding: 1px 6px; font-size: 10px; }
         ${mobileDocListCSS}
       `}</style>
-      <div className="legacy-card">
+      <div className="legacy-card" style={{ position: "relative" }}>
+        <HomeButton />
+
         <div className="grid_3 grid_4 table-responsive">
           <h5>عروض الأسعار</h5>
           <hr />
