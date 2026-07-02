@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { StatusChip } from "@/components/ui/status-chip";
+import HomeButton from "@/components/HomeButton";
 
 function useReturnsFullList() {
   return useQuery({
