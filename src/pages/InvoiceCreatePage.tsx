@@ -862,7 +862,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     //     لتفادي أي خلط/تكرار. (يشمل POS عند تغيّر walk-in name).
     // هذا يمنع تكرار الإدراج عند الضغط المتكرر على زر الحفظ بعد replaceState.
     // ============================================================
-    let effectiveEditId: string | undefined = editId;
+    let effectiveEditId: string | undefined = newSessionRef.current ? undefined : editId;
     let effectiveInvoiceNumber = invoiceNumber;
     const newCustomerKey = pos
       ? `pos:${(walkInName || "").trim() || "_"}`
