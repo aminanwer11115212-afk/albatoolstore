@@ -1179,7 +1179,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         });
         setInvoiceNumber(nextCandidate);
         // أعد الرابط لوضع الإنشاء
-        const createPath = isCash ? "/invoices/cash/new" : "/invoices/new";
+        const createPath = isCash ? "/invoices/cash/new" : "/invoices/create";
         window.history.replaceState({}, "", createPath);
         if (!opts.silent) {
           toast.success("تم فتح فاتورة جديدة — جاهزة للإدخال");
