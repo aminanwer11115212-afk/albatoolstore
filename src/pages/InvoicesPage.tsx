@@ -274,7 +274,9 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
         }
         ${mobileDocListCSS}
       `}</style>
-      <div className="legacy-card">
+      <div className="legacy-card" style={{ position: "relative" }}>
+        <HomeButton />
+
         <div className="grid_3 grid_4 table-responsive">
           <h5 style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
