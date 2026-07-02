@@ -182,16 +182,51 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
         type="button"
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openMenu())}
-        onFocus={() => {
-          // Radix Dialog's FocusScope يعيد الفوكس للزر لأن القائمة portaled خارج
-          // DialogContent — نعيد توجيه الفوكس للـ input بعد تأخير يتجاوز مسروق
-          // FocusScope (يعمل عبر microtask/rAF).
-          if (open) {
-            setTimeout(() => inputRef.current?.focus(), 60);
-          }
-        }}
         onKeyDown={(e) => {
-          if (open) return;
+          // القائمة مفتوحة والفوكس بقي على الزر (Radix FocusScope داخل Dialog
+          // يعيد الفوكس هنا لأن القائمة portaled خارج DialogContent). لذا
+          // نعالج مفاتيح الملاحة والكتابة على الزر مباشرة.
+          if (open) {
+            if (["ArrowDown","ArrowUp","Enter","Escape","Tab","Backspace"].includes(e.key)) {
+              e.stopPropagation();
+            }
+            if (e.key === "ArrowDown") { e.preventDefault(); setHighlight(h => Math.min(Math.max(0, totalItems - 1), h + 1)); return; }
+            if (e.key === "ArrowUp")   { e.preventDefault(); setHighlight(h => Math.max(0, h - 1)); return; }
+            if (e.key === "Escape")    { e.preventDefault(); closeAndFocus(false); return; }
+            if (e.key === "Backspace") {
+              e.preventDefault();
+              if (query.length === 0) closeAndFocus(false);
+              else { setQuery(q => q.slice(0, -1)); setHighlight(0); }
+              return;
+            }
+            if (e.key === "Tab") {
+              commitHighlighted();
+              setOpen(false);
+              return;
+            }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (selectAllOnEnter && onSelectAll) {
+                onSelectAll(options.map(o => o.value));
+                closeAndFocus(true);
+              } else if (canAdd && highlight === 0) {
+                doAdd();
+              } else {
+                const i2 = canAdd ? highlight - 1 : highlight;
+                const opt = filtered[i2];
+                if (opt) { onChange(opt.value); closeAndFocus(true); }
+              }
+              return;
+            }
+            // كتابة أحرف عادية أو أرقام → أضف إلى query
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+              e.preventDefault();
+              setQuery(q => q + e.key);
+              setHighlight(0);
+              return;
+            }
+            return;
+          }
           if (e.key === "Enter" || e.key === "F2") {
             e.preventDefault();
             e.stopPropagation();
