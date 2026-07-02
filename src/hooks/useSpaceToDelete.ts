@@ -139,7 +139,6 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
       // الحقول الرقمية/الاختيار في وضع التنقّل: Space يُحدِّد/يحذف الصف.
       e.preventDefault();
 
-      // موحَّد لحقول رقمية/اختيار: Space يُحدِّد فقط، لا يكتب ولا يغيّر القيمة.
       e.preventDefault();
 
       const now = Date.now();
