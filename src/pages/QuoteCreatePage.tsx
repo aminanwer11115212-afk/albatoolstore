@@ -2223,7 +2223,7 @@ export default function QuoteCreatePage() {
                       { duration: 5000, description: "تم حذف البنود والمرفقات والتغليف والنقل" }
                     );
                     setClearConfirmOpen(false);
-                    navigate(isSideMode ? "/quotes/side/new" : "/quotes/new");
+                    navigate(isSideMode ? "/quotes/side/new" : "/quotes/create");
                     return;
                   }
                   setRows([]);
