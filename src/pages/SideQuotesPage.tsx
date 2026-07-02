@@ -198,7 +198,9 @@ export default function SideQuotesPage() {
         .side-badge { display:inline-block; background:#ede9fe; color:#6d28d9; padding:2px 8px; border-radius:10px; font-weight:600; }
         ${mobileDocListCSS}
       `}</style>
-      <div className="legacy-card">
+      <div className="legacy-card" style={{ position: "relative" }}>
+        <HomeButton />
+
         <div className="grid_3 grid_4 table-responsive">
           <h5>
             <span className="side-badge">آخر {limit} عروض أسعار جانبية</span>
