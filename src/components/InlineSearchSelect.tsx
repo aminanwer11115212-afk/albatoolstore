@@ -93,16 +93,9 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     // أن inputRef.current صار مربوطاً (React 18 batching).
   };
 
-  // بعد فتح القائمة وضمان mount للـ input، ركّز عليه بعد تأخير يتجاوز
-  // FocusScope الخاص بـ Radix Dialog (الذي يعيد الفوكس داخل الـ scope).
-  useEffect(() => {
-    if (!open) return;
-    const t = setTimeout(() => {
-      const el = inputRef.current;
-      if (el) { el.focus(); el.select(); }
-    }, 60);
-    return () => clearTimeout(t);
-  }, [open]);
+  // ملاحظة: لا نُحرّك الفوكس إلى input داخل القائمة (Radix FocusScope يعيده
+  // للزر). بدلاً من ذلك نتعامل مع لوحة المفاتيح على الزر مباشرة أعلاه.
+
 
   const closeAndFocus = (advance = false) => {
     setOpen(false);
