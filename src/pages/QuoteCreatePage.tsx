@@ -373,6 +373,9 @@ export default function QuoteCreatePage() {
   const itemsScrollRef = useRef<HTMLDivElement>(null);
   const savedRef = useRef(false);
   const lastSavedIdRef = useRef<string | null>(null);
+  // يُرفع بعد ضغط "+ جديد" لبدء جلسة إنشاء جديدة داخل نفس الشاشة،
+  // فيتجاهل editId القادم من useParams (الذي لا يتغيّر مع replaceState).
+  const newSessionRef = useRef(false);
   // العميل المحفوظ في آخر حفظ ناجح — لاكتشاف "تغيّر العميل ⇒ عرض سعر جديد"
   const lastSavedCustomerRef = useRef<string | null>(null);
   // بصمة البنود كما حُمِّلت من قاعدة البيانات؛ تُستخدم لتخطّي إعادة كتابة البنود إن لم تتغيّر
