@@ -39,14 +39,29 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
       const t = e.target as HTMLElement;
       const tag = t.tagName;
 
-      // إذا كان الحقل نصياً (text/search/email/tel/url/textarea) أو contentEditable
-      // → اترك المسطرة تعمل بشكل طبيعي (كتابة مسافة) ولا تُفعّل تحديد الصف.
-      if (tag === "TEXTAREA" || t.isContentEditable) return;
-      if (tag === "INPUT") {
-        const type = ((t as HTMLInputElement).type || "text").toLowerCase();
-        const textLike = ["text", "search", "email", "tel", "url", "password"];
-        if (textLike.includes(type)) return;
+      // منطق الحقول النصية:
+      // - إذا كان المؤشر داخل النص (المستخدم نقر لتعديل) → اترك Space يكتب مسافة.
+      // - إذا كان الحقل مُركَّزاً حديثاً عبر التنقل (النص كله محدَّد أو فارغ) → Space يُحدِّد الصف.
+      if (tag === "TEXTAREA" || t.isContentEditable) {
+        // في textarea/contentEditable لا نستطيع الجزم بسهولة → اترك السلوك الطبيعي دائماً.
+        return;
       }
+      if (tag === "INPUT") {
+        const input = t as HTMLInputElement;
+        const type = (input.type || "text").toLowerCase();
+        const textLike = ["text", "search", "email", "tel", "url", "password"];
+        if (textLike.includes(type)) {
+          const val = input.value ?? "";
+          const start = input.selectionStart ?? 0;
+          const end = input.selectionEnd ?? 0;
+          const fullySelected = val.length > 0 && start === 0 && end === val.length;
+          const emptyField = val.length === 0;
+          // مؤشر كتابة نشط (نقر لتعديل) → اترك المسطرة تكتب مسافة
+          if (!fullySelected && !emptyField) return;
+          // خلاف ذلك (تنقل عبر Tab/Arrow → النص كله محدد) → استمرّ لتحديد الصف
+        }
+      }
+
 
       const isInput = tag === "INPUT" || tag === "SELECT";
       if (!isInput) return;
