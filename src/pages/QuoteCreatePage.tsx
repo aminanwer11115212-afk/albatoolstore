@@ -984,6 +984,7 @@ export default function QuoteCreatePage() {
       return true;
     }
     if (opts.andNew) {
+      newSessionRef.current = true;
       // إعادة التعيين في نفس الشاشة — لا تنقل المستخدم لصفحة أخرى
       setRows([]);
       setCustomer(null);
