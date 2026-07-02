@@ -183,9 +183,10 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
         onClick={() => (open ? setOpen(false) : openMenu())}
         onFocus={() => {
           // Radix Dialog's FocusScope يعيد الفوكس للزر لأن القائمة portaled خارج
-          // DialogContent — نعيد توجيه الفوكس للـ input داخل القائمة إن كانت مفتوحة.
+          // DialogContent — نعيد توجيه الفوكس للـ input بعد تأخير يتجاوز مسروق
+          // FocusScope (يعمل عبر microtask/rAF).
           if (open) {
-            requestAnimationFrame(() => inputRef.current?.focus());
+            setTimeout(() => inputRef.current?.focus(), 60);
           }
         }}
         onKeyDown={(e) => {
