@@ -981,24 +981,22 @@ export default function QuoteCreatePage() {
       return true;
     }
     if (opts.andNew) {
-      if (editId) {
-        navigate(isSideMode ? "/quotes/side/new" : "/quotes/new");
-      } else {
-        setRows([]);
-        setCustomer(null);
-        setCustomerSearch("");
-        setNotes("");
-        setInternalNote("");
-        setGeneralDiscount(0);
-        setQuoteDate(new Date().toISOString().slice(0, 10));
-        setQuoteNumber("");
-        savedRef.current = false;
-        lastSavedIdRef.current = null;
-        // أعد الرابط لوضع الإنشاء
-        const createPath = isSideMode ? "/quotes/side/new" : "/quotes/new";
-        window.history.replaceState({}, "", createPath);
-        setTimeout(() => customerInputRef.current?.focus(), 0);
-      }
+      // إعادة التعيين في نفس الشاشة — لا تنقل المستخدم لصفحة أخرى
+      setRows([]);
+      setCustomer(null);
+      setCustomerSearch("");
+      setNotes("");
+      setInternalNote("");
+      setGeneralDiscount(0);
+      setQuoteDate(new Date().toISOString().slice(0, 10));
+      setQuoteNumber("");
+      savedRef.current = false;
+      lastSavedIdRef.current = null;
+      lastSavedCustomerRef.current = null;
+      originalItemsHashRef.current = null;
+      const createPath = isSideMode ? "/quotes/side/new" : "/quotes/new";
+      window.history.replaceState({}, "", createPath);
+      setTimeout(() => customerInputRef.current?.focus(), 0);
     }
     return true;
     } finally {
