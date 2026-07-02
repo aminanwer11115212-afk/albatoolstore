@@ -443,8 +443,11 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                   value={form.state_id || ""}
                   options={states.map(s => ({ value: s.id, label: s.name }))}
                   onChange={(v) => setForm({ ...form, state_id: v || null, city_id: null, locality_id: null })}
+                  onAdd={addState}
+                  onDelete={async (o) => await removeState(o.value)}
                   onNavigateNext={() => focusAt(k + 1)}
-                  placeholder="— اختر —"
+                  placeholder="— اختر أو اكتب —"
+                  addLabel="إضافة ولاية"
                   disabled={!form.region_id}
                   className="bg-transparent border-0 outline-none px-3 text-sm w-full h-full text-right truncate"
                   title="اختر الولاية"
