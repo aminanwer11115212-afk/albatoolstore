@@ -5,7 +5,10 @@ import { startsWithMatch, normalizeAr } from "@/utils/searchMatch";
 export type InlineOption = { value: string; label: string };
 
 export type InlineSearchSelectHandle = {
+  /** يركّز الزر ويفتح القائمة تلقائياً — يستخدم عند التنقّل بلوحة المفاتيح */
   focus: () => void;
+  /** يركّز الزر فقط دون فتح القائمة */
+  focusOnly: () => void;
 };
 
 interface Props {
@@ -44,7 +47,14 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
   const menuRef = useRef<HTMLDivElement>(null);
 
   useImperativeHandle(ref, () => ({
-    focus: () => btnRef.current?.focus(),
+    // focus() الافتراضي (من التنقّل بلوحة المفاتيح) يفتح القائمة أيضاً
+    // حتى لا يحتاج المستخدم لضغطة Enter إضافية.
+    focus: () => {
+      btnRef.current?.focus();
+      // افتح القائمة إن لم تكن مفتوحة ولم يكن الحقل معطّلاً
+      if (!disabled) setTimeout(() => openMenu(), 0);
+    },
+    focusOnly: () => btnRef.current?.focus(),
   }));
 
   const selectedLabel = options.find(o => o.value === value)?.label || "";
