@@ -10,6 +10,7 @@ import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocLi
 import { StatusChip } from "@/components/ui/status-chip";
 import { receiveStockForPurchaseOnce } from "@/utils/stockReceive";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import HomeButton from "@/components/HomeButton";
 
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },
@@ -191,7 +192,9 @@ export default function PurchasePage() {
         .purchases-compact .st-pending, .purchases-compact .st-paid, .purchases-compact .st-canceled { padding: 1px 6px; font-size: 10px; }
         ${mobileDocListCSS}
       `}</style>
-      <div className="legacy-card">
+      <div className="legacy-card" style={{ position: "relative" }}>
+        <HomeButton />
+
         <div className="grid_3 grid_4 table-responsive">
           <h5>أوامر الشراء</h5>
           <hr />

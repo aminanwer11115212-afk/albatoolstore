@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { StatusChip } from "@/components/ui/status-chip";
+import HomeButton from "@/components/HomeButton";
 
 function useReturnsFullList() {
   return useQuery({
@@ -92,7 +93,9 @@ export default function StockReturnPage() {
         .returns-compact .st-accepted, .returns-compact .st-rejected { padding: 1px 6px; font-size: 10px; }
         ${mobileDocListCSS}
       `}</style>
-      <div className="legacy-card">
+      <div className="legacy-card" style={{ position: "relative" }}>
+        <HomeButton />
+
         <div className="grid_3 grid_4 table-responsive">
           <h5>
             <span>المرتجعات</span>

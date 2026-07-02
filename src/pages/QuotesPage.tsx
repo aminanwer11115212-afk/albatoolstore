@@ -14,6 +14,7 @@ import { deductStockForLines } from "@/utils/stockDeduction";
 import { useQuoteConvertedDialog } from "@/hooks/useQuoteConvertedDialog";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { StatusChip } from "@/components/ui/status-chip";
+import HomeButton from "@/components/HomeButton";
 
 export const QUOTE_STATUS_KEYS = ["draft", "sent", "accepted", "rejected"] as const;
 
@@ -167,7 +168,9 @@ export default function QuotesPage() {
         .quotes-compact .st-accepted, .quotes-compact .st-rejected { padding: 1px 6px; font-size: 10px; }
         ${mobileDocListCSS}
       `}</style>
-      <div className="legacy-card">
+      <div className="legacy-card" style={{ position: "relative" }}>
+        <HomeButton />
+
         <div className="grid_3 grid_4 table-responsive">
           <h5>عروض الأسعار</h5>
           <hr />

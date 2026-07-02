@@ -15,6 +15,7 @@ import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { StatusChip } from "@/components/ui/status-chip";
 import ShippingDispatchDialog from "@/components/invoice/ShippingDispatchDialog";
+import HomeButton from "@/components/HomeButton";
 
 // Status label map matching old system (custom.css .st-* classes)
 const statusMap: Record<string, { label: string; cls: string }> = {
@@ -273,7 +274,9 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
         }
         ${mobileDocListCSS}
       `}</style>
-      <div className="legacy-card">
+      <div className="legacy-card" style={{ position: "relative" }}>
+        <HomeButton />
+
         <div className="grid_3 grid_4 table-responsive">
           <h5 style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
