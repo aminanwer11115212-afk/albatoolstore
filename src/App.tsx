@@ -29,6 +29,7 @@ import {
 import { useUiPrefsCloudSync } from "./hooks/useUiPrefsCloudSync";
 import { StaffGuard, PermGuard } from "./components/RoleGuard";
 import SimpleCrudPage from "./pages/SimpleCrudPage";
+import HomeButton from "./components/HomeButton";
 
 // Lazy (يُحمَّل عند الزيارة فقط)
 const CustomersPage = lazy(() => import("./pages/CustomersPage"));
@@ -254,6 +255,7 @@ const App = () => {
         <NavigationPerfTracker />
         <ColumnResizeDebugHud />
         <ColumnsResetFloatingButton />
+        <HomeButton />
         <StaffGuard>
         <AppLayout>
           <Routes>

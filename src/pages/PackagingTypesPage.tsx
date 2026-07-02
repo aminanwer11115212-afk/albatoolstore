@@ -12,8 +12,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
-import HomeButton from "@/components/HomeButton";
-
 export default function PackagingTypesPage() {
   const { data, isLoading, refetch, update, remove } = usePackagingTypes();
 
@@ -68,7 +66,6 @@ export default function PackagingTypesPage() {
   return (
     <article className="content">
       <div className="legacy-card card-block">
-        <HomeButton />
         <div className="grid_3 grid_4">
           <div className="header-block" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
             <h3 className="title" style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
