@@ -1,19 +1,30 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import React from "react";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 
 /**
- * منطق Space في حقول جدول البنود (يغطّي فواتير كاش/عادية،
+ * منطق Space في جدول البنود (يغطّي فواتير كاش/عادية،
  * عروض عادية/جانبية، مشتريات، مرتجعات — كلها تستخدم نفس الهوك):
  *
- *  - تنقّل بـ Tab/Arrow إلى حقل اسم الصنف (النص كله محدَّد افتراضياً) → Space يُحدِّد الصف.
- *  - نقر بالماوس داخل الحقل ووضع المؤشر → Space يكتب مسافة عادية.
- *  - textarea / contentEditable → Space يكتب دائماً.
- *  - حقول رقمية → Space يُحدِّد دائماً.
+ * وضع التنقّل (افتراضي بعد Focus): Space يُحدِّد/يحذف الصف.
+ * وضع التحرير: يُفعَّل بعد Enter داخل الحقل أو نقر بالماوس → Space يكتب مسافة.
+ * الخروج من التحرير: Tab / Arrow / Escape / blur.
  */
 
-function makeKeyEvent(target: HTMLElement) {
+function fireKey(target: EventTarget, key: string, opts: KeyboardEventInit = {}) {
+  const ev = new KeyboardEvent("keydown", { key, bubbles: true, ...opts });
+  Object.defineProperty(ev, "target", { value: target, writable: false });
+  target.dispatchEvent(ev);
+}
+
+function fireMouseDown(target: EventTarget) {
+  const ev = new MouseEvent("mousedown", { bubbles: true });
+  Object.defineProperty(ev, "target", { value: target, writable: false });
+  target.dispatchEvent(ev);
+}
+
+function makeReactKeyEvent(target: HTMLElement) {
   let defaultPrevented = false;
   return {
     key: " ",
@@ -28,78 +39,116 @@ function makeKeyEvent(target: HTMLElement) {
   } as unknown as React.KeyboardEvent & { defaultPrevented: boolean };
 }
 
-function makeTextInput(value: string, selStart: number, selEnd: number) {
+function mountTextInput(value = "مسمار") {
   const input = document.createElement("input");
   input.type = "text";
   input.value = value;
-  // jsdom: setSelectionRange تعمل بعد الإضافة للـ DOM
   document.body.appendChild(input);
-  input.setSelectionRange(selStart, selEnd);
   return input;
 }
 
-describe("useSpaceToDelete — سلوك Space في الحقول النصية", () => {
-  it("النقر داخل النص (المؤشر في المنتصف) → Space يكتب مسافة، لا يُحدِّد الصف", () => {
+beforeEach(() => {
+  document.body.innerHTML = "";
+});
+
+describe("useSpaceToDelete — وضع التنقّل ↔ وضع التحرير عبر Enter", () => {
+  it("افتراضياً (وضع التنقّل) → Space يُحدِّد الصف حتى داخل حقل نصّي", () => {
     const onDelete = vi.fn();
     const { result } = renderHook(() => useSpaceToDelete(onDelete));
 
-    const input = makeTextInput("مسمار", 3, 3); // caret في المنتصف
-    const ev = makeKeyEvent(input);
-
+    const input = mountTextInput();
+    const ev = makeReactKeyEvent(input);
     act(() => result.current.handleRowKeyDown("uid-1", ev));
 
-    expect((ev as any).defaultPrevented).toBe(false);
-    expect(result.current.pendingUids.size).toBe(0);
-    expect(onDelete).not.toHaveBeenCalled();
+    expect((ev as any).defaultPrevented).toBe(true);
+    expect(result.current.pendingUids.has("uid-1")).toBe(true);
   });
 
-  it("Tab إلى الحقل (النص كله محدَّد) → Space يُحدِّد الصف", () => {
+  it("بعد Enter داخل الحقل → Space يكتب مسافة ولا يُحدِّد الصف", () => {
     const onDelete = vi.fn();
     const { result } = renderHook(() => useSpaceToDelete(onDelete));
 
-    const input = makeTextInput("مسمار", 0, "مسمار".length);
-    const ev = makeKeyEvent(input);
+    const input = mountTextInput();
+    fireKey(input, "Enter");
 
+    const ev = makeReactKeyEvent(input);
     act(() => result.current.handleRowKeyDown("uid-2", ev));
 
-    expect((ev as any).defaultPrevented).toBe(true);
-    expect(result.current.pendingUids.has("uid-2")).toBe(true);
+    expect((ev as any).defaultPrevented).toBe(false);
+    expect(result.current.pendingUids.size).toBe(0);
   });
 
-  it("حقل نصّي فارغ → Space يُحدِّد الصف", () => {
+  it("بعد نقر بالماوس داخل الحقل → Space يكتب مسافة", () => {
     const onDelete = vi.fn();
     const { result } = renderHook(() => useSpaceToDelete(onDelete));
 
-    const input = makeTextInput("", 0, 0);
-    const ev = makeKeyEvent(input);
+    const input = mountTextInput();
+    fireMouseDown(input);
 
+    const ev = makeReactKeyEvent(input);
     act(() => result.current.handleRowKeyDown("uid-3", ev));
-
-    expect((ev as any).defaultPrevented).toBe(true);
-    expect(result.current.pendingUids.has("uid-3")).toBe(true);
-  });
-
-  it("textarea → Space يكتب دائماً", () => {
-    const onDelete = vi.fn();
-    const { result } = renderHook(() => useSpaceToDelete(onDelete));
-
-    const ta = document.createElement("textarea");
-    const ev = makeKeyEvent(ta);
-
-    act(() => result.current.handleRowKeyDown("uid-4", ev));
 
     expect((ev as any).defaultPrevented).toBe(false);
     expect(result.current.pendingUids.size).toBe(0);
   });
 
-  it("<input type='number'> → Space يُحدِّد الصف دائماً", () => {
+  it("Tab بعد وضع التحرير يُعيد الوضع للتنقّل → Space يُحدِّد الصف مجدداً", () => {
+    const onDelete = vi.fn();
+    const { result } = renderHook(() => useSpaceToDelete(onDelete));
+
+    const input = mountTextInput();
+    fireKey(input, "Enter"); // دخل التحرير
+    fireKey(input, "Tab"); // خرج
+
+    const ev = makeReactKeyEvent(input);
+    act(() => result.current.handleRowKeyDown("uid-4", ev));
+
+    expect((ev as any).defaultPrevented).toBe(true);
+    expect(result.current.pendingUids.has("uid-4")).toBe(true);
+  });
+
+  it("Escape بعد التحرير يُعيد الوضع للتنقّل", () => {
+    const onDelete = vi.fn();
+    const { result } = renderHook(() => useSpaceToDelete(onDelete));
+
+    const input = mountTextInput();
+    fireKey(input, "Enter");
+    fireKey(input, "Escape");
+
+    const ev = makeReactKeyEvent(input);
+    act(() => result.current.handleRowKeyDown("uid-5", ev));
+
+    expect((ev as any).defaultPrevented).toBe(true);
+    expect(result.current.pendingUids.has("uid-5")).toBe(true);
+  });
+
+  it("blur يُنهي وضع التحرير", () => {
+    const onDelete = vi.fn();
+    const { result } = renderHook(() => useSpaceToDelete(onDelete));
+
+    const input = mountTextInput();
+    fireKey(input, "Enter");
+    // أطلق blur يدوياً
+    const blurEv = new FocusEvent("blur");
+    Object.defineProperty(blurEv, "target", { value: input, writable: false });
+    input.dispatchEvent(blurEv);
+
+    const ev = makeReactKeyEvent(input);
+    act(() => result.current.handleRowKeyDown("uid-6", ev));
+
+    expect((ev as any).defaultPrevented).toBe(true);
+    expect(result.current.pendingUids.has("uid-6")).toBe(true);
+  });
+
+  it("<input type='number'> → Space يُحدِّد دائماً (لا يتأثر بوضع التحرير)", () => {
     const onDelete = vi.fn();
     const { result } = renderHook(() => useSpaceToDelete(onDelete));
 
     const input = document.createElement("input");
     input.type = "number";
-    const ev = makeKeyEvent(input);
+    document.body.appendChild(input);
 
+    const ev = makeReactKeyEvent(input);
     act(() => result.current.handleRowKeyDown("uid-num", ev));
 
     expect((ev as any).defaultPrevented).toBe(true);
@@ -112,9 +161,10 @@ describe("useSpaceToDelete — سلوك Space في الحقول النصية", (
 
     const input = document.createElement("input");
     input.type = "number";
+    document.body.appendChild(input);
 
-    act(() => result.current.handleRowKeyDown("uid-x", makeKeyEvent(input)));
-    act(() => result.current.handleRowKeyDown("uid-x", makeKeyEvent(input)));
+    act(() => result.current.handleRowKeyDown("uid-x", makeReactKeyEvent(input)));
+    act(() => result.current.handleRowKeyDown("uid-x", makeReactKeyEvent(input)));
 
     await new Promise((r) => setTimeout(r, 0));
     expect(onDelete).toHaveBeenCalledWith("uid-x");
