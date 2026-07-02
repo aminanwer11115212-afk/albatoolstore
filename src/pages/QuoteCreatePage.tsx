@@ -373,6 +373,9 @@ export default function QuoteCreatePage() {
   const itemsScrollRef = useRef<HTMLDivElement>(null);
   const savedRef = useRef(false);
   const lastSavedIdRef = useRef<string | null>(null);
+  // يُرفع بعد ضغط "+ جديد" لبدء جلسة إنشاء جديدة داخل نفس الشاشة،
+  // فيتجاهل editId القادم من useParams (الذي لا يتغيّر مع replaceState).
+  const newSessionRef = useRef(false);
   // العميل المحفوظ في آخر حفظ ناجح — لاكتشاف "تغيّر العميل ⇒ عرض سعر جديد"
   const lastSavedCustomerRef = useRef<string | null>(null);
   // بصمة البنود كما حُمِّلت من قاعدة البيانات؛ تُستخدم لتخطّي إعادة كتابة البنود إن لم تتغيّر
@@ -861,7 +864,7 @@ export default function QuoteCreatePage() {
     // (window.history.replaceState لا يُحدِّث useParams، لذلك بدون هذا
     // الاحتياط ستُنشئ نقرة الحفظ الثانية عرض سعر جديداً مكرَّراً).
     // إذا تغيّر العميل عمّا حُفظ → عرض جديد برقم عشوائي جديد.
-    let effectiveEditId = editId || lastSavedIdRef.current || undefined;
+    let effectiveEditId = (newSessionRef.current ? undefined : editId) || lastSavedIdRef.current || undefined;
     if (effectiveEditId && !editId && lastSavedCustomerRef.current && lastSavedCustomerRef.current !== activeCustomer!.id) {
       lastSavedIdRef.current = null;
       effectiveEditId = undefined;
@@ -981,24 +984,23 @@ export default function QuoteCreatePage() {
       return true;
     }
     if (opts.andNew) {
-      if (editId) {
-        navigate(isSideMode ? "/quotes/side/new" : "/quotes/new");
-      } else {
-        setRows([]);
-        setCustomer(null);
-        setCustomerSearch("");
-        setNotes("");
-        setInternalNote("");
-        setGeneralDiscount(0);
-        setQuoteDate(new Date().toISOString().slice(0, 10));
-        setQuoteNumber("");
-        savedRef.current = false;
-        lastSavedIdRef.current = null;
-        // أعد الرابط لوضع الإنشاء
-        const createPath = isSideMode ? "/quotes/side/new" : "/quotes/new";
-        window.history.replaceState({}, "", createPath);
-        setTimeout(() => customerInputRef.current?.focus(), 0);
-      }
+      newSessionRef.current = true;
+      // إعادة التعيين في نفس الشاشة — لا تنقل المستخدم لصفحة أخرى
+      setRows([]);
+      setCustomer(null);
+      setCustomerSearch("");
+      setNotes("");
+      setInternalNote("");
+      setGeneralDiscount(0);
+      setQuoteDate(new Date().toISOString().slice(0, 10));
+      setQuoteNumber("");
+      savedRef.current = false;
+      lastSavedIdRef.current = null;
+      lastSavedCustomerRef.current = null;
+      originalItemsHashRef.current = null;
+      const createPath = isSideMode ? "/quotes/side/new" : "/quotes/new";
+      window.history.replaceState({}, "", createPath);
+      setTimeout(() => customerInputRef.current?.focus(), 0);
     }
     return true;
     } finally {
