@@ -279,7 +279,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
               value={query}
               onChange={(e) => { setQuery(e.target.value); setHighlight(0); }}
               placeholder="ابحث أو اكتب اسم جديد..."
-              autoFocus
+              onKeyDown={handleMenuKey}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
