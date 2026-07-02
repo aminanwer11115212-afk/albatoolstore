@@ -1129,6 +1129,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       setSavedInvoiceId(invId!);
       // بث حدث لتحديث الشاشات المرتبطة (الترحيلات، قائمة الفواتير)
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      // حدّث الشريط الجانبي (آخر الفواتير) فوراً حتى تظهر الفاتورة المحفوظة
+      queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       // تحديث بيانات الدفع المحفوظة لتعكس القيم الجديدة بعد الحفظ
       setSavedTotal(Number(totals.total) || 0);
       setSavedPaid(computedPaid);
