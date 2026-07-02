@@ -121,15 +121,23 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
       const tag = t.tagName;
 
       // إذا كان الحقل في "وضع التحرير" (بعد Enter أو نقر بالماوس)
-      // → اترك Space يعمل عادياً ويكتب مسافة.
+      // → اترك Space يعمل عادياً ويكتب مسافة (لا تحديد ولا حذف).
       if (isEditing(t)) return;
 
-      // خلاف ذلك: نحن في "وضع التنقّل" — نتابع لتفعيل تحديد/حذف الصف.
+      // "وضع التنقّل": في الحقول النصية (اسم الصنف …) لا نُفعّل التحديد ولا الحذف
+      // — يجب أوّلاً ضغط Enter أو النقر لبدء التعديل.
       if (tag === "TEXTAREA" || t.isContentEditable) return;
-
+      if (tag === "INPUT") {
+        const type = ((t as HTMLInputElement).type || "text").toLowerCase();
+        const textLike = ["text", "search", "email", "tel", "url", "password"];
+        if (textLike.includes(type)) return;
+      }
 
       const isInput = tag === "INPUT" || tag === "SELECT";
       if (!isInput) return;
+
+      // الحقول الرقمية/الاختيار في وضع التنقّل: Space يُحدِّد/يحذف الصف.
+      e.preventDefault();
 
       // موحَّد لحقول رقمية/اختيار: Space يُحدِّد فقط، لا يكتب ولا يغيّر القيمة.
       e.preventDefault();
