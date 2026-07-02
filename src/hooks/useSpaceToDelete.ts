@@ -1,14 +1,95 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * اختصار المسطرة (Space) لتحديد متعدد للصفوف ثم حذفها دفعة واحدة:
- * - الضغطة على صف غير محدد: تُضيفه إلى مجموعة المحددين.
- * - الضغطة على صف آخر: تُضاف أيضاً (تحديد متعدد).
- * - ضغطتان سريعتان جداً ("ططق" خلال 250ms) على نفس الصف: تحذف كل المحددين.
- * - أي ضغطة بطيئة على صف محدد: تُلغي تحديده فقط (Toggle).
- * - Esc: يمسح كل التحديدات.
+ * اختصار المسطرة (Space) في جدول البنود:
+ *
+ * وضع "التنقّل" (افتراضي بعد Focus): Space يُحدِّد/يحذف الصف.
+ * وضع "التحرير": بعد ضغط Enter داخل الحقل، أو نقر بالماوس لوضع المؤشر،
+ *                 يعمل Space كمسطرة عادية ولا يُفعّل التحديد.
+ * الخروج من وضع التحرير: مغادرة الحقل (blur) أو Escape أو Tab/Arrow.
  */
 const DOUBLE_PRESS_WINDOW_MS = 250;
+
+// عناصر الإدخال التي دخلت "وضع التحرير" (Enter أو نقر بالماوس)
+const editingElements = new WeakSet<HTMLElement>();
+
+function isEditing(el: HTMLElement | null): boolean {
+  return !!el && editingElements.has(el);
+}
+
+// مُستمِعات عالمية لضبط وضع التحرير — تُسجَّل مرّة واحدة.
+if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
+  (window as any).__spaceEditingHooked = true;
+
+  // Enter داخل حقل نصّي → ادخل وضع التحرير
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key !== "Enter") return;
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      const tag = t.tagName;
+      if (tag === "TEXTAREA" || (t as HTMLElement).isContentEditable) {
+        editingElements.add(t);
+        return;
+      }
+      if (tag === "INPUT") {
+        const type = ((t as HTMLInputElement).type || "text").toLowerCase();
+        const textLike = ["text", "search", "email", "tel", "url", "password"];
+        if (textLike.includes(type)) editingElements.add(t);
+      }
+    },
+    true,
+  );
+
+  // نقر بالماوس داخل حقل نصّي → ادخل وضع التحرير
+  window.addEventListener(
+    "mousedown",
+    (e) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      const tag = t.tagName;
+      if (tag === "TEXTAREA" || t.isContentEditable) {
+        editingElements.add(t);
+        return;
+      }
+      if (tag === "INPUT") {
+        const type = ((t as HTMLInputElement).type || "text").toLowerCase();
+        const textLike = ["text", "search", "email", "tel", "url", "password"];
+        if (textLike.includes(type)) editingElements.add(t);
+      }
+    },
+    true,
+  );
+
+  // Tab / السهم / Escape → خروج من وضع التحرير
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (
+        e.key === "Tab" ||
+        e.key === "Escape" ||
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown"
+      ) {
+        const t = e.target as HTMLElement | null;
+        if (t) editingElements.delete(t);
+      }
+    },
+    true,
+  );
+
+  // مغادرة الحقل تُنهي وضع التحرير
+  window.addEventListener(
+    "blur",
+    (e) => {
+      const t = e.target as HTMLElement | null;
+      if (t) editingElements.delete(t);
+    },
+    true,
+  );
+}
+
 
 export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>) {
   const [pendingUids, setPendingUids] = useState<Set<string>>(() => new Set());
