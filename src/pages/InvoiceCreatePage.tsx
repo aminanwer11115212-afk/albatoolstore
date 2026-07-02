@@ -1156,6 +1156,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         return true;
       }
       if (opts.andNew) {
+        newSessionRef.current = true;
         setRows([]);
         setCustomer(null);
         setCustomerSearch("");
