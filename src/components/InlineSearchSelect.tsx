@@ -111,6 +111,18 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     }
   };
 
+  const commitHighlighted = () => {
+    if (selectAllOnEnter && onSelectAll) {
+      onSelectAll(options.map(o => o.value));
+      return true;
+    }
+    if (canAdd && highlight === 0) return false; // Add يتطلّب await — لا يُعالَج هنا
+    const idx = canAdd ? highlight - 1 : highlight;
+    const opt = filtered[idx];
+    if (opt) { onChange(opt.value); return true; }
+    return false;
+  };
+
   const handleMenuKey = async (e: React.KeyboardEvent) => {
     if (!open) return;
     if (["ArrowDown", "ArrowUp", "Enter", "Escape", "Tab", "Backspace"].includes(e.key)) {
@@ -120,6 +132,13 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     else if (e.key === "ArrowUp") { e.preventDefault(); setHighlight(h => Math.max(0, h - 1)); }
     else if (e.key === "Escape") { e.preventDefault(); closeAndFocus(false); }
     else if (e.key === "Backspace" && query === "") { e.preventDefault(); closeAndFocus(false); }
+    else if (e.key === "Tab") {
+      // Tab يختار المُبرَز (إن وُجد) ثم يُغلق القائمة ويترك المتصفح ينقل الفوكس
+      // طبيعياً إلى الحقل التالي/السابق — بدلاً من أن يعلق داخل أزرار القائمة.
+      commitHighlighted();
+      setOpen(false);
+      // لا preventDefault — نسمح للـ Tab أن ينقل الفوكس
+    }
     else if (e.key === "Enter") {
       e.preventDefault();
       if (selectAllOnEnter && onSelectAll) {
