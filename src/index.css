@@ -2371,7 +2371,7 @@ input[type="number"] {
 .home-quick-btn:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
 
 /* على الكارد يحوي الزر: نترك مساحة أعلى لتفادي التداخل مع العنوان */
-.legacy-card:has(> .home-quick-btn) { padding-top: 48px; }
+.legacy-card:has(> .home-quick-btn) { position: relative; padding-top: 48px; }
 
 @media (max-width: 640px) {
   .home-quick-btn {
