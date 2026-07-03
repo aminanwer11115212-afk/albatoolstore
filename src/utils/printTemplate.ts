@@ -93,7 +93,8 @@ export function generatePrintHTML(data: PrintData): string {
   // Packaging/transport block: hidden for account-only and no-details variants.
   const showExtras = variant !== "account-only" && variant !== "no-details" && variant !== "stocktake";
   const logoURL = resolveLogoUrl(company?.logo_url);
-  const finalTotal = grandTotal + oldBalance;
+  // "المطلوب النهائي" = جملة الفاتورة − المبلغ المدفوع (لا يُجمع مع الحساب القديم).
+  const finalTotal = Math.max(0, grandTotal - paidAmount);
   const cleanPackaging = cleanExtraHTML(packagingInfo);
   const cleanTransport = cleanExtraHTML(transportInfo);
 
