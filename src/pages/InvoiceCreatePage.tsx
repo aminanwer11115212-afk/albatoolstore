@@ -1149,7 +1149,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       // حتى لا يُنشئ الضغط على "حفظ" مجدداً فاتورة جديدة
       if (!effectiveEditId && invId) {
         const editPath = isCash ? `/invoices/cash/edit/${invId}` : `/invoices/edit/${invId}`;
-        window.history.replaceState({}, "", editPath);
+        // نستخدم navigate بـ replace حتى يتزامن React Router مع الرابط الجديد،
+        // وإلا سيبقى يعتقد أننا في المسار السابق ولن يستجيب للنقر على نفس الفاتورة لاحقاً.
+        navigate(editPath, { replace: true });
       }
       // تحديث dbId للصفوف المحلية لتتوافق مع الواقع في قاعدة البيانات
       if (!effectiveEditId && invId) {
