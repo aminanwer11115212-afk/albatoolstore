@@ -269,8 +269,9 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
             }
             if (target) {
               target.focus();
-              if (target instanceof HTMLInputElement) target.select();
+              // لا تحديد أثناء التنقّل.
             }
+
           }, 30);
         });
         return;
