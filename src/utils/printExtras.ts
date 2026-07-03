@@ -145,7 +145,7 @@ export async function loadQuoteExtras(quoteId: string | undefined | null): Promi
     const [{ data: transports }, { data: packaging }] = await Promise.all([
       supabase
         .from("quote_transports")
-        .select("vehicle_number, driver_name, transport_date, cost, notes, transporters(name), destinations(name)")
+        .select("transporters(name, phone, address)")
         .eq("quote_id", quoteId),
       supabase
         .from("quotes_packaging")
