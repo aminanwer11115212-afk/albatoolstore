@@ -756,13 +756,15 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     // حارس متزامن لمنع الإدراج المتوازي/المكرر (نقر مزدوج، saveThen + نقر يدوي، StrictMode...)
     if (isSavingRef.current) return false;
     isSavingRef.current = true;
+    // إعادة تعيين آمنة لأي مسار خروج مبكر لا يمر عبر try/finally الرئيسي أدناه
+    const releaseGuard = () => { isSavingRef.current = false; setSaving(false); };
     let activeCustomer = customer;
     // إن لم يُختَر عميل من القائمة لكن يوجد اسم/رقم نصي حر، أنشئ/طابق العميل تلقائياً (للآجل والكاش)
     if (!activeCustomer) {
       const freeText = (customerSearch || "").trim();
       const isCashMode = isCash;
       if (!freeText) {
-        if (!isCashMode) { toast.error("اختر عميلاً أو اكتب اسمه"); return false; }
+        if (!isCashMode) { toast.error("اختر عميلاً أو اكتب اسمه"); releaseGuard(); return false; }
         // كاش بدون أي اسم/رقم → ضيف مجهول
       } else {
         // تطبيع رقم الهاتف: إزالة المسافات/الشرطات/الأقواس/النقاط، وتحويل 00 البادئة إلى +
@@ -834,7 +836,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
             .insert(insertPayload)
             .select("*")
             .single();
-          if (cErr) { toast.error(`تعذّر إنشاء العميل: ${cErr.message}`); return false; }
+          if (cErr) { toast.error(`تعذّر إنشاء العميل: ${cErr.message}`); releaseGuard(); return false; }
           activeCustomer = created as any;
           toast.message(`تم إنشاء عميل جديد: ${insertPayload.name}`);
           // إخطار الشاشات الأخرى بالعميل الجديد
@@ -852,7 +854,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       }
     }
     const validRows = rows.filter((r) => r.product_id);
-    if (!validRows.length) { toast.error("أضف منتجاً واحداً على الأقل"); return false; }
+    if (!validRows.length) { toast.error("أضف منتجاً واحداً على الأقل"); releaseGuard(); return false; }
 
     // ============================================================
     // ميزة موحّدة: "تحديث بدل التكرار" + "رقم عشوائي عند تغيّر العميل"
@@ -973,13 +975,19 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           invId = undefined;
           recordExisted = false;
         } else if (!itemsUnchanged) {
-          // البنود تغيّرت — اقرأ القديمة لحساب فرق المخزون ثم احذف
+          // البنود تغيّرت — اقرأ القديمة لحساب فرق المخزون ثم احذف مع فحص الخطأ
           const { data: prev } = await supabase
             .from("invoice_items")
             .select("product_id, quantity")
             .eq("invoice_id", effectiveEditId);
           oldItems = (prev || []).map((p: any) => ({ product_id: p.product_id, quantity: p.quantity }));
-          await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: effectiveEditId });
+          // Full sync: احذف كل البنود المرتبطة بهذه الفاتورة قبل إعادة الإدراج.
+          // نستخدم DELETE مباشر مع فحص الخطأ — لو فشل الحذف كنّا سنكرِّر البنود.
+          const { error: delErr } = await supabase
+            .from("invoice_items")
+            .delete()
+            .eq("invoice_id", effectiveEditId);
+          if (delErr) throw delErr;
         }
       }
 
