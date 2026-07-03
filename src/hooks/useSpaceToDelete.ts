@@ -74,6 +74,36 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
     true,
   );
 
+  // في وضع التنقّل (داخل جدول البنود): امنع كتابة أي حرف داخل الحقل.
+  // الكتابة تُسمح فقط بعد ضغط Enter (وضع التحرير).
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (!t.closest?.("[data-nav-table]")) return;
+      if (editingElements.has(t)) return;
+      // مفاتيح التحكم/التنقّل مسموحة دائماً
+      const allowed = new Set([
+        "Tab","Escape","Enter","ArrowLeft","ArrowRight","ArrowUp","ArrowDown",
+        "Home","End","PageUp","PageDown","Shift","Control","Alt","Meta",
+        "CapsLock","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12",
+      ]);
+      if (allowed.has(e.key)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Space يعالَج كاختصار في handleRowKeyDown
+      if (e.key === " " || e.code === "Space") return;
+      // أي مفتاح آخر (حروف/أرقام/رموز/Backspace/Delete): امنعه في وضع التنقّل
+      const tag = t.tagName;
+      const isEditable =
+        tag === "TEXTAREA" || tag === "INPUT" || t.isContentEditable;
+      if (!isEditable) return;
+      e.preventDefault();
+    },
+    true,
+  );
+
+
   // ============ مؤشر بصري لوضع Space (تنقّل/تعديل) ============
   // يعمل فقط على الحقول داخل جدول البنود (data-nav-table).
   const badge = document.createElement("div");
