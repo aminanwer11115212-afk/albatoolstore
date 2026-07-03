@@ -119,7 +119,7 @@ export function generatePrintHTML(data: PrintData): string {
 <meta name="lov-doc-label" content="${attr(title)}">
 <meta name="lov-doc-number" content="${attr(number || "")}">
 <meta name="lov-customer-name" content="${attr(customer?.name || "")}">
-<meta name="lov-wa-phone" content="${attr(customer?.phone || "")}">
+<meta name="lov-wa-phone" content="">
 <title>${esc(title)} ${esc(number || "")}</title>
 <style>
   @page { size: A4; margin: 10mm; }

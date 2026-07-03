@@ -56,30 +56,26 @@ function setCached(key: string, value: ExtraStrings) {
 
 function formatTransports(rows: any[]): string | undefined {
   if (!rows || rows.length === 0) return undefined;
-  const lines = rows.map((r) => {
-    const transporter = r.transporters?.name || r.transporter_name || "";
-    const destination = r.destinations?.name || r.destination_name || "";
-    const vehicle = r.vehicle_number || "";
-    const driver = r.driver_name || "";
-    const date = r.transport_date || "";
-    const cost = Number(r.cost || 0);
-    const parts: string[] = [];
-    if (transporter) parts.push(`الناقل: ${escapeHtml(transporter)}`);
-    if (destination) parts.push(`الوجهة: ${escapeHtml(destination)}`);
-    if (vehicle) parts.push(`المركبة: ${escapeHtml(vehicle)}`);
-    if (driver) parts.push(`السائق: ${escapeHtml(driver)}`);
-    let line = parts.join(" | ");
-    if (date) line += ` — ${escapeHtml(date)}`;
-    if (cost > 0) line += ` — التكلفة: ${fmt(cost)}`;
-    if (r.notes) line += `<br><span style="color:#666;font-size:11px;">${escapeHtml(r.notes)}</span>`;
-    return line;
-  });
-  const totalCost = rows.reduce((s, r) => s + Number(r.cost || 0), 0);
-  let html = lines.join("<br>");
-  if (totalCost > 0) {
-    html += `<br><strong>الإجمالي: ${fmt(totalCost)}</strong>`;
+  // بيانات الترحيلات المعروضة في ورقة الطباعة تقتصر على: الاسم، الهاتف، العنوان.
+  // (رقم/نوع المركبة والسائق والتكلفة والتاريخ لا تظهر — لأسباب سرية العمل.)
+  const seen = new Set<string>();
+  const blocks: string[] = [];
+  for (const r of rows) {
+    const t = r.transporters || {};
+    const name = t.name || r.transporter_name || "";
+    if (!name) continue;
+    const phone = t.phone || "";
+    const address = t.address || "";
+    const key = `${name}|${phone}|${address}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const parts: string[] = [`الاسم: ${escapeHtml(name)}`];
+    if (phone)   parts.push(`الهاتف: ${escapeHtml(phone)}`);
+    if (address) parts.push(`العنوان: ${escapeHtml(address)}`);
+    blocks.push(parts.join(" | "));
   }
-  return html;
+  if (blocks.length === 0) return undefined;
+  return blocks.join("<br>");
 }
 
 function formatPackaging(rows: any[]): string | undefined {
@@ -121,7 +117,7 @@ export async function loadInvoiceExtras(invoiceId: string | undefined | null): P
     const [{ data: transports }, { data: packaging }] = await Promise.all([
       supabase
         .from("invoice_transports")
-        .select("vehicle_number, driver_name, transport_date, cost, notes, transporters(name), destinations(name)")
+        .select("transporters(name, phone, address)")
         .eq("invoice_id", invoiceId),
       supabase
         .from("invoice_packaging")
@@ -149,7 +145,7 @@ export async function loadQuoteExtras(quoteId: string | undefined | null): Promi
     const [{ data: transports }, { data: packaging }] = await Promise.all([
       supabase
         .from("quote_transports")
-        .select("vehicle_number, driver_name, transport_date, cost, notes, transporters(name), destinations(name)")
+        .select("transporters(name, phone, address)")
         .eq("quote_id", quoteId),
       supabase
         .from("quotes_packaging")

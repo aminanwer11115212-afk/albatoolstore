@@ -53,13 +53,7 @@ describe("loadInvoiceExtras", () => {
   it("returns HTML strings when records exist", async () => {
     tableData.invoice_transports = [
       {
-        vehicle_number: "ABC-123",
-        driver_name: "Ali",
-        transport_date: "2025-01-01",
-        cost: 150,
-        notes: null,
-        transporters: { name: "Fast Co" },
-        destinations: { name: "Riyadh" },
+        transporters: { name: "Fast Co", phone: "0100000000", address: "Riyadh HQ" },
       },
     ];
     tableData.invoice_packaging = [
@@ -74,12 +68,15 @@ describe("loadInvoiceExtras", () => {
     ];
     const res = await loadInvoiceExtras("inv-1");
     expect(res.transportInfo).toBeDefined();
-    expect(res.transportInfo).toContain("الناقل:");
+    expect(res.transportInfo).toContain("الاسم:");
     expect(res.transportInfo).toContain("Fast Co");
-    expect(res.transportInfo).toContain("الوجهة:");
-    expect(res.transportInfo).toContain("المركبة:");
-    expect(res.transportInfo).toContain("التكلفة:");
-    expect(res.transportInfo).toContain("الإجمالي:");
+    expect(res.transportInfo).toContain("الهاتف:");
+    expect(res.transportInfo).toContain("0100000000");
+    expect(res.transportInfo).toContain("العنوان:");
+    expect(res.transportInfo).toContain("Riyadh HQ");
+    // بيانات المركبة/السائق/التكلفة لم تعد تُطبع
+    expect(res.transportInfo).not.toContain("المركبة:");
+    expect(res.transportInfo).not.toContain("السائق:");
 
     expect(res.packagingInfo).toBeDefined();
     expect(res.packagingInfo).toContain("النوع:");
@@ -105,13 +102,7 @@ describe("loadQuoteExtras", () => {
   it("returns HTML strings when records exist", async () => {
     tableData.quote_transports = [
       {
-        vehicle_number: "XYZ-9",
-        driver_name: "Sara",
-        transport_date: "2025-02-02",
-        cost: 200,
-        notes: "ملاحظة",
-        transporters: { name: "Speedy" },
-        destinations: { name: "Jeddah" },
+        transporters: { name: "Speedy", phone: "0200", address: "Jeddah St" },
       },
     ];
     tableData.quotes_packaging = [
@@ -126,8 +117,8 @@ describe("loadQuoteExtras", () => {
     ];
     const res = await loadQuoteExtras("q-1");
     expect(res.transportInfo).toContain("Speedy");
-    expect(res.transportInfo).toContain("Jeddah");
-    expect(res.transportInfo).toContain("الإجمالي:");
+    expect(res.transportInfo).toContain("0200");
+    expect(res.transportInfo).toContain("Jeddah St");
     expect(res.packagingInfo).toContain("Crate");
     expect(res.packagingInfo).toContain("الكمية:");
     expect(res.packagingInfo).toContain("الإجمالي:");
