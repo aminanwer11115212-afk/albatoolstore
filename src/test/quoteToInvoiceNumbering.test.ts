@@ -15,12 +15,14 @@ const builder = (name: string) => {
   const filters: Array<(r: Row) => boolean> = [];
   let pendingInsert: Row | Row[] | null = null;
   let pendingUpdate: Row | null = null;
+  let pendingDelete = false;
   const api: any = {
     select: () => api,
     eq: (col: string, val: any) => { filters.push((r) => r[col] === val); return api; },
     limit: () => api,
     insert: (row: Row | Row[]) => { pendingInsert = row; return api; },
     update: (row: Row) => { pendingUpdate = row; return api; },
+    delete: () => { pendingDelete = true; return api; },
     single: async () => {
       if (pendingInsert) {
         const arr = Array.isArray(pendingInsert) ? pendingInsert : [pendingInsert];
