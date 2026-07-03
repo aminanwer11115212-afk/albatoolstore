@@ -111,8 +111,9 @@ export function useInvoiceKeyboardNav(rootRef: React.RefObject<HTMLDivElement>) 
         e.preventDefault();
         if (candidate) {
           candidate.focus();
-          if (candidate instanceof HTMLInputElement && (candidate.type === "text" || candidate.type === "number")) candidate.select();
+          // لا تحديد أثناء التنقّل.
         }
+
         return;
       }
 
