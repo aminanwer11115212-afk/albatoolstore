@@ -1978,7 +1978,7 @@ export default function QuoteCreatePage() {
                           return;
                         }
 
-                        if (!confirm(`تحويل العرض ${quoteNumber} إلى فاتورة؟ سيُحفظ العرض بحالة "مقبول/محوّل" ويظهر في سجل التحويلات.`)) return;
+                        if (!confirm(`تحويل العرض ${quoteNumber} إلى فاتورة؟ سيتم حذف عرض السعر من القائمة بعد التحويل.`)) return;
                         const ok = await saveQuote("draft", { skipNavigate: true, silent: true });
                         if (!ok) return;
                         try {

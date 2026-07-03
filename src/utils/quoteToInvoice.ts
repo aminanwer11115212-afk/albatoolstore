@@ -2,13 +2,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Unified quote → invoice conversion.
- * Used everywhere a quote status becomes "accepted" (QuotesPage, QuoteCreatePage,
- * QuoteViewPage, DashboardRecentQuotes, RecentItemsSidebar, Staff portal).
+ * Used everywhere a quote is converted (QuotesPage, QuoteCreatePage,
+ * QuoteViewPage, SideQuotesPage, Staff portal).
  *
  * Behavior:
  * - Creates an invoice with workflow_status = 'new' (no stock deduction).
- * - Marks the quote: status='accepted', converted_to_invoice_id, converted_at.
- * - Idempotent: if the quote already has converted_to_invoice_id, returns it.
+ * - Copies quote items to invoice_items.
+ * - Deletes the original quote and its items (user preference — the invoice
+ *   becomes the single source of truth; the quote no longer appears in the list).
  * - Stock deduction happens later when the invoice's workflow_status leaves 'new'.
  */
 export async function convertQuoteToInvoice(
@@ -96,28 +97,7 @@ export async function convertQuoteToInvoice(
     .single();
   if (insErr || !inv) throw insErr || new Error("Failed to create invoice");
 
-  // 5. CRITICAL: Mark quote as converted IMMEDIATELY after invoice creation.
-  // This guarantees idempotency: if any subsequent step (items copy) fails
-  // and the user retries, we won't create a duplicate invoice — the converted_to_invoice_id
-  // check at the top will return the existing one.
-  const { data: userData } = await supabase.auth.getUser();
-  const { error: upErr } = await supabase
-    .from("quotes")
-    .update({
-      status: "accepted",
-      workflow_status: "converted",
-      converted_to_invoice_id: inv.id,
-      converted_at: new Date().toISOString(),
-      converted_by: userData?.user?.id || null,
-    } as any)
-    .eq("id", quoteId);
-  if (upErr) {
-    // Rollback: delete the orphan invoice we just created so retry works cleanly.
-    await supabase.from("invoices").delete().eq("id", inv.id);
-    throw upErr;
-  }
-
-  // 6. Copy items (after the quote is safely marked converted)
+  // 5. Copy items first
   if (items && items.length > 0) {
     const payload = items.map((it: any) => ({
       invoice_id: inv.id,
@@ -134,8 +114,18 @@ export async function convertQuoteToInvoice(
       total: it.total,
     }));
     const { error: itErr } = await supabase.from("invoice_items").insert(payload);
-    if (itErr) throw itErr;
+    if (itErr) {
+      // Rollback the orphan invoice
+      await supabase.from("invoices").delete().eq("id", inv.id);
+      throw itErr;
+    }
   }
+
+  // 6. Delete the original quote (items first, then the quote itself).
+  // User preference: after a successful conversion the quote is removed from
+  // the quotes list — the resulting invoice is the single source of truth.
+  await supabase.from("quote_items").delete().eq("quote_id", quoteId);
+  await supabase.from("quotes").delete().eq("id", quoteId);
 
   return { invoiceId: inv.id, invoiceNumber: invNum, alreadyConverted: false };
 }

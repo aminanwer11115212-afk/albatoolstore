@@ -109,12 +109,15 @@ export default function SideQuotesPage() {
   };
 
   const handleConvert = async (q: any) => {
-    if (!confirm(`تحويل العرض الجانبي ${q.quote_number} إلى فاتورة؟ سيتم الإبقاء على العرض بحالة "مقبول".`)) return;
+    if (!confirm(`تحويل العرض الجانبي ${q.quote_number} إلى فاتورة؟ سيتم حذف عرض السعر من القائمة بعد التحويل.`)) return;
     try {
       const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
       const { invoiceId, invoiceNumber } = await convertQuoteToInvoice(q.id);
-      toast.success(`تم التحويل إلى فاتورة ${invoiceNumber} — العرض محفوظ كمقبول`);
+      toast.success(`تم التحويل إلى فاتورة ${invoiceNumber} — تم حذف عرض السعر`);
       qc.invalidateQueries({ queryKey: ["side-quotes"] });
+      qc.invalidateQueries({ queryKey: ["quotes-full"] });
+      qc.invalidateQueries({ queryKey: ["quotes-with-customers"] });
+      qc.invalidateQueries({ queryKey: ["quotes"] });
       navigate(`/invoices/edit/${invoiceId}`);
     } catch (e: any) {
       toast.error(e.message);

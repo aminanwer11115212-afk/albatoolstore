@@ -15,12 +15,14 @@ const builder = (name: string) => {
   const filters: Array<(r: Row) => boolean> = [];
   let pendingInsert: Row | Row[] | null = null;
   let pendingUpdate: Row | null = null;
+  let pendingDelete = false;
   const api: any = {
     select: () => api,
     eq: (col: string, val: any) => { filters.push((r) => r[col] === val); return api; },
     limit: () => api,
     insert: (row: Row | Row[]) => { pendingInsert = row; return api; },
     update: (row: Row) => { pendingUpdate = row; return api; },
+    delete: () => { pendingDelete = true; return api; },
     single: async () => {
       if (pendingInsert) {
         const arr = Array.isArray(pendingInsert) ? pendingInsert : [pendingInsert];
@@ -46,6 +48,11 @@ const builder = (name: string) => {
         const rows = table(name).filter((r) => filters.every((f) => f(r)));
         rows.forEach((r) => Object.assign(r, pendingUpdate));
         return Promise.resolve({ data: rows, error: null }).then(resolve);
+      }
+      if (pendingDelete) {
+        const remaining = table(name).filter((r) => !filters.every((f) => f(r)));
+        db[name] = remaining;
+        return Promise.resolve({ data: null, error: null }).then(resolve);
       }
       const rows = table(name).filter((r) => filters.every((f) => f(r)));
       return Promise.resolve({ data: rows, error: null }).then(resolve);
