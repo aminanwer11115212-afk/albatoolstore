@@ -49,6 +49,11 @@ const builder = (name: string) => {
         rows.forEach((r) => Object.assign(r, pendingUpdate));
         return Promise.resolve({ data: rows, error: null }).then(resolve);
       }
+      if (pendingDelete) {
+        const remaining = table(name).filter((r) => !filters.every((f) => f(r)));
+        db[name] = remaining;
+        return Promise.resolve({ data: null, error: null }).then(resolve);
+      }
       const rows = table(name).filter((r) => filters.every((f) => f(r)));
       return Promise.resolve({ data: rows, error: null }).then(resolve);
     },
