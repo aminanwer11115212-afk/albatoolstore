@@ -105,19 +105,9 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
 
 
   // ============ مؤشر بصري لوضع Space (تنقّل/تعديل) ============
-  // يعمل فقط على الحقول داخل جدول البنود (data-nav-table).
-  const badge = document.createElement("div");
-  badge.setAttribute("data-space-mode-badge", "");
-  badge.style.cssText = [
-    "position:fixed","z-index:9999","pointer-events:none",
-    "font-family:inherit","font-size:10px","font-weight:700",
-    "padding:1px 6px","border-radius:9999px","line-height:1.4",
-    "box-shadow:0 1px 2px rgba(0,0,0,.15)","display:none","color:#fff",
-  ].join(";");
-  const attachBadge = () => {
-    if (!badge.isConnected && document.body) document.body.appendChild(badge);
-  };
-
+  // - وضع التنقّل: تُبرَز الصف كاملاً باللون البرتقالي (data-space-mode="nav"
+  //   على عنصر [data-nav-row]) بدون أي تأشير على الخلية.
+  // - وضع التعديل: تُبرَز الخلية النشطة فقط (data-space-mode="edit").
   const isTextLike = (el: HTMLElement) => {
     const tag = el.tagName;
     if (tag === "TEXTAREA" || el.isContentEditable) return true;
@@ -137,41 +127,30 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
       if (type === "number") return "nav";
     }
     if (!isTextLike(el)) return null;
-    // النصوص: افتراضياً تنقّل. لا يدخل وضع التعديل إلا صراحةً (Enter/نقر).
     if (editingElements.has(el)) return "edit";
     return "nav";
   };
 
+  const clearMarks = () => {
+    document.querySelectorAll("[data-space-mode]").forEach((n) => {
+      (n as HTMLElement).removeAttribute("data-space-mode");
+    });
+  };
 
   const refresh = () => {
     const el = document.activeElement as HTMLElement | null;
-    if (!el) { badge.style.display = "none"; return; }
+    if (!el) { clearMarks(); return; }
     const mode = computeMode(el);
-    document.querySelectorAll("[data-space-mode]").forEach((n) => {
-      if (n !== el) (n as HTMLElement).removeAttribute("data-space-mode");
-    });
-    if (!mode) {
-      el.removeAttribute("data-space-mode");
-      badge.style.display = "none";
-      return;
+    clearMarks();
+    if (!mode) return;
+    if (mode === "nav") {
+      const row = el.closest("[data-nav-row]") as HTMLElement | null;
+      if (row) row.setAttribute("data-space-mode", "nav");
+    } else {
+      el.setAttribute("data-space-mode", "edit");
     }
-    el.setAttribute("data-space-mode", mode);
-    attachBadge();
-    const rect = el.getBoundingClientRect();
-    badge.textContent = mode === "edit" ? "تعديل" : "تنقّل";
-    badge.style.background = mode === "edit" ? "hsl(142 71% 40%)" : "hsl(38 92% 45%)";
-    // ضع الشارة فوق الحقل بالكامل بدون تداخل مع النص.
-    const badgeH = 18;
-    let top = rect.top - badgeH - 2;
-    if (top < 2) top = rect.bottom + 2; // إن كان الحقل بأعلى الشاشة، اعرضها تحته
-    badge.style.top = `${top}px`;
-    // محاذاة يمين الحقل (RTL) لتفادي تغطية بداية النص.
-    const badgeW = 44;
-    let left = rect.right - badgeW;
-    if (left < 2) left = 2;
-    badge.style.left = `${left}px`;
-    badge.style.display = "block";
   };
+
 
 
   const scheduleRefresh = () => requestAnimationFrame(refresh);
@@ -179,10 +158,11 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
   window.addEventListener("focusout", () => {
     requestAnimationFrame(() => {
       if (!document.activeElement || document.activeElement === document.body) {
-        badge.style.display = "none";
+        clearMarks();
       } else refresh();
     });
   }, true);
+
   window.addEventListener("keyup", scheduleRefresh, true);
   window.addEventListener("mouseup", scheduleRefresh, true);
   window.addEventListener("input", scheduleRefresh, true);
