@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS auto_workflow_on_item ON public.invoice_items;
