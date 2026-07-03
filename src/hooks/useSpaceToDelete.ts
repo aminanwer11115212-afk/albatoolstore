@@ -122,17 +122,11 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
       if (type === "number") return "nav";
     }
     if (!isTextLike(el)) return null;
+    // النصوص: افتراضياً تنقّل. لا يدخل وضع التعديل إلا صراحةً (Enter/نقر).
     if (editingElements.has(el)) return "edit";
-    if (tag === "INPUT" || tag === "TEXTAREA") {
-      const inp = el as HTMLInputElement | HTMLTextAreaElement;
-      const val = inp.value ?? "";
-      const start = inp.selectionStart ?? 0;
-      const end = inp.selectionEnd ?? 0;
-      const fullySelected = val.length > 0 && start === 0 && end === val.length;
-      if (val.length > 0 && !fullySelected) return "edit";
-    }
     return "nav";
   };
+
 
   const refresh = () => {
     const el = document.activeElement as HTMLElement | null;
