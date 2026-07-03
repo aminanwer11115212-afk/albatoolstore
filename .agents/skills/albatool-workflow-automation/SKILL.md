@@ -30,7 +30,7 @@ Any change to the set MUST update all three together.
 event                                    → target           where
 ──────────────────────────────────────────────────────────────────────
 new invoice created                       → new             default column value
-quote → invoice (items inserted)         → preparing       trigger: auto_workflow_on_item
+quote → invoice (items inserted)         → new             (stays مقبول until print — item-insert trigger REMOVED 2026-07)
 stocktake print (variant=stocktake)      → preparing       InvoiceCreatePage.handlePrint
 invoice print                             → preparing       InvoiceCreatePage / InvoiceViewPage handlePrint
 packaging row inserted                    → preparing       trigger: auto_workflow_on_packaging
