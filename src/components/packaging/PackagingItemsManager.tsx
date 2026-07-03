@@ -338,9 +338,11 @@ export default function PackagingItemsManager({
               return (
                 <tr
                   key={it.id}
+                  data-row-uid={it.id}
                   className={idx % 2 === 0 ? "odd" : "even"}
                   style={isSpacePending(it.id) ? { background: "hsl(var(--destructive) / 0.15)", outline: "2px solid hsl(var(--destructive) / 0.5)" } : undefined}
                 >
+
                   <td>{(types || []).find((t: any) => t.id === it.packaging_type_id)?.name || "—"}</td>
                   <td>{it.product_name || "—"}</td>
                   <td className="text-center" style={{ fontWeight: 600, color: "hsl(var(--muted-foreground))" }}>

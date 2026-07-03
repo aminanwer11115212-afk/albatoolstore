@@ -1187,7 +1187,7 @@ export default function StockReturnCreatePage() {
                     });
                     return visibleRows.map((r, idx, arr) => {
                     return (
-                    <tr key={r.uid} className={`excel-row ${r.selected ? "row-selected-danger" : ""} ${isSpacePending(r.uid) ? "row-pending-delete" : ""}`} onKeyDown={(e) => handleSpaceDelete(r.uid, e)}>
+                    <tr key={r.uid} className={`excel-row ${r.selected ? "row-selected-danger" : ""} ${isSpacePending(r.uid) ? "row-pending-delete" : ""}`} data-row-uid={r.uid} onKeyDown={(e) => handleSpaceDelete(r.uid, e)}>
                       <td className="text-center">
                         <input type="checkbox" checked={r.selected} onChange={(e) => updateRow(r.uid, { selected: e.target.checked })} />
                       </td>

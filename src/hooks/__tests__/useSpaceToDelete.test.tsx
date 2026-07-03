@@ -1,111 +1,129 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import React from "react";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 
 /**
- * المفهوم الجديد: لا يوجد وضع تنقّل/تعديل.
- * - Space/Enter/Tab/الأسهم/الحروف/الأرقام: تعمل عادياً بدون أي حجب.
- * - Ctrl+Delete أو Ctrl+Backspace فقط: يحذف الصف الحالي.
+ * السلوك الجديد: Shift مفردة = تبديل تحديد الصف. Shift مزدوجة = حذف المحدَّدين.
  */
 
-function makeEvent(target: HTMLElement, opts: Partial<KeyboardEventInit> & { key: string }) {
-  let defaultPrevented = false;
-  let propagationStopped = false;
-  return {
-    key: opts.key,
-    ctrlKey: !!opts.ctrlKey,
-    metaKey: !!opts.metaKey,
-    shiftKey: !!opts.shiftKey,
-    altKey: !!opts.altKey,
-    target,
-    preventDefault: () => { defaultPrevented = true; },
-    stopPropagation: () => { propagationStopped = true; },
-    get defaultPrevented() { return defaultPrevented; },
-    get propagationStopped() { return propagationStopped; },
-  } as unknown as React.KeyboardEvent & { defaultPrevented: boolean };
-}
-
-function mountRow() {
+function mountRow(uid: string) {
   const row = document.createElement("tr");
+  row.setAttribute("data-row-uid", uid);
   row.setAttribute("data-nav-row", "0");
   row.setAttribute("data-nav-table", "items");
-  const td = document.createElement("td");
   const input = document.createElement("input");
   input.type = "text";
   input.setAttribute("data-nav-col", "product");
-  td.appendChild(input);
-  row.appendChild(td);
+  row.appendChild(input);
   document.body.appendChild(row);
   return input;
 }
 
-beforeEach(() => { document.body.innerHTML = ""; });
+function tapShift() {
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Shift" }));
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "Shift" }));
+}
 
-describe("useSpaceToDelete — اختصار Ctrl+Delete لحذف الصف", () => {
-  it("Space وحده لا يحذف ولا يمنع الكتابة", () => {
+beforeEach(() => { document.body.innerHTML = ""; vi.useFakeTimers(); });
+afterEach(() => { vi.useRealTimers(); });
+
+describe("useSpaceToDelete — Shift للتحديد، Shift-Shift للحذف", () => {
+  it("Shift مفردة تُبدِّل تحديد الصف الحالي", () => {
     const onDelete = vi.fn();
     const { result } = renderHook(() => useSpaceToDelete(onDelete));
-    const input = mountRow();
-    const ev = makeEvent(input, { key: " " });
-    act(() => result.current.handleRowKeyDown("uid-1", ev));
-    expect((ev as any).defaultPrevented).toBe(false);
+    const input = mountRow("u1");
+    input.focus();
+
+    act(() => { tapShift(); });
+    expect(result.current.isPending("u1")).toBe(true);
+
+    act(() => { vi.advanceTimersByTime(500); tapShift(); });
+    expect(result.current.isPending("u1")).toBe(false);
+  });
+
+  it("Shift على صفوف مختلفة يُحدِّد الجميع", () => {
+    const onDelete = vi.fn();
+    const { result } = renderHook(() => useSpaceToDelete(onDelete));
+    const a = mountRow("a");
+    const b = mountRow("b");
+    const c = mountRow("c");
+
+    a.focus(); act(() => { tapShift(); });
+    act(() => { vi.advanceTimersByTime(500); });
+    b.focus(); act(() => { tapShift(); });
+    act(() => { vi.advanceTimersByTime(500); });
+    c.focus(); act(() => { tapShift(); });
+
+    expect(result.current.isPending("a")).toBe(true);
+    expect(result.current.isPending("b")).toBe(true);
+    expect(result.current.isPending("c")).toBe(true);
+  });
+
+  it("ضغطتان سريعتان على Shift تحذف كل المحدَّدين", async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useSpaceToDelete(onDelete));
+    const a = mountRow("a");
+    const b = mountRow("b");
+
+    a.focus(); act(() => { tapShift(); });
+    act(() => { vi.advanceTimersByTime(500); });
+    b.focus(); act(() => { tapShift(); });
+
+    // ضغطة ثانية سريعة → حذف
+    act(() => { vi.advanceTimersByTime(100); tapShift(); });
+    await act(async () => { await vi.runAllTimersAsync(); });
+
+    expect(onDelete).toHaveBeenCalledWith("a");
+    expect(onDelete).toHaveBeenCalledWith("b");
+    expect(result.current.pendingUids.size).toBe(0);
+  });
+
+  it("Shift+حرف (كمُعدِّل) لا يُحدِّد شيئاً", () => {
+    const onDelete = vi.fn();
+    const { result } = renderHook(() => useSpaceToDelete(onDelete));
+    const input = mountRow("u2");
+    input.focus();
+
+    // محاكاة Shift+A: Shift down → A down → A up → Shift up
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Shift" }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "A", shiftKey: true }));
+      window.dispatchEvent(new KeyboardEvent("keyup", { key: "A", shiftKey: true }));
+      window.dispatchEvent(new KeyboardEvent("keyup", { key: "Shift" }));
+    });
+
+    expect(result.current.isPending("u2")).toBe(false);
+  });
+
+  it("Escape يمسح كل التحديدات", () => {
+    const onDelete = vi.fn();
+    const { result } = renderHook(() => useSpaceToDelete(onDelete));
+    const input = mountRow("u3");
+    input.focus();
+
+    act(() => { tapShift(); });
+    expect(result.current.isPending("u3")).toBe(true);
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(result.current.isPending("u3")).toBe(false);
+  });
+
+  it("Space/Enter لا يُطلقان تحديدًا ولا حذفًا", () => {
+    const onDelete = vi.fn();
+    const { result } = renderHook(() => useSpaceToDelete(onDelete));
+    const input = mountRow("u4");
+    input.focus();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: " " }));
+      window.dispatchEvent(new KeyboardEvent("keyup", { key: " " }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+      window.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter" }));
+    });
+
+    expect(result.current.isPending("u4")).toBe(false);
     expect(onDelete).not.toHaveBeenCalled();
-  });
-
-  it("Delete وحده (بدون Ctrl) لا يحذف الصف — يبقى محرّرًا للنص", () => {
-    const onDelete = vi.fn();
-    const { result } = renderHook(() => useSpaceToDelete(onDelete));
-    const input = mountRow();
-    const ev = makeEvent(input, { key: "Delete" });
-    act(() => result.current.handleRowKeyDown("uid-2", ev));
-    expect((ev as any).defaultPrevented).toBe(false);
-    expect(onDelete).not.toHaveBeenCalled();
-  });
-
-  it("Ctrl+Delete يحذف الصف الحالي", async () => {
-    const onDelete = vi.fn();
-    const { result } = renderHook(() => useSpaceToDelete(onDelete));
-    const input = mountRow();
-    const ev = makeEvent(input, { key: "Delete", ctrlKey: true });
-    act(() => result.current.handleRowKeyDown("uid-3", ev));
-    expect((ev as any).defaultPrevented).toBe(true);
-    expect(onDelete).toHaveBeenCalledWith("uid-3");
-  });
-
-  it("Ctrl+Backspace يحذف الصف الحالي أيضاً", () => {
-    const onDelete = vi.fn();
-    const { result } = renderHook(() => useSpaceToDelete(onDelete));
-    const input = mountRow();
-    const ev = makeEvent(input, { key: "Backspace", ctrlKey: true });
-    act(() => result.current.handleRowKeyDown("uid-4", ev));
-    expect(onDelete).toHaveBeenCalledWith("uid-4");
-  });
-
-  it("Meta+Delete (macOS) يحذف الصف", () => {
-    const onDelete = vi.fn();
-    const { result } = renderHook(() => useSpaceToDelete(onDelete));
-    const input = mountRow();
-    const ev = makeEvent(input, { key: "Delete", metaKey: true });
-    act(() => result.current.handleRowKeyDown("uid-5", ev));
-    expect(onDelete).toHaveBeenCalledWith("uid-5");
-  });
-
-  it("Enter/Tab/الأسهم لا تحذف ولا تمنع الافتراضي", () => {
-    const onDelete = vi.fn();
-    const { result } = renderHook(() => useSpaceToDelete(onDelete));
-    const input = mountRow();
-    for (const key of ["Enter", "Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) {
-      const ev = makeEvent(input, { key });
-      act(() => result.current.handleRowKeyDown("uid-x", ev));
-      expect((ev as any).defaultPrevented).toBe(false);
-    }
-    expect(onDelete).not.toHaveBeenCalled();
-  });
-
-  it("isPending تُرجع false دائماً (لا يوجد تحديد معلّق)", () => {
-    const onDelete = vi.fn();
-    const { result } = renderHook(() => useSpaceToDelete(onDelete));
-    expect(result.current.isPending("anything")).toBe(false);
   });
 });
