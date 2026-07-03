@@ -973,13 +973,19 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           invId = undefined;
           recordExisted = false;
         } else if (!itemsUnchanged) {
-          // البنود تغيّرت — اقرأ القديمة لحساب فرق المخزون ثم احذف
+          // البنود تغيّرت — اقرأ القديمة لحساب فرق المخزون ثم احذف مع فحص الخطأ
           const { data: prev } = await supabase
             .from("invoice_items")
             .select("product_id, quantity")
             .eq("invoice_id", effectiveEditId);
           oldItems = (prev || []).map((p: any) => ({ product_id: p.product_id, quantity: p.quantity }));
-          await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: effectiveEditId });
+          // Full sync: احذف كل البنود المرتبطة بهذه الفاتورة قبل إعادة الإدراج.
+          // نستخدم DELETE مباشر مع فحص الخطأ — لو فشل الحذف كنّا سنكرِّر البنود.
+          const { error: delErr } = await supabase
+            .from("invoice_items")
+            .delete()
+            .eq("invoice_id", effectiveEditId);
+          if (delErr) throw delErr;
         }
       }
 
