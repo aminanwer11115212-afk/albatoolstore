@@ -30,7 +30,7 @@ Any change to the set MUST update all three together.
 event                                    → target           where
 ──────────────────────────────────────────────────────────────────────
 new invoice created                       → new             default column value
-quote → invoice (items inserted)         → preparing       trigger: auto_workflow_on_item
+quote → invoice (items inserted)         → new             (stays مقبول until print — item-insert trigger REMOVED 2026-07)
 stocktake print (variant=stocktake)      → preparing       InvoiceCreatePage.handlePrint
 invoice print                             → preparing       InvoiceCreatePage / InvoiceViewPage handlePrint
 packaging row inserted                    → preparing       trigger: auto_workflow_on_packaging
@@ -44,6 +44,8 @@ quote sent via WhatsApp / printed         → quote.status=sent  markQuoteAsSent
 ```
 
 `ready_to_ship` is reached **only** via packaging — never via plain invoice printing.
+
+**Note (2026-07):** The `trg_auto_workflow_on_item` DB trigger was DROPPED. Direct-saved invoices AND quote→invoice conversions both stay at `new` (مقبول). The first user-visible print bumps them to `preparing` via the RPC in `InvoiceCreatePage.handlePrint` / `InvoiceViewPage.handlePrint`. Do not re-add that trigger without user approval.
 
 ## Golden rules (never break)
 
