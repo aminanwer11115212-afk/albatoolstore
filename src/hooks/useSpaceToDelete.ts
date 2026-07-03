@@ -158,10 +158,11 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
   window.addEventListener("focusout", () => {
     requestAnimationFrame(() => {
       if (!document.activeElement || document.activeElement === document.body) {
-        badge.style.display = "none";
+        clearMarks();
       } else refresh();
     });
   }, true);
+
   window.addEventListener("keyup", scheduleRefresh, true);
   window.addEventListener("mouseup", scheduleRefresh, true);
   window.addEventListener("input", scheduleRefresh, true);
