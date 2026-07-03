@@ -756,6 +756,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     // حارس متزامن لمنع الإدراج المتوازي/المكرر (نقر مزدوج، saveThen + نقر يدوي، StrictMode...)
     if (isSavingRef.current) return false;
     isSavingRef.current = true;
+    // إعادة تعيين آمنة لأي مسار خروج مبكر لا يمر عبر try/finally الرئيسي أدناه
+    const releaseGuard = () => { isSavingRef.current = false; setSaving(false); };
     let activeCustomer = customer;
     // إن لم يُختَر عميل من القائمة لكن يوجد اسم/رقم نصي حر، أنشئ/طابق العميل تلقائياً (للآجل والكاش)
     if (!activeCustomer) {
