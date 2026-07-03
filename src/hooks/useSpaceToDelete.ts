@@ -103,6 +103,39 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
     true,
   );
 
+  // امنع اللصق (paste) والإدخال بالإدخال المباشر/IME في وضع التنقّل.
+  const blockIfNav = (e: Event) => {
+    const t = e.target as HTMLElement | null;
+    if (!t) return;
+    if (!t.closest?.("[data-nav-table]")) return;
+    if (editingElements.has(t)) return;
+    const tag = t.tagName;
+    if (tag !== "INPUT" && tag !== "TEXTAREA" && !t.isContentEditable) return;
+    e.preventDefault();
+    if ("stopPropagation" in e) (e as Event).stopPropagation();
+  };
+  window.addEventListener("paste", blockIfNav, true);
+  window.addEventListener("drop", blockIfNav, true);
+  window.addEventListener("beforeinput", (e) => {
+    const t = e.target as HTMLElement | null;
+    if (!t) return;
+    if (!t.closest?.("[data-nav-table]")) return;
+    if (editingElements.has(t)) return;
+    const tag = t.tagName;
+    if (tag !== "INPUT" && tag !== "TEXTAREA" && !t.isContentEditable) return;
+    // اسمح فقط بعمليات التنقّل التي لا تُدخل بيانات؛ امنع أي إدخال نصّي.
+    const ie = e as InputEvent;
+    if (ie.inputType && ie.inputType.startsWith("insert")) {
+      e.preventDefault();
+    }
+    // امنع الحذف أيضاً في وضع التنقّل
+    if (ie.inputType && ie.inputType.startsWith("delete")) {
+      e.preventDefault();
+    }
+  }, true);
+
+
+
 
   // ============ مؤشر بصري لوضع Space (تنقّل/تعديل) ============
   // - وضع التنقّل: تُبرَز الصف كاملاً باللون البرتقالي (data-space-mode="nav"
