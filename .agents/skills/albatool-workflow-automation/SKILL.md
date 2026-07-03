@@ -45,6 +45,8 @@ quote sent via WhatsApp / printed         → quote.status=sent  markQuoteAsSent
 
 `ready_to_ship` is reached **only** via packaging — never via plain invoice printing.
 
+**Note (2026-07):** The `trg_auto_workflow_on_item` DB trigger was DROPPED. Direct-saved invoices AND quote→invoice conversions both stay at `new` (مقبول). The first user-visible print bumps them to `preparing` via the RPC in `InvoiceCreatePage.handlePrint` / `InvoiceViewPage.handlePrint`. Do not re-add that trigger without user approval.
+
 ## Golden rules (never break)
 
 1. **Always go through the RPC** `public.advance_invoice_workflow(invoice_id, target, reason)`. Never write `UPDATE invoices SET workflow_status = ...` from the app — it skips logging, the rank guard, the empty-invoice guard, and the kill switch.
