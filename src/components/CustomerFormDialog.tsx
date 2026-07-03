@@ -97,16 +97,23 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
       setGroups(g.data || []);
       setDestinations((d.data as any[]) || []);
 
-      // load default destination for existing customer
+      // load default destination + preferred transporter for existing customer
       if (init.id) {
-        const { data: cd } = await (supabase as any)
-          .from("customer_destinations")
-          .select("destination_id,is_default")
-          .eq("customer_id", init.id);
-        if (cd && cd.length) {
-          const def = cd.find((x: any) => x.is_default) || cd[0];
-          setForm(f => ({ ...f, destination_id: def.destination_id }));
-        }
+        const [{ data: cd }, { data: cpt }] = await Promise.all([
+          (supabase as any).from("customer_destinations")
+            .select("destination_id,is_default").eq("customer_id", init.id),
+          (supabase as any).from("customer_preferred_transporter")
+            .select("transporter_id").eq("customer_id", init.id).maybeSingle(),
+        ]);
+        setForm(f => {
+          const next = { ...f };
+          if (cd && cd.length) {
+            const def = cd.find((x: any) => x.is_default) || cd[0];
+            next.destination_id = def.destination_id;
+          }
+          if (cpt?.transporter_id) next.preferred_transporter_id = cpt.transporter_id;
+          return next;
+        });
       }
     })();
     setTimeout(() => refs.current[0]?.focus(), 50);
