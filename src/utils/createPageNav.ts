@@ -45,11 +45,10 @@ function isSuggestionsOpen(): boolean {
 function focusEl(el: HTMLElement | null): boolean {
   if (!el) return false;
   el.focus();
-  if (el instanceof HTMLInputElement && (el.type === "text" || el.type === "number")) {
-    try { el.select(); } catch {}
-  }
+  // لا نُحدِّد النص أثناء التنقّل — التحديد يحدث فقط في وضع التحرير.
   return true;
 }
+
 
 function findQuickInput(root: HTMLElement, col: string): HTMLInputElement | null {
   const zone =
