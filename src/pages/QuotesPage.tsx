@@ -95,12 +95,14 @@ export default function QuotesPage() {
   };
 
   const handleConvertToInvoice = async (q: any) => {
-    if (!confirm(`تحويل العرض ${q.quote_number} إلى فاتورة؟ سيتم الإبقاء على العرض بحالة "مقبول".`)) return;
+    if (!confirm(`تحويل العرض ${q.quote_number} إلى فاتورة؟ سيتم حذف عرض السعر من القائمة بعد التحويل.`)) return;
     try {
       const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
       const { invoiceId, invoiceNumber } = await convertQuoteToInvoice(q.id);
-      toast.success(`تم تحويل العرض إلى فاتورة ${invoiceNumber} — العرض محفوظ كمقبول`);
+      toast.success(`تم تحويل العرض إلى فاتورة ${invoiceNumber} — تم حذف عرض السعر`);
       qc.invalidateQueries({ queryKey: ["quotes-full"] });
+      qc.invalidateQueries({ queryKey: ["quotes-with-customers"] });
+      qc.invalidateQueries({ queryKey: ["quotes"] });
       qc.invalidateQueries({ queryKey: ["invoices-full"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       navigate(`/invoices/edit/${invoiceId}`);
