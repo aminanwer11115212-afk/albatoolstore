@@ -1188,9 +1188,10 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
         });
         setInvoiceNumber(nextCandidate);
-        // أعد الرابط لوضع الإنشاء
+        // أعد الرابط لوضع الإنشاء عبر React Router حتى يتزامن (useParams) مع الرابط
+        // الجديد، فينفتح النقر على أي فاتورة في الشريط الجانبي بشكل صحيح.
         const createPath = isCash ? "/invoices/cash/new" : "/invoices/create";
-        window.history.replaceState({}, "", createPath);
+        navigate(createPath, { replace: true });
         if (!opts.silent) {
           toast.success("تم فتح فاتورة جديدة — جاهزة للإدخال");
         }
