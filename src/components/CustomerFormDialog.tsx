@@ -322,12 +322,14 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
         saved = data;
       }
 
-      // ربط الترحيل المفضّل (جدول منفصل)
-      if (form.preferred_transporter_id && saved?.id) {
+      // ربط الترحيل المفضّل (جدول منفصل) — احذف دائماً ثم أضف إن وُجد
+      if (saved?.id) {
         await supabase.from("customer_preferred_transporter" as any)
           .delete().eq("customer_id", saved.id);
-        await supabase.from("customer_preferred_transporter" as any)
-          .insert({ customer_id: saved.id, transporter_id: form.preferred_transporter_id });
+        if (form.preferred_transporter_id) {
+          await supabase.from("customer_preferred_transporter" as any)
+            .insert({ customer_id: saved.id, transporter_id: form.preferred_transporter_id });
+        }
       }
 
       // ربط الوجهة الافتراضية
