@@ -117,7 +117,7 @@ export async function loadInvoiceExtras(invoiceId: string | undefined | null): P
     const [{ data: transports }, { data: packaging }] = await Promise.all([
       supabase
         .from("invoice_transports")
-        .select("vehicle_number, driver_name, transport_date, cost, notes, transporters(name), destinations(name)")
+        .select("transporters(name, phone, address)")
         .eq("invoice_id", invoiceId),
       supabase
         .from("invoice_packaging")
