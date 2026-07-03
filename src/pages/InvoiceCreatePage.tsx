@@ -836,7 +836,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
             .insert(insertPayload)
             .select("*")
             .single();
-          if (cErr) { toast.error(`تعذّر إنشاء العميل: ${cErr.message}`); return false; }
+          if (cErr) { toast.error(`تعذّر إنشاء العميل: ${cErr.message}`); releaseGuard(); return false; }
           activeCustomer = created as any;
           toast.message(`تم إنشاء عميل جديد: ${insertPayload.name}`);
           // إخطار الشاشات الأخرى بالعميل الجديد
