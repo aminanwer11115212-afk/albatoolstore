@@ -2381,31 +2381,10 @@ input[type="number"] {
   .home-quick-btn { display: none !important; }
 }
 
-/* ===== مؤشر وضع Space (تنقّل/تعديل) داخل جدول البنود ===== */
-/* وضع التنقّل: تلوين الصف كاملاً بالبرتقالي بدون أي تأشير على الحقل */
-[data-nav-table] tr[data-nav-row][data-space-mode="nav"] > td,
-[data-nav-row][data-space-mode="nav"] {
-  background-color: hsl(38 92% 50% / 0.22) !important;
+/* ===== إبراز خفيف للصف النشط (اختياري) ===== */
+[data-nav-table] tr[data-nav-row]:focus-within > td {
+  background-color: hsl(var(--muted) / 0.35);
 }
-/* داخل صف في وضع التنقّل: ألغِ إطار/حلقة تركيز الحقل حتى لا يبدو قابلاً للكتابة */
-[data-nav-row][data-space-mode="nav"] input:focus,
-[data-nav-row][data-space-mode="nav"] select:focus,
-[data-nav-row][data-space-mode="nav"] textarea:focus,
-[data-nav-row][data-space-mode="nav"] input:focus-visible,
-[data-nav-row][data-space-mode="nav"] select:focus-visible,
-[data-nav-row][data-space-mode="nav"] textarea:focus-visible {
-  outline: none !important;
-  box-shadow: none !important;
-  border-color: transparent !important;
-  background: transparent !important;
-  caret-color: transparent !important;
-}
-/* وضع التعديل: تأطير الخلية النشطة فقط بالأخضر لإظهار قابلية الكتابة */
-[data-nav-table] [data-space-mode="edit"] {
-  box-shadow: inset 0 0 0 2px hsl(142 71% 45% / 0.9) !important;
-  border-color: hsl(142 71% 45%) !important;
-  caret-color: hsl(142 71% 30%) !important;
-  background: hsl(0 0% 100%) !important;
-}
+
 
 
