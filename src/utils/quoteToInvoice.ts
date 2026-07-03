@@ -2,13 +2,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Unified quote → invoice conversion.
- * Used everywhere a quote status becomes "accepted" (QuotesPage, QuoteCreatePage,
- * QuoteViewPage, DashboardRecentQuotes, RecentItemsSidebar, Staff portal).
+ * Used everywhere a quote is converted (QuotesPage, QuoteCreatePage,
+ * QuoteViewPage, SideQuotesPage, Staff portal).
  *
  * Behavior:
  * - Creates an invoice with workflow_status = 'new' (no stock deduction).
- * - Marks the quote: status='accepted', converted_to_invoice_id, converted_at.
- * - Idempotent: if the quote already has converted_to_invoice_id, returns it.
+ * - Copies quote items to invoice_items.
+ * - Deletes the original quote and its items (user preference — the invoice
+ *   becomes the single source of truth; the quote no longer appears in the list).
  * - Stock deduction happens later when the invoice's workflow_status leaves 'new'.
  */
 export async function convertQuoteToInvoice(
