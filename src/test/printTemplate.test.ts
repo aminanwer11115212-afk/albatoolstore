@@ -10,7 +10,7 @@ const S = {
   itemsTable: ">اسم الصنف<",                  // items <thead>
   prices: ">السعر<",                          // price column header (full only)
   grandTotalRow: 'class="total-row"',         // grand total row in items table
-  accountBoxes: ">الحساب القديم<",            // summary boxes
+  accountBoxes: ">المبلغ المدفوع<",            // summary boxes
   finalRequired: ">المطلوب النهائي<",
   packaging: ">تفاصيل التغليف<",
   transport: ">معلومات الترحيل<",

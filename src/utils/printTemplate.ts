@@ -93,7 +93,8 @@ export function generatePrintHTML(data: PrintData): string {
   // Packaging/transport block: hidden for account-only and no-details variants.
   const showExtras = variant !== "account-only" && variant !== "no-details" && variant !== "stocktake";
   const logoURL = resolveLogoUrl(company?.logo_url);
-  const finalTotal = grandTotal + oldBalance;
+  // "المطلوب النهائي" = جملة الفاتورة − المبلغ المدفوع (لا يُجمع مع الحساب القديم).
+  const finalTotal = Math.max(0, grandTotal - paidAmount);
   const cleanPackaging = cleanExtraHTML(packagingInfo);
   const cleanTransport = cleanExtraHTML(transportInfo);
 
@@ -396,9 +397,9 @@ ${showItems ? (variant === "stocktake" ? `
 ${showAccount ? `
 <!-- Summary Boxes -->
 <div class="summary-row" data-section="account-summary" data-section-label="ملخص الحساب">
-  <div class="summary-box" data-section="old-balance" data-section-label="الحساب القديم">
-    <div class="summary-box-title">الحساب القديم</div>
-    <div class="summary-box-value red">${oldBalance.toLocaleString()}</div>
+  <div class="summary-box" data-section="paid-amount" data-section-label="المبلغ المدفوع">
+    <div class="summary-box-title">المبلغ المدفوع</div>
+    <div class="summary-box-value" style="color:#16a34a;">${paidAmount.toLocaleString()}</div>
   </div>
   <div class="summary-box" data-section="final-total" data-section-label="المطلوب النهائي" style="border-color:#2980b9;">
     <div class="summary-box-title">المطلوب النهائي</div>
