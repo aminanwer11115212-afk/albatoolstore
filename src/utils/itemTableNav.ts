@@ -27,11 +27,10 @@ export function makeRowNavHandler(opts: {
     const el = document.querySelector<HTMLElement>(sel);
     if (!el) return false;
     el.focus();
-    if (el instanceof HTMLInputElement) {
-      try { el.select(); } catch {}
-    }
+    // لا نُحدِّد النص عند التنقّل — التحديد يحدث فقط في وضع التحرير (Enter/نقر).
     return true;
   };
+
 
   return function handleKeyDown(
     rowIndex: number,
