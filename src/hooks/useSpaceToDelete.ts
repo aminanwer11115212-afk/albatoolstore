@@ -42,25 +42,10 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
     true,
   );
 
-  // نقر بالماوس داخل حقل نصّي → ادخل وضع التحرير
-  window.addEventListener(
-    "mousedown",
-    (e) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      const tag = t.tagName;
-      if (tag === "TEXTAREA" || t.isContentEditable) {
-        editingElements.add(t);
-        return;
-      }
-      if (tag === "INPUT") {
-        const type = ((t as HTMLInputElement).type || "text").toLowerCase();
-        const textLike = ["text", "search", "email", "tel", "url", "password"];
-        if (textLike.includes(type)) editingElements.add(t);
-      }
-    },
-    true,
-  );
+  // ملاحظة: النقر بالماوس لا يُدخل الحقل في وضع التحرير.
+  // وضع التحرير يبدأ فقط بضغط Enter داخل الحقل (مثل جداول العملاء/الولاية).
+  // Escape / Tab / Arrow / blur يعيد الحقل لوضع التنقّل.
+
 
   // Tab / السهم / Escape → خروج من وضع التحرير
   window.addEventListener(
