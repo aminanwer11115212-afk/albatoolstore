@@ -764,7 +764,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       const freeText = (customerSearch || "").trim();
       const isCashMode = isCash;
       if (!freeText) {
-        if (!isCashMode) { toast.error("اختر عميلاً أو اكتب اسمه"); return false; }
+        if (!isCashMode) { toast.error("اختر عميلاً أو اكتب اسمه"); releaseGuard(); return false; }
         // كاش بدون أي اسم/رقم → ضيف مجهول
       } else {
         // تطبيع رقم الهاتف: إزالة المسافات/الشرطات/الأقواس/النقاط، وتحويل 00 البادئة إلى +
