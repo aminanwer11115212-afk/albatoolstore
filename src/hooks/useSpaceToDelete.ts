@@ -122,17 +122,11 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
       if (type === "number") return "nav";
     }
     if (!isTextLike(el)) return null;
+    // النصوص: افتراضياً تنقّل. لا يدخل وضع التعديل إلا صراحةً (Enter/نقر).
     if (editingElements.has(el)) return "edit";
-    if (tag === "INPUT" || tag === "TEXTAREA") {
-      const inp = el as HTMLInputElement | HTMLTextAreaElement;
-      const val = inp.value ?? "";
-      const start = inp.selectionStart ?? 0;
-      const end = inp.selectionEnd ?? 0;
-      const fullySelected = val.length > 0 && start === 0 && end === val.length;
-      if (val.length > 0 && !fullySelected) return "edit";
-    }
     return "nav";
   };
+
 
   const refresh = () => {
     const el = document.activeElement as HTMLElement | null;
@@ -206,34 +200,19 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
       // → اترك Space يعمل عادياً ويكتب مسافة (لا تحديد ولا حذف).
       if (isEditing(t)) return;
 
-      // الحقول النصية في وضع التنقّل:
-      // - إذا كان الحقل يحتوي على نص سابق (بيانات قديمة/محفوظة) والمؤشر
-      //   في موضع محدَّد داخل النص (وليس تحديدًا كاملًا) → اعتبره وضع
-      //   تحرير واترك المسطرة تكتب مسافة عادية.
-      // - وإلا (فارغ أو النص كامل محدَّد بعد Tab/سهم) → لا تحديد ولا حذف؛
-      //   يجب أولاً ضغط Enter أو النقر لبدء التعديل.
+      // الحقول النصية في وضع التنقّل: Space يُحدِّد/يحذف الصف (كالأرقام).
+      // للكتابة داخل الحقل يجب أولاً ضغط Enter أو النقر بالماوس لدخول
+      // وضع التحرير (يعالَج ذلك في المستمعات العالمية أعلاه).
       const isTextTag =
         tag === "TEXTAREA" || t.isContentEditable ||
         (tag === "INPUT" && ["text","search","email","tel","url","password"].includes(
           ((t as HTMLInputElement).type || "text").toLowerCase()
         ));
-      if (isTextTag) {
-        if (tag === "INPUT" || tag === "TEXTAREA") {
-          const inp = t as HTMLInputElement | HTMLTextAreaElement;
-          const val = inp.value ?? "";
-          const start = inp.selectionStart ?? 0;
-          const end = inp.selectionEnd ?? 0;
-          const fullySelected = val.length > 0 && start === 0 && end === val.length;
-          if (val.length > 0 && !fullySelected) {
-            editingElements.add(t);
-            return;
-          }
-        }
-        return;
-      }
-
+      // الأرقام/الاختيار أيضاً تعمل كاختصار.
       const isInput = tag === "INPUT" || tag === "SELECT";
-      if (!isInput) return;
+      if (!isTextTag && !isInput) return;
+
+
 
       // الحقول الرقمية/الاختيار في وضع التنقّل: Space يُحدِّد/يحذف الصف.
       e.preventDefault();
@@ -290,8 +269,9 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
             }
             if (target) {
               target.focus();
-              if (target instanceof HTMLInputElement) target.select();
+              // لا تحديد أثناء التنقّل.
             }
+
           }, 30);
         });
         return;

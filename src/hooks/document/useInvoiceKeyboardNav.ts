@@ -84,8 +84,9 @@ export function useInvoiceKeyboardNav(rootRef: React.RefObject<HTMLDivElement>) 
         if (nextEl) {
           e.preventDefault();
           nextEl.focus();
-          if (nextEl instanceof HTMLInputElement && (nextEl.type === "text" || nextEl.type === "number")) nextEl.select();
+          // لا تحديد أثناء التنقّل.
         } else {
+
           e.preventDefault();
         }
         return;
@@ -110,8 +111,9 @@ export function useInvoiceKeyboardNav(rootRef: React.RefObject<HTMLDivElement>) 
         e.preventDefault();
         if (candidate) {
           candidate.focus();
-          if (candidate instanceof HTMLInputElement && (candidate.type === "text" || candidate.type === "number")) candidate.select();
+          // لا تحديد أثناء التنقّل.
         }
+
         return;
       }
 
@@ -133,10 +135,9 @@ export function useInvoiceKeyboardNav(rootRef: React.RefObject<HTMLDivElement>) 
       if (nextEl) {
         e.preventDefault();
         nextEl.focus();
-        if (nextEl instanceof HTMLInputElement && (nextEl.type === "text" || nextEl.type === "number")) {
-          nextEl.select();
-        }
+        // لا تحديد أثناء التنقّل — يبدأ التحديد فقط في وضع التحرير.
       }
+
     };
     root.addEventListener("keydown", handler);
     return () => root.removeEventListener("keydown", handler);
