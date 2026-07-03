@@ -854,7 +854,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       }
     }
     const validRows = rows.filter((r) => r.product_id);
-    if (!validRows.length) { toast.error("أضف منتجاً واحداً على الأقل"); return false; }
+    if (!validRows.length) { toast.error("أضف منتجاً واحداً على الأقل"); releaseGuard(); return false; }
 
     // ============================================================
     // ميزة موحّدة: "تحديث بدل التكرار" + "رقم عشوائي عند تغيّر العميل"
