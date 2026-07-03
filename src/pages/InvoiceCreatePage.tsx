@@ -1746,7 +1746,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                     return visibleRows.map((r, idx, arr) => {
                     return (
                     <React.Fragment key={r.uid}>
-                      <tr className={`excel-row ${r.selected ? "row-selected-danger" : ""} ${isSpacePending(r.uid) ? "row-pending-delete" : ""}`} onKeyDown={(e) => handleSpaceDelete(r.uid, e)}>
+                      <tr className={`excel-row ${r.selected ? "row-selected-danger" : ""} ${isSpacePending(r.uid) ? "row-pending-delete" : ""}`} data-row-uid={r.uid} onKeyDown={(e) => handleSpaceDelete(r.uid, e)}>
                         <td className="text-center">
                           <input type="checkbox" checked={r.selected}
                             onChange={(e) => updateRow(r.uid, { selected: e.target.checked })} />
