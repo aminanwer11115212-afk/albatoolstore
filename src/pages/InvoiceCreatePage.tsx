@@ -1149,7 +1149,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       // حتى لا يُنشئ الضغط على "حفظ" مجدداً فاتورة جديدة
       if (!effectiveEditId && invId) {
         const editPath = isCash ? `/invoices/cash/edit/${invId}` : `/invoices/edit/${invId}`;
-        window.history.replaceState({}, "", editPath);
+        // نستخدم navigate بـ replace حتى يتزامن React Router مع الرابط الجديد،
+        // وإلا سيبقى يعتقد أننا في المسار السابق ولن يستجيب للنقر على نفس الفاتورة لاحقاً.
+        navigate(editPath, { replace: true });
       }
       // تحديث dbId للصفوف المحلية لتتوافق مع الواقع في قاعدة البيانات
       if (!effectiveEditId && invId) {
@@ -1186,9 +1188,10 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
         });
         setInvoiceNumber(nextCandidate);
-        // أعد الرابط لوضع الإنشاء
+        // أعد الرابط لوضع الإنشاء عبر React Router حتى يتزامن (useParams) مع الرابط
+        // الجديد، فينفتح النقر على أي فاتورة في الشريط الجانبي بشكل صحيح.
         const createPath = isCash ? "/invoices/cash/new" : "/invoices/create";
-        window.history.replaceState({}, "", createPath);
+        navigate(createPath, { replace: true });
         if (!opts.silent) {
           toast.success("تم فتح فاتورة جديدة — جاهزة للإدخال");
         }
