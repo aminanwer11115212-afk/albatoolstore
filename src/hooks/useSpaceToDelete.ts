@@ -160,10 +160,19 @@ if (typeof window !== "undefined" && !(window as any).__spaceEditingHooked) {
     const rect = el.getBoundingClientRect();
     badge.textContent = mode === "edit" ? "تعديل" : "تنقّل";
     badge.style.background = mode === "edit" ? "hsl(142 71% 40%)" : "hsl(38 92% 45%)";
-    badge.style.top = `${Math.max(2, rect.top - 10)}px`;
-    badge.style.left = `${Math.max(2, rect.left - 4)}px`;
+    // ضع الشارة فوق الحقل بالكامل بدون تداخل مع النص.
+    const badgeH = 18;
+    let top = rect.top - badgeH - 2;
+    if (top < 2) top = rect.bottom + 2; // إن كان الحقل بأعلى الشاشة، اعرضها تحته
+    badge.style.top = `${top}px`;
+    // محاذاة يمين الحقل (RTL) لتفادي تغطية بداية النص.
+    const badgeW = 44;
+    let left = rect.right - badgeW;
+    if (left < 2) left = 2;
+    badge.style.left = `${left}px`;
     badge.style.display = "block";
   };
+
 
   const scheduleRefresh = () => requestAnimationFrame(refresh);
   window.addEventListener("focusin", scheduleRefresh, true);
