@@ -77,7 +77,7 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
     supabase
       .from("invoice_transports")
       .select(
-        "id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name, phone), destinations(name)"
+        "id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name, phone, address), destinations(name)"
       )
       .eq("invoice_id", id),
     supabase
