@@ -152,8 +152,9 @@ describe("Integration: workflow_status updates → DB stock deduction occurs onc
     expect(productsTable.get("p1")).toBe(90);
     expect(productsTable.get("p2")).toBe(45);
 
-    // Only one read of products (the single deduction batch).
-    expect(productsSelectCalls).toBe(1);
+    // Deduction now uses an atomic RPC (`apply_stock_delta`), so there is
+    // no separate read step — assertion updated accordingly.
+    expect(productsSelectCalls).toBe(0);
   });
 
   it("writes to products exactly once on direct quote → done", async () => {
