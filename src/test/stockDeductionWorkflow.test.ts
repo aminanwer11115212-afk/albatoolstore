@@ -39,6 +39,12 @@ vi.mock("@/integrations/supabase/client", () => {
           }),
         };
       },
+      rpc: async (name: string, args: any) => {
+        if (name !== "apply_stock_delta") return { data: null, error: null };
+        const cur = productStocks.get(args._product_id) ?? 0;
+        productStocks.set(args._product_id, Math.max(0, cur + Number(args._delta)));
+        return { data: null, error: null };
+      },
     },
   };
 });
