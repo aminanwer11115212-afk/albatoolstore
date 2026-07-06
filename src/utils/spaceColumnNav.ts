@@ -17,6 +17,8 @@
 const EDIT_ATTR = "data-edit-mode";
 
 let attached = false;
+let detach: (() => void) | null = null;
+let pendingFocusOutTimer: number | null = null;
 
 function isEligibleCell(el: Element | null): el is HTMLElement {
   if (!el) return false;
