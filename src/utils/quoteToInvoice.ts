@@ -149,13 +149,17 @@ export async function convertQuoteToInvoice(
 
   // 6. Deduct stock for the newly-created invoice (matches direct-invoice save).
   //    Idempotent via `invoices.stock_deduction_id` — safe if this ever re-runs.
+  let stockDeducted = false;
+  let deductedLineCount = 0;
   if (items && items.length > 0) {
     try {
       const { deductStockForInvoiceOnce } = await import("@/utils/stockDeduction");
-      await deductStockForInvoiceOnce(
-        inv.id,
-        items.map((it: any) => ({ product_id: it.product_id, quantity: it.quantity })),
-      );
+      const linesForStock = items
+        .map((it: any) => ({ product_id: it.product_id, quantity: it.quantity }))
+        .filter((l: any) => l.product_id && Number(l.quantity || 0) > 0);
+      const res = await deductStockForInvoiceOnce(inv.id, linesForStock);
+      stockDeducted = res.deducted;
+      deductedLineCount = res.deducted ? linesForStock.length : 0;
     } catch (e) {
       console.error("[convertQuoteToInvoice] stock deduction failed", e);
       // لا نُلغي الفاتورة — البنود محفوظة وسيتمكّن المستخدم من إعادة الخصم لاحقاً.
@@ -172,5 +176,11 @@ export async function convertQuoteToInvoice(
     .from("quotes").delete().eq("id", quoteId);
   if (delQuoteErr) console.error("[convertQuoteToInvoice] delete quote failed", delQuoteErr);
 
-  return { invoiceId: inv.id, invoiceNumber: invNum, alreadyConverted: false };
+  return {
+    invoiceId: inv.id,
+    invoiceNumber: invNum,
+    alreadyConverted: false,
+    stockDeducted,
+    deductedLineCount,
+  };
 }
