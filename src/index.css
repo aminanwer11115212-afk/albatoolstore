@@ -1928,34 +1928,65 @@ input[type="number"] {
 }
 
 /* =====================================================================
-   Two-mode items-table cells (nav mode = default, edit mode = mouse click)
-   Managed by src/utils/spaceColumnNav.ts.
-   Nav mode: no caret, orange row outline, yellow focused cell.
-   Edit mode: caret + normal input styling.
+   Two-mode items-table cells — managed by src/utils/spaceColumnNav.ts
+   Nav mode (data-row-mode="nav")   → إبراز برتقالي كامل على الصف والخلية.
+   Edit mode (data-row-mode="edit") → إبراز أصفر كامل على الصف والخلية.
    ===================================================================== */
-[data-nav-col]:not([data-edit-mode="true"]) {
-  caret-color: transparent;
+[data-nav-col]:not([data-edit-mode="true"]) { caret-color: transparent; }
+
+/* ---- الصف كامل: خلفية + شريط جانبي بلون الوضع ---- */
+tr[data-row-mode="nav"]:not(.row-pending-delete):not(.row-selected-danger) > td {
+  background: hsl(25 95% 53% / 0.12) !important;
+  box-shadow: inset 0 -2px 0 hsl(25 95% 53% / 0.95), inset 0 2px 0 hsl(25 95% 53% / 0.95);
 }
+tr[data-row-mode="nav"]:not(.row-pending-delete):not(.row-selected-danger) > td:first-child {
+  box-shadow:
+    inset 0 -2px 0 hsl(25 95% 53% / 0.95),
+    inset 0 2px 0 hsl(25 95% 53% / 0.95),
+    inset 4px 0 0 hsl(25 95% 53% / 0.95);
+}
+tr[data-row-mode="nav"]:not(.row-pending-delete):not(.row-selected-danger) > td:last-child {
+  box-shadow:
+    inset 0 -2px 0 hsl(25 95% 53% / 0.95),
+    inset 0 2px 0 hsl(25 95% 53% / 0.95),
+    inset -4px 0 0 hsl(25 95% 53% / 0.95);
+}
+
+tr[data-row-mode="edit"]:not(.row-pending-delete):not(.row-selected-danger) > td {
+  background: hsl(48 100% 55% / 0.18) !important;
+  box-shadow: inset 0 -2px 0 hsl(45 100% 45% / 0.95), inset 0 2px 0 hsl(45 100% 45% / 0.95);
+}
+tr[data-row-mode="edit"]:not(.row-pending-delete):not(.row-selected-danger) > td:first-child {
+  box-shadow:
+    inset 0 -2px 0 hsl(45 100% 45% / 0.95),
+    inset 0 2px 0 hsl(45 100% 45% / 0.95),
+    inset 4px 0 0 hsl(45 100% 45% / 0.95);
+}
+tr[data-row-mode="edit"]:not(.row-pending-delete):not(.row-selected-danger) > td:last-child {
+  box-shadow:
+    inset 0 -2px 0 hsl(45 100% 45% / 0.95),
+    inset 0 2px 0 hsl(45 100% 45% / 0.95),
+    inset -4px 0 0 hsl(45 100% 45% / 0.95);
+}
+
+/* ---- الخلية المُركّز عليها: لون أعمق + إطار داخلي ---- */
 [data-nav-col]:focus:not([data-edit-mode="true"]) {
-  background: hsl(48 100% 75% / 0.55) !important;
-  box-shadow: inset 0 0 0 2px hsl(38 92% 50%) !important;
+  background: hsl(25 95% 53% / 0.35) !important;
+  box-shadow: inset 0 0 0 2px hsl(25 95% 45%) !important;
+  color: hsl(20 60% 15%) !important;
   outline: none !important;
 }
-tr.excel-row:focus-within:not(.row-pending-delete):not(.row-selected-danger) > td {
-  box-shadow: inset 0 -2px 0 hsl(25 95% 53% / 0.9), inset 0 2px 0 hsl(25 95% 53% / 0.9);
+[data-nav-col][data-edit-mode="true"]:focus {
+  background: hsl(48 100% 60% / 0.45) !important;
+  box-shadow: inset 0 0 0 2px hsl(45 100% 40%) !important;
+  color: hsl(30 60% 15%) !important;
+  outline: none !important;
 }
-tr.excel-row:focus-within:not(.row-pending-delete):not(.row-selected-danger) > td:first-child {
-  box-shadow:
-    inset 0 -2px 0 hsl(25 95% 53% / 0.9),
-    inset 0 2px 0 hsl(25 95% 53% / 0.9),
-    inset 4px 0 0 hsl(25 95% 53% / 0.9);
-}
-tr.excel-row:focus-within:not(.row-pending-delete):not(.row-selected-danger) > td:last-child {
-  box-shadow:
-    inset 0 -2px 0 hsl(25 95% 53% / 0.9),
-    inset 0 2px 0 hsl(25 95% 53% / 0.9),
-    inset -4px 0 0 hsl(25 95% 53% / 0.9);
-}
+
+/* ---- صف الإضافة السريعة أيضاً ---- */
+.quick-add-row[data-row-mode="nav"] { background: hsl(25 95% 53% / 0.10) !important; }
+.quick-add-row[data-row-mode="edit"] { background: hsl(48 100% 55% / 0.16) !important; }
+
 
 
 
