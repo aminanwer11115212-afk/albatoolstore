@@ -6,11 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
  * QuoteViewPage, SideQuotesPage, Staff portal).
  *
  * Behavior:
- * - Creates an invoice with workflow_status = 'new' (no stock deduction).
+ * - Creates an invoice with workflow_status = 'new'.
  * - Copies quote items to invoice_items.
+ * - Deducts stock immediately (idempotent via `stock_deduction_id` guard),
+ *   matching the behaviour of a direct invoice save.
  * - Deletes the original quote and its items (user preference — the invoice
  *   becomes the single source of truth; the quote no longer appears in the list).
- * - Stock deduction happens later when the invoice's workflow_status leaves 'new'.
  */
 export async function convertQuoteToInvoice(
   quoteId: string,
