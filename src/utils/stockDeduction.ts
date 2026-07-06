@@ -69,17 +69,25 @@ export async function deductStockForLines(lines: StockLine[]): Promise<void> {
 }
 
 /**
- * Idempotent stock deduction for an invoice.
+ * Idempotent stock deduction for an invoice — RESERVATION-FIRST pattern.
  *
- * Uses `invoices.stock_deduction_id` as a guard:
- *  - If already set => skip (return { deducted: false }).
- *  - Otherwise => deduct, then write a new uuid + timestamp.
+ * Uses `invoices.stock_deduction_id` as a guard, but writes it BEFORE the
+ * stock is decremented. Sequence:
  *
- * Safe against double-clicks, refresh, retry-after-network-failure, and
- * repeated workflow_status transitions.
+ *   1. Read guard. Already set  → skip (return already_deducted).
+ *   2. Conditional UPDATE:
+ *        SET stock_deduction_id = <new uuid>
+ *        WHERE id = X AND stock_deduction_id IS NULL
+ *        RETURNING stock_deduction_id
+ *      This is atomic at the row level in Postgres — only one caller wins.
+ *      If 0 rows returned → someone else won the race → re-read + skip.
+ *   3. Winner deducts stock. If deduction fails the guard is ALREADY set,
+ *      so retries cannot double-deduct (they short-circuit at step 1).
+ *   4. Best-effort: write `stock_deducted_at` for observability.
  *
- * Note: read-then-write is not fully atomic at the DB level, but covers all
- * realistic application-level retry scenarios.
+ * Trade-off: if step 3 fails, stock is UNDER-deducted (never over). This is
+ * the safe direction — retrying via a manual "re-deduct" path is preferable
+ * to silently deducting twice.
  */
 export async function deductStockForInvoiceOnce(
   invoiceId: string,
@@ -103,26 +111,56 @@ export async function deductStockForInvoiceOnce(
     return { deducted: false, deductionId: inv.stock_deduction_id, reason: "already_deducted" };
   }
 
-  // 2) Perform deduction
-  await deductStockForLines(lines);
-
-  // 3) Mark invoice as deducted
+  // 2) Reserve the deduction slot atomically (row-level UPDATE with predicate).
   const deductionId =
     (typeof crypto !== "undefined" && "randomUUID" in crypto)
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const { error: upErr } = await supabase
+
+  const { data: reserved, error: reserveErr } = await (supabase as any)
     .from("invoices")
-    .update({
-      stock_deduction_id: deductionId,
-      stock_deducted_at: new Date().toISOString(),
-    })
+    .update({ stock_deduction_id: deductionId })
+    .eq("id", invoiceId)
+    .is("stock_deduction_id", null)
+    .select("stock_deduction_id");
+
+  if (reserveErr) {
+    console.error("[stockDeduction] reservation UPDATE failed", reserveErr);
+    return { deducted: false, deductionId: null, reason: "reserve_failed" };
+  }
+
+  const wonReservation = Array.isArray(reserved) && reserved.length > 0;
+  if (!wonReservation) {
+    // Another caller reserved between our read and our write. Re-fetch the id.
+    const { data: after } = await supabase
+      .from("invoices")
+      .select("stock_deduction_id")
+      .eq("id", invoiceId)
+      .maybeSingle();
+    return {
+      deducted: false,
+      deductionId: after?.stock_deduction_id ?? null,
+      reason: "already_deducted",
+    };
+  }
+
+  // 3) We own the reservation — deduct stock. Any failure here leaves the
+  //    guard set, so a retry will short-circuit at step 1 and NEVER
+  //    re-deduct. This is the safety guarantee.
+  try {
+    await deductStockForLines(lines);
+  } catch (e) {
+    console.error("[stockDeduction] deduction failed after reservation", e);
+    return { deducted: false, deductionId, reason: "deduction_failed" };
+  }
+
+  // 4) Best-effort: mark deducted_at timestamp for reporting/observability.
+  const { error: tsErr } = await supabase
+    .from("invoices")
+    .update({ stock_deducted_at: new Date().toISOString() })
     .eq("id", invoiceId);
-  if (upErr) {
-    console.error("[stockDeduction] failed to mark invoice as deducted", upErr);
-    // Stock was already changed; the next call will see no guard and may double-deduct.
-    // Surface error so caller can decide. We still return deducted:true to reflect reality.
-    return { deducted: true, deductionId: null, reason: "mark_failed" };
+  if (tsErr) {
+    console.warn("[stockDeduction] stock_deducted_at write failed (non-critical)", tsErr);
   }
 
   return { deducted: true, deductionId };
