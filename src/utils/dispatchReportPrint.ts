@@ -342,6 +342,7 @@ function signaturesHTML(): string {
 export type LiveOverlayEntry = {
   transporterName?: string;
   transporterPhone?: string;
+  transporterAddress?: string;
   destinationName?: string;
 };
 
