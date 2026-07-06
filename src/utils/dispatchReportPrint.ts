@@ -275,13 +275,6 @@ function renderCard(doc: DispatchDoc, idx: number): string {
           <div><span class="d-label-inline">العميل:</span> <b>${esc(
             cust?.name || "عميل نقدي"
           )}</b></div>
-          ${
-            cust?.phone
-              ? `<div><span class="d-label-inline">📞 الهاتف:</span> <b>${esc(
-                  cust.phone
-                )}</b></div>`
-              : ""
-          }
         </div>
         ${
           cust?.address
