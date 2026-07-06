@@ -187,6 +187,7 @@ function renderTransports(rows: any[]): string {
     .map((r) => {
       const transporter = r.transporters?.name || "";
       const transporterPhone = r.transporters?.phone || "";
+      const transporterAddress = r.transporters?.address || "";
       const destination = r.destinations?.name || "";
       const vehicle = r.vehicle_number || "";
       const driver = r.driver_name || "";
@@ -200,6 +201,7 @@ function renderTransports(rows: any[]): string {
         if (transporterPhone) t += ` • ☎ ${esc(transporterPhone)}`;
         parts.push(t);
       }
+      if (transporterAddress) parts.push(`📍 عنوان الترحيلات: <b>${esc(transporterAddress)}</b>`);
       if (destination) parts.push(`الوجهة: <b>${esc(destination)}</b>`);
       if (vehicle) parts.push(`مركبة: ${esc(vehicle)}`);
       if (driver) parts.push(`سائق: ${esc(driver)}`);
