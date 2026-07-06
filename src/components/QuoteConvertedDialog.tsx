@@ -16,6 +16,8 @@ export function QuoteConvertedDialog({
   invoiceId,
   invoiceNumber,
   alreadyConverted,
+  stockDeducted = false,
+  deductedLineCount = 0,
   onOpenQuote,
   onOpenInvoice,
   onStay,
@@ -25,6 +27,8 @@ export function QuoteConvertedDialog({
   invoiceId: string;
   invoiceNumber: string;
   alreadyConverted: boolean;
+  stockDeducted?: boolean;
+  deductedLineCount?: number;
   onOpenQuote: () => void;
   onOpenInvoice: () => void;
   onStay?: () => void;
@@ -38,6 +42,22 @@ export function QuoteConvertedDialog({
           </DialogTitle>
           <DialogDescription>
             رقم الفاتورة: <strong>{invoiceNumber}</strong>
+            <br />
+            {stockDeducted ? (
+              <span
+                className="inline-block mt-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm text-primary"
+                role="status"
+              >
+                ✅ تم خصم المخزون تلقائيًا لـ <strong>{deductedLineCount}</strong> صنف
+              </span>
+            ) : !alreadyConverted ? (
+              <span
+                className="inline-block mt-2 rounded-md border border-muted-foreground/30 bg-muted px-3 py-1.5 text-sm text-muted-foreground"
+                role="status"
+              >
+                ℹ️ لم يُخصم مخزون (لا توجد أصناف مربوطة بالمخزن في هذا العرض).
+              </span>
+            ) : null}
             <br />
             ماذا تريد أن تفعل الآن؟
           </DialogDescription>
