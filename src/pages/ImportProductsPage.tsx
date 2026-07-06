@@ -145,7 +145,6 @@ export default function ImportProductsPage() {
               purchase_price: toNumber(shared.purchase_price),
               stock_quantity: toNumber(shared.stock_quantity),
               min_stock: toNumber(shared.min_stock),
-              is_active: true,
             });
           } else if (mode === "customers") {
             toInsert.push({
