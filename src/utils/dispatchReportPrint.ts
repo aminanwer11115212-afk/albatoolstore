@@ -77,7 +77,7 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
     supabase
       .from("invoice_transports")
       .select(
-        "id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name, phone), destinations(name)"
+        "id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name, phone, address), destinations(name)"
       )
       .eq("invoice_id", id),
     supabase
@@ -187,6 +187,7 @@ function renderTransports(rows: any[]): string {
     .map((r) => {
       const transporter = r.transporters?.name || "";
       const transporterPhone = r.transporters?.phone || "";
+      const transporterAddress = r.transporters?.address || "";
       const destination = r.destinations?.name || "";
       const vehicle = r.vehicle_number || "";
       const driver = r.driver_name || "";
@@ -200,6 +201,7 @@ function renderTransports(rows: any[]): string {
         if (transporterPhone) t += ` • ☎ ${esc(transporterPhone)}`;
         parts.push(t);
       }
+      if (transporterAddress) parts.push(`📍 عنوان الترحيلات: <b>${esc(transporterAddress)}</b>`);
       if (destination) parts.push(`الوجهة: <b>${esc(destination)}</b>`);
       if (vehicle) parts.push(`مركبة: ${esc(vehicle)}`);
       if (driver) parts.push(`سائق: ${esc(driver)}`);
@@ -273,13 +275,6 @@ function renderCard(doc: DispatchDoc, idx: number): string {
           <div><span class="d-label-inline">العميل:</span> <b>${esc(
             cust?.name || "عميل نقدي"
           )}</b></div>
-          ${
-            cust?.phone
-              ? `<div><span class="d-label-inline">📞 الهاتف:</span> <b>${esc(
-                  cust.phone
-                )}</b></div>`
-              : ""
-          }
         </div>
         ${
           cust?.address
@@ -347,6 +342,7 @@ function signaturesHTML(): string {
 export type LiveOverlayEntry = {
   transporterName?: string;
   transporterPhone?: string;
+  transporterAddress?: string;
   destinationName?: string;
 };
 
@@ -367,7 +363,7 @@ export function buildDispatchSheetHTML(
     const previewRow = {
       __preview: true,
       transporters: overlay.transporterName
-        ? { name: overlay.transporterName, phone: overlay.transporterPhone }
+        ? { name: overlay.transporterName, phone: overlay.transporterPhone, address: overlay.transporterAddress }
         : null,
       destinations: overlay.destinationName ? { name: overlay.destinationName } : null,
       transport_date: null,

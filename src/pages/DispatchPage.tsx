@@ -40,6 +40,7 @@ export default function DispatchPage() {
       out[invId] = {
         transporterName: t?.name,
         transporterPhone: t?.phone,
+        transporterAddress: t?.address,
         destinationName: d?.name,
       };
     }
