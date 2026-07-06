@@ -1,28 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * تحديد/حذف صفوف جدول البنود عبر مفتاح Shift:
+ * تحديد/حذف صفوف جدول البنود عبر مفتاح Space في وضع التنقّل:
  *
- * - ضغط Shift مرة (بدون أي مفتاح آخر بينها وبين الإفلات) وأنت على صف
- *   → تُبدَّل حالة تحديد ذلك الصف.
- * - ضغطتان متتاليتان على Shift خلال 350ms
- *   → تحذف كل الصفوف المحدَّدة.
+ * - وضع التنقّل (افتراضي عند وصول التركيز بالكيبورد): ضغطة Space مفردة
+ *   تُبدِّل حالة تحديد الصف الذي تركّز فيه (data-row-uid).
+ * - ضغطتان متتاليتان على Space خلال 350ms → تحذف كل المحدَّدين.
  * - Escape → يمسح كل التحديدات.
  *
- * لا يتعارض مع Space/Enter/الأسهم/الكتابة: هذه المفاتيح إن ضُغطت بين
- * ضغطتَي Shift تُلوّث الضغطة فلا تُحسب كنقرة تحديد.
+ * وضع التعديل (بعد نقر ماوس على الحقل — يُدار في `spaceColumnNav.ts`)
+ * يُعطّل هذا السلوك بالكامل: Space يكتب مسافة عادية، ولا تحديد.
  *
- * التوقيع محفوظ لتوافق الصفحات: isPending / handleRowKeyDown.
  * الصفحات يجب أن تضع data-row-uid على عنصر <tr> لكل صف.
+ * التوقيع محفوظ: isPending / handleRowKeyDown / pendingUids / clear.
  */
-const DOUBLE_SHIFT_WINDOW_MS = 350;
+const DOUBLE_TAP_WINDOW_MS = 350;
+
+function isNavModeCell(el: Element | null): boolean {
+  if (!el) return false;
+  const he = el as HTMLElement;
+  if (!he.hasAttribute?.("data-nav-col")) return false;
+  if (he.getAttribute("data-edit-mode") === "true") return false;
+  return true;
+}
 
 export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const selectedRef = useRef<Set<string>>(new Set());
-  const pollutedRef = useRef(false);
-  const shiftDownAtRef = useRef<number>(0);
-  const lastShiftTapAtRef = useRef<number>(0);
+  const lastTapAtRef = useRef<number>(0);
   const onDeleteRef = useRef(onDelete);
 
   useEffect(() => { onDeleteRef.current = onDelete; }, [onDelete]);
@@ -39,7 +44,6 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
     const uids = Array.from(selectedRef.current);
     if (uids.length === 0) return;
 
-    // احفظ موقع أوّل صف محدَّد لنقل التركيز بعد الحذف.
     const firstUid = uids[0];
     const firstRow = document.querySelector<HTMLElement>(
       `[data-row-uid="${firstUid}"]`,
@@ -76,33 +80,21 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
         if (selectedRef.current.size > 0) setSelected(new Set());
         return;
       }
-      if (e.key === "Shift") {
-        if (!e.repeat) {
-          shiftDownAtRef.current = Date.now();
-          pollutedRef.current = false;
-        }
-        return;
-      }
-      // أي مفتاح آخر يُلوّث ضغطة Shift الحالية.
-      pollutedRef.current = true;
-    };
+      if (e.key !== " " && e.code !== "Space") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // فقط في وضع التنقّل داخل خلية جدول البنود.
+      if (!isNavModeCell(document.activeElement)) return;
 
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key !== "Shift") return;
-      const held = Date.now() - shiftDownAtRef.current;
-      // إن كان Shift مضغوطاً كمُعدِّل مع مفتاح آخر، لا تعتبره نقرة.
-      if (pollutedRef.current || held > 600) {
-        pollutedRef.current = false;
-        return;
-      }
+      e.preventDefault();
+
       const uid = focusedRowUid();
       const now = Date.now();
-      const isDoubleTap = now - lastShiftTapAtRef.current <= DOUBLE_SHIFT_WINDOW_MS;
-      lastShiftTapAtRef.current = now;
+      const isDoubleTap = now - lastTapAtRef.current <= DOUBLE_TAP_WINDOW_MS;
+      lastTapAtRef.current = now;
 
-      if (isDoubleTap) {
-        // احذف كل المحدَّدين (مع تضمين الصف الحالي إن وُجد).
-        if (uid) {
+      if (isDoubleTap && selectedRef.current.size > 0) {
+        // ضمّن الصف الحالي ثم احذف الجميع.
+        if (uid && !selectedRef.current.has(uid)) {
           setSelected((prev) => {
             const next = new Set(prev);
             next.add(uid);
@@ -110,9 +102,8 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
             return next;
           });
         }
-        // نفّذ الحذف بعد تحديث الحالة.
         setTimeout(() => { void runDelete(); }, 0);
-        lastShiftTapAtRef.current = 0;
+        lastTapAtRef.current = 0;
         return;
       }
 
@@ -126,18 +117,14 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
     };
 
     window.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("keyup", onKeyUp, true);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("keyup", onKeyUp, true);
-    };
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [runDelete]);
 
   const isPending = useCallback((uid: string) => selected.has(uid), [selected]);
 
-  // handleRowKeyDown محفوظ للتوافق فقط — الحذف يُدار عبر Shift عالمياً.
+  // Compatibility no-op: pages still pass a per-row keydown handler.
   const handleRowKeyDown = useCallback(
-    (_uid: string, _e: React.KeyboardEvent) => { /* no-op */ },
+    (_uid: string, _e: React.KeyboardEvent) => { /* handled globally */ },
     [],
   );
 
