@@ -520,7 +520,7 @@ export function buildDispatchSheetHTML(
 
   <div class="d-summary">
     <div>📅 التاريخ: <b>${today}</b></div>
-    <div>عدد الفواتير: <b>${docs.length}</b></div>
+    <div>عدد الفواتير: <b>${mergedDocs.length}</b></div>
     <div>إجمالي عدد القطع: <b>${totalPacksAll}</b></div>
   </div>
 
