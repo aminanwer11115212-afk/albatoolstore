@@ -17,6 +17,8 @@
 const EDIT_ATTR = "data-edit-mode";
 
 let attached = false;
+let detach: (() => void) | null = null;
+let pendingFocusOutTimer: number | null = null;
 
 function isEligibleCell(el: Element | null): el is HTMLElement {
   if (!el) return false;
@@ -72,6 +74,11 @@ export function attachSpaceColumnNav() {
   };
 
   const onFocusIn = (e: FocusEvent) => {
+    // Cancel any pending focusout cleanup — the new focus target wins.
+    if (pendingFocusOutTimer !== null) {
+      clearTimeout(pendingFocusOutTimer);
+      pendingFocusOutTimer = null;
+    }
     const el = e.target as HTMLElement | null;
     updateModeIndicator(el && isEligibleCell(el) ? el : null);
   };
@@ -79,7 +86,9 @@ export function attachSpaceColumnNav() {
   const onFocusOut = (e: FocusEvent) => {
     const el = e.target as HTMLElement | null;
     if (el?.hasAttribute?.(EDIT_ATTR)) el.removeAttribute(EDIT_ATTR);
-    setTimeout(() => {
+    if (pendingFocusOutTimer !== null) clearTimeout(pendingFocusOutTimer);
+    pendingFocusOutTimer = window.setTimeout(() => {
+      pendingFocusOutTimer = null;
       const active = document.activeElement as HTMLElement | null;
       updateModeIndicator(active && isEligibleCell(active) ? active : null);
     }, 0);
@@ -118,4 +127,30 @@ export function attachSpaceColumnNav() {
   document.addEventListener("focusout", onFocusOut, true);
   document.addEventListener("keydown", onKeyDown, true);
   document.addEventListener("beforeinput", onBeforeInput, true);
+
+  detach = () => {
+    document.removeEventListener("pointerdown", onPointerDown, true);
+    document.removeEventListener("focusin", onFocusIn, true);
+    document.removeEventListener("focusout", onFocusOut, true);
+    document.removeEventListener("keydown", onKeyDown, true);
+    document.removeEventListener("beforeinput", onBeforeInput, true);
+    if (pendingFocusOutTimer !== null) {
+      clearTimeout(pendingFocusOutTimer);
+      pendingFocusOutTimer = null;
+    }
+    clearRowModeAttr();
+    attached = false;
+    detach = null;
+  };
+}
+
+/** Detach all listeners — used by tests and Vite HMR to avoid duplicates. */
+export function detachSpaceColumnNav() {
+  detach?.();
+}
+
+// Vite HMR: dispose old listeners before the module is replaced, otherwise
+// each hot-reload accumulates a fresh set of capturing listeners.
+if (typeof import.meta !== "undefined" && (import.meta as any).hot) {
+  (import.meta as any).hot.dispose(() => detachSpaceColumnNav());
 }

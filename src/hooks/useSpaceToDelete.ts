@@ -55,10 +55,18 @@ export function useSpaceToDelete(onDelete: (uid: string) => void | Promise<void>
       ? parseInt(firstRow.getAttribute("data-nav-row") || "-1", 10)
       : -1;
 
-    setSelected(new Set());
+    // Run all deletes; keep any failed uids selected so the user can retry
+    // and sees the pending-delete highlight persist for failures.
+    const failed: string[] = [];
     for (const u of uids) {
-      try { await Promise.resolve(onDeleteRef.current(u)); } catch { /* ignore */ }
+      try {
+        await Promise.resolve(onDeleteRef.current(u));
+      } catch (err) {
+        console.error("[useSpaceToDelete] delete failed for", u, err);
+        failed.push(u);
+      }
     }
+    setSelected(new Set(failed));
     if (rowIdx >= 0 && tableName) {
       window.setTimeout(() => {
         const sel = (r: number) => document.querySelector<HTMLElement>(

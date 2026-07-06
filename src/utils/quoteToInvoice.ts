@@ -98,6 +98,22 @@ export async function convertQuoteToInvoice(
     .single();
   if (insErr || !inv) throw insErr || new Error("Failed to create invoice");
 
+  // 4b. IDEMPOTENCY: mark the quote as converted BEFORE inserting items or
+  // deducting stock. If any later step fails and the user retries, the
+  // early-exit guard at the top of this function short-circuits and returns
+  // the already-created invoice instead of creating a duplicate.
+  {
+    const { error: markErr } = await supabase
+      .from("quotes")
+      .update({ converted_to_invoice_id: inv.id })
+      .eq("id", quoteId);
+    if (markErr) {
+      const { error: rbErr } = await supabase.from("invoices").delete().eq("id", inv.id);
+      if (rbErr) console.error("[convertQuoteToInvoice] rollback after mark failed", rbErr);
+      throw markErr;
+    }
+  }
+
   // 5. Copy items first
   if (items && items.length > 0) {
     const payload = items.map((it: any) => ({
@@ -116,8 +132,9 @@ export async function convertQuoteToInvoice(
     }));
     const { error: itErr } = await supabase.from("invoice_items").insert(payload);
     if (itErr) {
-      // Rollback the orphan invoice
-      await supabase.from("invoices").delete().eq("id", inv.id);
+      // Rollback the orphan invoice (and log if rollback itself fails).
+      const { error: rbErr } = await supabase.from("invoices").delete().eq("id", inv.id);
+      if (rbErr) console.error("[convertQuoteToInvoice] items-insert rollback failed", rbErr);
       throw itErr;
     }
   }
@@ -140,8 +157,12 @@ export async function convertQuoteToInvoice(
   // 7. Delete the original quote (items first, then the quote itself).
   // User preference: after a successful conversion the quote is removed from
   // the quotes list — the resulting invoice is the single source of truth.
-  await supabase.from("quote_items").delete().eq("quote_id", quoteId);
-  await supabase.from("quotes").delete().eq("id", quoteId);
+  const { error: delItemsErr } = await supabase
+    .from("quote_items").delete().eq("quote_id", quoteId);
+  if (delItemsErr) console.error("[convertQuoteToInvoice] delete quote_items failed", delItemsErr);
+  const { error: delQuoteErr } = await supabase
+    .from("quotes").delete().eq("id", quoteId);
+  if (delQuoteErr) console.error("[convertQuoteToInvoice] delete quote failed", delQuoteErr);
 
   return { invoiceId: inv.id, invoiceNumber: invNum, alreadyConverted: false };
 }

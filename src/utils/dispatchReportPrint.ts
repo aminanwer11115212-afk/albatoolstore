@@ -56,7 +56,7 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
   const { data: invoice, error: invErr } = await supabase
     .from("invoices")
     .select(
-      "id, invoice_number, date, total, status, notes, customers(name, phone, address)"
+      "id, invoice_number, date, total, status, notes, customers(name, address)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -520,7 +520,7 @@ export function buildDispatchSheetHTML(
 
   <div class="d-summary">
     <div>📅 التاريخ: <b>${today}</b></div>
-    <div>عدد الفواتير: <b>${docs.length}</b></div>
+    <div>عدد الفواتير: <b>${mergedDocs.length}</b></div>
     <div>إجمالي عدد القطع: <b>${totalPacksAll}</b></div>
   </div>
 
