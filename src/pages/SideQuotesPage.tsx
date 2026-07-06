@@ -121,7 +121,13 @@ export default function SideQuotesPage() {
       qc.invalidateQueries({ queryKey: ["quotes"] });
       navigate(`/invoices/edit/${invoiceId}`);
     } catch (e: any) {
-      toast.error(e.message);
+      const { reportCriticalError } = await import("@/utils/errorReporter");
+      reportCriticalError({
+        title: "فشل تحويل العرض الجانبي إلى فاتورة",
+        error: e,
+        context: `SideQuotesPage.handleConvert(quote=${q?.quote_number || q?.id})`,
+        fallbackMessage: "تعذّر إتمام التحويل — راجع البنود والاتصال ثم أعد المحاولة",
+      });
     }
   };
 
