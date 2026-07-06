@@ -46,37 +46,17 @@ function setEditMode(cell: HTMLElement) {
   }
 }
 
-/* -------- Mode indicator pill (bottom-start of viewport) -------- */
-let indicatorEl: HTMLDivElement | null = null;
-function ensureIndicator(): HTMLDivElement {
-  if (indicatorEl) return indicatorEl;
-  const el = document.createElement("div");
-  el.setAttribute("data-mode-indicator", "");
-  el.style.cssText = [
-    "position:fixed", "bottom:12px", "inset-inline-start:12px", "z-index:2147483647",
-    "font-family:Cairo,system-ui,sans-serif", "font-weight:700", "font-size:12px",
-    "padding:6px 12px", "border-radius:999px", "pointer-events:none",
-    "box-shadow:0 4px 12px hsl(0 0% 0% / 0.18)", "display:none",
-    "transition:background .15s, color .15s",
-  ].join(";");
-  document.body.appendChild(el);
-  indicatorEl = el;
-  return el;
+/* -------- Mode indicator: على الصف نفسه عبر data-row-mode -------- */
+function clearRowModeAttr() {
+  const prev = document.querySelectorAll<HTMLElement>("[data-row-mode]");
+  prev.forEach((el) => el.removeAttribute("data-row-mode"));
 }
 function updateModeIndicator(cell: HTMLElement | null) {
-  const el = ensureIndicator();
-  if (!cell || !isEligibleCell(cell)) { el.style.display = "none"; return; }
-  const edit = inEditMode(cell);
-  el.style.display = "inline-block";
-  if (edit) {
-    el.textContent = "✎ وضع التعديل";
-    el.style.background = "hsl(48 100% 55%)";
-    el.style.color = "hsl(30 60% 15%)";
-  } else {
-    el.textContent = "⇆ وضع التنقّل — Shift للتعديل";
-    el.style.background = "hsl(25 95% 53%)";
-    el.style.color = "#fff";
-  }
+  clearRowModeAttr();
+  if (!cell || !isEligibleCell(cell)) return;
+  const row = cell.closest<HTMLElement>("tr, .quick-add-row, [data-nav-zone='quick']");
+  if (!row) return;
+  row.setAttribute("data-row-mode", inEditMode(cell) ? "edit" : "nav");
 }
 
 export function attachSpaceColumnNav() {
