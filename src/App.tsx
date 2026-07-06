@@ -251,6 +251,7 @@ const App = () => {
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <CriticalErrorDialog />
       {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
       <BrowserRouter>
         <NavigationPerfTracker />
