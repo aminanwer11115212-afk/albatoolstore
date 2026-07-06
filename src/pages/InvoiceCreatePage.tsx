@@ -1199,8 +1199,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       return true;
     } catch (e: any) {
       console.error("[InvoiceCreatePage] saveInvoice failed", e);
-      const msg = e?.message || e?.error_description || e?.hint || e?.details || (typeof e === "string" ? e : "فشل الحفظ — سبب غير معروف");
-      toast.error(`فشل حفظ الفاتورة: ${msg}`, { duration: 8000 });
+      const { reportCriticalError } = await import("@/utils/errorReporter");
+      reportCriticalError({
+        title: "فشل حفظ الفاتورة",
+        error: e,
+        context: "InvoiceCreatePage.saveInvoice",
+        fallbackMessage: "تعذّر حفظ الفاتورة — تحقّق من الاتصال والبيانات ثم أعد المحاولة",
+      });
       return false;
     } finally {
       setSaving(false);

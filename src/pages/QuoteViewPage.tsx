@@ -212,7 +212,15 @@ export default function QuoteViewPage() {
       qc.invalidateQueries({ queryKey: ["invoices-full"] });
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       navigate(`/invoices/edit/${invoiceId}`);
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      const { reportCriticalError } = await import("@/utils/errorReporter");
+      reportCriticalError({
+        title: "فشل تحويل عرض السعر إلى فاتورة",
+        error: e,
+        context: `QuoteViewPage.handleConvertToInvoice(quote=${quote?.quote_number || quote?.id})`,
+        fallbackMessage: "تعذّر إتمام التحويل — راجع البنود والاتصال ثم أعد المحاولة",
+      });
+    }
   };
 
   const handlePrint = async (variant: "full" | "no-account" | "account-only" | "no-details" | "stocktake" = "full", noHeader: boolean = false) => {
