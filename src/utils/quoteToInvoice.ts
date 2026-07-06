@@ -6,11 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
  * QuoteViewPage, SideQuotesPage, Staff portal).
  *
  * Behavior:
- * - Creates an invoice with workflow_status = 'new' (no stock deduction).
+ * - Creates an invoice with workflow_status = 'new'.
  * - Copies quote items to invoice_items.
+ * - Deducts stock immediately (idempotent via `stock_deduction_id` guard),
+ *   matching the behaviour of a direct invoice save.
  * - Deletes the original quote and its items (user preference — the invoice
  *   becomes the single source of truth; the quote no longer appears in the list).
- * - Stock deduction happens later when the invoice's workflow_status leaves 'new'.
  */
 export async function convertQuoteToInvoice(
   quoteId: string,
@@ -121,7 +122,22 @@ export async function convertQuoteToInvoice(
     }
   }
 
-  // 6. Delete the original quote (items first, then the quote itself).
+  // 6. Deduct stock for the newly-created invoice (matches direct-invoice save).
+  //    Idempotent via `invoices.stock_deduction_id` — safe if this ever re-runs.
+  if (items && items.length > 0) {
+    try {
+      const { deductStockForInvoiceOnce } = await import("@/utils/stockDeduction");
+      await deductStockForInvoiceOnce(
+        inv.id,
+        items.map((it: any) => ({ product_id: it.product_id, quantity: it.quantity })),
+      );
+    } catch (e) {
+      console.error("[convertQuoteToInvoice] stock deduction failed", e);
+      // لا نُلغي الفاتورة — البنود محفوظة وسيتمكّن المستخدم من إعادة الخصم لاحقاً.
+    }
+  }
+
+  // 7. Delete the original quote (items first, then the quote itself).
   // User preference: after a successful conversion the quote is removed from
   // the quotes list — the resulting invoice is the single source of truth.
   await supabase.from("quote_items").delete().eq("quote_id", quoteId);
