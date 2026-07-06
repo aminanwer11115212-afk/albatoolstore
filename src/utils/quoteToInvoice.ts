@@ -42,6 +42,8 @@ export async function convertQuoteToInvoice(
         invoiceId: existing.id,
         invoiceNumber: existing.invoice_number,
         alreadyConverted: true,
+        stockDeducted: false,
+        deductedLineCount: 0,
       };
     }
   }
