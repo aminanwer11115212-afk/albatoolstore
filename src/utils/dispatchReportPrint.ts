@@ -363,7 +363,7 @@ export function buildDispatchSheetHTML(
     const previewRow = {
       __preview: true,
       transporters: overlay.transporterName
-        ? { name: overlay.transporterName, phone: overlay.transporterPhone }
+        ? { name: overlay.transporterName, phone: overlay.transporterPhone, address: overlay.transporterAddress }
         : null,
       destinations: overlay.destinationName ? { name: overlay.destinationName } : null,
       transport_date: null,
