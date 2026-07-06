@@ -16,11 +16,69 @@ const cleanPhone = (raw: any): string | null => {
   return cleaned || null;
 };
 
+// ── Normalize header text: lowercase, strip diacritics/spaces/punctuation ─────
+const normHeader = (h: any): string =>
+  String(h ?? "")
+    .replace(/[\u064B-\u065F\u0670]/g, "") // Arabic diacritics
+    .replace(/[إأآا]/g, "ا")
+    .replace(/[ة]/g, "ه")
+    .replace(/[ى]/g, "ي")
+    .replace(/[^\p{L}\p{N}]/gu, "")
+    .toLowerCase()
+    .trim();
+
+// ── Column aliases (normalized) → target field ────────────────────────────────
+const FIELD_ALIASES: Record<string, string[]> = {
+  // products
+  name: ["name", "productname", "itemname", "اسم", "الاسم", "اسمالصنف", "اسمالمنتج", "الصنف", "المنتج", "بيان", "البيان", "وصف", "الوصف", "description"],
+  sku: ["sku", "code", "barcode", "الكود", "كود", "باركود", "رمز", "الرمز", "رقمالصنف"],
+  unit: ["unit", "uom", "الوحده", "وحده", "وحدهالقياس"],
+  sale_price: ["saleprice", "price", "sellingprice", "سعرالبيع", "سعر", "السعر", "بيع", "سعرالمفرد", "سعرالجمله"],
+  purchase_price: ["purchaseprice", "costprice", "cost", "سعرالشراء", "التكلفه", "تكلفه", "شراء", "سعرالتكلفه"],
+  stock_quantity: ["stockquantity", "quantity", "qty", "stock", "الكميه", "كميه", "الرصيد", "رصيد", "المخزون", "مخزون"],
+  min_stock: ["minstock", "minqty", "minimum", "حدادنى", "الحدالادنى", "اقلكميه"],
+  // customers/suppliers extras
+  phone: ["phone", "mobile", "tel", "الهاتف", "هاتف", "جوال", "الجوال", "موبايل", "الموبايل", "تليفون"],
+  whatsapp: ["whatsapp", "wa", "الواتساب", "واتساب", "واتس", "الواتس"],
+  email: ["email", "mail", "الايميل", "ايميل", "البريد", "بريدالكتروني"],
+  address: ["address", "العنوان", "عنوان"],
+  city: ["city", "المدينه", "مدينه"],
+  company: ["company", "companyname", "الشركه", "شركه", "المؤسسه"],
+  notes: ["notes", "note", "remark", "ملاحظات", "ملاحظه", "بيان"],
+};
+
+/** Build a header → field map by matching normalized aliases. */
+function detectColumns(headers: string[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  const used = new Set<string>();
+  for (const h of headers) {
+    const nh = normHeader(h);
+    if (!nh) continue;
+    for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+      if (used.has(field)) continue;
+      if (aliases.some((a) => nh === a || nh.includes(a) || a.includes(nh))) {
+        map[h] = field;
+        used.add(field);
+        break;
+      }
+    }
+  }
+  return map;
+}
+
+const toNumber = (v: any): number => {
+  if (v == null || v === "") return 0;
+  const s = String(v).replace(/[^\d.-]/g, "");
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+};
+
 export default function ImportProductsPage() {
   const [mode, setMode] = useState<Mode>("products");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [deleteExisting, setDeleteExisting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const addLog = (m: string) => setLogs((p) => [...p, m]);
@@ -36,42 +94,68 @@ export default function ImportProductsPage() {
       const rows = xlsx.utils.sheet_to_json<any>(sheet, { defval: null });
       addLog(`عدد الصفوف المقروءة: ${rows.length}`);
 
+      if (rows.length === 0) throw new Error("الملف فارغ");
+
+      // ── Auto-detect columns from headers ────────────────────────────────
+      const headers = Object.keys(rows[0]);
+      const colMap = detectColumns(headers);
+      addLog(`الأعمدة المكتشفة:`);
+      for (const [h, f] of Object.entries(colMap)) addLog(`  "${h}" → ${f}`);
+      const unmapped = headers.filter((h) => !colMap[h]);
+      if (unmapped.length) addLog(`أعمدة غير معروفة (سيتم تجاهلها): ${unmapped.join(", ")}`);
+
+      // Validate required field
+      const hasName = Object.values(colMap).includes("name");
+      if (!hasName) throw new Error("لم يتم العثور على عمود الاسم في الملف (name / الاسم / اسم الصنف)");
+
+      // ── Optional delete before insert ───────────────────────────────────
+      if (deleteExisting) {
+        const table = mode === "products" ? "products" : mode === "customers" ? "customers" : "suppliers";
+        addLog(`🗑️ حذف كل السجلات القديمة من ${table}...`);
+        const { error: delErr } = await supabase.from(table).delete().not("id", "is", null);
+        if (delErr) throw new Error(`فشل الحذف: ${delErr.message}`);
+        addLog(`✅ تم الحذف`);
+      }
+
+      // ── Map each row to target fields via colMap ────────────────────────
       const toInsert: any[] = [];
       for (const row of rows) {
+        const mapped: any = {};
+        for (const [h, field] of Object.entries(colMap)) {
+          mapped[field] = row[h];
+        }
+
+        const name = String(mapped.name ?? "").trim();
+        if (!name) continue;
+
         if (mode === "products") {
-          const name = String(row.name ?? row["اسم الصنف"] ?? row["الاسم"] ?? "").trim();
-          if (!name) continue;
           toInsert.push({
             name,
-            sku: row.sku ?? null,
-            unit: row.unit ?? null,
-            sale_price: Number(row.sale_price ?? row["سعر البيع"] ?? 0) || 0,
-            purchase_price: Number(row.purchase_price ?? row["سعر الشراء"] ?? 0) || 0,
-            stock_quantity: Number(row.stock_quantity ?? row["الكمية"] ?? 0) || 0,
-            min_stock: Number(row.min_stock ?? 0) || 0,
+            sku: mapped.sku != null ? String(mapped.sku).trim() || null : null,
+            unit: mapped.unit != null ? String(mapped.unit).trim() || null : null,
+            sale_price: toNumber(mapped.sale_price),
+            purchase_price: toNumber(mapped.purchase_price),
+            stock_quantity: toNumber(mapped.stock_quantity),
+            min_stock: toNumber(mapped.min_stock),
             is_active: true,
           });
         } else if (mode === "customers") {
-          const name = String(row.name ?? row["الاسم"] ?? row["اسم العميل"] ?? "").trim();
-          if (!name) continue;
           toInsert.push({
             name,
-            phone: cleanPhone(row.phone ?? row["الهاتف"]),
-            whatsapp: cleanPhone(row.whatsapp ?? row["الواتساب"]),
-            email: row.email ?? null,
-            address: row.address ?? null,
-            city: row.city ?? null,
-            company: row.company ?? null,
-            notes: row.notes ?? null,
+            phone: cleanPhone(mapped.phone),
+            whatsapp: cleanPhone(mapped.whatsapp),
+            email: mapped.email ?? null,
+            address: mapped.address ?? null,
+            city: mapped.city ?? null,
+            company: mapped.company ?? null,
+            notes: mapped.notes ?? null,
           });
         } else {
-          const name = String(row.name ?? row["الاسم"] ?? "").trim();
-          if (!name) continue;
           toInsert.push({
             name,
-            phone: cleanPhone(row.phone ?? row["الهاتف"]),
-            email: row.email ?? null,
-            company: row.company ?? null,
+            phone: cleanPhone(mapped.phone),
+            email: mapped.email ?? null,
+            company: mapped.company ?? null,
           });
         }
       }
@@ -94,6 +178,7 @@ export default function ImportProductsPage() {
       toast.success(`تم استيراد ${inserted} سجل`);
       if (mode === "products") window.dispatchEvent(new Event("products:changed"));
     } catch (e: any) {
+      addLog(`❌ ${e.message}`);
       toast.error(e.message);
     } finally {
       setBusy(false);
@@ -104,7 +189,7 @@ export default function ImportProductsPage() {
     <div className="p-6" dir="rtl">
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
-          <CardTitle>استيراد البيانات (XLSX / CSV)</CardTitle>
+          <CardTitle>استيراد البيانات (XLSX / CSV) — كشف تلقائي للأعمدة</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
@@ -131,12 +216,23 @@ export default function ImportProductsPage() {
               className="block w-full text-sm"
             />
             <p className="text-xs text-muted-foreground mt-2">
-              الأعمدة المدعومة (يقبل الإنجليزية والعربية):
-              {mode === "products" && " name/اسم الصنف، sku، unit، sale_price، purchase_price، stock_quantity"}
-              {mode === "customers" && " name/الاسم، phone/الهاتف، whatsapp/الواتساب، email، address، city، company"}
-              {mode === "suppliers" && " name/الاسم، phone/الهاتف، email، company"}
+              سيقوم النظام باكتشاف الأعمدة تلقائياً من ترويسة الملف. الحقول المدعومة:
+              <br />
+              {mode === "products" && "الاسم / السعر / سعر الشراء / الكمية / الحد الأدنى / الوحدة / الكود (SKU). أي مسميات مقاربة بالعربية أو الإنجليزية تعمل."}
+              {mode === "customers" && "الاسم / الهاتف / الواتساب / الإيميل / العنوان / المدينة / الشركة / ملاحظات."}
+              {mode === "suppliers" && "الاسم / الهاتف / الإيميل / الشركة."}
             </p>
           </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={deleteExisting}
+              onChange={(e) => setDeleteExisting(e.target.checked)}
+              disabled={busy}
+            />
+            حذف كل السجلات القديمة قبل الاستيراد (لا يمكن التراجع)
+          </label>
 
           <Button onClick={handleImport} disabled={!file || busy}>
             {busy ? "جارٍ الاستيراد..." : "بدء الاستيراد"}
