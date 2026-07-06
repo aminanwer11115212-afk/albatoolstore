@@ -694,7 +694,13 @@ export default function PurchaseCreatePage() {
         window.history.replaceState({}, "", `/purchase/edit/${savedId}`);
       }
     } catch (e: any) {
-      toast.error(e.message);
+      const { reportCriticalError } = await import("@/utils/errorReporter");
+      reportCriticalError({
+        title: "فشل حفظ أمر الشراء",
+        error: e,
+        context: "PurchaseCreatePage.savePurchase",
+        fallbackMessage: "تعذّر حفظ أمر الشراء — تحقّق من البيانات والاتصال ثم أعد المحاولة",
+      });
     } finally {
       setSaving(false);
       isSavingRef.current = false;
