@@ -55,7 +55,8 @@ function detectColumns(headers: string[]): Record<string, string> {
     const nh = normHeader(h);
     if (!nh) continue;
     for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
-      if (used.has(field)) continue;
+      // "name" can be split across multiple columns (e.g. Products, Products_1) — allow duplicates
+      if (field !== "name" && used.has(field)) continue;
       if (aliases.some((a) => nh === a || nh.includes(a) || a.includes(nh))) {
         map[h] = field;
         used.add(field);
