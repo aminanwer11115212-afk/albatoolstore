@@ -74,6 +74,11 @@ export function attachSpaceColumnNav() {
   };
 
   const onFocusIn = (e: FocusEvent) => {
+    // Cancel any pending focusout cleanup — the new focus target wins.
+    if (pendingFocusOutTimer !== null) {
+      clearTimeout(pendingFocusOutTimer);
+      pendingFocusOutTimer = null;
+    }
     const el = e.target as HTMLElement | null;
     updateModeIndicator(el && isEligibleCell(el) ? el : null);
   };
@@ -81,7 +86,9 @@ export function attachSpaceColumnNav() {
   const onFocusOut = (e: FocusEvent) => {
     const el = e.target as HTMLElement | null;
     if (el?.hasAttribute?.(EDIT_ATTR)) el.removeAttribute(EDIT_ATTR);
-    setTimeout(() => {
+    if (pendingFocusOutTimer !== null) clearTimeout(pendingFocusOutTimer);
+    pendingFocusOutTimer = window.setTimeout(() => {
+      pendingFocusOutTimer = null;
       const active = document.activeElement as HTMLElement | null;
       updateModeIndicator(active && isEligibleCell(active) ? active : null);
     }, 0);
