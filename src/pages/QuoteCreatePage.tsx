@@ -1008,6 +1008,15 @@ export default function QuoteCreatePage() {
       setTimeout(() => customerInputRef.current?.focus(), 0);
     }
     return true;
+    } catch (e: any) {
+      const { reportCriticalError } = await import("@/utils/errorReporter");
+      reportCriticalError({
+        title: "فشل حفظ عرض السعر",
+        error: e,
+        context: "QuoteCreatePage.saveQuote",
+        fallbackMessage: "تعذّر حفظ عرض السعر — تحقّق من الاتصال وأعد المحاولة",
+      });
+      return false;
     } finally {
       savingQuoteRef.current = false;
       setSavingQuote(false);
