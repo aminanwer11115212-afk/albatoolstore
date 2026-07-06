@@ -118,46 +118,54 @@ export default function ImportProductsPage() {
         addLog(`✅ تم الحذف`);
       }
 
-      // ── Map each row to target fields via colMap ────────────────────────
+      // ── Collect headers per field. "name" may appear in multiple columns
+      // (e.g. Products, Products_1) — treat each as a separate row.
+      const nameHeaders = Object.entries(colMap).filter(([, f]) => f === "name").map(([h]) => h);
+      const otherEntries = Object.entries(colMap).filter(([, f]) => f !== "name");
+
       const toInsert: any[] = [];
+      const seen = new Set<string>();
       for (const row of rows) {
-        const mapped: any = {};
-        for (const [h, field] of Object.entries(colMap)) {
-          mapped[field] = row[h];
-        }
+        const shared: any = {};
+        for (const [h, field] of otherEntries) shared[field] = row[h];
 
-        const name = String(mapped.name ?? "").trim();
-        if (!name) continue;
+        for (const nh of nameHeaders) {
+          const name = String(row[nh] ?? "").trim();
+          if (!name) continue;
+          const key = name.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
 
-        if (mode === "products") {
-          toInsert.push({
-            name,
-            sku: mapped.sku != null ? String(mapped.sku).trim() || null : null,
-            unit: mapped.unit != null ? String(mapped.unit).trim() || null : null,
-            sale_price: toNumber(mapped.sale_price),
-            purchase_price: toNumber(mapped.purchase_price),
-            stock_quantity: toNumber(mapped.stock_quantity),
-            min_stock: toNumber(mapped.min_stock),
-            is_active: true,
-          });
-        } else if (mode === "customers") {
-          toInsert.push({
-            name,
-            phone: cleanPhone(mapped.phone),
-            whatsapp: cleanPhone(mapped.whatsapp),
-            email: mapped.email ?? null,
-            address: mapped.address ?? null,
-            city: mapped.city ?? null,
-            company: mapped.company ?? null,
-            notes: mapped.notes ?? null,
-          });
-        } else {
-          toInsert.push({
-            name,
-            phone: cleanPhone(mapped.phone),
-            email: mapped.email ?? null,
-            company: mapped.company ?? null,
-          });
+          if (mode === "products") {
+            toInsert.push({
+              name,
+              sku: shared.sku != null ? String(shared.sku).trim() || null : null,
+              unit: shared.unit != null ? String(shared.unit).trim() || null : null,
+              sale_price: toNumber(shared.sale_price),
+              purchase_price: toNumber(shared.purchase_price),
+              stock_quantity: toNumber(shared.stock_quantity),
+              min_stock: toNumber(shared.min_stock),
+              is_active: true,
+            });
+          } else if (mode === "customers") {
+            toInsert.push({
+              name,
+              phone: cleanPhone(shared.phone),
+              whatsapp: cleanPhone(shared.whatsapp),
+              email: shared.email ?? null,
+              address: shared.address ?? null,
+              city: shared.city ?? null,
+              company: shared.company ?? null,
+              notes: shared.notes ?? null,
+            });
+          } else {
+            toInsert.push({
+              name,
+              phone: cleanPhone(shared.phone),
+              email: shared.email ?? null,
+              company: shared.company ?? null,
+            });
+          }
         }
       }
       addLog(`صفوف صالحة للإدراج: ${toInsert.length}`);
