@@ -2,9 +2,11 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { attachSelectBackspaceClose } from "./utils/selectKeyNav";
+import { attachSpaceColumnNav } from "./utils/spaceColumnNav";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 attachSelectBackspaceClose();
+attachSpaceColumnNav();
 
 // Global listeners لرصد كل promise rejection أو خطأ غير معالَج.
 // مهم في الإنتاج لأن أخطاء async fire-and-forget لا تظهر بدون هذا.
