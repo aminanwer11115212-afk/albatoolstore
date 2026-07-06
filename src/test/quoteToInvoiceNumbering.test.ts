@@ -13,12 +13,18 @@ function table(name: string) {
 
 const builder = (name: string) => {
   const filters: Array<(r: Row) => boolean> = [];
+  const nullFilters: Array<(r: Row) => boolean> = [];
   let pendingInsert: Row | Row[] | null = null;
   let pendingUpdate: Row | null = null;
   let pendingDelete = false;
+  let selectCalled = false;
   const api: any = {
-    select: () => api,
+    select: () => { selectCalled = true; return api; },
     eq: (col: string, val: any) => { filters.push((r) => r[col] === val); return api; },
+    is: (col: string, val: any) => {
+      nullFilters.push((r) => (val === null ? r[col] == null : r[col] === val));
+      return api;
+    },
     limit: () => api,
     insert: (row: Row | Row[]) => { pendingInsert = row; return api; },
     update: (row: Row) => { pendingUpdate = row; return api; },
@@ -45,9 +51,11 @@ const builder = (name: string) => {
         return Promise.resolve({ data: inserted, error: null }).then(resolve);
       }
       if (pendingUpdate) {
-        const rows = table(name).filter((r) => filters.every((f) => f(r)));
+        const rows = table(name).filter(
+          (r) => filters.every((f) => f(r)) && nullFilters.every((f) => f(r)),
+        );
         rows.forEach((r) => Object.assign(r, pendingUpdate));
-        return Promise.resolve({ data: rows, error: null }).then(resolve);
+        return Promise.resolve({ data: selectCalled ? rows : null, error: null }).then(resolve);
       }
       if (pendingDelete) {
         const remaining = table(name).filter((r) => !filters.every((f) => f(r)));
@@ -64,6 +72,7 @@ const builder = (name: string) => {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (name: string) => builder(name),
+    rpc: async () => ({ data: null, error: null }),
     auth: { getUser: async () => ({ data: { user: { id: "u1" } } }) },
   },
 }));

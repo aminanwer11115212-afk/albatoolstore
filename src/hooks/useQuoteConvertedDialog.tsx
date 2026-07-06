@@ -7,15 +7,10 @@ type ConvertedInfo = {
   invoiceNumber: string;
   alreadyConverted: boolean;
   quoteId?: string;
+  stockDeducted?: boolean;
+  deductedLineCount?: number;
 };
 
-/**
- * Reusable hook that opens a confirmation dialog after a quote is
- * converted to an invoice. Three choices:
- *   - فتح عرض السعر للتعديل: navigates to /quotes/edit/:quoteId.
- *   - فتح الفاتورة للتعديل: navigates to /invoices/edit/:invoiceId (the converted invoice).
- *   - البقاء هنا: stays so the user can create another quote.
- */
 export function useQuoteConvertedDialog(opts?: { onStay?: () => void }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -33,11 +28,12 @@ export function useQuoteConvertedDialog(opts?: { onStay?: () => void }) {
       invoiceId={info.invoiceId}
       invoiceNumber={info.invoiceNumber}
       alreadyConverted={info.alreadyConverted}
+      stockDeducted={info.stockDeducted}
+      deductedLineCount={info.deductedLineCount}
       onOpenQuote={() => {
         if (info.quoteId) {
           navigate(`/quotes/edit/${info.quoteId}`);
         } else {
-          // Fallback: no quoteId available, open the invoice instead.
           navigate(`/invoices/edit/${info.invoiceId}`);
         }
       }}

@@ -1983,9 +1983,9 @@ export default function QuoteCreatePage() {
                         if (!ok) return;
                         try {
                           const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
-                          const { invoiceId, invoiceNumber, alreadyConverted } = await convertQuoteToInvoice(editId);
+                          const { invoiceId, invoiceNumber, alreadyConverted, stockDeducted, deductedLineCount } = await convertQuoteToInvoice(editId);
                           quoteGoneRef.current = true;
-                          showConverted({ invoiceId, invoiceNumber, alreadyConverted, quoteId: editId });
+                          showConverted({ invoiceId, invoiceNumber, alreadyConverted, quoteId: editId, stockDeducted, deductedLineCount });
                         } catch (e: any) {
                           toast.error(e.message || "فشل تحويل العرض إلى فاتورة");
                         }

@@ -18,12 +18,18 @@ function table(name: string) {
 
 const builder = (name: string) => {
   const filters: Array<(r: Row) => boolean> = [];
+  const nullFilters: Array<(r: Row) => boolean> = [];
   let pendingInsert: Row | Row[] | null = null;
   let pendingUpdate: Row | null = null;
   let pendingDelete = false;
+  let selectCalled = false;
   const api: any = {
-    select: () => api,
+    select: () => { selectCalled = true; return api; },
     eq: (col: string, val: any) => { filters.push((r) => r[col] === val); return api; },
+    is: (col: string, val: any) => {
+      nullFilters.push((r) => (val === null ? r[col] == null : r[col] === val));
+      return api;
+    },
     in: (col: string, vals: any[]) => { filters.push((r) => vals.includes(r[col])); return api; },
     like: () => api,
     limit: () => api,
@@ -53,9 +59,11 @@ const builder = (name: string) => {
         return Promise.resolve({ data: inserted, error: null }).then(resolve);
       }
       if (pendingUpdate) {
-        const rows = table(name).filter((r) => filters.every((f) => f(r)));
+        const rows = table(name).filter(
+          (r) => filters.every((f) => f(r)) && nullFilters.every((f) => f(r)),
+        );
         rows.forEach((r) => Object.assign(r, pendingUpdate));
-        return Promise.resolve({ data: rows, error: null }).then(resolve);
+        return Promise.resolve({ data: selectCalled ? rows : null, error: null }).then(resolve);
       }
       if (pendingDelete) {
         const remaining = table(name).filter((r) => !filters.every((f) => f(r)));
@@ -72,6 +80,13 @@ const builder = (name: string) => {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (name: string) => builder(name),
+    rpc: async (_name: string, args: any) => {
+      // apply_stock_delta — best-effort stock update in the in-memory db.
+      const products = table("products");
+      const p = products.find((r) => r.id === args._product_id);
+      if (p) p.stock_quantity = Math.max(0, Number(p.stock_quantity || 0) + Number(args._delta || 0));
+      return { data: null, error: null };
+    },
     auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
   },
 }));

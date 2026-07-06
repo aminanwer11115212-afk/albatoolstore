@@ -70,6 +70,14 @@ vi.mock("@/integrations/supabase/client", () => {
         }
         throw new Error(`unexpected table: ${table}`);
       },
+      rpc: async (name: string, args: any) => {
+        if (name !== "apply_stock_delta") return { data: null, error: null };
+        productsUpdateCalls++;
+        productWriteCount.set(args._product_id, (productWriteCount.get(args._product_id) || 0) + 1);
+        const cur = productsTable.get(args._product_id) ?? 0;
+        productsTable.set(args._product_id, Math.max(0, cur + Number(args._delta)));
+        return { data: null, error: null };
+      },
     },
   };
 });
@@ -144,8 +152,9 @@ describe("Integration: workflow_status updates → DB stock deduction occurs onc
     expect(productsTable.get("p1")).toBe(90);
     expect(productsTable.get("p2")).toBe(45);
 
-    // Only one read of products (the single deduction batch).
-    expect(productsSelectCalls).toBe(1);
+    // Deduction now uses an atomic RPC (`apply_stock_delta`), so there is
+    // no separate read step — assertion updated accordingly.
+    expect(productsSelectCalls).toBe(0);
   });
 
   it("writes to products exactly once on direct quote → done", async () => {

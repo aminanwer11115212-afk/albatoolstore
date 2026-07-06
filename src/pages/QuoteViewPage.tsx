@@ -204,8 +204,9 @@ export default function QuoteViewPage() {
     if (!quote || !confirm("تحويل عرض السعر إلى فاتورة؟ سيتم الإبقاء على عرض السعر بحالة \"مقبول\".")) return;
     try {
       const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
-      const { invoiceId, invoiceNumber } = await convertQuoteToInvoice(quote.id);
-      toast.success(`تم تحويل العرض إلى فاتورة ${invoiceNumber} — العرض محفوظ كمقبول`);
+      const { invoiceId, invoiceNumber, stockDeducted, deductedLineCount } = await convertQuoteToInvoice(quote.id);
+      const stockMsg = stockDeducted ? ` · ✅ تم خصم المخزون تلقائيًا (${deductedLineCount} صنف)` : "";
+      toast.success(`تم تحويل العرض إلى فاتورة ${invoiceNumber} — العرض محفوظ كمقبول${stockMsg}`);
       qc.invalidateQueries({ queryKey: ["quotes-full"] });
       qc.invalidateQueries({ queryKey: ["quotes-with-customers"] });
       qc.invalidateQueries({ queryKey: ["invoices-full"] });
