@@ -15,7 +15,13 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export async function convertQuoteToInvoice(
   quoteId: string,
-): Promise<{ invoiceId: string; invoiceNumber: string; alreadyConverted: boolean }> {
+): Promise<{
+  invoiceId: string;
+  invoiceNumber: string;
+  alreadyConverted: boolean;
+  stockDeducted: boolean;
+  deductedLineCount: number;
+}> {
   // 1. Load quote
   const { data: quote, error: qErr } = await supabase
     .from("quotes")
