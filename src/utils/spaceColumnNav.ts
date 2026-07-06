@@ -127,4 +127,30 @@ export function attachSpaceColumnNav() {
   document.addEventListener("focusout", onFocusOut, true);
   document.addEventListener("keydown", onKeyDown, true);
   document.addEventListener("beforeinput", onBeforeInput, true);
+
+  detach = () => {
+    document.removeEventListener("pointerdown", onPointerDown, true);
+    document.removeEventListener("focusin", onFocusIn, true);
+    document.removeEventListener("focusout", onFocusOut, true);
+    document.removeEventListener("keydown", onKeyDown, true);
+    document.removeEventListener("beforeinput", onBeforeInput, true);
+    if (pendingFocusOutTimer !== null) {
+      clearTimeout(pendingFocusOutTimer);
+      pendingFocusOutTimer = null;
+    }
+    clearRowModeAttr();
+    attached = false;
+    detach = null;
+  };
+}
+
+/** Detach all listeners — used by tests and Vite HMR to avoid duplicates. */
+export function detachSpaceColumnNav() {
+  detach?.();
+}
+
+// Vite HMR: dispose old listeners before the module is replaced, otherwise
+// each hot-reload accumulates a fresh set of capturing listeners.
+if (typeof import.meta !== "undefined" && (import.meta as any).hot) {
+  (import.meta as any).hot.dispose(() => detachSpaceColumnNav());
 }
