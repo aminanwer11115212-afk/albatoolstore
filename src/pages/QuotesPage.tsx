@@ -98,8 +98,11 @@ export default function QuotesPage() {
     if (!confirm(`تحويل العرض ${q.quote_number} إلى فاتورة؟ سيتم حذف عرض السعر من القائمة بعد التحويل.`)) return;
     try {
       const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
-      const { invoiceId, invoiceNumber } = await convertQuoteToInvoice(q.id);
-      toast.success(`تم تحويل العرض إلى فاتورة ${invoiceNumber} — تم حذف عرض السعر`);
+      const { invoiceId, invoiceNumber, stockDeducted, deductedLineCount } = await convertQuoteToInvoice(q.id);
+      const stockMsg = stockDeducted
+        ? ` · ✅ تم خصم المخزون تلقائيًا (${deductedLineCount} صنف)`
+        : "";
+      toast.success(`تم تحويل العرض إلى فاتورة ${invoiceNumber} — تم حذف عرض السعر${stockMsg}`);
       qc.invalidateQueries({ queryKey: ["quotes-full"] });
       qc.invalidateQueries({ queryKey: ["quotes-with-customers"] });
       qc.invalidateQueries({ queryKey: ["quotes"] });
