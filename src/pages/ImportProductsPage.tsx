@@ -30,7 +30,7 @@ const normHeader = (h: any): string =>
 // ── Column aliases (normalized) → target field ────────────────────────────────
 const FIELD_ALIASES: Record<string, string[]> = {
   // products
-  name: ["name", "productname", "itemname", "اسم", "الاسم", "اسمالصنف", "اسمالمنتج", "الصنف", "المنتج", "بيان", "البيان", "وصف", "الوصف", "description"],
+  name: ["name", "product", "products", "item", "productname", "itemname", "اسم", "الاسم", "اسمالصنف", "اسمالمنتج", "الصنف", "المنتج", "المنتجات", "منتج", "بيان", "البيان", "وصف", "الوصف", "description"],
   sku: ["sku", "code", "barcode", "الكود", "كود", "باركود", "رمز", "الرمز", "رقمالصنف"],
   unit: ["unit", "uom", "الوحده", "وحده", "وحدهالقياس"],
   sale_price: ["saleprice", "price", "sellingprice", "سعرالبيع", "سعر", "السعر", "بيع", "سعرالمفرد", "سعرالجمله"],
