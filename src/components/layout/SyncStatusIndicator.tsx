@@ -132,6 +132,36 @@ export default function SyncStatusIndicator() {
               : "التعديلات ستُخزَّن محلياً وتُرفَع تلقائياً عند عودة الاتصال."}
           </div>
 
+          {rt && (
+            <div
+              className="px-4 py-2 border-b border-border text-[11px]"
+              data-testid="sync-realtime-status"
+              data-sync-status={rt.status}
+              data-sync-connected={rt.connectedTables}
+              data-sync-total={rt.totalTables}
+              data-sync-request-id={rt.lastRequestId ?? ""}
+            >
+              <div className="flex items-center gap-1.5 font-semibold">
+                {rt.status === "live" && <Wifi size={12} className="text-emerald-500" />}
+                {rt.status === "degraded" && <AlertTriangle size={12} className="text-amber-500" />}
+                {rt.status === "connecting" && <Loader2 size={12} className="text-muted-foreground animate-spin" />}
+                {rt.status === "offline" && <WifiOff size={12} className="text-destructive" />}
+                <span>
+                  المزامنة اللحظية:{" "}
+                  {rt.status === "live" ? "متصلة" :
+                    rt.status === "degraded" ? `جزئية (${rt.connectedTables}/${rt.totalTables})` :
+                    rt.status === "connecting" ? "جارٍ الاتصال" : "منقطعة"}
+                </span>
+              </div>
+              <div className="text-muted-foreground mt-1 space-y-0.5">
+                {rt.lastEventAt && <div>آخر تحديث: {new Date(rt.lastEventAt).toLocaleTimeString("ar-EG")}</div>}
+                {rt.lastPollAt && <div>آخر فحص احتياطي: {new Date(rt.lastPollAt).toLocaleTimeString("ar-EG")}</div>}
+                {rt.lastRequestId && <div className="truncate" title={rt.lastRequestId}>معرّف آخر عملية: {rt.lastRequestId}</div>}
+                {rt.lastError && <div className="text-destructive truncate" title={rt.lastError}>خطأ: {rt.lastError}</div>}
+              </div>
+            </div>
+          )}
+
           <div className="max-h-72 overflow-y-auto">
             {pending.length === 0 ? (
               <div className="p-6 text-center text-xs text-muted-foreground">
