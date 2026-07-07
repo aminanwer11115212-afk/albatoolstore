@@ -553,19 +553,26 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   async function removeRow(uid: string) {
     const target = rows.find((r) => r.uid === uid);
     if (!target) return;
-    // إذا كان البند محفوظاً في قاعدة البيانات: احذفه + أرجع الكمية إلى المخزون فوراً
+    // إذا كان البند محفوظاً في قاعدة البيانات: احذفه أولاً، ثم أرجع الكمية إلى المخزون فقط بعد نجاح الحذف
+    // (كان الترتيب معكوساً وقد يُضاف المخزون قبل نجاح الحذف فيتضاعف)
     if (target.dbId && editId) {
       try {
-        if (target.product_id && Number(target.quantity) > 0) {
-          await applyStockDeltaForLines(
-            [{ product_id: target.product_id, quantity: Number(target.quantity) }],
-            [],
-          );
-        }
         const { error } = await supabase.from("invoice_items").delete().eq("id", target.dbId);
         if (error) throw error;
+        if (target.product_id && Number(target.quantity) > 0) {
+          try {
+            await applyStockDeltaForLines(
+              [{ product_id: target.product_id, quantity: Number(target.quantity) }],
+              [],
+            );
+          } catch (stockErr: any) {
+            console.error("stock restore after delete failed:", stockErr);
+            toast.error("تم حذف البند لكن تعذّر إرجاع الكمية للمخزون: " + (stockErr?.message || ""));
+          }
+        }
         toast.success("تم حذف البند");
       } catch (e: any) {
+        console.error("remove row failed:", e);
         toast.error(e?.message || "فشل حذف البند");
         return;
       }
