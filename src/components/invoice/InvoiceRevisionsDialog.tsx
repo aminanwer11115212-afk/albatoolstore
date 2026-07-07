@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { History, User, Clock } from "lucide-react";
+import { toast } from "sonner";
 import { useDialogSize } from "@/hooks/useDialogSize";
 
 interface Props {
