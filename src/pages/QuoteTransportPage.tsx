@@ -35,9 +35,12 @@ export default function QuoteTransportPage() {
     const { data: trs } = await supabase.from("quote_transports").select("*, transporters(name), destinations(name)").eq("quote_id", id).order("created_at", { ascending: false });
     setList(trs || []);
     if (q?.customer_id) {
-      const { data: dests } = await supabase.from("customer_destinations").select("destination_id, is_default").eq("customer_id", q.customer_id);
-      const def = (dests || []).find((d: any) => d.is_default);
-      if (def) setDestinationId(def.destination_id);
+      try {
+        const { fetchCustomerTransportDefaults } = await import("@/utils/customerTransportDefaults");
+        const defaults = await fetchCustomerTransportDefaults(q.customer_id);
+        if (defaults.destinationId) setDestinationId(defaults.destinationId);
+        if (defaults.transporterId) setTransporterId(defaults.transporterId);
+      } catch (e) { console.warn("customer transport defaults failed", e); }
     }
     setLoading(false);
   };
