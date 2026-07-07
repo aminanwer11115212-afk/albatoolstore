@@ -1,6 +1,10 @@
 import { useState, useCallback, useEffect, lazy } from "react";
 import { lazyEl } from "@/components/PageLoader";
-import { QueryClient, QueryCache, MutationCache, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryCache, MutationCache } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createIDBPersister } from "@/lib/queryPersister";
+import { initOfflineFlush } from "@/lib/offlineQueue";
+import OfflineBanner from "@/components/layout/OfflineBanner";
 import { toast } from "sonner";
 import { BrowserRouter, Route, Routes, useParams, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
