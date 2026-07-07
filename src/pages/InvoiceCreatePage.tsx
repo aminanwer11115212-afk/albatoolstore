@@ -229,34 +229,42 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   useEffect(() => {
     (async () => {
       setProductsLoading(true);
-      const [cs, ps, cfg] = await Promise.all([
-        supabase.from("customers").select("id,name,phone,balance,company").order("name"),
-        fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
-        supabase.from("company_settings").select("*").maybeSingle(),
-      ]);
-      if (cs.data) setCustomers(cs.data as Customer[]);
-      setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
-      setProductsLoading(false);
-      if (cfg.data) setCompany(cfg.data);
-      if (!editId) {
-        // Numbering: رقم افتراضي عشوائي لكل فاتورة جديدة لتفادي التكرار
-        // (POS و Regular لكل منهما بادئة مستقلة)
-        const prefix = pos
-          ? ((cfg.data as any)?.pos_invoice_prefix || "POS-")
-          : (cfg.data?.invoice_prefix || "INV-");
-        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
-        const candidate = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
-          scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
-        });
-        setInvoiceNumber(candidate);
+      try {
+        const [cs, ps, cfg] = await Promise.all([
+          supabase.from("customers").select("id,name,phone,balance,company").order("name"),
+          fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
+          supabase.from("company_settings").select("*").maybeSingle(),
+        ]);
+        if (cs.error) throw cs.error;
+        if (cfg.error) throw cfg.error;
+        if (cs.data) setCustomers(cs.data as Customer[]);
+        setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
+        if (cfg.data) setCompany(cfg.data);
+        if (!editId) {
+          const prefix = pos
+            ? ((cfg.data as any)?.pos_invoice_prefix || "POS-")
+            : (cfg.data?.invoice_prefix || "INV-");
+          const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+          const candidate = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
+            scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+          });
+          setInvoiceNumber(candidate);
+        }
+      } catch (e: any) {
+        console.error("initial load failed:", e);
+        try { const { toast } = await import("sonner"); toast.error(e?.message || "تعذّر تحميل البيانات الأولية"); } catch {}
+      } finally {
+        setProductsLoading(false);
       }
     })();
 
-    supabase.from("accounts").select("id,name,bank_name,account_type").order("name").then(({ data }) => {
+    supabase.from("accounts").select("id,name,bank_name,account_type").order("name").then(({ data, error }) => {
+      if (error) { console.warn("accounts load failed:", error); return; }
       if (data) setAccounts(data);
     });
 
-    supabase.from("warehouses").select("id,name").order("name").then(({ data }) => {
+    supabase.from("warehouses").select("id,name").order("name").then(({ data, error }) => {
+      if (error) { console.warn("warehouses load failed:", error); return; }
       if (data) setWarehouses(data as any);
     });
 
