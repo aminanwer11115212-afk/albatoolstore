@@ -819,6 +819,21 @@ export default function ReadyToShipPanel({
         .rts-btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); width: 100%; justify-content: center; height: 36px; font-size: 12px; }
         .rts-btn-ghost { background: transparent; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
         .rts-btn-sm { height: 26px; width: auto; padding: 0 8px; font-size: 10.5px; }
+        .rts-btn-warning { background: hsl(38 92% 50%); color: hsl(0 0% 100%); }
+        .rts-table td.cell-empty { background: hsl(38 92% 50% / 0.08); box-shadow: inset 0 -2px 0 hsl(38 92% 50% / 0.55); }
+        .rts-empty-hint {
+          font-size: 9.5px; font-weight: 700; color: hsl(38 92% 35%);
+          padding: 2px 4px 0; text-align: center; line-height: 1.2;
+        }
+        .rts-toast {
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          padding: 6px 10px; margin: 6px 8px 0;
+          background: hsl(38 92% 50% / 0.12);
+          border: 1px solid hsl(38 92% 50% / 0.45);
+          border-radius: 6px;
+          font-size: 11px; font-weight: 700; color: hsl(38 92% 25%);
+        }
+        .rts-toast b { color: hsl(38 92% 25%); font-weight: 900; }
 
         .rts-table thead th.cell-sel { min-width: 130px; }
         .rts-table thead th.cell-act { width: 92px; text-align: center; }
