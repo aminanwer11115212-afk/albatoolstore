@@ -24,7 +24,7 @@ function fmt(n: number | null | undefined): string {
   return Number(n || 0).toLocaleString("en-US");
 }
 
-function buildDocHTML(args: {
+export function buildDocHTML(args: {
   docTitle: string;
   docNumber?: string;
   date: string;
@@ -57,8 +57,12 @@ function buildDocHTML(args: {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="lov-doc-label" content="${attr(docTitle)}">
+<meta name="lov-doc-number" content="${attr(docNumber || "")}">
+<meta name="lov-customer-name" content="${attr(customer?.name || "")}">
 <title>${attr(docTitle)} ${attr(docNumber || "")}</title>
 <style>
+
   @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #1a1a1a; background: #f3f4f6; padding: 80px 12px 24px; line-height: 1.5; font-size: 14px; }
@@ -142,17 +146,33 @@ function buildDocHTML(args: {
       <tr class="total-row" data-section="grand-total"><td colspan="2" style="text-align:right; padding-right:15px;">الإجمالي</td><td></td><td></td><td>${fmt(grandTotal)}</td></tr>
     </tbody>
   </table>
-  <div class="summary-row" data-section="account-summary">
-    <div class="summary-box" data-section="paid-amount"><div class="summary-box-title">المبلغ المدفوع</div><div class="summary-box-value" style="color:#16a34a;">${fmt(paidAmount)}</div></div>
-    <div class="summary-box" data-section="final-total" style="border-color:#2980b9;"><div class="summary-box-title">المطلوب النهائي</div><div class="summary-box-value blue">${fmt(finalTotal)}</div></div>
+  <div class="summary-row" data-section="account-summary" data-section-label="ملخص الحساب">
+    <div class="summary-box" data-section="paid-amount" data-section-label="المبلغ المدفوع"><div class="summary-box-title">المبلغ المدفوع</div><div class="summary-box-value" style="color:#16a34a;">${fmt(paidAmount)}</div></div>
+    <div class="summary-box" data-section="final-total" data-section-label="المطلوب النهائي" style="border-color:#2980b9;"><div class="summary-box-title">المطلوب النهائي</div><div class="summary-box-value blue">${fmt(finalTotal)}</div></div>
   </div>
+
 
   ${notes ? `<div class="notes-section" data-section="notes"><h4>📝 ملاحظات</h4><p>${attr(notes)}</p></div>` : ""}
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 (function(){
-  var fileName = ${JSON.stringify(`${docTitle}${docNumber ? " - " + docNumber : ""}.pdf`)};
+  // اسم ملف PDF يطابق قالب الطباعة الرسمية (buildWaFileName في printTemplate.ts):
+  //   "<اسم المستند> - <اسم العميل> - <رقم المستند>.pdf"
+  //   مثال: "فاتورة مبيعات - أحمد علي - INV-001.pdf"
+  var __docLabel  = ${JSON.stringify(String(docTitle || "مستند"))};
+  var __docNumber = ${JSON.stringify(String(docNumber || ""))};
+  var __customer  = ${JSON.stringify(String(customer?.name || "بدون اسم"))};
+  function __cleanName(s){
+    s = (s || '').toString().trim();
+    if (!s || s === '-' || s === '—' || s === '_' || s === 'undefined' || s === 'null') return '';
+    s = s.replace(/[\\/:*?"<>|\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return s;
+  }
+  var __parts = [__cleanName(__docLabel) || 'مستند', __cleanName(__customer) || 'بدون اسم'];
+  if (__cleanName(__docNumber)) __parts.push(__cleanName(__docNumber));
+  var fileName = __parts.join(' - ').slice(0, 120) + '.pdf';
+
   var btn = document.getElementById('__btn_pdf');
   var label = document.getElementById('__btn_label');
   var progress = document.getElementById('__progress');
