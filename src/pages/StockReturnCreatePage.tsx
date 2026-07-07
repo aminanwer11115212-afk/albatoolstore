@@ -777,7 +777,18 @@ export default function StockReturnCreatePage() {
     }
   }
 
-  // ---------- Render ----------
+  // F9 = معاينة الطباعة، F10 = طباعة مباشرة (يتطلب حفظ المرتجع أولاً)
+  useDocPrintShortcuts({
+    onPreview: () => {
+      if (!editId) { toast.message("احفظ المرتجع أولاً"); return; }
+      navigate(`/preview/return/${editId}`);
+    },
+    onPrint: () => {
+      if (!editId) { toast.message("احفظ المرتجع أولاً"); return; }
+      navigate(`/preview/return/${editId}?autoprint=1`);
+    },
+  });
+
   return (
     <div ref={pageRef} className="neo-quote-scope" dir="rtl" style={{ position: "relative" }}>
       <style>{`
