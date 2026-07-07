@@ -626,7 +626,7 @@ export default function NotificationsPage() {
           <div className="text-center py-10 text-sm text-muted-foreground">لا توجد إشعارات تطابق الفلتر</div>
         ) : (
           <div className="space-y-1">
-            {filtered.map(n => {
+            {visible.map(n => {
               const isOut = n.severity === "out";
               const isLow = n.severity === "low";
               const isPinned = n.kind === "stock" && (isOut || isLow);
@@ -662,6 +662,25 @@ export default function NotificationsPage() {
                 </div>
               );
             })}
+            {hasMore && (
+              <div className="flex flex-col items-center gap-1 py-3">
+                <button
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  className="btn-xs btn-info flex items-center gap-1"
+                >
+                  عرض المزيد ({filtered.length - visible.length} متبقٍ)
+                </button>
+                <button
+                  onClick={() => setVisibleCount(filtered.length)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground underline"
+                >
+                  عرض الكل ({filtered.length})
+                </button>
+              </div>
+            )}
+            <div className="text-center text-[11px] text-muted-foreground pt-2">
+              عرض {visible.length} من {filtered.length}
+            </div>
           </div>
         )}
       </div>
