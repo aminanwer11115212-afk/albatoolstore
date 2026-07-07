@@ -226,6 +226,7 @@ const btnStyle = (bg: string): React.CSSProperties => ({
 
 export default function StockReturnCreatePage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { id: editId } = useParams();
   // One-time reset of saved toolbar positions for this screen
   useEffect(() => {
