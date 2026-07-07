@@ -979,7 +979,34 @@ export default function ReadyToShipPanel({
             <div style={{ fontWeight: 700 }}>لا توجد فواتير جاهزة للرفع</div>
             <div style={{ fontSize: 10, marginTop: 4 }}>الفواتير التي تنتهي تغليفها تظهر هنا</div>
           </div>
-        ) : tab === "all" ? (
+        ) : (() => {
+          const unassigned = invoices.filter((inv) => {
+            const c = getChoice(inv);
+            return !c.transporterId || !c.destinationId;
+          }).length;
+          return unassigned > 0 ? (
+            <div className="rts-toast">
+              <span>⚠ <b>{unassigned}</b> فاتورة بلا ناقل أو وجهة — اختر يدوياً من الخلايا الصفراء ثم اضغط «تثبيت» لحفظ الاختيار كافتراضي للعميل.</span>
+              <button
+                type="button"
+                className="rts-btn rts-btn-ghost"
+                style={{ height: 24, fontSize: 10.5, padding: "0 8px" }}
+                onClick={() => setAddTrOpen(true)}
+              >
+                <Plus size={11} /> ناقل جديد
+              </button>
+            </div>
+          ) : null;
+        })()}
+        {invoices.length > 0 && (tab === "all" ? (
+          <table className="rts-table">
+            <thead>
+              <tr>
+                <th className="cell-idx">#</th>
+                <th className="cell-check">
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
           <table className="rts-table">
             <thead>
               <tr>
