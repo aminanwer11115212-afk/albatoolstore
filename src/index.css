@@ -1973,22 +1973,28 @@ tr[data-row-mode="edit"]:not(.row-pending-delete):not(.row-selected-danger) > td
 }
 
 /* ---- الخلية المُركّز عليها: لون أعمق + إطار داخلي ---- */
-[data-nav-col]:focus:not([data-edit-mode="true"]) {
+[data-nav-table] [data-nav-col]:focus:not([data-edit-mode="true"]) {
   background: hsl(25 95% 53% / 0.35) !important;
   box-shadow: inset 0 0 0 2px hsl(25 95% 45%) !important;
   color: hsl(20 60% 15%) !important;
   outline: none !important;
 }
-[data-nav-col][data-edit-mode="true"]:focus {
+[data-nav-table] [data-nav-col][data-edit-mode="true"]:focus {
   background: hsl(48 100% 60% / 0.45) !important;
   box-shadow: inset 0 0 0 2px hsl(45 100% 40%) !important;
   color: hsl(30 60% 15%) !important;
   outline: none !important;
 }
 
-/* ---- صف الإضافة السريعة أيضاً ---- */
-.quick-add-row[data-row-mode="nav"] { background: hsl(25 95% 53% / 0.10) !important; }
-.quick-add-row[data-row-mode="edit"] { background: hsl(48 100% 55% / 0.16) !important; }
+/* ---- صف الإضافة السريعة: بدون أي تلوين وضع/تحديد ---- */
+.quick-add-row[data-row-mode],
+[data-nav-zone="quick"][data-row-mode] { background: transparent !important; }
+.quick-add-row [data-nav-col]:focus,
+[data-nav-zone="quick"] [data-nav-col]:focus {
+  background: revert !important;
+  box-shadow: revert !important;
+  color: revert !important;
+}
 
 
 
