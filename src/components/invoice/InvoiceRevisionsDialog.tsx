@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { History, User, Clock } from "lucide-react";
+import { toast } from "sonner";
 import { useDialogSize } from "@/hooks/useDialogSize";
 
 interface Props {
@@ -27,15 +28,27 @@ export default function InvoiceRevisionsDialog({ invoiceId, open, onOpenChange }
 
   useEffect(() => {
     if (!open || !invoiceId) return;
+    let cancelled = false;
     setLoading(true);
-    (supabase as any).from("invoice_revisions")
-      .select("*")
-      .eq("invoice_id", invoiceId)
-      .order("revision_number", { ascending: false })
-      .then(({ data }: any) => {
-        setRevisions(data || []);
-        setLoading(false);
-      });
+    (async () => {
+      try {
+        const { data, error } = await (supabase as any).from("invoice_revisions")
+          .select("*")
+          .eq("invoice_id", invoiceId)
+          .order("revision_number", { ascending: false });
+        if (error) throw error;
+        if (!cancelled) setRevisions(data || []);
+      } catch (e: any) {
+        console.error("load revisions failed:", e);
+        if (!cancelled) {
+          toast.error(e?.message || "تعذّر تحميل سجل التعديلات");
+          setRevisions([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [open, invoiceId]);
 
   return (

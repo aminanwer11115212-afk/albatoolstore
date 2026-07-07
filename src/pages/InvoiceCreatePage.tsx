@@ -229,34 +229,42 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   useEffect(() => {
     (async () => {
       setProductsLoading(true);
-      const [cs, ps, cfg] = await Promise.all([
-        supabase.from("customers").select("id,name,phone,balance,company").order("name"),
-        fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
-        supabase.from("company_settings").select("*").maybeSingle(),
-      ]);
-      if (cs.data) setCustomers(cs.data as Customer[]);
-      setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
-      setProductsLoading(false);
-      if (cfg.data) setCompany(cfg.data);
-      if (!editId) {
-        // Numbering: رقم افتراضي عشوائي لكل فاتورة جديدة لتفادي التكرار
-        // (POS و Regular لكل منهما بادئة مستقلة)
-        const prefix = pos
-          ? ((cfg.data as any)?.pos_invoice_prefix || "POS-")
-          : (cfg.data?.invoice_prefix || "INV-");
-        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
-        const candidate = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
-          scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
-        });
-        setInvoiceNumber(candidate);
+      try {
+        const [cs, ps, cfg] = await Promise.all([
+          supabase.from("customers").select("id,name,phone,balance,company").order("name"),
+          fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
+          supabase.from("company_settings").select("*").maybeSingle(),
+        ]);
+        if (cs.error) throw cs.error;
+        if (cfg.error) throw cfg.error;
+        if (cs.data) setCustomers(cs.data as Customer[]);
+        setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
+        if (cfg.data) setCompany(cfg.data);
+        if (!editId) {
+          const prefix = pos
+            ? ((cfg.data as any)?.pos_invoice_prefix || "POS-")
+            : (cfg.data?.invoice_prefix || "INV-");
+          const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+          const candidate = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
+            scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+          });
+          setInvoiceNumber(candidate);
+        }
+      } catch (e: any) {
+        console.error("initial load failed:", e);
+        try { const { toast } = await import("sonner"); toast.error(e?.message || "تعذّر تحميل البيانات الأولية"); } catch {}
+      } finally {
+        setProductsLoading(false);
       }
     })();
 
-    supabase.from("accounts").select("id,name,bank_name,account_type").order("name").then(({ data }) => {
+    supabase.from("accounts").select("id,name,bank_name,account_type").order("name").then(({ data, error }) => {
+      if (error) { console.warn("accounts load failed:", error); return; }
       if (data) setAccounts(data);
     });
 
-    supabase.from("warehouses").select("id,name").order("name").then(({ data }) => {
+    supabase.from("warehouses").select("id,name").order("name").then(({ data, error }) => {
+      if (error) { console.warn("warehouses load failed:", error); return; }
       if (data) setWarehouses(data as any);
     });
 
@@ -545,19 +553,26 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   async function removeRow(uid: string) {
     const target = rows.find((r) => r.uid === uid);
     if (!target) return;
-    // إذا كان البند محفوظاً في قاعدة البيانات: احذفه + أرجع الكمية إلى المخزون فوراً
+    // إذا كان البند محفوظاً في قاعدة البيانات: احذفه أولاً، ثم أرجع الكمية إلى المخزون فقط بعد نجاح الحذف
+    // (كان الترتيب معكوساً وقد يُضاف المخزون قبل نجاح الحذف فيتضاعف)
     if (target.dbId && editId) {
       try {
-        if (target.product_id && Number(target.quantity) > 0) {
-          await applyStockDeltaForLines(
-            [{ product_id: target.product_id, quantity: Number(target.quantity) }],
-            [],
-          );
-        }
         const { error } = await supabase.from("invoice_items").delete().eq("id", target.dbId);
         if (error) throw error;
+        if (target.product_id && Number(target.quantity) > 0) {
+          try {
+            await applyStockDeltaForLines(
+              [{ product_id: target.product_id, quantity: Number(target.quantity) }],
+              [],
+            );
+          } catch (stockErr: any) {
+            console.error("stock restore after delete failed:", stockErr);
+            toast.error("تم حذف البند لكن تعذّر إرجاع الكمية للمخزون: " + (stockErr?.message || ""));
+          }
+        }
         toast.success("تم حذف البند");
       } catch (e: any) {
+        console.error("remove row failed:", e);
         toast.error(e?.message || "فشل حذف البند");
         return;
       }

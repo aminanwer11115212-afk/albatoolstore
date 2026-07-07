@@ -41,78 +41,105 @@ export default function InvoiceTransportPage() {
   const load = async () => {
     if (!id) return;
     setLoading(true);
-    const { data: inv } = await supabase.from("invoices").select("*, customers(id, name)").eq("id", id).single();
-    setInvoice(inv);
+    try {
+      const { data: inv, error: invErr } = await supabase.from("invoices").select("*, customers(id, name)").eq("id", id).single();
+      if (invErr) throw invErr;
+      setInvoice(inv);
 
-    const { data: items } = await supabase.from("invoice_items").select("product_id, quantity").eq("invoice_id", id);
-    const ids: string[] = [];
-    const qtyMap: Record<string, number> = {};
-    (items || []).forEach((it: any) => {
-      if (!it.product_id) return;
-      if (!ids.includes(it.product_id)) ids.push(it.product_id);
-      qtyMap[it.product_id] = (qtyMap[it.product_id] || 0) + Number(it.quantity || 0);
-    });
-    setInvoiceProductIds(ids);
-    setProductQuantities(qtyMap);
-
-    const { data: trns } = await supabase.from("invoice_transports")
-      .select("*, transporters(name), destinations(name)")
-      .eq("invoice_id", id)
-      .order("created_at", { ascending: false });
-    setList(trns || []);
-
-    const trnIds = (trns || []).map((t: any) => t.id);
-    if (trnIds.length) {
-      const { data: tItems } = await (supabase as any).from("invoices_transports_items")
-        .select("product_id, quantity").in("invoice_transport_id", trnIds);
-      const sMap: Record<string, number> = {};
-      (tItems || []).forEach((it: any) => {
+      const { data: items, error: itemsErr } = await supabase.from("invoice_items").select("product_id, quantity").eq("invoice_id", id);
+      if (itemsErr) throw itemsErr;
+      const ids: string[] = [];
+      const qtyMap: Record<string, number> = {};
+      (items || []).forEach((it: any) => {
         if (!it.product_id) return;
-        sMap[it.product_id] = (sMap[it.product_id] || 0) + Number(it.quantity || 0);
+        if (!ids.includes(it.product_id)) ids.push(it.product_id);
+        qtyMap[it.product_id] = (qtyMap[it.product_id] || 0) + Number(it.quantity || 0);
       });
-      setShippedTotals(sMap);
-    } else {
-      setShippedTotals({});
-    }
+      setInvoiceProductIds(ids);
+      setProductQuantities(qtyMap);
 
-    if (inv?.customer_id) {
-      const [{ data: dests }, { data: pref }] = await Promise.all([
-        supabase.from("customer_destinations")
-          .select("destination_id, is_default").eq("customer_id", inv.customer_id),
-        (supabase as any).from("customer_preferred_transporter")
-          .select("transporter_id").eq("customer_id", inv.customer_id).maybeSingle(),
-      ]);
-      const def = (dests || []).find((d: any) => d.is_default);
-      if (def && !destinationId) setDestinationId(def.destination_id);
-      if (pref?.transporter_id && !transporterId) setTransporterId(pref.transporter_id);
+      const { data: trns, error: trnsErr } = await supabase.from("invoice_transports")
+        .select("*, transporters(name), destinations(name)")
+        .eq("invoice_id", id)
+        .order("created_at", { ascending: false });
+      if (trnsErr) throw trnsErr;
+      setList(trns || []);
+
+      const trnIds = (trns || []).map((t: any) => t.id);
+      if (trnIds.length) {
+        const { data: tItems, error: tItemsErr } = await (supabase as any).from("invoices_transports_items")
+          .select("product_id, quantity").in("invoice_transport_id", trnIds);
+        if (tItemsErr) throw tItemsErr;
+        const sMap: Record<string, number> = {};
+        (tItems || []).forEach((it: any) => {
+          if (!it.product_id) return;
+          sMap[it.product_id] = (sMap[it.product_id] || 0) + Number(it.quantity || 0);
+        });
+        setShippedTotals(sMap);
+      } else {
+        setShippedTotals({});
+      }
+
+      if (inv?.customer_id) {
+        try {
+          const [{ data: dests }, { data: pref }] = await Promise.all([
+            supabase.from("customer_destinations")
+              .select("destination_id, is_default").eq("customer_id", inv.customer_id),
+            (supabase as any).from("customer_preferred_transporter")
+              .select("transporter_id").eq("customer_id", inv.customer_id).maybeSingle(),
+          ]);
+          const def = (dests || []).find((d: any) => d.is_default);
+          if (def && !destinationId) setDestinationId(def.destination_id);
+          if (pref?.transporter_id && !transporterId) setTransporterId(pref.transporter_id);
+        } catch (prefErr) {
+          console.warn("customer preferences load failed:", prefErr);
+        }
+      }
+    } catch (e: any) {
+      console.error("transport load failed:", e);
+      toast.error(e?.message || "تعذّر تحميل بيانات الترحيل");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleAdd = async () => {
     if (!id) return;
+    if (!transporterId) { toast.error("اختر الناقل"); return; }
+    const costNum = parseFloat(cost);
+    if (cost !== "" && (!isFinite(costNum) || costNum < 0)) { toast.error("التكلفة غير صحيحة"); return; }
     try {
-      await supabase.from("invoice_transports").insert({
+      const { error } = await supabase.from("invoice_transports").insert({
         invoice_id: id,
         transporter_id: transporterId || null,
         destination_id: destinationId || null,
         transport_date: transportDate,
         vehicle_number: vehicleNumber || null,
         driver_name: driverName || null,
-        cost: parseFloat(cost) || 0,
+        cost: isFinite(costNum) ? costNum : 0,
         notes: notes || null,
       });
+      if (error) throw error;
       toast.success("تم إضافة الترحيل");
       setTransporterId(""); setVehicleNumber(""); setDriverName(""); setCost("0"); setNotes("");
       load();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      console.error("transport insert failed:", e);
+      toast.error(e?.message || "تعذّر إضافة الترحيل");
+    }
   };
 
   const handleDelete = async (tId: string) => {
     if (!confirm("حذف هذا الترحيل وبنوده؟")) return;
-    await supabase.from("invoice_transports").delete().eq("id", tId);
-    toast.success("تم الحذف");
-    load();
+    try {
+      const { error } = await supabase.from("invoice_transports").delete().eq("id", tId);
+      if (error) throw error;
+      toast.success("تم الحذف");
+      load();
+    } catch (e: any) {
+      console.error("transport delete failed:", e);
+      toast.error(e?.message || "تعذّر حذف الترحيل");
+    }
   };
 
   const toggleExpanded = (tId: string) => {

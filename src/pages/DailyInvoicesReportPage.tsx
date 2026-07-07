@@ -108,7 +108,7 @@ export default function DailyInvoicesReportPage() {
                     <td data-label="وقت الإنشاء" className="px-4 py-3 text-foreground text-xs">{new Date(inv.created_at).toLocaleTimeString("ar-SA")}</td>
                     <td data-label="الإجراءات" className="px-4 py-3">
                       <button
-                        onClick={() => navigate(`/invoices/${inv.id}`)}
+                        onClick={() => navigate(`/invoices/view/${inv.id}`)}
                         className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 transition-colors min-h-[32px] min-w-[32px] inline-flex items-center justify-center"
                         title="عرض الفاتورة"
                         aria-label="عرض الفاتورة"

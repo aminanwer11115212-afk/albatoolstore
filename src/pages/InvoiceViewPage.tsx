@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -74,6 +74,7 @@ export default function InvoiceViewPage() {
 
   // Status change
   const [newStatus, setNewStatus] = useState("pending");
+  const savingEditRef = useRef(false);
 
   useEffect(() => {
     loadInvoice();
@@ -282,17 +283,23 @@ export default function InvoiceViewPage() {
 
   const handleWhatsApp = async (_type: WhatsAppMessageType) => {
     if (!invoice) return;
-    const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
-    await shareDocumentViaWhatsApp({
-      docType: "invoice",
-      docId: invoice.id,
-      phone: pickCustomerWhatsApp(invoice.customers),
-      customerName: invoice.customers?.name || (invoice as any).walk_in_customer_name,
-      docNumber: invoice.invoice_number,
-      total: invoice.total,
-      docLabel: (invoice as any).source === "pos" ? "فاتورة كاش" : "فاتورة",
-    });
-    setShowWhatsappMenu(false);
+    try {
+      const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+      await shareDocumentViaWhatsApp({
+        docType: "invoice",
+        docId: invoice.id,
+        phone: pickCustomerWhatsApp(invoice.customers),
+        customerName: invoice.customers?.name || (invoice as any).walk_in_customer_name,
+        docNumber: invoice.invoice_number,
+        total: invoice.total,
+        docLabel: (invoice as any).source === "pos" ? "فاتورة كاش" : "فاتورة",
+      });
+    } catch (e: any) {
+      console.error("whatsapp share failed:", e);
+      toast.error(e?.message || "تعذّرت مشاركة الفاتورة عبر واتساب");
+    } finally {
+      setShowWhatsappMenu(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -415,30 +422,57 @@ export default function InvoiceViewPage() {
 
   const saveEdit = async () => {
     if (!editingCell || !invoice) return;
+    // Guard against double submit (onBlur + onKeyDown Enter fire together)
+    if (savingEditRef.current) return;
     const { index, field } = editingCell;
     const item = items[index];
-    const val = parseFloat(editValue) || 0;
+    if (!item) { setEditingCell(null); return; }
+    const val = parseFloat(editValue);
+    if (!isFinite(val) || val < 0) {
+      toast.error("أدخل قيمة صحيحة (رقم موجب)");
+      setEditingCell(null);
+      return;
+    }
+    if (field === "quantity" && val <= 0) {
+      toast.error("الكمية يجب أن تكون أكبر من صفر");
+      setEditingCell(null);
+      return;
+    }
+    if (field === "discount" && val > 100) {
+      toast.error("الخصم لا يتجاوز 100%");
+      setEditingCell(null);
+      return;
+    }
     const updates: any = { [field]: val };
-    const qty = field === "quantity" ? val : item.quantity;
-    const price = field === "unit_price" ? val : item.unit_price;
-    const disc = field === "discount" ? val : (item.discount || 0);
+    const qty = field === "quantity" ? val : Number(item.quantity) || 0;
+    const price = field === "unit_price" ? val : Number(item.unit_price) || 0;
+    const disc = field === "discount" ? val : Number(item.discount || 0);
     const baseTotal = qty * price;
     const afterDiscount = baseTotal - (baseTotal * disc / 100);
-    updates.total = afterDiscount;
+    updates.total = isFinite(afterDiscount) ? afterDiscount : 0;
+    savingEditRef.current = true;
     try {
-      await supabase.from("invoice_items").update(updates).eq("id", item.id);
+      const { error: itemErr } = await supabase.from("invoice_items").update(updates).eq("id", item.id);
+      if (itemErr) throw itemErr;
       const newItems = items.map((it, i) => i === index ? { ...it, ...updates } : it);
-      const newSubtotal = newItems.reduce((s: number, it: any) => s + (it.quantity * it.unit_price), 0);
-      const newDisc = newItems.reduce((s: number, it: any) => s + (it.quantity * it.unit_price * (it.discount || 0) / 100), 0);
-      const newTotal = newSubtotal - newDisc + Number(invoice.shipping || 0);
-      await supabase.from("invoices").update({
+      const newSubtotal = newItems.reduce((s: number, it: any) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0);
+      const newDisc = newItems.reduce((s: number, it: any) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0) * (Number(it.discount) || 0) / 100, 0);
+      const newTotal = newSubtotal - newDisc + (Number(invoice.shipping) || 0);
+      if (!isFinite(newTotal)) throw new Error("قيم غير صحيحة في الفاتورة");
+      const { error: invErr } = await supabase.from("invoices").update({
         subtotal: newSubtotal, discount: newDisc, total: newTotal,
-        due_amount: Math.max(0, newTotal - (invoice.paid_amount || 0)),
+        due_amount: Math.max(0, newTotal - (Number(invoice.paid_amount) || 0)),
       }).eq("id", invoice.id);
+      if (invErr) throw invErr;
       toast.success("تم التحديث");
       loadInvoice();
-    } catch (e: any) { toast.error(e.message); }
-    setEditingCell(null);
+    } catch (e: any) {
+      console.error("saveEdit failed:", e);
+      toast.error(e?.message || "تعذّر حفظ التعديل");
+    } finally {
+      savingEditRef.current = false;
+      setEditingCell(null);
+    }
   };
 
   const EditableCell = ({ value, index, field, suffix }: { value: number; index: number; field: string; suffix?: string }) => {
