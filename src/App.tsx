@@ -279,7 +279,9 @@ const App = () => {
         <ColumnsResetFloatingButton />
         <HomeButton />
         <StaffGuard>
+        <ConfirmDeleteProvider>
         <AppLayout>
+
           <Routes>
             <Route path="/login" element={lazyEl(<LoginPage />, "تسجيل الدخول")} />
             {/* /signup معطّل — الحسابات تُنشأ من المسؤول فقط */}
