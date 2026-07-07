@@ -18,6 +18,7 @@ import {
   useCustomerTransporters, useCustomerDestinations, useCustomerPreferredTransporter,
 } from "@/hooks/useData";
 import SearchableSelect from "@/components/transport/SearchableSelect";
+import { resolveDefaultsFromCache } from "@/utils/customerTransportDefaults";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -385,15 +386,17 @@ export default function ReadyToShipPanel({
     </button>
   );
 
-  // القوائم تعرض كل الناقلين/الوجهات في النظام (متزامنة مع صفحة إدارة العملاء)
-  // الافتراضي يبقى من ربط العميل (preferred / is_default) إن وُجد.
+  // القوائم تعرض كل الناقلين/الوجهات في النظام (متزامنة مع صفحة إدارة العملاء).
+  // الافتراضي يُحلّ عبر util موحّد يستخدمه أيضاً InvoiceTransportPage/QuoteTransportPage
+  // — بدون سقوط تلقائي على أول قيمة (الفراغ مقصود عند غياب افتراضيات العميل).
   const optionsForInvoice = useCallback((inv: any) => {
     const cid = inv.customer_id;
     const allT = (allTransporters as any[]) || [];
     const allD = (allDestinations as any[]) || [];
-    const linkedD = ((custDestinations as any[]) || []).filter((x) => x.customer_id === cid);
-    const preferred = ((prefTransporters as any[]) || []).find((p) => p.customer_id === cid)?.transporter_id;
-    const defaultDest = linkedD.find((ld) => ld.is_default)?.destination_id;
+    const { transporterId: preferred, destinationId: defaultDest } = resolveDefaultsFromCache(cid, {
+      prefTransporters: prefTransporters as any,
+      custDestinations: custDestinations as any,
+    });
     return { transporters: allT, destinations: allD, preferred, defaultDest };
   }, [allTransporters, allDestinations, custDestinations, prefTransporters]);
 
@@ -597,7 +600,7 @@ export default function ReadyToShipPanel({
               : (inv.customers?.name || "كاش")}
           </span>
         </td>
-        <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
+        <td className={`cell-sel ${!choice.transporterId ? "cell-empty" : ""}`} onClick={(e) => e.stopPropagation()}>
           <SearchableSelect
             options={transporters as any}
             value={choice.transporterId}
@@ -605,19 +608,38 @@ export default function ReadyToShipPanel({
             placeholder="— اختر ناقل —"
             className="rts-select"
           />
+          {!choice.transporterId && (
+            <div className="rts-empty-hint">⚠ لم يُحدَّد ناقل للعميل</div>
+          )}
         </td>
-        <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
+        <td className={`cell-sel ${!choice.destinationId ? "cell-empty" : ""}`} onClick={(e) => e.stopPropagation()}>
           <SearchableSelect
             options={destinations as any}
             value={choice.destinationId}
             onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
-            placeholder="— بدون وجهة —"
+            placeholder="— اختر وجهة —"
             className="rts-select"
           />
+          {!choice.destinationId && (
+            <div className="rts-empty-hint">⚠ لم تُحدَّد وجهة</div>
+          )}
         </td>
         <td className="cell-act" onClick={(e) => e.stopPropagation()}>
           {hasTransport ? (
             <span className="rts-pill"><CheckCircle2 size={12} /> مُرحَّلة</span>
+          ) : !choice.transporterId && !choice.destinationId && inv.customer_id ? (
+            <button
+              type="button"
+              className="rts-btn rts-btn-warning rts-btn-sm"
+              title="اختر ناقل ووجهة وحدّث افتراضيات العميل"
+              onClick={() => {
+                setFocusedRowId(inv.id);
+                // Prompt user to pick both, then use existing pin-to-customer flow
+                toast.info("اختر ناقل ووجهة من الخليتين ثم اضغط تثبيت");
+              }}
+            >
+              <Plus size={12} /> اختر للعميل
+            </button>
           ) : (
             <button
               type="button"
@@ -797,6 +819,21 @@ export default function ReadyToShipPanel({
         .rts-btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); width: 100%; justify-content: center; height: 36px; font-size: 12px; }
         .rts-btn-ghost { background: transparent; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
         .rts-btn-sm { height: 26px; width: auto; padding: 0 8px; font-size: 10.5px; }
+        .rts-btn-warning { background: hsl(38 92% 50%); color: hsl(0 0% 100%); }
+        .rts-table td.cell-empty { background: hsl(38 92% 50% / 0.08); box-shadow: inset 0 -2px 0 hsl(38 92% 50% / 0.55); }
+        .rts-empty-hint {
+          font-size: 9.5px; font-weight: 700; color: hsl(38 92% 35%);
+          padding: 2px 4px 0; text-align: center; line-height: 1.2;
+        }
+        .rts-toast {
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          padding: 6px 10px; margin: 6px 8px 0;
+          background: hsl(38 92% 50% / 0.12);
+          border: 1px solid hsl(38 92% 50% / 0.45);
+          border-radius: 6px;
+          font-size: 11px; font-weight: 700; color: hsl(38 92% 25%);
+        }
+        .rts-toast b { color: hsl(38 92% 25%); font-weight: 900; }
 
         .rts-table thead th.cell-sel { min-width: 130px; }
         .rts-table thead th.cell-act { width: 92px; text-align: center; }
@@ -942,7 +979,26 @@ export default function ReadyToShipPanel({
             <div style={{ fontWeight: 700 }}>لا توجد فواتير جاهزة للرفع</div>
             <div style={{ fontSize: 10, marginTop: 4 }}>الفواتير التي تنتهي تغليفها تظهر هنا</div>
           </div>
-        ) : tab === "all" ? (
+        ) : (() => {
+          const unassigned = invoices.filter((inv) => {
+            const c = getChoice(inv);
+            return !c.transporterId || !c.destinationId;
+          }).length;
+          return unassigned > 0 ? (
+            <div className="rts-toast">
+              <span>⚠ <b>{unassigned}</b> فاتورة بلا ناقل أو وجهة — اختر يدوياً من الخلايا الصفراء ثم اضغط «تثبيت» لحفظ الاختيار كافتراضي للعميل.</span>
+              <button
+                type="button"
+                className="rts-btn rts-btn-ghost"
+                style={{ height: 24, fontSize: 10.5, padding: "0 8px" }}
+                onClick={() => setAddTrOpen(true)}
+              >
+                <Plus size={11} /> ناقل جديد
+              </button>
+            </div>
+          ) : null;
+        })()}
+        {invoices.length > 0 && (tab === "all" ? (
           <table className="rts-table">
             <thead>
               <tr>
@@ -1009,8 +1065,9 @@ export default function ReadyToShipPanel({
               })}
             </tbody>
           </table>
-        )}
+        ))}
       </div>
+
 
       {/* Footer */}
       {!hideFooter && (

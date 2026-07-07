@@ -196,6 +196,9 @@ export default function NotificationsPage() {
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
+  // Pagination — تحميل تدريجي بدل رسم آلاف العناصر دفعة واحدة
+  const PAGE_SIZE = 100;
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
   const [readIds, setReadIds] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem(NOTIF_READ_KEY);
@@ -404,6 +407,27 @@ export default function NotificationsPage() {
 
   useEffect(() => { load();   }, [days]);
 
+  // Realtime — يعيد التحميل تلقائياً عند تغيّر المخزون/الفواتير/المهام
+  // لتظهر الإشعارات الجديدة بدون انتظار إعادة تحميل يدوية.
+  useEffect(() => {
+    let pending: any = null;
+    const debouncedReload = () => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(() => { load(); pending = null; }, 800);
+    };
+    const channel = (supabase as any)
+      .channel("notifications-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, debouncedReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, debouncedReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "quotes" }, debouncedReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "todos" }, debouncedReload)
+      .subscribe();
+    return () => {
+      if (pending) clearTimeout(pending);
+      try { (supabase as any).removeChannel(channel); } catch {}
+    };
+  }, [load]);
+
   // إخفاء مؤقت لإشعارات المخزون (يُحفظ مع تاريخ انتهاء)
   const SNOOZE_KEY = NOTIF_SNOOZE_KEY;
   const SNOOZE_MS = 2 * 60 * 60 * 1000; // ساعتان
@@ -475,6 +499,12 @@ export default function NotificationsPage() {
       return b.ts - a.ts;
     });
   }, [items, kindFilter, search, snoozed]);
+
+  // إعادة ضبط عدد المرئي عند تغيّر الفلاتر
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [kindFilter, search, days]);
+
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const hasMore = filtered.length > visible.length;
 
   const snoozedCount = useMemo(() => {
     const now = Date.now();
@@ -596,7 +626,7 @@ export default function NotificationsPage() {
           <div className="text-center py-10 text-sm text-muted-foreground">لا توجد إشعارات تطابق الفلتر</div>
         ) : (
           <div className="space-y-1">
-            {filtered.map(n => {
+            {visible.map(n => {
               const isOut = n.severity === "out";
               const isLow = n.severity === "low";
               const isPinned = n.kind === "stock" && (isOut || isLow);
@@ -632,6 +662,25 @@ export default function NotificationsPage() {
                 </div>
               );
             })}
+            {hasMore && (
+              <div className="flex flex-col items-center gap-1 py-3">
+                <button
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  className="btn-xs btn-info flex items-center gap-1"
+                >
+                  عرض المزيد ({filtered.length - visible.length} متبقٍ)
+                </button>
+                <button
+                  onClick={() => setVisibleCount(filtered.length)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground underline"
+                >
+                  عرض الكل ({filtered.length})
+                </button>
+              </div>
+            )}
+            <div className="text-center text-[11px] text-muted-foreground pt-2">
+              عرض {visible.length} من {filtered.length}
+            </div>
           </div>
         )}
       </div>
