@@ -55,9 +55,56 @@ export default function PurchasePage() {
   (suppliers || []).forEach((s: any) => supplierMap.set(s.id, s));
 
   const confirmDelete = useConfirmDelete();
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const order = (orders || []).find((o: any) => o.id === id);
     const willRestore = order?.status === "received";
+
+    // Look up which products in this PO are "safe to also delete":
+    // products that (a) exist, (b) are only referenced by THIS purchase order,
+    // (c) are not used in any invoice, quote, stock return, or stock transfer,
+    // and (d) have no current stock (or stock will be zeroed by the restore).
+    let deletableProductIds: string[] = [];
+    try {
+      const { data: poItems } = await supabase
+        .from("purchase_order_items")
+        .select("product_id, quantity")
+        .eq("purchase_order_id", id);
+      const productIds = Array.from(
+        new Set(((poItems || []) as any[]).map((r) => r.product_id).filter(Boolean)),
+      ) as string[];
+
+      if (productIds.length) {
+        // For each candidate, run cheap "any row exists" probes on the sibling tables.
+        const [invRes, quoRes, retRes, otherPoRes, tfrRes, prodRes] = await Promise.all([
+          supabase.from("invoice_items").select("product_id").in("product_id", productIds).limit(500),
+          supabase.from("quote_items").select("product_id").in("product_id", productIds).limit(500),
+          supabase.from("stock_return_items").select("product_id").in("product_id", productIds).limit(500),
+          supabase.from("purchase_order_items").select("product_id, purchase_order_id").in("product_id", productIds).neq("purchase_order_id", id).limit(500),
+          supabase.from("stock_transfers").select("product_id").in("product_id", productIds).limit(500),
+          supabase.from("products").select("id, stock_quantity").in("id", productIds),
+        ]);
+        const usedElsewhere = new Set<string>();
+        [invRes.data, quoRes.data, retRes.data, otherPoRes.data, tfrRes.data].forEach((rows) => {
+          ((rows || []) as any[]).forEach((r) => { if (r?.product_id) usedElsewhere.add(r.product_id); });
+        });
+        const stockMap = new Map<string, number>();
+        ((prodRes.data || []) as any[]).forEach((r) => stockMap.set(r.id, Number(r.stock_quantity || 0)));
+        // Compute expected stock AFTER restoring (subtracting) the PO quantities.
+        const poQtyByProduct = new Map<string, number>();
+        ((poItems || []) as any[]).forEach((r) => {
+          if (!r.product_id) return;
+          poQtyByProduct.set(r.product_id, (poQtyByProduct.get(r.product_id) || 0) + Number(r.quantity || 0));
+        });
+        deletableProductIds = productIds.filter((pid) => {
+          if (usedElsewhere.has(pid)) return false;
+          const currentStock = stockMap.get(pid) ?? 0;
+          const afterRestore = willRestore ? currentStock - (poQtyByProduct.get(pid) || 0) : currentStock;
+          // Only offer to delete when the product would end up with 0 (or negative) stock.
+          return afterRestore <= 0.0001;
+        });
+      }
+    } catch { /* probe is best-effort; fall back to no checkbox */ }
+
     confirmDelete({
       title: "حذف أمر الشراء",
       description: willRestore
@@ -66,7 +113,14 @@ export default function PurchasePage() {
       confirmLabel: "حذف الأمر",
       successMessage: "تم الحذف" + (willRestore ? " وإرجاع المخزون" : ""),
       errorMessage: "تعذّر حذف الأمر",
-      onConfirm: async () => {
+      extraCheckbox: deletableProductIds.length
+        ? {
+            label: `احذف أيضاً ${deletableProductIds.length} منتج أُضيف عبر هذا الأمر ولا يُستخدم في مكان آخر`,
+            hint: "المنتجات المستخدَمة في فواتير أو عروض أسعار أو أوامر شراء أخرى لن تُحذف.",
+            defaultChecked: false,
+          }
+        : undefined,
+      onConfirm: async ({ extraChecked }) => {
         if (willRestore) {
           const { data: items } = await supabase
             .from("purchase_order_items")
@@ -87,10 +141,41 @@ export default function PurchasePage() {
         }
         await supabase.from("purchase_order_items").delete().eq("purchase_order_id", id);
         await remove.mutateAsync(id);
+
+        if (extraChecked && deletableProductIds.length) {
+          // Re-verify each product is still unused (in case another user just
+          // referenced it) before deleting, so we never orphan a live row.
+          try {
+            const [invRes2, quoRes2, retRes2, otherPoRes2, tfrRes2] = await Promise.all([
+              supabase.from("invoice_items").select("product_id").in("product_id", deletableProductIds).limit(500),
+              supabase.from("quote_items").select("product_id").in("product_id", deletableProductIds).limit(500),
+              supabase.from("stock_return_items").select("product_id").in("product_id", deletableProductIds).limit(500),
+              supabase.from("purchase_order_items").select("product_id").in("product_id", deletableProductIds).limit(500),
+              supabase.from("stock_transfers").select("product_id").in("product_id", deletableProductIds).limit(500),
+            ]);
+            const stillUsed = new Set<string>();
+            [invRes2.data, quoRes2.data, retRes2.data, otherPoRes2.data, tfrRes2.data].forEach((rows) => {
+              ((rows || []) as any[]).forEach((r) => { if (r?.product_id) stillUsed.add(r.product_id); });
+            });
+            const safeToDelete = deletableProductIds.filter((pid) => !stillUsed.has(pid));
+            if (safeToDelete.length) {
+              const { error: delProdErr } = await supabase.from("products").delete().in("id", safeToDelete);
+              if (delProdErr) throw delProdErr;
+              const skipped = deletableProductIds.length - safeToDelete.length;
+              if (skipped > 0) toast.info(`تم حذف ${safeToDelete.length} منتج — ${skipped} منتج ما زال مستخدَماً ولم يُحذَف.`);
+            } else {
+              toast.info("تعذّر حذف المنتجات: أصبحت مستخدَمة في مستندات أخرى.");
+            }
+          } catch (e: any) {
+            toast.error("تم حذف الأمر ولكن تعذّر حذف المنتجات: " + (e?.message || ""));
+          }
+        }
+
         window.dispatchEvent(new Event("products:changed"));
       },
     });
   };
+
 
 
   const handleConvertToInvoice = async (o: any) => {

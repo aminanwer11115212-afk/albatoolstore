@@ -9,13 +9,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 /**
  * Unified confirm-delete dialog for all admin tables.
  *
- * Usage:
+ * Basic usage:
  *   const confirmDelete = useConfirmDelete();
  *   confirmDelete({
  *     title: "حذف الفاتورة",
@@ -23,9 +24,25 @@ import { Loader2 } from "lucide-react";
  *     onConfirm: async () => { await doDelete(id); },
  *   });
  *
- * Handles: loading spinner on confirm button, error toast on failure,
- * closes automatically on success.
+ * With an optional extra checkbox (e.g. "also delete auxiliary products"):
+ *   confirmDelete({
+ *     title: "حذف أمر الشراء",
+ *     description: "...",
+ *     extraCheckbox: {
+ *       label: `احذف أيضاً ${n} منتج أُضيف عبر هذا الأمر ولا يُستخدم في مكان آخر`,
+ *       defaultChecked: false,
+ *     },
+ *     onConfirm: async ({ extraChecked }) => { ... },
+ *   });
  */
+
+type ExtraCheckbox = {
+  label: string;
+  defaultChecked?: boolean;
+  hint?: string;
+};
+
+type ConfirmContext = { extraChecked: boolean };
 
 type ConfirmOptions = {
   title?: string;
@@ -34,7 +51,8 @@ type ConfirmOptions = {
   cancelLabel?: string;
   successMessage?: string;
   errorMessage?: string;
-  onConfirm: () => void | Promise<void>;
+  extraCheckbox?: ExtraCheckbox;
+  onConfirm: (ctx: ConfirmContext) => void | Promise<void>;
 };
 
 type Ctx = (opts: ConfirmOptions) => void;
@@ -45,11 +63,13 @@ export function ConfirmDeleteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [opts, setOpts] = useState<ConfirmOptions | null>(null);
+  const [extraChecked, setExtraChecked] = useState(false);
   const optsRef = useRef<ConfirmOptions | null>(null);
 
   const request = useCallback<Ctx>((o) => {
     optsRef.current = o;
     setOpts(o);
+    setExtraChecked(!!o.extraCheckbox?.defaultChecked);
     setPending(false);
     setOpen(true);
   }, []);
@@ -59,7 +79,7 @@ export function ConfirmDeleteProvider({ children }: { children: ReactNode }) {
     if (!o) return;
     setPending(true);
     try {
-      await o.onConfirm();
+      await o.onConfirm({ extraChecked });
       if (o.successMessage) toast.success(o.successMessage);
       setOpen(false);
     } catch (e: any) {
@@ -79,6 +99,27 @@ export function ConfirmDeleteProvider({ children }: { children: ReactNode }) {
               {opts?.description || "هل أنت متأكد من الحذف؟ لا يمكن التراجع عن هذا الإجراء."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {opts?.extraCheckbox ? (
+            <label
+              className="mt-2 flex items-start gap-3 rounded-md border border-border/60 bg-muted/40 p-3 cursor-pointer select-none"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Checkbox
+                checked={extraChecked}
+                onCheckedChange={(v) => setExtraChecked(v === true)}
+                disabled={pending}
+                className="mt-0.5"
+              />
+              <div className="flex-1 text-sm leading-relaxed">
+                <div className="font-semibold">{opts.extraCheckbox.label}</div>
+                {opts.extraCheckbox.hint ? (
+                  <div className="mt-1 text-xs text-muted-foreground">{opts.extraCheckbox.hint}</div>
+                ) : null}
+              </div>
+            </label>
+          ) : null}
+
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel disabled={pending}>
               {opts?.cancelLabel || "إلغاء"}
@@ -107,3 +148,4 @@ export function useConfirmDelete() {
   if (!ctx) throw new Error("useConfirmDelete must be used inside <ConfirmDeleteProvider>");
   return ctx;
 }
+
