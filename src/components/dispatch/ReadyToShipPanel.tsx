@@ -405,10 +405,11 @@ export default function ReadyToShipPanel({
     const next: Record<string, RowChoice> = { ...rowChoice };
     let changed = false;
     for (const inv of invoices) {
-      const { preferred, defaultDest, transporters, destinations } = optionsForInvoice(inv);
+      const { preferred, defaultDest } = optionsForInvoice(inv);
       const existing = inv.invoice_transports?.[0];
-      const tId = existing?.transporter_id ?? preferred ?? transporters[0]?.id ?? "";
-      const dId = existing?.destination_id ?? defaultDest ?? destinations[0]?.id ?? "";
+      // اترك الحقل فارغاً إذا لم يُحدَّد ناقل/وجهة في أي مكان في النظام
+      const tId = existing?.transporter_id ?? preferred ?? "";
+      const dId = existing?.destination_id ?? defaultDest ?? "";
       const cur = next[inv.id] || {};
       const newT = cur.transporterId ?? tId;
       const newD = cur.destinationId ?? dId;
@@ -424,11 +425,12 @@ export default function ReadyToShipPanel({
 
   const getChoice = (inv: any) => {
     const c = rowChoice[inv.id] || {};
-    const { preferred, defaultDest, transporters, destinations } = optionsForInvoice(inv);
+    const { preferred, defaultDest } = optionsForInvoice(inv);
     const existing = inv.invoice_transports?.[0];
+    // بدون سقوط تلقائي على أول ناقل/وجهة — الحقل يظلّ فارغاً حتى يختار المستخدم
     return {
-      transporterId: c.transporterId ?? existing?.transporter_id ?? preferred ?? transporters[0]?.id ?? "",
-      destinationId: c.destinationId ?? existing?.destination_id ?? defaultDest ?? destinations[0]?.id ?? "",
+      transporterId: c.transporterId ?? existing?.transporter_id ?? preferred ?? "",
+      destinationId: c.destinationId ?? existing?.destination_id ?? defaultDest ?? "",
     };
   };
 
