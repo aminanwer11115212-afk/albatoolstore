@@ -385,15 +385,17 @@ export default function ReadyToShipPanel({
     </button>
   );
 
-  // القوائم تعرض كل الناقلين/الوجهات في النظام (متزامنة مع صفحة إدارة العملاء)
-  // الافتراضي يبقى من ربط العميل (preferred / is_default) إن وُجد.
+  // القوائم تعرض كل الناقلين/الوجهات في النظام (متزامنة مع صفحة إدارة العملاء).
+  // الافتراضي يُحلّ عبر util موحّد يستخدمه أيضاً InvoiceTransportPage/QuoteTransportPage
+  // — بدون سقوط تلقائي على أول قيمة (الفراغ مقصود عند غياب افتراضيات العميل).
   const optionsForInvoice = useCallback((inv: any) => {
     const cid = inv.customer_id;
     const allT = (allTransporters as any[]) || [];
     const allD = (allDestinations as any[]) || [];
-    const linkedD = ((custDestinations as any[]) || []).filter((x) => x.customer_id === cid);
-    const preferred = ((prefTransporters as any[]) || []).find((p) => p.customer_id === cid)?.transporter_id;
-    const defaultDest = linkedD.find((ld) => ld.is_default)?.destination_id;
+    const { transporterId: preferred, destinationId: defaultDest } = resolveDefaultsFromCache(cid, {
+      prefTransporters: prefTransporters as any,
+      custDestinations: custDestinations as any,
+    });
     return { transporters: allT, destinations: allD, preferred, defaultDest };
   }, [allTransporters, allDestinations, custDestinations, prefTransporters]);
 
