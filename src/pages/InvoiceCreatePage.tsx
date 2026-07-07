@@ -1185,6 +1185,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       // حدّث الشريط الجانبي (آخر الفواتير) فوراً حتى تظهر الفاتورة المحفوظة
       queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices-full"] });
       // تحديث بيانات الدفع المحفوظة لتعكس القيم الجديدة بعد الحفظ
       setSavedTotal(Number(totals.total) || 0);
       setSavedPaid(computedPaid);
