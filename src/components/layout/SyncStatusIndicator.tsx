@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Cloud, CloudOff, Loader2, RefreshCw, Trash2, CheckCircle2 } from "lucide-react";
+import { Cloud, CloudOff, Loader2, RefreshCw, Trash2, CheckCircle2, Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { flushQueue, removeItem, clearQueue } from "@/lib/offlineQueue";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { subscribeSyncState, type SyncState } from "@/lib/realtimeSync";
 
 /**
  * SyncStatusIndicator — أيقونة في شريط الأدوات تعرض حالة الاتصال وعدد
