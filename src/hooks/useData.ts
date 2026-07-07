@@ -132,6 +132,16 @@ function useTable<T extends keyof Tables<any>>(table: string) {
   });
 
   // ── REMOVE ── يُزال الصف فوراً ──
+  // خرائط لِمفاتيح الاستعلامات المشتقّة (القوائم في صفحات الإدارة) لضمان
+  // اختفاء الصف المحذوف فوراً دون الحاجة لإعادة تحميل الصفحة.
+  const derivedListKeys: Record<string, string[]> = {
+    invoices: ["invoices-with-customers", "invoices-full", "today-invoices"],
+    quotes: ["quotes-full", "quotes-with-customers", "side-quotes"],
+    purchase_orders: ["purchase-orders-full", "purchase-orders"],
+    stock_returns: ["stock-returns-full"],
+    transactions: ["transactions-with-accounts", "recent-transactions"],
+  };
+
   const remove = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await (supabase as any).from(table).delete().eq("id", id);
@@ -143,14 +153,34 @@ function useTable<T extends keyof Tables<any>>(table: string) {
       queryClient.setQueryData<any[]>([table], (old) =>
         (old || []).filter((item: any) => item.id !== id)
       );
-      return { previous };
+      // إزالة تفاؤلية من كل مفاتيح القوائم المشتقّة لتظهر النتيجة فوراً
+      const extras = derivedListKeys[table] || [];
+      const snapshots: Array<{ key: any; value: any }> = [];
+      if (extras.length) {
+        queryClient.getQueryCache().findAll().forEach((q) => {
+          const k = q.queryKey?.[0];
+          if (typeof k === "string" && extras.includes(k)) {
+            snapshots.push({ key: q.queryKey, value: q.state.data });
+            queryClient.setQueryData<any[]>(q.queryKey as any, (old: any) =>
+              Array.isArray(old) ? old.filter((row: any) => row?.id !== id) : old
+            );
+          }
+        });
+      }
+      return { previous, snapshots };
     },
     onError: (_err, _vars, context: any) => {
       if (context?.previous) queryClient.setQueryData([table], context.previous);
+      if (Array.isArray(context?.snapshots)) {
+        context.snapshots.forEach((s: any) => queryClient.setQueryData(s.key, s.value));
+      }
     },
-    // Optimistic remove يضمن دقة الكاش — نُعلِّم الاستعلام stale فقط.
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: [table], refetchType: "none" });
+      // إبطال مفاتيح القوائم المشتقّة (مع إعادة جلب فعلية) حتى تُحدَّث صفحات الإدارة
+      (derivedListKeys[table] || []).forEach((k) => {
+        queryClient.invalidateQueries({ queryKey: [k] });
+      });
       if (table === "products") {
         window.dispatchEvent(new Event("products:changed"));
       } else if (table === "customers") {
@@ -162,15 +192,12 @@ function useTable<T extends keyof Tables<any>>(table: string) {
         queryClient.invalidateQueries({ queryKey: ["suppliers"] });
         queryClient.invalidateQueries({ queryKey: ["accounts"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-        queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
-        queryClient.invalidateQueries({ queryKey: ["transactions-with-accounts"] });
         window.dispatchEvent(new Event("customers:changed"));
         window.dispatchEvent(new Event("suppliers:changed"));
         window.dispatchEvent(new Event("accounts:changed"));
       } else if (table === "invoices") {
         queryClient.invalidateQueries({ queryKey: ["customers"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-        queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
         window.dispatchEvent(new Event("customers:changed"));
       } else if (table === "stock_returns") {
         queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -181,6 +208,7 @@ function useTable<T extends keyof Tables<any>>(table: string) {
       }
     },
   });
+
 
   return { ...query, insert, update, remove };
 }
