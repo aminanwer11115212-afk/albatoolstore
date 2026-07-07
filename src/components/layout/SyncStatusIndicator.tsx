@@ -14,8 +14,29 @@ export default function SyncStatusIndicator() {
   const { online, pending, pendingCount } = useOnlineStatus();
   const [open, setOpen] = useState(false);
   const [flushing, setFlushing] = useState(false);
+  const [rt, setRt] = useState<SyncState | null>(null);
+  const [lastNotifiedRt, setLastNotifiedRt] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
+
+  useEffect(() => subscribeSyncState(setRt), []);
+
+  // إشعارات المستخدم عند تدهور/عودة المزامنة اللحظية
+  useEffect(() => {
+    if (!rt) return;
+    if (rt.status === lastNotifiedRt) return;
+    if (lastNotifiedRt === null) { setLastNotifiedRt(rt.status); return; }
+    if (rt.status === "degraded") {
+      toast.warning("مزامنة جزئية — بعض التحديثات قد تتأخر", {
+        description: rt.lastRequestId ? `المعرّف: ${rt.lastRequestId}` : undefined,
+      });
+    } else if (rt.status === "offline" && online) {
+      toast.error("انقطعت المزامنة اللحظية", { description: rt.lastError || "سيتم إعادة المحاولة تلقائيًا" });
+    } else if (rt.status === "live" && (lastNotifiedRt === "degraded" || lastNotifiedRt === "offline")) {
+      toast.success("عادت المزامنة اللحظية");
+    }
+    setLastNotifiedRt(rt.status);
+  }, [rt, lastNotifiedRt, online]);
 
   useEffect(() => {
     if (!open) return;
