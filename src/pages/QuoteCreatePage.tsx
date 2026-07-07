@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck } from "lucide-react";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
+import { useDocPrintShortcuts } from "@/hooks/useDocPrintShortcuts";
 import PanelResizer from "@/components/PanelResizer";
 import RowResizer from "@/components/RowResizer";
 import QuoteAttachmentsDialog from "@/components/quote/QuoteAttachmentsDialog";
