@@ -24,7 +24,7 @@ function fmt(n: number | null | undefined): string {
   return Number(n || 0).toLocaleString("en-US");
 }
 
-function buildDocHTML(args: {
+export function buildDocHTML(args: {
   docTitle: string;
   docNumber?: string;
   date: string;
