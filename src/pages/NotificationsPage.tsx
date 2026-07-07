@@ -196,6 +196,9 @@ export default function NotificationsPage() {
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
+  // Pagination — تحميل تدريجي بدل رسم آلاف العناصر دفعة واحدة
+  const PAGE_SIZE = 100;
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
   const [readIds, setReadIds] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem(NOTIF_READ_KEY);
