@@ -407,6 +407,27 @@ export default function NotificationsPage() {
 
   useEffect(() => { load();   }, [days]);
 
+  // Realtime — يعيد التحميل تلقائياً عند تغيّر المخزون/الفواتير/المهام
+  // لتظهر الإشعارات الجديدة بدون انتظار إعادة تحميل يدوية.
+  useEffect(() => {
+    let pending: any = null;
+    const debouncedReload = () => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(() => { load(); pending = null; }, 800);
+    };
+    const channel = (supabase as any)
+      .channel("notifications-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, debouncedReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, debouncedReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "quotes" }, debouncedReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "todos" }, debouncedReload)
+      .subscribe();
+    return () => {
+      if (pending) clearTimeout(pending);
+      try { (supabase as any).removeChannel(channel); } catch {}
+    };
+  }, [load]);
+
   // إخفاء مؤقت لإشعارات المخزون (يُحفظ مع تاريخ انتهاء)
   const SNOOZE_KEY = NOTIF_SNOOZE_KEY;
   const SNOOZE_MS = 2 * 60 * 60 * 1000; // ساعتان
