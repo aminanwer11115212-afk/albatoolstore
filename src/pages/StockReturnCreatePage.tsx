@@ -771,6 +771,11 @@ export default function StockReturnCreatePage() {
       toast.warning("تم حفظ المرتجع لكن فشل تحديث المخزون: " + stockErr.message);
     }
 
+    // حدّث قائمة المرتجعات فوراً بعد الحفظ
+    queryClient.invalidateQueries({ queryKey: ["stock-returns-full"] });
+    queryClient.invalidateQueries({ queryKey: ["stock_returns"] });
+    queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+
     toast.success(editId ? "تم تحديث المرتجع وتعديل المخزون" : "تم حفظ المرتجع وإعادة الكميات للمخزون");
     navigate(`/stock-return/view/${rid}`);
     } finally {
