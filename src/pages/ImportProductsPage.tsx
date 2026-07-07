@@ -35,15 +35,15 @@ const FIELD_ALIASES: Record<string, string[]> = {
   name: ["name", "product", "products", "item", "productname", "itemname", "اسم", "الاسم", "اسمالصنف", "اسمالمنتج", "الصنف", "المنتج", "المنتجات", "منتج", "بيان", "البيان", "وصف", "الوصف", "description"],
   sku: ["sku", "code", "barcode", "الكود", "كود", "باركود", "رمز", "الرمز", "رقمالصنف"],
   unit: ["unit", "uom", "الوحده", "وحده", "وحدهالقياس"],
-  sale_price: ["saleprice", "price", "sellingprice", "سعرالبيع", "سعر", "السعر", "بيع", "سعرالمفرد", "سعرالجمله", "السعرالمحلي", "السعرالمحلى", "سعرمحلي", "محلي", "المحلي"],
+  sale_price: ["saleprice", "sellingprice", "سعرالبيع", "بيع", "سعرالمفرد", "سعرالجمله", "السعرالمحلي", "السعرالمحلى", "سعرمحلي", "المحلي", "المحلى", "price"],
   purchase_price: ["purchaseprice", "costprice", "cost", "سعرالشراء", "التكلفه", "تكلفه", "شراء", "سعرالتكلفه"],
-  foreign_price: ["foreignprice", "السعرالاجنبي", "السعرالاجنبى", "سعراجنبي", "الاجنبي", "اجنبي"],
-  brand: ["brand", "الماركه", "ماركه", "البراند", "براند", "الشركه المصنعه", "الشركهالمصنعه", "manufacturer"],
+  foreign_price: ["foreignprice", "السعرالاجنبي", "السعرالاجنبى", "سعراجنبي", "الاجنبي", "اجنبي", "الاجنبى", "اجنبى"],
+  brand: ["brand", "الماركه", "ماركه", "البراند", "براند", "الشركهالمصنعه", "manufacturer"],
   category: ["category", "الفئه", "فئه", "التصنيف", "تصنيف", "القسم", "قسم"],
   stock_quantity: ["stockquantity", "quantity", "qty", "stock", "الكميه", "كميه", "الرصيد", "رصيد", "المخزون", "مخزون"],
   min_stock: ["minstock", "minqty", "minimum", "حدادنى", "الحدالادنى", "اقلكميه"],
   // customers/suppliers extras
-  phone: ["phone", "mobile", "tel", "الهاتف", "هاتف", "جوال", "الجوال", "موبايل", "الموبايل", "تليفون", "رقمهاتفالعميل1", "رقمهاتف", "رقم"],
+  phone: ["phone", "mobile", "tel", "الهاتف", "هاتف", "جوال", "الجوال", "موبايل", "الموبايل", "تليفون", "رقمهاتفالعميل1", "رقمهاتف"],
   whatsapp: ["whatsapp", "wa", "الواتساب", "واتساب", "واتس", "الواتس"],
   email: ["email", "mail", "الايميل", "ايميل", "البريد", "بريدالكتروني"],
   address: ["address", "العنوان", "عنوان"],
@@ -52,16 +52,38 @@ const FIELD_ALIASES: Record<string, string[]> = {
   notes: ["notes", "note", "remark", "ملاحظات", "ملاحظه"],
 };
 
-/** Build a header → field map by matching normalized aliases. */
+/**
+ * Build a header → field map.
+ * Uses two passes so an ambiguous substring can never steal a header that
+ * matches another field exactly (e.g. "السعر الأجنبى" must go to foreign_price,
+ * not sale_price via the shared "سعر" substring).
+ */
 function detectColumns(headers: string[]): Record<string, string> {
   const map: Record<string, string> = {};
   const used = new Set<string>();
+
+  // Pass 1: exact normalized match
   for (const h of headers) {
     const nh = normHeader(h);
     if (!nh) continue;
     for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
       if (field !== "name" && used.has(field)) continue;
-      if (aliases.some((a) => nh === a || nh.includes(a) || a.includes(nh))) {
+      if (aliases.some((a) => nh === a)) {
+        map[h] = field;
+        used.add(field);
+        break;
+      }
+    }
+  }
+
+  // Pass 2: substring match for whatever still has no assignment
+  for (const h of headers) {
+    if (map[h]) continue;
+    const nh = normHeader(h);
+    if (!nh) continue;
+    for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+      if (field !== "name" && used.has(field)) continue;
+      if (aliases.some((a) => nh.includes(a) || a.includes(nh))) {
         map[h] = field;
         used.add(field);
         break;
