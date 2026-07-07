@@ -359,6 +359,15 @@ export default function DocumentPreviewPage({ docType }: Props) {
         <iframe
           title={title}
           srcDoc={html}
+          onLoad={(e) => {
+            // دعم autoprint=1 لطباعة مباشرة عبر اختصار F10
+            if (search.get("autoprint") === "1") {
+              try {
+                const w = (e.currentTarget as HTMLIFrameElement).contentWindow;
+                setTimeout(() => { try { w?.focus(); w?.print(); } catch {} }, 250);
+              } catch {}
+            }
+          }}
           style={{ flex: 1, width: "100%", border: "0", background: "#fff" }}
         />
       )}
