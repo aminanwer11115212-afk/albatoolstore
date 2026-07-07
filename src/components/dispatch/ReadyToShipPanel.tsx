@@ -600,7 +600,7 @@ export default function ReadyToShipPanel({
               : (inv.customers?.name || "كاش")}
           </span>
         </td>
-        <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
+        <td className={`cell-sel ${!choice.transporterId ? "cell-empty" : ""}`} onClick={(e) => e.stopPropagation()}>
           <SearchableSelect
             options={transporters as any}
             value={choice.transporterId}
@@ -608,19 +608,38 @@ export default function ReadyToShipPanel({
             placeholder="— اختر ناقل —"
             className="rts-select"
           />
+          {!choice.transporterId && (
+            <div className="rts-empty-hint">⚠ لم يُحدَّد ناقل للعميل</div>
+          )}
         </td>
-        <td className="cell-sel" onClick={(e) => e.stopPropagation()}>
+        <td className={`cell-sel ${!choice.destinationId ? "cell-empty" : ""}`} onClick={(e) => e.stopPropagation()}>
           <SearchableSelect
             options={destinations as any}
             value={choice.destinationId}
             onChange={(val) => setRowChoice((p) => ({ ...p, [inv.id]: { ...p[inv.id], destinationId: val } }))}
-            placeholder="— بدون وجهة —"
+            placeholder="— اختر وجهة —"
             className="rts-select"
           />
+          {!choice.destinationId && (
+            <div className="rts-empty-hint">⚠ لم تُحدَّد وجهة</div>
+          )}
         </td>
         <td className="cell-act" onClick={(e) => e.stopPropagation()}>
           {hasTransport ? (
             <span className="rts-pill"><CheckCircle2 size={12} /> مُرحَّلة</span>
+          ) : !choice.transporterId && !choice.destinationId && inv.customer_id ? (
+            <button
+              type="button"
+              className="rts-btn rts-btn-warning rts-btn-sm"
+              title="اختر ناقل ووجهة وحدّث افتراضيات العميل"
+              onClick={() => {
+                setFocusedRowId(inv.id);
+                // Prompt user to pick both, then use existing pin-to-customer flow
+                toast.info("اختر ناقل ووجهة من الخليتين ثم اضغط تثبيت");
+              }}
+            >
+              <Plus size={12} /> اختر للعميل
+            </button>
           ) : (
             <button
               type="button"
