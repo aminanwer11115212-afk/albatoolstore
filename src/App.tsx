@@ -220,7 +220,7 @@ const StockReturnEditWrapper = () => {
 const CategoriesPage = () => <SimpleCrudPage title="فئات المنتجات" hook={useProductCategories} fields={[{ key: "name", label: "الاسم" }, { key: "description", label: "الوصف" }]} />;
 const WarehousesPage = () => <SimpleCrudPage title="المستودعات" hook={useWarehouses} fields={[{ key: "name", label: "الاسم" }, { key: "location", label: "الموقع" }, { key: "description", label: "الوصف" }]} />;
 const ClientGroupsPage = () => <SimpleCrudPage title="مجموعات العملاء" hook={useCustomerGroups} fields={[{ key: "name", label: "الاسم" }, { key: "description", label: "الوصف" }]} />;
-const TransportersPage = () => <SimpleCrudPage title="الناقلين" hook={useTransporters} fields={[{ key: "name", label: "الاسم" }, { key: "phone", label: "الهاتف" }, { key: "address", label: "العنوان" }, { key: "notes", label: "ملاحظات" }]} />;
+const TransportersPage = lazy(() => import("./pages/TransportersPage"));
 
 const DestinationsPage = () => <SimpleCrudPage title="إدارة الوجهات" hook={useDestinations} fields={[{ key: "name", label: "اسم الوجهة" }, { key: "description", label: "الوصف" }]} />;
 const TransactionCategoriesPage = () => <SimpleCrudPage title="فئات المعاملات" hook={useTransactionCategories} fields={[{ key: "name", label: "الاسم" }, { key: "description", label: "الوصف" }]} />;
