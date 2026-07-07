@@ -1387,6 +1387,36 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos]);
 
+  // ---------- F9 = معاينة الطباعة، F10 = طباعة مباشرة (تُرقّي الحالة إلى "قيد التجهيز") ----------
+  useDocPrintShortcuts({
+    onPreview: async () => {
+      await saveThen(async (id) => {
+        try {
+          await supabase.rpc("advance_invoice_workflow" as any, {
+            _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
+          });
+          invalidateWorkflowAutoCache(id);
+          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+        } catch {}
+        navigate(`/preview/invoice/${id}`);
+      });
+    },
+    onPrint: async () => {
+      await saveThen(async (id) => {
+        try {
+          await supabase.rpc("advance_invoice_workflow" as any, {
+            _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
+          });
+          invalidateWorkflowAutoCache(id);
+          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+        } catch {}
+        navigate(`/preview/invoice/${id}?autoprint=1`);
+      });
+    },
+  });
+
+
+
 
   // ---------- Render ----------
   return (
