@@ -9,6 +9,7 @@ import { applyStockDeltaForLines } from "@/utils/stockDeduction";
 import { Plus, Edit, Printer, StickyNote } from "lucide-react";
 import StatusButton, { STOCK_RETURN_STATUS_OPTIONS } from "@/components/StatusButton";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
+import { useDocPrintShortcuts } from "@/hooks/useDocPrintShortcuts";
 import PanelResizer from "@/components/PanelResizer";
 import RowResizer from "@/components/RowResizer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
