@@ -248,11 +248,27 @@ const App = () => {
     }
   }, []);
 
+  useEffect(() => {
+    initOfflineFlush();
+  }, []);
+
   return (
-  <QueryClientProvider client={queryClient}>
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{
+      persister: createIDBPersister(),
+      maxAge: 1000 * 60 * 60 * 24 * 7, // أسبوع
+      buster: "v1",
+      dehydrateOptions: {
+        // لا نحفظ الاستعلامات الفاشلة أو التي لم تُجلَب بعد
+        shouldDehydrateQuery: (q) => q.state.status === "success",
+      },
+    }}
+  >
     <ProductsCacheSync />
     <RealtimeSync />
     <TooltipProvider>
+      <OfflineBanner />
       <Toaster />
       <Sonner />
       <CriticalErrorDialog />
@@ -439,7 +455,7 @@ const App = () => {
         </StaffGuard>
       </BrowserRouter>
     </TooltipProvider>
-  </QueryClientProvider>
+  </PersistQueryClientProvider>
 );
 };
 
