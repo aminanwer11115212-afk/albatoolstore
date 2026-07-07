@@ -282,17 +282,23 @@ export default function InvoiceViewPage() {
 
   const handleWhatsApp = async (_type: WhatsAppMessageType) => {
     if (!invoice) return;
-    const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
-    await shareDocumentViaWhatsApp({
-      docType: "invoice",
-      docId: invoice.id,
-      phone: pickCustomerWhatsApp(invoice.customers),
-      customerName: invoice.customers?.name || (invoice as any).walk_in_customer_name,
-      docNumber: invoice.invoice_number,
-      total: invoice.total,
-      docLabel: (invoice as any).source === "pos" ? "فاتورة كاش" : "فاتورة",
-    });
-    setShowWhatsappMenu(false);
+    try {
+      const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+      await shareDocumentViaWhatsApp({
+        docType: "invoice",
+        docId: invoice.id,
+        phone: pickCustomerWhatsApp(invoice.customers),
+        customerName: invoice.customers?.name || (invoice as any).walk_in_customer_name,
+        docNumber: invoice.invoice_number,
+        total: invoice.total,
+        docLabel: (invoice as any).source === "pos" ? "فاتورة كاش" : "فاتورة",
+      });
+    } catch (e: any) {
+      console.error("whatsapp share failed:", e);
+      toast.error(e?.message || "تعذّرت مشاركة الفاتورة عبر واتساب");
+    } finally {
+      setShowWhatsappMenu(false);
+    }
   };
 
   const handleDelete = async () => {
