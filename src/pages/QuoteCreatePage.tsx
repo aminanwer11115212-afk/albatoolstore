@@ -1001,6 +1001,8 @@ export default function QuoteCreatePage() {
     // حدّث الشريط الجانبي (آخر العروض) فوراً بعد الحفظ حتى تظهر العرض الجديد/المحدّث
     queryClient.invalidateQueries({ queryKey: ["quotes-with-customers"] });
     queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    queryClient.invalidateQueries({ queryKey: ["quotes-full"] });
+    queryClient.invalidateQueries({ queryKey: ["side-quotes"] });
     // إذا كنّا في وضع الإنشاء وتم الحفظ بنجاح، بدّل العنوان لوضع التعديل
     // حتى لا يُنشئ الضغط على "حفظ" مجدداً عرض سعر جديد
     if (!editId && qid) {
