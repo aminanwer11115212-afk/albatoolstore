@@ -630,6 +630,22 @@ export default function PurchaseCreatePage() {
           if (!error) { createdRow = created; break; }
           const isDup = (error as any).code === "23505" || /duplicate key|purchase_orders_order_number_key/i.test(error.message || "");
           if (!isDup) throw error;
+          // رقم أمر الشراء هو المفتاح — لو موجود سابقاً حدّث السجل الحالي بدل إنشاء نسخة مكررة
+          const { data: existing } = await (supabase as any)
+            .from("purchase_orders")
+            .select("*")
+            .eq("order_number", candidate)
+            .maybeSingle();
+          if (existing?.id) {
+            const { error: upErr } = await (supabase as any)
+              .from("purchase_orders")
+              .update(payload)
+              .eq("id", existing.id);
+            if (upErr) throw upErr;
+            await supabase.from("purchase_order_items").delete().eq("purchase_order_id", existing.id);
+            createdRow = existing;
+            break;
+          }
           candidate = await buildNextNumber(Math.min(attempt, 2));
           attempt++;
         }
@@ -686,6 +702,12 @@ export default function PurchaseCreatePage() {
       } else {
         toast.success(isEdit ? "تم تحديث أمر الشراء" : "تم إنشاء أمر الشراء");
       }
+
+      // حدّث قوائم أوامر الشراء والموردين والمنتجات فوراً بعد الحفظ
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders-full"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
 
       // تسجيل المورد المحفوظ — يُستخدم في الضغطة التالية لتقرير "نفس المورد ⇒ تحديث"
       lastSavedSupplierRef.current = supplierId;
