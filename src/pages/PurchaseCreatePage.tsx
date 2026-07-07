@@ -703,6 +703,12 @@ export default function PurchaseCreatePage() {
         toast.success(isEdit ? "تم تحديث أمر الشراء" : "تم إنشاء أمر الشراء");
       }
 
+      // حدّث قوائم أوامر الشراء والموردين والمنتجات فوراً بعد الحفظ
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders-full"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+
       // تسجيل المورد المحفوظ — يُستخدم في الضغطة التالية لتقرير "نفس المورد ⇒ تحديث"
       lastSavedSupplierRef.current = supplierId;
       if (!isEdit && savedId) {
