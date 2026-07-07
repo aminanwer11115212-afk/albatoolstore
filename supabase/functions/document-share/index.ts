@@ -31,17 +31,20 @@ function buildDocHTML(args: {
   customer: { name?: string; phone?: string; address?: string } | null;
   items: Array<{ product_name: string; quantity: number; unit_price: number; total: number }>;
   grandTotal: number;
-  oldBalance: number;
+  paidAmount?: number;
   notes?: string | null;
   company: any;
   hiddenSections?: string[];
 }): string {
-  const { docTitle, docNumber, date, customer, items, grandTotal, oldBalance, notes, company, hiddenSections = [] } = args;
+  const { docTitle, docNumber, date, customer, items, grandTotal, paidAmount = 0, notes, company, hiddenSections = [] } = args;
   const logoURL = company?.logo_url || "";
   const logoHTML = logoURL
     ? `<div class="header-logo"><img src="${attr(logoURL)}" alt="Logo" /></div>`
     : "";
-  const finalTotal = grandTotal + oldBalance;
+  // نفس معادلة الطباعة الرسمية:
+  // "المطلوب النهائي" = جملة الفاتورة − المبلغ المدفوع (لا يُجمع مع أي حساب قديم).
+  const finalTotal = Math.max(0, Number(grandTotal || 0) - Number(paidAmount || 0));
+
   // Build CSS to hide sections that the document owner toggled off in the
   // preview before generating the share link. We use the same data-section
   // keys as the in-app preview toolbar so the customer sees an identical view.
@@ -140,9 +143,10 @@ function buildDocHTML(args: {
     </tbody>
   </table>
   <div class="summary-row" data-section="account-summary">
-    <div class="summary-box" data-section="old-balance"><div class="summary-box-title">الحساب القديم</div><div class="summary-box-value red">${fmt(oldBalance)}</div></div>
+    <div class="summary-box" data-section="paid-amount"><div class="summary-box-title">المبلغ المدفوع</div><div class="summary-box-value" style="color:#16a34a;">${fmt(paidAmount)}</div></div>
     <div class="summary-box" data-section="final-total" style="border-color:#2980b9;"><div class="summary-box-title">المطلوب النهائي</div><div class="summary-box-value blue">${fmt(finalTotal)}</div></div>
   </div>
+
   ${notes ? `<div class="notes-section" data-section="notes"><h4>📝 ملاحظات</h4><p>${attr(notes)}</p></div>` : ""}
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -525,7 +529,8 @@ Deno.serve(async (req) => {
     let customer: any = null;
     let items: any[] = [];
     let grandTotal = 0;
-    let oldBalance = 0;
+    let paidAmount = 0;
+
     let notes: string | null = null;
     let statementHtml: string | null = null;
 
@@ -541,8 +546,9 @@ Deno.serve(async (req) => {
       date = (inv as any).date || "";
       const c = (inv as any).customers;
       customer = c ? { name: c.name, phone: c.phone, address: c.address } : null;
-      oldBalance = Number(c?.balance || 0);
+      paidAmount = Number((inv as any).paid_amount || 0);
       grandTotal = Number((inv as any).total || 0);
+
       notes = (inv as any).notes || null;
       const { data: rows } = await supabase.from("invoice_items").select("*").eq("invoice_id", tk.doc_id);
       items = (rows || []).map((r: any) => ({
@@ -560,8 +566,9 @@ Deno.serve(async (req) => {
       date = (q as any).date || "";
       const c = (q as any).customers;
       customer = c ? { name: c.name, phone: c.phone, address: c.address } : null;
-      oldBalance = Number(c?.balance || 0);
+      paidAmount = 0;
       grandTotal = Number((q as any).total || 0);
+
       notes = (q as any).notes || null;
       const { data: rows } = await supabase.from("quote_items").select("*").eq("quote_id", tk.doc_id);
       items = (rows || []).map((r: any) => ({
@@ -579,8 +586,9 @@ Deno.serve(async (req) => {
       date = (r as any).date || "";
       const c = (r as any).customers;
       customer = c ? { name: c.name, phone: c.phone, address: c.address } : null;
-      oldBalance = Number(c?.balance || 0);
+      paidAmount = Number((r as any).paid_amount || 0);
       grandTotal = Number((r as any).total || 0);
+
       notes = (r as any).reason || null;
       const { data: rows } = await supabase.from("stock_return_items").select("*").eq("stock_return_id", tk.doc_id);
       items = (rows || []).map((x: any) => ({
@@ -842,7 +850,7 @@ Deno.serve(async (req) => {
     const hiddenSections = Array.isArray((tk as any).hidden_sections)
       ? ((tk as any).hidden_sections as unknown[]).filter((s) => typeof s === "string") as string[]
       : [];
-    const html = statementHtml || buildDocHTML({ docTitle, docNumber, date, customer, items, grandTotal, oldBalance, notes, company, hiddenSections });
+    const html = statementHtml || buildDocHTML({ docTitle, docNumber, date, customer, items, grandTotal, paidAmount, notes, company, hiddenSections });
     return new Response(html, {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
