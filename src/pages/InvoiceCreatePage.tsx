@@ -12,6 +12,7 @@ import { Plus, Edit, Printer, MessageCircle, FileText, StickyNote, Image as Imag
 import StatusButton, { WORKFLOW_STATUS_OPTIONS, INVOICE_STATUS_OPTIONS } from "@/components/StatusButton";
 import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
+import { useDocPrintShortcuts } from "@/hooks/useDocPrintShortcuts";
 import PanelResizer from "@/components/PanelResizer";
 import RowResizer from "@/components/RowResizer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -1385,6 +1386,36 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos]);
+
+  // ---------- F9 = معاينة الطباعة، F10 = طباعة مباشرة (تُرقّي الحالة إلى "قيد التجهيز") ----------
+  useDocPrintShortcuts({
+    onPreview: async () => {
+      await saveThen(async (id) => {
+        try {
+          await supabase.rpc("advance_invoice_workflow" as any, {
+            _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
+          });
+          invalidateWorkflowAutoCache(id);
+          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+        } catch {}
+        navigate(`/preview/invoice/${id}`);
+      });
+    },
+    onPrint: async () => {
+      await saveThen(async (id) => {
+        try {
+          await supabase.rpc("advance_invoice_workflow" as any, {
+            _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
+          });
+          invalidateWorkflowAutoCache(id);
+          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+        } catch {}
+        navigate(`/preview/invoice/${id}?autoprint=1`);
+      });
+    },
+  });
+
+
 
 
   // ---------- Render ----------

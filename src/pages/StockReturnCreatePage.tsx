@@ -9,6 +9,7 @@ import { applyStockDeltaForLines } from "@/utils/stockDeduction";
 import { Plus, Edit, Printer, StickyNote } from "lucide-react";
 import StatusButton, { STOCK_RETURN_STATUS_OPTIONS } from "@/components/StatusButton";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
+import { useDocPrintShortcuts } from "@/hooks/useDocPrintShortcuts";
 import PanelResizer from "@/components/PanelResizer";
 import RowResizer from "@/components/RowResizer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -776,7 +777,18 @@ export default function StockReturnCreatePage() {
     }
   }
 
-  // ---------- Render ----------
+  // F9 = معاينة الطباعة، F10 = طباعة مباشرة (يتطلب حفظ المرتجع أولاً)
+  useDocPrintShortcuts({
+    onPreview: () => {
+      if (!editId) { toast.message("احفظ المرتجع أولاً"); return; }
+      navigate(`/preview/return/${editId}`);
+    },
+    onPrint: () => {
+      if (!editId) { toast.message("احفظ المرتجع أولاً"); return; }
+      navigate(`/preview/return/${editId}?autoprint=1`);
+    },
+  });
+
   return (
     <div ref={pageRef} className="neo-quote-scope" dir="rtl" style={{ position: "relative" }}>
       <style>{`
