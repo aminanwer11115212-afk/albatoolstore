@@ -215,6 +215,9 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
     return startsWithAny([inv.invoice_number, inv.customers?.name, inv.walk_in_customer_name], search);
   }), [invoices, workflowFilter, paymentFilter, sourceFilter, customerSearch, dateFrom, dateTo, minAmount, search, getPaymentStatus]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  // بعد الحذف: إن أصبحت الصفحة الحالية خارج النطاق، اقفز للصفحة الأخيرة المتاحة
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages, page]);
+
   const start = (page - 1) * perPage;
   const paginated = useMemo(() => filtered.slice(start, start + perPage), [filtered, start, perPage]);
 

@@ -67,6 +67,8 @@ export default function StockReturnPage() {
     return startsWithAny([r.return_number, r.customers?.name, r.reason], search);
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages, page]);
+
   const start = (page - 1) * perPage;
   const paginated = filtered.slice(start, start + perPage);
 

@@ -155,6 +155,8 @@ export default function QuotesPage() {
     return startsWithAny([q.quote_number, q.customers?.name], search);
   }), [quotes, statusFilter, customerSearch, dateFrom, dateTo, minAmount, search]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages, page]);
+
   const start = (page - 1) * perPage;
   const paginated = useMemo(() => filtered.slice(start, start + perPage), [filtered, start, perPage]);
 

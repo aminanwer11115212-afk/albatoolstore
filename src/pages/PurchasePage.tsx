@@ -167,6 +167,8 @@ export default function PurchasePage() {
     return startsWithAny([o.order_number, supplierMap.get(o.supplier_id)?.name], search);
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages, page]);
+
   const start = (page - 1) * perPage;
   const paginated = filtered.slice(start, start + perPage);
 
