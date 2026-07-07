@@ -326,26 +326,43 @@ h2{color:#c0392b;margin-bottom:12px}p{color:#555}</style></head>
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const requestId = newRequestId();
+  const started = Date.now();
+
   try {
     const url = new URL(req.url);
     const token = (url.searchParams.get("token") || "").trim();
-    if (!token) return buildErrorHTML("رابط غير صالح", 400);
+    logInfo(requestId, "share.request", { method: req.method, hasToken: !!token });
+    if (!token) {
+      logError(requestId, "share.invalid_token", new Error("missing token"));
+      return buildErrorHTML("رابط غير صالح", 400, requestId);
+    }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: tk } = await supabase
+    const { data: tk, error: tkErr } = await supabase
       .from("document_share_tokens")
       .select("doc_type, doc_id, expires_at, hidden_sections")
       .eq("token", token)
       .maybeSingle();
 
-    if (!tk) return buildErrorHTML("الرابط غير موجود", 404);
-    if (new Date(tk.expires_at as string) <= new Date()) {
-      return buildErrorHTML("انتهت صلاحية الرابط", 410);
+    if (tkErr) {
+      logError(requestId, "share.token_lookup_failed", tkErr, { token: token.slice(0, 8) });
+      return buildErrorHTML("خطأ أثناء التحقق من الرابط", 500, requestId);
     }
+    if (!tk) {
+      logError(requestId, "share.token_not_found", new Error("token not found"), { token: token.slice(0, 8) });
+      return buildErrorHTML("الرابط غير موجود", 404, requestId);
+    }
+    if (new Date(tk.expires_at as string) <= new Date()) {
+      logInfo(requestId, "share.token_expired", { doc_type: tk.doc_type, expires_at: tk.expires_at });
+      return buildErrorHTML("انتهت صلاحية الرابط", 410, requestId);
+    }
+    logInfo(requestId, "share.token_ok", { doc_type: tk.doc_type });
+
 
     const { data: companyArr } = await supabase.from("company_settings").select("*").limit(1);
     const company = Array.isArray(companyArr) ? companyArr[0] : null;
