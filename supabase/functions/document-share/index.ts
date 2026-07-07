@@ -57,8 +57,12 @@ function buildDocHTML(args: {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="lov-doc-label" content="${attr(docTitle)}">
+<meta name="lov-doc-number" content="${attr(docNumber || "")}">
+<meta name="lov-customer-name" content="${attr(customer?.name || "")}">
 <title>${attr(docTitle)} ${attr(docNumber || "")}</title>
 <style>
+
   @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #1a1a1a; background: #f3f4f6; padding: 80px 12px 24px; line-height: 1.5; font-size: 14px; }
