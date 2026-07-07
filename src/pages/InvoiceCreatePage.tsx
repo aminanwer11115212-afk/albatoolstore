@@ -12,6 +12,7 @@ import { Plus, Edit, Printer, MessageCircle, FileText, StickyNote, Image as Imag
 import StatusButton, { WORKFLOW_STATUS_OPTIONS, INVOICE_STATUS_OPTIONS } from "@/components/StatusButton";
 import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
+import { useDocPrintShortcuts } from "@/hooks/useDocPrintShortcuts";
 import PanelResizer from "@/components/PanelResizer";
 import RowResizer from "@/components/RowResizer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
