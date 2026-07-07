@@ -309,17 +309,19 @@ function buildPackagingHTML(args: {
 </html>`;
 }
 
-function buildErrorHTML(message: string, status: number): Response {
+function buildErrorHTML(message: string, status: number, requestId?: string): Response {
+  const rid = requestId ? `<p style="margin-top:12px;color:#999;font-size:12px;font-family:monospace">Request ID: ${attr(requestId)}</p>` : "";
   const html = `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>خطأ</title>
 <style>body{font-family:Tahoma,Arial,sans-serif;background:#f3f4f6;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
 .box{background:#fff;padding:32px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.1);text-align:center;max-width:420px}
 h2{color:#c0392b;margin-bottom:12px}p{color:#555}</style></head>
-<body><div class="box"><h2>تعذّر فتح المستند</h2><p>${attr(message)}</p></div></body></html>`;
+<body><div class="box"><h2>تعذّر فتح المستند</h2><p>${attr(message)}</p><p style="margin-top:8px;color:#777;font-size:12px">إذا استمرت المشكلة، أرسل رقم الطلب للمسؤول.</p>${rid}</div></body></html>`;
   return new Response(html, {
     status,
-    headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+    headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "x-request-id": requestId || "" },
   });
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
