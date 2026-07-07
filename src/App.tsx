@@ -454,8 +454,10 @@ const App = () => {
             <Route path="*" element={lazyEl(<NotFound />, "غير موجود")} />
           </Routes>
         </AppLayout>
+        </ConfirmDeleteProvider>
         </StaffGuard>
       </BrowserRouter>
+
     </TooltipProvider>
   </PersistQueryClientProvider>
 );
