@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { notifyDuplicateItem } from "@/utils/duplicateItemToast";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { toast } from "sonner";
@@ -225,6 +226,7 @@ const btnStyle = (bg: string): React.CSSProperties => ({
 
 export default function StockReturnCreatePage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { id: editId } = useParams();
   // One-time reset of saved toolbar positions for this screen
   useEffect(() => {
@@ -768,6 +770,11 @@ export default function StockReturnCreatePage() {
       console.error("[StockReturn] stock restoration failed", stockErr);
       toast.warning("تم حفظ المرتجع لكن فشل تحديث المخزون: " + stockErr.message);
     }
+
+    // حدّث قائمة المرتجعات فوراً بعد الحفظ
+    queryClient.invalidateQueries({ queryKey: ["stock-returns-full"] });
+    queryClient.invalidateQueries({ queryKey: ["stock_returns"] });
+    queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
 
     toast.success(editId ? "تم تحديث المرتجع وتعديل المخزون" : "تم حفظ المرتجع وإعادة الكميات للمخزون");
     navigate(`/stock-return/view/${rid}`);
