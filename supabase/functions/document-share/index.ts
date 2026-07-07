@@ -688,18 +688,27 @@ Deno.serve(async (req) => {
   <div class="footer-note">شكراً لتعاملكم معنا — هذا الإيصال صادر إلكترونياً ومعتمد بدون توقيع.</div>
 </div></body></html>`;
     } else {
-      return buildErrorHTML("نوع المستند غير مدعوم", 400);
+      logError(requestId, "share.unsupported_doc_type", new Error("unsupported"), { doc_type: tk.doc_type });
+      return buildErrorHTML("نوع المستند غير مدعوم", 400, requestId);
     }
 
     const hiddenSections = Array.isArray((tk as any).hidden_sections)
       ? ((tk as any).hidden_sections as unknown[]).filter((s) => typeof s === "string") as string[]
       : [];
     const html = statementHtml || buildDocHTML({ docTitle, docNumber, date, customer, items, grandTotal, paidAmount, notes, company, hiddenSections });
+    logInfo(requestId, "share.rendered", {
+      doc_type: tk.doc_type,
+      doc_number: docNumber,
+      ms: Date.now() - started,
+      bytes: html.length,
+    });
     return new Response(html, {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+      headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "x-request-id": requestId },
     });
   } catch (e: any) {
-    return buildErrorHTML("خطأ في الخادم: " + (e?.message || String(e)), 500);
+    logError(requestId, "share.unhandled_exception", e, { ms: Date.now() - started });
+    return buildErrorHTML("خطأ في الخادم: " + (e?.message || String(e)), 500, requestId);
   }
+
 });
