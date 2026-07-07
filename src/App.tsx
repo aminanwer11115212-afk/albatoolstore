@@ -1,6 +1,10 @@
 import { useState, useCallback, useEffect, lazy } from "react";
 import { lazyEl } from "@/components/PageLoader";
-import { QueryClient, QueryCache, MutationCache, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryCache, MutationCache } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createIDBPersister } from "@/lib/queryPersister";
+import { initOfflineFlush } from "@/lib/offlineQueue";
+import OfflineBanner from "@/components/layout/OfflineBanner";
 import { toast } from "sonner";
 import { BrowserRouter, Route, Routes, useParams, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -244,11 +248,27 @@ const App = () => {
     }
   }, []);
 
+  useEffect(() => {
+    initOfflineFlush();
+  }, []);
+
   return (
-  <QueryClientProvider client={queryClient}>
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{
+      persister: createIDBPersister(),
+      maxAge: 1000 * 60 * 60 * 24 * 7, // أسبوع
+      buster: "v1",
+      dehydrateOptions: {
+        // لا نحفظ الاستعلامات الفاشلة أو التي لم تُجلَب بعد
+        shouldDehydrateQuery: (q) => q.state.status === "success",
+      },
+    }}
+  >
     <ProductsCacheSync />
     <RealtimeSync />
     <TooltipProvider>
+      <OfflineBanner />
       <Toaster />
       <Sonner />
       <CriticalErrorDialog />
@@ -435,7 +455,7 @@ const App = () => {
         </StaffGuard>
       </BrowserRouter>
     </TooltipProvider>
-  </QueryClientProvider>
+  </PersistQueryClientProvider>
 );
 };
 
