@@ -40,50 +40,75 @@ export default function InvoicePackagingPage() {
   const loadData = async () => {
     if (!id) return;
     setLoading(true);
-    const { data: inv } = await supabase.from("invoices").select("*, customers(name)").eq("id", id).single();
-    setInvoice(inv);
+    try {
+      const { data: inv, error: invErr } = await supabase.from("invoices").select("*, customers(name)").eq("id", id).single();
+      if (invErr) throw invErr;
+      setInvoice(inv);
 
-    const { data: items } = await supabase.from("invoice_items").select("product_id").eq("invoice_id", id);
-    const ids = Array.from(new Set((items || []).map((it: any) => it.product_id).filter(Boolean))) as string[];
-    setInvoiceProductIds(ids);
+      const { data: items, error: itemsErr } = await supabase.from("invoice_items").select("product_id").eq("invoice_id", id);
+      if (itemsErr) throw itemsErr;
+      const ids = Array.from(new Set((items || []).map((it: any) => it.product_id).filter(Boolean))) as string[];
+      setInvoiceProductIds(ids);
 
-    const { data: pkgs } = await supabase
-      .from("invoice_packaging")
-      .select("*, packaging_types(name)")
-      .eq("invoice_id", id)
-      .order("created_at", { ascending: false });
-    setPackagingList(pkgs || []);
-    setLoading(false);
+      const { data: pkgs, error: pkgsErr } = await supabase
+        .from("invoice_packaging")
+        .select("*, packaging_types(name)")
+        .eq("invoice_id", id)
+        .order("created_at", { ascending: false });
+      if (pkgsErr) throw pkgsErr;
+      setPackagingList(pkgs || []);
+    } catch (e: any) {
+      console.error("loadData failed:", e);
+      toast.error(e?.message || "تعذّر تحميل بيانات التغليف");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAdd = async () => {
     if (!id) return;
+    const packs = parseInt(quantity);
+    const pieces = parseInt(piecesPerPack);
+    if (!isFinite(packs) || packs <= 0) { toast.error("عدد العبوات يجب أن يكون أكبر من صفر"); return; }
+    if (!isFinite(pieces) || pieces <= 0) { toast.error("عدد القطع بالعبوة يجب أن يكون أكبر من صفر"); return; }
+    const weightNum = weight === "" ? null : parseFloat(weight);
+    if (weightNum !== null && (!isFinite(weightNum) || weightNum < 0)) { toast.error("الوزن غير صحيح"); return; }
+    const costNum = parseFloat(cost);
+    if (cost !== "" && (!isFinite(costNum) || costNum < 0)) { toast.error("التكلفة غير صحيحة"); return; }
     try {
-      const packs = parseInt(quantity) || 1;
-      const pieces = parseInt(piecesPerPack) || 1;
-      await supabase.from("invoice_packaging").insert({
+      const { error } = await supabase.from("invoice_packaging").insert({
         invoice_id: id,
         packaging_type_id: packagingTypeId || null,
         packs_count: packs,
         pieces_per_pack: pieces,
         quantity: packs * pieces,
-        weight: parseFloat(weight) || null,
+        weight: weightNum,
         dimensions: dimensions || null,
-        cost: parseFloat(cost) || 0,
+        cost: isFinite(costNum) ? costNum : 0,
         notes: notes || null,
       });
+      if (error) throw error;
       toast.success("تم إضافة التغليف بنجاح");
       setPackagingTypeId(""); setQuantity("1"); setPiecesPerPack("1"); setWeight("");
       setDimensions(""); setCost("0"); setNotes("");
       loadData();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      console.error("packaging insert failed:", e);
+      toast.error(e?.message || "تعذّر إضافة التغليف");
+    }
   };
 
   const handleDelete = async (pkgId: string) => {
     if (!confirm("حذف هذا التغليف؟")) return;
-    await supabase.from("invoice_packaging").delete().eq("id", pkgId);
-    toast.success("تم الحذف");
-    loadData();
+    try {
+      const { error } = await supabase.from("invoice_packaging").delete().eq("id", pkgId);
+      if (error) throw error;
+      toast.success("تم الحذف");
+      loadData();
+    } catch (e: any) {
+      console.error("packaging delete failed:", e);
+      toast.error(e?.message || "تعذّر حذف التغليف");
+    }
   };
 
   const toggleExpanded = (pkgId: string) => {
