@@ -1086,6 +1086,13 @@ export default function QuoteCreatePage() {
     action(id);
   };
 
+  // F9 = معاينة الطباعة، F10 = طباعة مباشرة (بدون تغيير حالة عرض السعر)
+  useDocPrintShortcuts({
+    onPreview: () => saveThen((id) => navigate(isSideMode ? `/preview/quote/${id}` : `/preview/quote/${id}`)),
+    onPrint: () => saveThen((id) => navigate(`/preview/quote/${id}?autoprint=1`)),
+  });
+
+
   // ---------- Render ----------
   return (
     <div ref={pageRef} className={`neo-quote-scope${isSideMode ? " neo-quote-scope-side" : ""}`} dir="rtl" style={{ position: "relative" }}>
