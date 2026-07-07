@@ -74,6 +74,7 @@ export default function InvoiceViewPage() {
 
   // Status change
   const [newStatus, setNewStatus] = useState("pending");
+  const savingEditRef = useRef(false);
 
   useEffect(() => {
     loadInvoice();
