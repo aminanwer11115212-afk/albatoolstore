@@ -7,6 +7,8 @@ import { startsWithAny } from "@/utils/searchMatch";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompanySettings } from "@/hooks/useData";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
+
 function useSideQuotes() {
   return useQuery({
     queryKey: ["side-quotes"],
@@ -95,18 +97,24 @@ export default function SideQuotesPage() {
   const fmtMoney = (n: any) =>
     Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("حذف عرض السعر الجانبي؟")) return;
-    try {
-      await supabase.from("quote_items").delete().eq("quote_id", id);
-      const { error } = await supabase.from("quotes").delete().eq("id", id);
-      if (error) throw error;
-      toast.success("تم الحذف");
-      qc.invalidateQueries({ queryKey: ["side-quotes"] });
-    } catch (e: any) {
-      toast.error(e.message);
-    }
+  const confirmDelete = useConfirmDelete();
+  const handleDelete = (id: string) => {
+    confirmDelete({
+      title: "حذف عرض السعر الجانبي",
+      description: "هل أنت متأكد من حذف هذا العرض الجانبي؟",
+      successMessage: "تم الحذف",
+      errorMessage: "تعذّر حذف العرض",
+      onConfirm: async () => {
+        await supabase.from("quote_items").delete().eq("quote_id", id);
+        const { error } = await supabase.from("quotes").delete().eq("id", id);
+        if (error) throw error;
+        qc.invalidateQueries({ queryKey: ["side-quotes"] });
+        qc.invalidateQueries({ queryKey: ["quotes-full"] });
+        qc.invalidateQueries({ queryKey: ["quotes-with-customers"] });
+      },
+    });
   };
+
 
   const handleConvert = async (q: any) => {
     if (!confirm(`تحويل العرض الجانبي ${q.quote_number} إلى فاتورة؟ سيتم حذف عرض السعر من القائمة بعد التحويل.`)) return;

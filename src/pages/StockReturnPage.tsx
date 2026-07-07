@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
+
 import ZoomControls from "@/components/ZoomControls";
 import { useNavigate } from "react-router-dom";
 import { useStockReturns, useCompanySettings } from "@/hooks/useData";
@@ -38,11 +40,17 @@ export default function StockReturnPage() {
   const company = companyArr?.[0] || null;
   const currency = company?.currency || "SDG";
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا المرتجع؟")) return;
-    try { await remove.mutateAsync(id); toast.success("تم حذف المرتجع"); }
-    catch (e: any) { toast.error(e.message); }
+  const confirmDelete = useConfirmDelete();
+  const handleDelete = (id: string) => {
+    confirmDelete({
+      title: "حذف المرتجع",
+      description: "هل أنت متأكد من حذف هذا المرتجع؟",
+      successMessage: "تم حذف المرتجع",
+      errorMessage: "تعذّر حذف المرتجع",
+      onConfirm: async () => { await remove.mutateAsync(id); },
+    });
   };
+
 
   const filtered = (returns || []).filter((r: any) => {
     if (statusFilter !== "all" && (r.status || "pending") !== statusFilter) return false;

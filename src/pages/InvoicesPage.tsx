@@ -13,6 +13,8 @@ import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import WorkflowStatusBadge, { WORKFLOW_STATUSES, type WorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
+
 import { StatusChip } from "@/components/ui/status-chip";
 import ShippingDispatchDialog from "@/components/invoice/ShippingDispatchDialog";
 // Status label map matching old system (custom.css .st-* classes)
@@ -96,26 +98,31 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
     navigate(`/preview/invoice/${inv.id}${suffix}`);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذه الفاتورة؟ سيتم إرجاع الكميات إلى المخزون.")) return;
-    try {
-      const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
-      const { restoredStock } = await deleteInvoiceWithStockRestore(id);
-      // إزالة الفاتورة من كاش React Query محلياً
-      qc.setQueriesData<any>(
-        { predicate: (q) => {
-          const key = q.queryKey[0];
-          return key === "invoices-with-customers" || key === "invoices";
-        }},
-        (old: any) => Array.isArray(old) ? old.filter((row: any) => row.id !== id) : old,
-      );
-      qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
-      qc.invalidateQueries({ queryKey: ["invoices"] });
-      toast.success(restoredStock ? "تم حذف الفاتورة وإرجاع الكميات إلى المخزون" : "تم حذف الفاتورة");
-    } catch (e: any) {
-      toast.error(e?.message || "تعذّر حذف الفاتورة");
-    }
+  const confirmDelete = useConfirmDelete();
+  const handleDelete = (id: string) => {
+    confirmDelete({
+      title: "حذف الفاتورة",
+      description: "هل أنت متأكد من حذف هذه الفاتورة؟ سيتم إرجاع الكميات إلى المخزون.",
+      confirmLabel: "حذف الفاتورة",
+      errorMessage: "تعذّر حذف الفاتورة",
+      onConfirm: async () => {
+        const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
+        const { restoredStock } = await deleteInvoiceWithStockRestore(id);
+        qc.setQueriesData<any>(
+          { predicate: (q) => {
+            const key = q.queryKey[0];
+            return key === "invoices-with-customers" || key === "invoices" || key === "invoices-full";
+          }},
+          (old: any) => Array.isArray(old) ? old.filter((row: any) => row.id !== id) : old,
+        );
+        qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+        qc.invalidateQueries({ queryKey: ["invoices-full"] });
+        qc.invalidateQueries({ queryKey: ["invoices"] });
+        toast.success(restoredStock ? "تم حذف الفاتورة وإرجاع الكميات إلى المخزون" : "تم حذف الفاتورة");
+      },
+    });
   };
+
   const handleWorkflowChange = async (inv: any, newStatus: WorkflowStatus) => {
     if (newStatus === inv.workflow_status) return;
     const before = (inv.workflow_status || "new") as WorkflowStatus;

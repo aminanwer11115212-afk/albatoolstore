@@ -10,6 +10,8 @@ import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocLi
 import { StatusChip } from "@/components/ui/status-chip";
 import { receiveStockForPurchaseOnce } from "@/utils/stockReceive";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
+
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },
   received:  { label: "مستلَم", cls: "st-paid" },
@@ -52,38 +54,44 @@ export default function PurchasePage() {
   const supplierMap = new Map<string, any>();
   (suppliers || []).forEach((s: any) => supplierMap.set(s.id, s));
 
-  const handleDelete = async (id: string) => {
+  const confirmDelete = useConfirmDelete();
+  const handleDelete = (id: string) => {
     const order = (orders || []).find((o: any) => o.id === id);
-    if (!confirm("هل أنت متأكد من حذف هذا الأمر؟")) return;
-    try {
-      // إرجاع المخزون إذا كان الأمر مستلماً (كان قد أضاف كميات للمخزون)
-      if (order?.status === "received") {
-        const { data: items } = await supabase
-          .from("purchase_order_items")
-          .select("product_id, quantity")
-          .eq("purchase_order_id", id);
-        if (items && items.length > 0) {
-          // ذرّي + متوازٍ: استخدم RPC decrement_product_stock عبر Promise.all
-          // بدل قراءة + كتابة يدوية (race condition).
-          await Promise.all(
-            (items as any[])
-              .filter((it) => it.product_id)
-              .map((it) =>
-                (supabase as any).rpc("decrement_product_stock", {
-                  _product_id: it.product_id,
-                  _qty: Number(it.quantity || 0),
-                }),
-              ),
-          );
+    const willRestore = order?.status === "received";
+    confirmDelete({
+      title: "حذف أمر الشراء",
+      description: willRestore
+        ? "هذا الأمر مستلَم — سيتم خصم الكميات المستلمة من المخزون عند الحذف."
+        : "هل أنت متأكد من حذف هذا الأمر؟",
+      confirmLabel: "حذف الأمر",
+      successMessage: "تم الحذف" + (willRestore ? " وإرجاع المخزون" : ""),
+      errorMessage: "تعذّر حذف الأمر",
+      onConfirm: async () => {
+        if (willRestore) {
+          const { data: items } = await supabase
+            .from("purchase_order_items")
+            .select("product_id, quantity")
+            .eq("purchase_order_id", id);
+          if (items && items.length > 0) {
+            await Promise.all(
+              (items as any[])
+                .filter((it) => it.product_id)
+                .map((it) =>
+                  (supabase as any).rpc("decrement_product_stock", {
+                    _product_id: it.product_id,
+                    _qty: Number(it.quantity || 0),
+                  }),
+                ),
+            );
+          }
         }
-      }
-      // حذف بنود الأمر أولاً لتجنب مشاكل FK
-      await supabase.from("purchase_order_items").delete().eq("purchase_order_id", id);
-      await remove.mutateAsync(id);
-      toast.success("تم الحذف" + (order?.status === "received" ? " وإرجاع المخزون" : ""));
-      window.dispatchEvent(new Event("products:changed"));
-    } catch (e: any) { toast.error(e.message); }
+        await supabase.from("purchase_order_items").delete().eq("purchase_order_id", id);
+        await remove.mutateAsync(id);
+        window.dispatchEvent(new Event("products:changed"));
+      },
+    });
   };
+
 
   const handleConvertToInvoice = async (o: any) => {
     if (!confirm(`تحويل أمر الشراء ${o.order_number} إلى فاتورة مشتريات (استلام البضاعة وتحديث المخزون)؟`)) return;
