@@ -1007,14 +1007,6 @@ export default function ReadyToShipPanel({
                   <input
                     type="checkbox"
                     checked={allChecked}
-          <table className="rts-table">
-            <thead>
-              <tr>
-                <th className="cell-idx">#</th>
-                <th className="cell-check">
-                  <input
-                    type="checkbox"
-                    checked={allChecked}
                     onChange={toggleAll}
                   />
                 </th>
