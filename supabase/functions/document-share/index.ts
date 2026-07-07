@@ -529,7 +529,8 @@ Deno.serve(async (req) => {
     let customer: any = null;
     let items: any[] = [];
     let grandTotal = 0;
-    let oldBalance = 0;
+    let paidAmount = 0;
+
     let notes: string | null = null;
     let statementHtml: string | null = null;
 
@@ -545,8 +546,9 @@ Deno.serve(async (req) => {
       date = (inv as any).date || "";
       const c = (inv as any).customers;
       customer = c ? { name: c.name, phone: c.phone, address: c.address } : null;
-      oldBalance = Number(c?.balance || 0);
+      paidAmount = Number((inv as any).paid_amount || 0);
       grandTotal = Number((inv as any).total || 0);
+
       notes = (inv as any).notes || null;
       const { data: rows } = await supabase.from("invoice_items").select("*").eq("invoice_id", tk.doc_id);
       items = (rows || []).map((r: any) => ({
@@ -564,8 +566,9 @@ Deno.serve(async (req) => {
       date = (q as any).date || "";
       const c = (q as any).customers;
       customer = c ? { name: c.name, phone: c.phone, address: c.address } : null;
-      oldBalance = Number(c?.balance || 0);
+      paidAmount = 0;
       grandTotal = Number((q as any).total || 0);
+
       notes = (q as any).notes || null;
       const { data: rows } = await supabase.from("quote_items").select("*").eq("quote_id", tk.doc_id);
       items = (rows || []).map((r: any) => ({
@@ -583,8 +586,9 @@ Deno.serve(async (req) => {
       date = (r as any).date || "";
       const c = (r as any).customers;
       customer = c ? { name: c.name, phone: c.phone, address: c.address } : null;
-      oldBalance = Number(c?.balance || 0);
+      paidAmount = Number((r as any).paid_amount || 0);
       grandTotal = Number((r as any).total || 0);
+
       notes = (r as any).reason || null;
       const { data: rows } = await supabase.from("stock_return_items").select("*").eq("stock_return_id", tk.doc_id);
       items = (rows || []).map((x: any) => ({
