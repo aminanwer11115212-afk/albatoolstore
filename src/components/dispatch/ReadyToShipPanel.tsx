@@ -18,6 +18,7 @@ import {
   useCustomerTransporters, useCustomerDestinations, useCustomerPreferredTransporter,
 } from "@/hooks/useData";
 import SearchableSelect from "@/components/transport/SearchableSelect";
+import { resolveDefaultsFromCache } from "@/utils/customerTransportDefaults";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
