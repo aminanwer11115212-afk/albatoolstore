@@ -108,8 +108,10 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
       setAllowedDestinationIds(destIds.size > 0 ? destIds : null);
 
       if (!destinationId) {
-        const def = (dests || []).find((d: any) => d.is_default);
-        if (def) setDestinationId(def.destination_id);
+        // نفس منطق ReadyToShipPanel/InvoiceTransportPage — الفراغ عند عدم وجود افتراضي
+        const { fetchCustomerTransportDefaults } = await import("@/utils/customerTransportDefaults");
+        const defaults = await fetchCustomerTransportDefaults(customerId);
+        if (defaults.destinationId) setDestinationId(defaults.destinationId);
       }
     } else {
       setAllowedTransporterIds(null);
