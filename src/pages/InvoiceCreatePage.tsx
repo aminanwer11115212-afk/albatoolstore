@@ -1062,9 +1062,39 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
             break;
           }
           lastError = error;
-          // إذا كان الخطأ تكرار رقم الفاتورة، ولّد رقماً عشوائياً جديداً وحاول مجدداً
+          // إذا كان الخطأ تكرار رقم الفاتورة — رقم الفاتورة هو المفتاح،
+          // نبحث عن الفاتورة الموجودة ونعمل UPDATE بدل إنشاء نسخة مكررة.
           const isDup = (error as any).code === "23505" || /duplicate key|invoices_invoice_number_key/i.test(error.message || "");
           if (!isDup) throw error;
+          const { data: existing } = await supabase
+            .from("invoices")
+            .select("id")
+            .eq("invoice_number", currentNumber)
+            .maybeSingle();
+          if (existing?.id) {
+            const { error: upErr } = await supabase
+              .from("invoices")
+              .update(payload)
+              .eq("id", existing.id);
+            if (upErr) throw upErr;
+            // احذف البنود القديمة لإعادة إدراج الحالية
+            const { data: prev } = await supabase
+              .from("invoice_items")
+              .select("product_id, quantity")
+              .eq("invoice_id", existing.id);
+            oldItems = (prev || []).map((p: any) => ({ product_id: p.product_id, quantity: p.quantity }));
+            const { error: delErr } = await supabase
+              .from("invoice_items")
+              .delete()
+              .eq("invoice_id", existing.id);
+            if (delErr) throw delErr;
+            invId = existing.id;
+            recordExisted = true;
+            effectiveEditId = existing.id;
+            lastError = null;
+            break;
+          }
+          // حالة سباق نادرة — ولّد رقماً جديداً وأعد المحاولة
           const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
           currentNumber = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
             scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),

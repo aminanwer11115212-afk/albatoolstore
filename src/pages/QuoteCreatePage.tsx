@@ -912,7 +912,8 @@ export default function QuoteCreatePage() {
       const { data: { user: _u } } = await supabase.auth.getUser();
       (payload as any).created_by_uid = _u?.id || null;
       (payload as any).is_side = isSideMode;
-      // Try insert; on duplicate quote_number, recompute next number and retry up to 5 times
+      // Try insert؛ إذا كان الرقم مكرراً (23505) — رقم عرض السعر هو المفتاح،
+      // نبحث عن السجل الموجود ونعمل UPDATE بدل إنشاء نسخة مكررة.
       let attempt = 0;
       let qNum = quoteNumber;
       const prefix = isSideMode ? (sideQuotePrefix || "QTS-") : (quotePrefix || "QT-");
@@ -931,7 +932,28 @@ export default function QuoteCreatePage() {
           break;
         }
         if (error.code === "23505" || /duplicate key|quotes_quote_number_key/i.test(error.message)) {
-          // ولّد رقماً عشوائياً جديداً وحاول مجدداً
+          // ابحث عن العرض بنفس الرقم وحدّثه — لا إنشاء نسخة مكررة
+          const { data: existing } = await supabase
+            .from("quotes")
+            .select("id")
+            .eq("quote_number", qNum)
+            .maybeSingle();
+          if (existing?.id) {
+            const { error: upErr } = await supabase
+              .from("quotes")
+              .update(payload)
+              .eq("id", existing.id);
+            if (upErr) {
+              toast.error(upErr.message);
+              return false;
+            }
+            await (supabase as any).rpc("delete_quote_items_silent", { p_quote_id: existing.id });
+            qid = existing.id;
+            recordExisted = true;
+            effectiveEditId = existing.id;
+            break;
+          }
+          // حالة سباق نادرة — ولّد رقماً جديداً وأعد المحاولة
           const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
           qNum = await generateRandomDocNumber("quotes", "quote_number", prefix, {
             scope: (q) => (isSideMode ? q.eq("is_side", true) : q.or("is_side.is.null,is_side.eq.false")),
@@ -944,7 +966,7 @@ export default function QuoteCreatePage() {
         return false;
       }
       if (!qid) {
-        toast.error("تعذّر توليد رقم عرض سعر فريد، حاول مرة أخرى");
+        toast.error("تعذّر حفظ عرض السعر، حاول مرة أخرى");
         return false;
       }
     }
