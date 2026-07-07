@@ -850,7 +850,7 @@ Deno.serve(async (req) => {
     const hiddenSections = Array.isArray((tk as any).hidden_sections)
       ? ((tk as any).hidden_sections as unknown[]).filter((s) => typeof s === "string") as string[]
       : [];
-    const html = statementHtml || buildDocHTML({ docTitle, docNumber, date, customer, items, grandTotal, oldBalance, notes, company, hiddenSections });
+    const html = statementHtml || buildDocHTML({ docTitle, docNumber, date, customer, items, grandTotal, paidAmount, notes, company, hiddenSections });
     return new Response(html, {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
