@@ -243,7 +243,7 @@ export default function NotificationsPage() {
         .from("products")
         .select("id, name, stock_quantity, min_stock, updated_at")
         .order("stock_quantity", { ascending: true })
-        .limit(2000),
+        .limit(10000),
       (supabase as any)
         .from("activity_log")
         .select("id, table_name, action, record_id, created_at, changed_by, new_data, old_data, changed_fields")
