@@ -82,15 +82,10 @@ export default function InvoiceTransportPage() {
 
       if (inv?.customer_id) {
         try {
-          const [{ data: dests }, { data: pref }] = await Promise.all([
-            supabase.from("customer_destinations")
-              .select("destination_id, is_default").eq("customer_id", inv.customer_id),
-            (supabase as any).from("customer_preferred_transporter")
-              .select("transporter_id").eq("customer_id", inv.customer_id).maybeSingle(),
-          ]);
-          const def = (dests || []).find((d: any) => d.is_default);
-          if (def && !destinationId) setDestinationId(def.destination_id);
-          if (pref?.transporter_id && !transporterId) setTransporterId(pref.transporter_id);
+          const { fetchCustomerTransportDefaults } = await import("@/utils/customerTransportDefaults");
+          const defaults = await fetchCustomerTransportDefaults(inv.customer_id);
+          if (defaults.destinationId && !destinationId) setDestinationId(defaults.destinationId);
+          if (defaults.transporterId && !transporterId) setTransporterId(defaults.transporterId);
         } catch (prefErr) {
           console.warn("customer preferences load failed:", prefErr);
         }
