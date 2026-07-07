@@ -24,11 +24,9 @@ function isEligibleCell(el: Element | null): el is HTMLElement {
   if (!el) return false;
   const he = el as HTMLElement;
   if (!he.hasAttribute("data-nav-col")) return false;
-  if (
-    !he.closest("[data-nav-table]") &&
-    !he.closest(".quick-add-row") &&
-    !he.closest('[data-nav-zone="quick"]')
-  ) return false;
+  // صف الإضافة السريع (quick-add-row) مستثنى: يكتب مباشرة بلا وضع تنقل.
+  if (!he.closest("[data-nav-table]")) return false;
+  if (he.closest(".quick-add-row") || he.closest('[data-nav-zone="quick"]')) return false;
   if (he.tagName === "TEXTAREA") return false;
   return true;
 }
