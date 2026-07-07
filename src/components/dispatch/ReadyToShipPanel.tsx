@@ -1073,8 +1073,9 @@ export default function ReadyToShipPanel({
               })}
             </tbody>
           </table>
-        )}
+        ))}
       </div>
+
 
       {/* Footer */}
       {!hideFooter && (
