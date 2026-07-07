@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Cloud, CloudOff, Loader2, RefreshCw, Trash2, CheckCircle2 } from "lucide-react";
+import { Cloud, CloudOff, Loader2, RefreshCw, Trash2, CheckCircle2, Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { flushQueue, removeItem, clearQueue } from "@/lib/offlineQueue";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { subscribeSyncState, type SyncState } from "@/lib/realtimeSync";
 
 /**
  * SyncStatusIndicator — أيقونة في شريط الأدوات تعرض حالة الاتصال وعدد
@@ -13,8 +14,29 @@ export default function SyncStatusIndicator() {
   const { online, pending, pendingCount } = useOnlineStatus();
   const [open, setOpen] = useState(false);
   const [flushing, setFlushing] = useState(false);
+  const [rt, setRt] = useState<SyncState | null>(null);
+  const [lastNotifiedRt, setLastNotifiedRt] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
+
+  useEffect(() => subscribeSyncState(setRt), []);
+
+  // إشعارات المستخدم عند تدهور/عودة المزامنة اللحظية
+  useEffect(() => {
+    if (!rt) return;
+    if (rt.status === lastNotifiedRt) return;
+    if (lastNotifiedRt === null) { setLastNotifiedRt(rt.status); return; }
+    if (rt.status === "degraded") {
+      toast.warning("مزامنة جزئية — بعض التحديثات قد تتأخر", {
+        description: rt.lastRequestId ? `المعرّف: ${rt.lastRequestId}` : undefined,
+      });
+    } else if (rt.status === "offline" && online) {
+      toast.error("انقطعت المزامنة اللحظية", { description: rt.lastError || "سيتم إعادة المحاولة تلقائيًا" });
+    } else if (rt.status === "live" && (lastNotifiedRt === "degraded" || lastNotifiedRt === "offline")) {
+      toast.success("عادت المزامنة اللحظية");
+    }
+    setLastNotifiedRt(rt.status);
+  }, [rt, lastNotifiedRt, online]);
 
   useEffect(() => {
     if (!open) return;
@@ -109,6 +131,36 @@ export default function SyncStatusIndicator() {
                 : `${pendingCount} عملية بانتظار الرفع.`
               : "التعديلات ستُخزَّن محلياً وتُرفَع تلقائياً عند عودة الاتصال."}
           </div>
+
+          {rt && (
+            <div
+              className="px-4 py-2 border-b border-border text-[11px]"
+              data-testid="sync-realtime-status"
+              data-sync-status={rt.status}
+              data-sync-connected={rt.connectedTables}
+              data-sync-total={rt.totalTables}
+              data-sync-request-id={rt.lastRequestId ?? ""}
+            >
+              <div className="flex items-center gap-1.5 font-semibold">
+                {rt.status === "live" && <Wifi size={12} className="text-emerald-500" />}
+                {rt.status === "degraded" && <AlertTriangle size={12} className="text-amber-500" />}
+                {rt.status === "connecting" && <Loader2 size={12} className="text-muted-foreground animate-spin" />}
+                {rt.status === "offline" && <WifiOff size={12} className="text-destructive" />}
+                <span>
+                  المزامنة اللحظية:{" "}
+                  {rt.status === "live" ? "متصلة" :
+                    rt.status === "degraded" ? `جزئية (${rt.connectedTables}/${rt.totalTables})` :
+                    rt.status === "connecting" ? "جارٍ الاتصال" : "منقطعة"}
+                </span>
+              </div>
+              <div className="text-muted-foreground mt-1 space-y-0.5">
+                {rt.lastEventAt && <div>آخر تحديث: {new Date(rt.lastEventAt).toLocaleTimeString("ar-EG")}</div>}
+                {rt.lastPollAt && <div>آخر فحص احتياطي: {new Date(rt.lastPollAt).toLocaleTimeString("ar-EG")}</div>}
+                {rt.lastRequestId && <div className="truncate" title={rt.lastRequestId}>معرّف آخر عملية: {rt.lastRequestId}</div>}
+                {rt.lastError && <div className="text-destructive truncate" title={rt.lastError}>خطأ: {rt.lastError}</div>}
+              </div>
+            </div>
+          )}
 
           <div className="max-h-72 overflow-y-auto">
             {pending.length === 0 ? (
