@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useDestinations } from "@/hooks/useData";
+
+const schema = z.object({
+  name: z.string().trim().min(1, "الاسم مطلوب").max(120, "الاسم طويل جداً"),
+  phone: z.string().trim().min(4, "الهاتف مطلوب").max(40, "الهاتف طويل جداً"),
+  address: z.string().trim().min(1, "العنوان مطلوب").max(255, "العنوان طويل جداً"),
+  destination_ids: z.array(z.string().uuid()).min(1, "اختر وجهة واحدة على الأقل"),
+});
 
 type Props = {
   open: boolean;
@@ -21,45 +29,48 @@ export default function QuickAddTransporterDialog({ open, onOpenChange, onCreate
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [destIds, setDestIds] = useState<Set<string>>(new Set());
+  const [destIds, setDestIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
 
   const reset = () => {
-    setName(""); setPhone(""); setAddress(""); setDestIds(new Set()); setNotes("");
+    setName(""); setPhone(""); setAddress(""); setDestIds([]); setNotes("");
   };
 
   const toggleDest = (id: string) => {
-    setDestIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+    setDestIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const save = async () => {
-    if (!name.trim()) { toast.error("الاسم مطلوب"); return; }
+    const parsed = schema.safeParse({ name, phone, address, destination_ids: destIds });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message || "بيانات غير صحيحة");
+      return;
+    }
     setBusy(true);
     try {
       const { data, error } = await (supabase as any).from("transporters").insert({
-        name: name.trim(),
-        phone: phone.trim() || null,
-        address: address.trim() || null,
+        name: parsed.data.name,
+        phone: parsed.data.phone,
+        address: parsed.data.address,
         notes: notes.trim() || null,
       }).select().single();
       if (error) throw error;
 
-      if (data?.id && destIds.size > 0) {
-        const links = Array.from(destIds).map((destination_id) => ({
+      if (data?.id) {
+        const links = parsed.data.destination_ids.map((destination_id, idx) => ({
           transporter_id: data.id,
           destination_id,
+          position: idx,
         }));
-        const { error: linkErr } = await (supabase as any).from("destination_transporters").insert(links);
+        const { error: linkErr } = await (supabase as any)
+          .from("destination_transporters")
+          .insert(links);
         if (linkErr) throw linkErr;
       }
 
       toast.success("تمت إضافة الناقل بنجاح", {
-        description: `«${data?.name ?? name.trim()}» متاح الآن في قائمة الناقلين`,
+        description: `«${data?.name ?? parsed.data.name}» متاح الآن في قائمة الناقلين`,
       });
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["transporters"] }),
@@ -88,26 +99,28 @@ export default function QuickAddTransporterDialog({ open, onOpenChange, onCreate
         <div className="grid gap-3 py-2">
           <div className="grid gap-1.5">
             <Label htmlFor="tr-name">الاسم *</Label>
-            <Input id="tr-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم الناقل" />
+            <Input id="tr-name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="اسم الناقل" />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="tr-phone">الهاتف</Label>
-            <Input id="tr-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxx" />
+            <Label htmlFor="tr-phone">الهاتف *</Label>
+            <Input id="tr-phone" value={phone} maxLength={40} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxx" />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="tr-address">العنوان</Label>
-            <Input id="tr-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="العنوان الذي يظهر في تقارير الترحيل" />
+            <Label htmlFor="tr-address">العنوان *</Label>
+            <Input id="tr-address" value={address} maxLength={255} onChange={(e) => setAddress(e.target.value)} placeholder="يظهر في تقرير الترحيلات" />
           </div>
           <div className="grid gap-1.5">
-            <Label>الوجهات التي يوصّل إليها</Label>
+            <Label>الوجهات التي يوصّل إليها *</Label>
             <div className="max-h-40 overflow-y-auto border border-border rounded-md p-2 bg-muted/30">
               {destList.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-2 text-center">لا توجد وجهات بعد</div>
+                <div className="text-xs text-muted-foreground py-2 text-center">
+                  لا توجد وجهات — أضف وجهات أولاً من صفحة إدارة الوجهات.
+                </div>
               ) : destList.map((d: any) => (
                 <label key={d.id} className="flex items-center gap-2 py-1 cursor-pointer text-sm">
                   <input
                     type="checkbox"
-                    checked={destIds.has(d.id)}
+                    checked={destIds.includes(d.id)}
                     onChange={() => toggleDest(d.id)}
                     className="w-4 h-4"
                   />
@@ -115,10 +128,18 @@ export default function QuickAddTransporterDialog({ open, onOpenChange, onCreate
                 </label>
               ))}
             </div>
+            {destIds.length > 0 && (
+              <div className="text-[11px] text-muted-foreground">
+                الترتيب: {destIds
+                  .map((id) => destList.find((x: any) => x.id === id)?.name)
+                  .filter(Boolean)
+                  .join(" ← ")}
+              </div>
+            )}
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="tr-notes">ملاحظات</Label>
-            <Textarea id="tr-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            <Textarea id="tr-notes" value={notes} maxLength={500} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
         </div>
         <DialogFooter className="gap-2">
