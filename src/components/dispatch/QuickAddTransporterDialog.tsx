@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useDestinations } from "@/hooks/useData";
 
 type Props = {
   open: boolean;
@@ -16,15 +17,24 @@ type Props = {
 
 export default function QuickAddTransporterDialog({ open, onOpenChange, onCreated }: Props) {
   const qc = useQueryClient();
+  const { data: destinations } = useDestinations();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [vehicleType, setVehicleType] = useState("");
-  const [vehicleNumber, setVehicleNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [destIds, setDestIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
 
   const reset = () => {
-    setName(""); setPhone(""); setVehicleType(""); setVehicleNumber(""); setNotes("");
+    setName(""); setPhone(""); setAddress(""); setDestIds(new Set()); setNotes("");
+  };
+
+  const toggleDest = (id: string) => {
+    setDestIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const save = async () => {
@@ -34,15 +44,27 @@ export default function QuickAddTransporterDialog({ open, onOpenChange, onCreate
       const { data, error } = await (supabase as any).from("transporters").insert({
         name: name.trim(),
         phone: phone.trim() || null,
-        vehicle_type: vehicleType.trim() || null,
-        vehicle_number: vehicleNumber.trim() || null,
+        address: address.trim() || null,
         notes: notes.trim() || null,
       }).select().single();
       if (error) throw error;
+
+      if (data?.id && destIds.size > 0) {
+        const links = Array.from(destIds).map((destination_id) => ({
+          transporter_id: data.id,
+          destination_id,
+        }));
+        const { error: linkErr } = await (supabase as any).from("destination_transporters").insert(links);
+        if (linkErr) throw linkErr;
+      }
+
       toast.success("تمت إضافة الناقل بنجاح", {
         description: `«${data?.name ?? name.trim()}» متاح الآن في قائمة الناقلين`,
       });
-      await qc.invalidateQueries({ queryKey: ["transporters"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["transporters"] }),
+        qc.invalidateQueries({ queryKey: ["destination_transporters"] }),
+      ]);
       await qc.refetchQueries({ queryKey: ["transporters"], type: "active" });
       try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
       onCreated?.(data);
@@ -55,6 +77,8 @@ export default function QuickAddTransporterDialog({ open, onOpenChange, onCreate
     }
   };
 
+  const destList = (destinations as any[]) || [];
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent dir="rtl" className="max-w-md">
@@ -66,19 +90,31 @@ export default function QuickAddTransporterDialog({ open, onOpenChange, onCreate
             <Label htmlFor="tr-name">الاسم *</Label>
             <Input id="tr-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم الناقل" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="tr-phone">الهاتف</Label>
-              <Input id="tr-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxx" />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="tr-vtype">نوع المركبة</Label>
-              <Input id="tr-vtype" value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} placeholder="شاحنة / بكب…" />
-            </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="tr-phone">الهاتف</Label>
+            <Input id="tr-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxx" />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="tr-vnum">رقم المركبة</Label>
-            <Input id="tr-vnum" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} />
+            <Label htmlFor="tr-address">العنوان</Label>
+            <Input id="tr-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="العنوان الذي يظهر في تقارير الترحيل" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>الوجهات التي يوصّل إليها</Label>
+            <div className="max-h-40 overflow-y-auto border border-border rounded-md p-2 bg-muted/30">
+              {destList.length === 0 ? (
+                <div className="text-xs text-muted-foreground py-2 text-center">لا توجد وجهات بعد</div>
+              ) : destList.map((d: any) => (
+                <label key={d.id} className="flex items-center gap-2 py-1 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={destIds.has(d.id)}
+                    onChange={() => toggleDest(d.id)}
+                    className="w-4 h-4"
+                  />
+                  <span>{d.name}</span>
+                </label>
+              ))}
+            </div>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="tr-notes">ملاحظات</Label>
