@@ -1932,7 +1932,10 @@ input[type="number"] {
    Nav mode (data-row-mode="nav")   → إبراز برتقالي كامل على الصف والخلية.
    Edit mode (data-row-mode="edit") → إبراز أصفر كامل على الصف والخلية.
    ===================================================================== */
-[data-nav-col]:not([data-edit-mode="true"]) { caret-color: transparent; }
+[data-nav-table] [data-nav-col]:not([data-edit-mode="true"]) { caret-color: transparent; }
+/* صف الإضافة السريعة: الكاريت والتحديد طبيعيان دائماً */
+.quick-add-row [data-nav-col],
+[data-nav-zone="quick"] [data-nav-col] { caret-color: auto !important; }
 
 /* ---- الصف كامل: خلفية + شريط جانبي بلون الوضع ---- */
 tr[data-row-mode="nav"]:not(.row-pending-delete):not(.row-selected-danger) > td {
