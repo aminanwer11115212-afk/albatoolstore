@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { pickCustomerWhatsApp } from "@/utils/whatsapp";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useQuotes, useCompanySettings } from "@/hooks/useData";
@@ -13,6 +13,8 @@ import { deductStockForLines } from "@/utils/stockDeduction";
 
 import { useQuoteConvertedDialog } from "@/hooks/useQuoteConvertedDialog";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
+import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
+
 import { StatusChip } from "@/components/ui/status-chip";
 export const QUOTE_STATUS_KEYS = ["draft", "sent", "accepted", "rejected"] as const;
 
@@ -57,11 +59,17 @@ export default function QuotesPage() {
   const company = companyArr?.[0] || null;
   const currency = company?.currency || "SDG";
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا العرض؟")) return;
-    try { await remove.mutateAsync(id); toast.success("تم حذف العرض"); }
-    catch (e: any) { toast.error(e.message); }
+  const confirmDelete = useConfirmDelete();
+  const handleDelete = (id: string) => {
+    confirmDelete({
+      title: "حذف عرض السعر",
+      description: "هل أنت متأكد من حذف هذا العرض؟ لا يمكن التراجع عن هذا الإجراء.",
+      successMessage: "تم حذف العرض",
+      errorMessage: "تعذّر حذف العرض",
+      onConfirm: async () => { await remove.mutateAsync(id); },
+    });
   };
+
 
   const handleSendQuote = async (q: any, channel: "whatsapp" | "email" | "sms") => {
     const phone = pickCustomerWhatsApp(q.customers);
@@ -147,6 +155,8 @@ export default function QuotesPage() {
     return startsWithAny([q.quote_number, q.customers?.name], search);
   }), [quotes, statusFilter, customerSearch, dateFrom, dateTo, minAmount, search]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages, page]);
+
   const start = (page - 1) * perPage;
   const paginated = useMemo(() => filtered.slice(start, start + perPage), [filtered, start, perPage]);
 

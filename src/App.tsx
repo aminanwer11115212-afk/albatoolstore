@@ -35,6 +35,8 @@ import { useUiPrefsCloudSync } from "./hooks/useUiPrefsCloudSync";
 import { StaffGuard, PermGuard } from "./components/RoleGuard";
 import SimpleCrudPage from "./pages/SimpleCrudPage";
 import HomeButton from "./components/HomeButton";
+import { ConfirmDeleteProvider } from "./components/common/ConfirmDeleteProvider";
+
 
 // Lazy (يُحمَّل عند الزيارة فقط)
 const CustomersPage = lazy(() => import("./pages/CustomersPage"));
@@ -279,7 +281,9 @@ const App = () => {
         <ColumnsResetFloatingButton />
         <HomeButton />
         <StaffGuard>
+        <ConfirmDeleteProvider>
         <AppLayout>
+
           <Routes>
             <Route path="/login" element={lazyEl(<LoginPage />, "تسجيل الدخول")} />
             {/* /signup معطّل — الحسابات تُنشأ من المسؤول فقط */}
@@ -452,8 +456,10 @@ const App = () => {
             <Route path="*" element={lazyEl(<NotFound />, "غير موجود")} />
           </Routes>
         </AppLayout>
+        </ConfirmDeleteProvider>
         </StaffGuard>
       </BrowserRouter>
+
     </TooltipProvider>
   </PersistQueryClientProvider>
 );
