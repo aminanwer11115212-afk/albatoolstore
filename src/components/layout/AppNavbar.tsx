@@ -484,9 +484,23 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
     navigate("/login", { replace: true });
   };
 
-  const handleFullscreen = () => {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-    else document.exitFullscreen();
+  const handleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        const req = document.documentElement.requestFullscreen?.();
+        if (req && typeof (req as Promise<void>).then === "function") await req;
+      } else {
+        const ex = document.exitFullscreen?.();
+        if (ex && typeof (ex as Promise<void>).then === "function") await ex;
+      }
+    } catch (err: any) {
+      // Fullscreen may be blocked by iframe permissions-policy or browser settings.
+      console.warn("Fullscreen not available:", err?.message || err);
+      try {
+        const { toast } = await import("sonner");
+        toast.error("لا يمكن تفعيل ملء الشاشة في هذه النافذة");
+      } catch {}
+    }
   };
 
   // Helper: render a section
