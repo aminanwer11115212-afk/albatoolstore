@@ -746,6 +746,21 @@ export default function PurchaseCreatePage() {
     }));
   }
 
+  // F9 = معاينة الطباعة، F10 = طباعة مباشرة (بدون تغيير حالة أمر الشراء)
+  useDocPrintShortcuts({
+    onPreview: async () => {
+      let id = orderId || editId;
+      if (!id) { await handleSubmit(false); id = orderId || editId; }
+      if (id) navigate(`/preview/purchase/${id}`);
+    },
+    onPrint: async () => {
+      let id = orderId || editId;
+      if (!id) { await handleSubmit(false); id = orderId || editId; }
+      if (id) navigate(`/preview/purchase/${id}?autoprint=1`);
+    },
+  });
+
+
   return (
     <div ref={pageRef} className="neo-quote-scope" dir="rtl" style={{ position: "relative" }}>
       <style>{`
