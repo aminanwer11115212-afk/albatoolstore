@@ -500,6 +500,12 @@ export default function NotificationsPage() {
     });
   }, [items, kindFilter, search, snoozed]);
 
+  // إعادة ضبط عدد المرئي عند تغيّر الفلاتر
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [kindFilter, search, days]);
+
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const hasMore = filtered.length > visible.length;
+
   const snoozedCount = useMemo(() => {
     const now = Date.now();
     return Object.values(snoozed).filter(v => v > now).length;
