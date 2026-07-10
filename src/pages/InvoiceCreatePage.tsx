@@ -908,6 +908,29 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       }
     }
 
+    // ── Duplicate-save guard (طبقة قاعدة البيانات، عبر الأجهزة/الجلسات) ──
+    // إذا لم نكن في وضع تعديل ولا سبق حفظ في الجلسة، ابحث عن فاتورة موجودة
+    // بنفس (العميل + التاريخ + توقيع البنود) خلال آخر 24 ساعة → حوّل إلى UPDATE.
+    if (!effectiveEditId && !pos) {
+      const partyId = activeCustomer?.id || null;
+      const dup = await checkDuplicateBeforeInsert({
+        table: "invoices",
+        partyColumn: "customer_id",
+        partyId,
+        dateISO: invoiceDate,
+        items: validRows.map((r) => ({ product_id: r.product_id, quantity: r.quantity })),
+        excludeId: lastSavedIdRef.current,
+        docLabel: "الفاتورة",
+      });
+      if (dup?.existingId) {
+        effectiveEditId = dup.existingId;
+        effectiveInvoiceNumber = dup.existingNumber || effectiveInvoiceNumber;
+        lastSavedIdRef.current = dup.existingId;
+        setSavedInvoiceId(dup.existingId);
+        setInvoiceNumber(effectiveInvoiceNumber);
+      }
+    }
+
     setSaving(true);
     try {
       // احسب حالة الدفع بناءً على المبلغ المدفوع المحفوظ والإجمالي الجديد
