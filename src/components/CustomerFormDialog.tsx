@@ -558,6 +558,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, group_id: v || null })}
                 onAdd={addGroup}
                 onDelete={async (o) => await removeGroup(o.value)}
+                onRename={async (o, n) => await renameGroup(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— اختر —"
                 addLabel="إضافة مجموعة"
