@@ -428,6 +428,14 @@ export default function QuickAddProductDialog({
         </DialogContent>
       </Dialog>
 
+      <ImageCropDialog
+        open={cropOpen}
+        file={cropFile}
+        onCancel={() => { setCropOpen(false); setCropFile(null); }}
+        onConfirm={uploadCroppedProductImage}
+        title="قص صورة المنتج"
+      />
+
       {/* Quick Add Category Dialog */}
       <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
         <DialogContent dir="rtl" className="max-w-sm">
