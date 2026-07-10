@@ -42,7 +42,26 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("receipt");
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const { dlgRef, dlgStyle } = useDialogSize("invoice_attachments_dialog", open, { w: "min(680px, 96vw)", h: "90vh" });
+
+  /** إذا اختار المستخدم صورة واحدة فقط، افتح حوار القص أولاً. */
+  const onFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (files.length === 1 && files[0].type.startsWith("image/")) {
+      setCropFile(files[0]);
+      setCropOpen(true);
+      return;
+    }
+    handleUpload(files);
+  };
+
+  const filesFromOne = (file: File): FileList => {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    return dt.files;
+  };
 
   const load = async () => {
     if (!invoiceId) return;
