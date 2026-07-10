@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { RotateCw, Check, X, Square, RectangleHorizontal, Maximize2 } from "lucide-react";
+import { buildCroppedFile } from "@/utils/cropImage";
 
 type AspectPreset = "free" | "1:1" | "4:3" | "16:9";
 
