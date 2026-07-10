@@ -1,92 +1,70 @@
-# خطة: خصم موحّد + زر «سجّل دفعة» في المعاينة + تصحيح حالة الفاتورة
+# 🎯 خطة: السماح بالمخزون السالب وإظهاره في كل النظام
 
-## المشاكل المطروحة
-1. **الخصم غير موحّد** بين إنشاء الفاتورة، إنشاء عرض السعر، تعديل الفاتورة، وتسجيل الدفعة — يجب أن يظهر كمربع خصم في الجانب على كل هذه الشاشات.
-2. **حالة الفاتورة عند تسجيل الدفع** تنتقل مباشرة إلى "done" في workflow، بينما `status` قد لا يُحدَّث لـ `partial` أو `paid` تلقائيًا حسب `paid_amount` مقابل `total`.
-3. **زر «سجّل دفعة»** غير موجود داخل معاينة الفاتورة — يجب إضافته لتسريع التحصيل.
-4. **TS2305** لدالة `filterAllowedBankAccounts` — تم إصلاحه (alias مُصدَّر).
-
-## المخرجات المتوقعة
-- مربع خصم موحّد (نسبة % أو مبلغ مقطوع) في: إنشاء/تعديل الفاتورة، فاتورة الكاش، عرض السعر، حوار تسجيل الدفعة.
-- عند تسجيل دفعة → إعادة حساب `status`: `paid` إن `paid >= total`، `partial` إن `paid > 0 && paid < total`، وإلا `pending`.
-- زر «💳 سجّل دفعة» ضمن شريط أدوات `DocumentPreviewPage` (يظهر فقط للفواتير ذات متبقّي > 0 ولعميل مسجّل، ويحترم عزلة POS).
-- Trigger DB اختياري يعيد حساب `status` تلقائيًا عند تحديث `paid_amount` (احتياطي).
+## 🔎 المشكلة
+اليوم عند إضافة مشترى ثم بيع ثم إلغاء المشترى، المخزون الفعلي يصبح سالبًا (مثال: +20 − 5 − 20 = −5)، لكن النظام يستخدم `GREATEST(0, ...)` في كل مكان فيقصّه إلى صفر. النتيجة:
+- **يخفي عجزًا حقيقيًا** في المخزون.
+- عند البيع أو إنشاء فاتورة جديدة لا يظهر تحذير أن الرصيد فعليًا سالب.
+- تقارير المخزون تعطي أرقامًا مغلوطة (صفر بدل السالب).
 
 ---
 
-## توزيع العمل على Sub-Agents
-
-### 🤖 SUBAGENT #1 — مركّب خصم موحّد (Reusable Discount Box)
-**مكان التنفيذ:**
-- إنشاء: `src/components/shared/DiscountInput.tsx`
-- إنشاء: `src/test/discountInput.test.tsx`
-
-**المهمة:** بناء مكوّن `<DiscountInput value onChange grandBeforeDiscount />` يعرض حقلين: **نسبة %** و **مبلغ مقطوع**، متزامنَين تلقائيًا. يستخدم design tokens فقط. يمرَّر لاحقًا لصفحات الإنشاء والتعديل والدفع.
+## 🎁 المخرج المطلوب
+1. **قاعدة البيانات**: تسمح بتخزين `stock_quantity` سالبًا.
+2. **كل الشاشات** (منتجات، فواتير، مشتريات، مرتجعات، تحويلات، جرد) تعرض القيمة الحقيقية حتى لو كانت سالبة.
+3. **تنسيق موحّد**: الأرقام السالبة بلون تحذيري (مثل `text-destructive`) مع الإشارة `−`.
+4. **السماح بالحفظ**: البيع/الفاتورة لا تُمنع لأن المخزون سالب — فقط تُظهر تنبيهًا "المخزون سيصبح سالبًا".
 
 ---
 
-### 🤖 SUBAGENT #2 — تركيب مربع الخصم في صفحات الفواتير وعروض الأسعار
-**مكان التنفيذ:**
-- تعديل: `src/pages/InvoiceCreatePage.tsx`
-- تعديل: `src/pages/QuoteCreatePage.tsx`
-- تعديل: أي `InvoiceCashCreatePage` / `InvoiceEditPage` موجود (بحث عبر rg)
-- تعديل: `src/components/purchase/SupplierPaymentDialog.tsx` (وحوار دفع العميل إن وُجد)
+## 🧩 توزيع العمل على Sub-Agents
 
-**المهمة:**
-1. استبدال حقل الخصم الحالي (أو إضافته إن غاب) بمكوّن `DiscountInput` في الشريط الجانبي/بطاقة الإجماليات.
-2. تمرير القيمة الموحّدة لحقل `discount` في الحفظ.
-3. تأكيد ظهورها في `printTemplate` تلقائيًا (تم في الجولة السابقة).
+### 🤖 Agent 1 — طبقة البيانات (DB)
+- تعديل RPC `apply_stock_delta` و `decrement_product_stock`: إزالة `GREATEST(0, …)` والسماح بالنتيجة السالبة.
+- تعديل RPC `receive_purchase_stock_once` و `restore_purchase_stock_once` بنفس الطريقة.
+- Migration واحد يشمل كل التعديلات مع `SECURITY DEFINER` كما هي.
 
----
+### 🤖 Agent 2 — دوال العميل (Utils)
+- `src/utils/stockDeduction.ts` و `src/utils/stockReceive.ts`: إزالة `Math.max(0, …)` من أي عملية تجميع/عرض (لا يوجد الآن — الحماية في DB فقط).
+- التأكد أن `applyStockDeltaForLines` تسمح بنتيجة سالبة.
 
-### 🤖 SUBAGENT #3 — تصحيح حالة الفاتورة تلقائيًا + Trigger DB احتياطي
-**مكان التنفيذ:**
-- إنشاء: `src/utils/computeInvoiceStatus.ts` (دالة نقية + اختبار)
-- تعديل: أي مكان يُحدّث `paid_amount` أو ينشئ دفعة عميل — استدعاء `updateInvoiceStatusAfterPayment(invoiceId)`
-- **DB migration** (عبر supabase--migration): trigger `trg_invoice_recompute_status` على `invoices` عند تغيّر `paid_amount` أو `total` يعيد حساب `status` (مع احترام `cancelled`).
+### 🤖 Agent 3 — عرض الأرقام في الواجهة
+مسح شامل بـ `rg` لكل استخدام `stock_quantity` وعرضه، ثم:
+- إنشاء helper موحّد `formatStock(qty)` يرجّع رقمًا مع علامة `−` ولون `text-destructive` عند السالب.
+- تطبيقه في:
+  - `ProductsPage` (عمود المخزون)
+  - `Dashboard` / `DashboardStockAlert`
+  - `InvoiceCreatePage` / `QuoteCreatePage` (اقتراحات المنتجات + عمود المخزون في صف الإضافة)
+  - `PurchaseCreatePage` / `PurchasePage`
+  - `StockReturnPage` / `StockTransferPage` / `StockTrackingPage`
+  - أي "chip" رصيد داخل حوارات إضافة/تعديل المنتج.
 
-**المنطق:**
-```
-if status='cancelled' → keep
-else if paid >= total-0.01 → 'paid'
-else if paid > 0.01 → 'partial'
-else if due_date && due_date < today → 'overdue'
-else → 'pending'
-```
+### 🤖 Agent 4 — التنبيهات
+- عند البيع/إنشاء فاتورة والكمية المطلوبة تجعل الرصيد سالبًا: `toast.warning("سيصبح مخزون المنتج X سالبًا")` — بدون منع الحفظ.
+- تحديث `DashboardStockAlert` ليعرض المنتجات ذات المخزون ≤ 0 (وليس فقط المنخفض)، مع تمييز السالب.
 
----
-
-### 🤖 SUBAGENT #4 — زر «سجّل دفعة» في معاينة الفاتورة
-**مكان التنفيذ:**
-- إنشاء: `src/components/invoice/CustomerPaymentDialog.tsx` (على غرار SupplierPaymentDialog، بالاتجاه المعاكس: `income` / `customer_payment`).
-- تعديل: `src/pages/DocumentPreviewPage.tsx` (إضافة الزر في شريط الأدوات)
-- تعديل: `src/pages/InvoiceViewPage.tsx` (إن كان يريده هنا أيضًا)
-
-**السلوك:**
-- الزر يظهر فقط إذا `docType==="invoice"` و `remaining > 0` و للفاتورة عميل مسجّل (احترام عزلة POS: للفواتير `source='pos'` استخدم مسار الكاش).
-- بعد الحفظ: إعادة تحميل المعاينة (`react-query invalidate` لمفاتيح `invoices`, `customers`, `transactions`).
+### 🤖 Agent 5 — اختبارات
+- تحديث `stockDeductionIdempotency.test.ts` و `stockDeductionWorkflow.test.ts` ليتوقعا نتائج سالبة.
+- إضافة `src/test/negativeStockAllowed.test.ts` يغطي السيناريو الفعلي (شراء 20 → بيع 5 → إلغاء شراء ⇒ −5).
+- اختبار `formatStock` (علامة + لون).
 
 ---
 
-### 🤖 SUBAGENT #5 — تحقّق شامل (Playwright + vitest)
-**مكان التنفيذ:** `/tmp/browser/`
-
-**المهمة:**
-1. سيناريو: إنشاء فاتورة بخصم 10% → التحقق أنها محفوظة، ثم معاينة تُظهر سطر الخصم.
-2. تسجيل دفعة جزئية من زر المعاينة → التحقق أن `status='partial'` وأن السطر النهائي أحمر بعلامة −.
-3. تسجيل دفعة كاملة → `status='paid'` و "✓ مسددة بالكامل".
-4. دفع زائد → `status='paid'` و "أُضيفت لحسابه" أخضر.
-5. تشغيل `bunx vitest run discountInput computeInvoiceStatus documentBalanceSummary printTemplate`.
+## 🔧 التفاصيل التقنية
+- **Migration**: تعديل 4 دوال RPC فقط، بدون تغيير أعمدة (`numeric` يقبل السالب أصلًا).
+- **لا CHECK constraint جديدة** على `stock_quantity` — نبقيها حرّة.
+- **Design tokens فقط**: `text-destructive` للسالب، `text-foreground` للموجب.
+- **RTL/Arabic**: كل الرسائل بالعربية.
+- **لا تغيير في منطق الحجز/الفواتير** — فقط إزالة القص عند صفر.
 
 ---
 
-## الترتيب
-- SUBAGENT #1 (المكوّن) و #3 (منطق الحالة + Trigger) بالتوازي أولًا.
-- SUBAGENT #2 (تركيب) و #4 (زر الدفع) بالتوازي بعد #1.
-- SUBAGENT #5 آخر خطوة.
+## 📋 الترتيب
+1. Agents 1 + 2 بالتوازي (طبقة البيانات + Utils).
+2. Agents 3 + 4 بالتوازي بعدهما (الواجهة + التنبيهات).
+3. Agent 5 نهائيًا (الاختبارات + Playwright للسيناريو الحقيقي).
 
-## قواعد يجب احترامها
-- **عزلة POS**: زر «سجّل دفعة» يجب ألا يُنشئ `transaction` مرتبطة بعميل حقيقي لفاتورة `source='pos'` (skill: albatool-cash-payment-isolation).
-- Design tokens فقط، RTL/Cairo، لا ألوان hex في مكوّنات React.
-- استخدم `duplicateDocGuard` عند حفظ التعديلات (mem://features/duplicate-save-guard).
-- Trigger DB يجب أن يحترم `SECURITY DEFINER SET search_path = public`.
+## ✅ معيار النجاح
+- شراء 20 لمنتج جديد → مخزون = 20.
+- بيع 5 → مخزون = 15.
+- إلغاء المشترى → مخزون = **−5** يظهر بالأحمر في كل مكان.
+- إنشاء فاتورة جديدة لنفس المنتج ممكن، مع تحذير أن المخزون سيصبح أكثر سالبًا.
