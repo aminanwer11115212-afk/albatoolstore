@@ -9,6 +9,7 @@ import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import ImageCropDialog from "@/components/shared/ImageCropDialog";
 
 import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
