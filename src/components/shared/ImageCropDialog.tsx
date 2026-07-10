@@ -181,7 +181,7 @@ export default function ImageCropDialog({
           <DialogTitle className="text-base font-bold">{title}</DialogTitle>
         </DialogHeader>
 
-        <div className="relative w-full h-[60vh] bg-muted">
+        <div className="relative w-full h-[52vh] bg-muted">
           {src && (
             <Cropper
               image={src}
@@ -196,6 +196,17 @@ export default function ImageCropDialog({
               restrictPosition={false}
               showGrid
             />
+          )}
+          {previewUrl && (
+            <div className="absolute bottom-2 left-2 bg-card/95 backdrop-blur border border-border rounded-lg p-1.5 shadow-lg flex items-center gap-2">
+              <img
+                src={previewUrl}
+                alt="معاينة القص"
+                data-testid="crop-preview"
+                className="w-16 h-16 object-contain rounded bg-muted"
+              />
+              <span className="text-[10px] text-muted-foreground pr-1 pl-2">معاينة النتيجة</span>
+            </div>
           )}
         </div>
 
