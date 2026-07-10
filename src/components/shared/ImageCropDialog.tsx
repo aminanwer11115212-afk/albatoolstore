@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { RotateCw, Check, X, Square, RectangleHorizontal, Maximize2 } from "lucide-react";
 import { buildCroppedFile } from "@/utils/cropImage";
+import { useIsMobile } from "@/hooks/use-mobile";
+import MobileImageCropper from "@/components/shared/MobileImageCropper";
 
 type AspectPreset = "free" | "1:1" | "4:3" | "16:9";
 
@@ -99,6 +101,7 @@ export default function ImageCropDialog({
   lockAspect = false,
   title = "قص الصورة",
 }: ImageCropDialogProps) {
+  const isMobile = useIsMobile();
   const [src, setSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -173,6 +176,30 @@ export default function ImageCropDialog({
     { key: "16:9", label: "١٦:٩", icon: RectangleHorizontal },
     { key: "free", label: "حر", icon: Maximize2 },
   ];
+
+  // Mobile fullscreen cropper (touch-optimized)
+  if (open && isMobile && src && file) {
+    return (
+      <MobileImageCropper
+        imageUrl={src}
+        title={title}
+        onSave={async (dataUrl) => {
+          if (!dataUrl) {
+            onCancel();
+            return;
+          }
+          try {
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            onConfirm(buildCroppedFile(blob, file));
+          } catch (e) {
+            console.error(e);
+            onCancel();
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
