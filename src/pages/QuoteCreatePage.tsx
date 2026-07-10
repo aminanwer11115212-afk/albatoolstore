@@ -1824,25 +1824,15 @@ export default function QuoteCreatePage() {
                       id="general-discount"
                       defaultLabel="خصم"
                       value={
-                        <input
-                          type="number"
-                          min={0}
-                          value={generalDiscount || ""}
-                          onChange={(e) => setGeneralDiscount(Number(e.target.value) || 0)}
-                          placeholder="0"
-                          style={{
-                            width: 90,
-                            height: 24,
-                            padding: "2px 8px",
-                            textAlign: "center",
-                            border: "1px solid #f59e0b",
-                            borderRadius: 4,
-                            fontSize: 12,
-                            fontWeight: 700,
-                            background: "#fef3c7",
-                            color: "#92400e",
-                          }}
-                        />
+                        <div style={{ width: 200 }}>
+                          <DiscountInput
+                            label=""
+                            value={generalDiscount || 0}
+                            grandBeforeDiscount={(totals?.subtotal || 0) - (totals?.itemDiscounts || 0)}
+                            onChange={(v) => setGeneralDiscount(v)}
+                            compact
+                          />
+                        </div>
                       }
                     />
                   ),
