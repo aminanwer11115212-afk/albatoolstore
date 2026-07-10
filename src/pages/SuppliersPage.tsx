@@ -245,6 +245,8 @@ export default function SuppliersPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button onClick={() => setViewSupplier(s)} className="px-2 py-1 bg-blue-500/10 text-blue-600 rounded text-xs hover:bg-blue-500/20 flex items-center gap-1"><Eye size={12} /> عرض</button>
+                      <button onClick={() => setPayFor(s)} className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 flex items-center gap-1" title="تسجيل دفعة"><Wallet size={12} /> دفعة</button>
+                      <button onClick={() => navigate(`/reports/supplier-statement?supplier=${s.id}`)} className="px-2 py-1 bg-muted text-foreground rounded text-xs hover:bg-muted/70 flex items-center gap-1" title="كشف حساب"><FileText size={12} /> كشف</button>
                       <button onClick={() => handleEdit(s)} className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 flex items-center gap-1"><Edit size={12} /> تعديل</button>
                       <button onClick={() => handleDelete(s.id)}
                         className="px-2 py-1 bg-destructive/10 text-destructive rounded text-xs hover:bg-destructive/20"><Trash2 size={12} /></button>
