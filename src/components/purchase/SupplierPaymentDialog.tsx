@@ -112,6 +112,8 @@ export default function SupplierPaymentDialog({
     setSaving(true);
     try {
       // 1) إنشاء حركة مصروف (دفعة مورد)
+      const baseNote = notes || (purchaseOrderNumber ? `دفعة على أمر الشراء ${purchaseOrderNumber}` : "دفعة للمورد");
+      const description = referenceNo ? `${baseNote} — مرجع: ${referenceNo}` : baseNote;
       const txPayload: any = {
         type: "expense",
         category: "supplier_payment",
@@ -120,9 +122,8 @@ export default function SupplierPaymentDialog({
         amount: n,
         date,
         method,
-        reference_no: referenceNo || null,
         reference_id: purchaseOrderId || null,
-        notes: notes || (purchaseOrderNumber ? `دفعة على أمر الشراء ${purchaseOrderNumber}` : "دفعة للمورد"),
+        description,
       };
       const { error: txErr } = await (supabase as any).from("transactions").insert(txPayload);
       if (txErr) throw txErr;
