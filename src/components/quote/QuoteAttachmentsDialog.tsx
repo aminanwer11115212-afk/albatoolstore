@@ -408,6 +408,14 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
           ? `قص صورة المرفق (متبقي ${cropQueue.remaining})`
           : "قص صورة المرفق"}
       />
+      <ImageCropDialog
+        open={recrop.open}
+        file={recrop.file}
+        onCancel={recrop.cancel}
+        onConfirm={recrop.confirm}
+        defaultAspect="free"
+        title="إعادة قص صورة المرفق"
+      />
     </div>
   );
 }
