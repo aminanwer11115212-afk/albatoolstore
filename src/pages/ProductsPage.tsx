@@ -2317,6 +2317,20 @@ export default function ProductsPage() {
           </div>
         </div>
       </article>
+
+      <ImageCropDialog
+        open={cropOpen}
+        file={cropFile}
+        onCancel={() => { setCropOpen(false); setCropFile(null); cropTargetRef.current = null; }}
+        onConfirm={async (cropped) => {
+          setCropOpen(false);
+          const cb = cropTargetRef.current;
+          cropTargetRef.current = null;
+          setCropFile(null);
+          if (cb) await cb(cropped);
+        }}
+        title="قص صورة المنتج"
+      />
     </div>
   );
 }
