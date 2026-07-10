@@ -3,7 +3,8 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 import { loadInvoiceExtras, loadQuoteExtras } from "@/utils/printExtras";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Wallet } from "lucide-react";
+import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 
 /**
  * صفحة معاينة داخلية للمستندات (عرض سعر / فاتورة).
@@ -31,7 +32,12 @@ export default function DocumentPreviewPage({ docType }: Props) {
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [stocktakeSort, setStocktakeSort] = useState<"default" | "name-asc" | "name-desc" | "qty-desc" | "qty-asc">("default");
-  // alias لإيضاح أنّه يعمل لجميع أنواع المعاينة وليس كشف الجرد فقط
+  const [payOpen, setPayOpen] = useState(false);
+  const [invMeta, setInvMeta] = useState<{
+    id: string; number: string; total: number; paidAmount: number;
+    customerId: string | null; customerName: string | null; isPos: boolean;
+  } | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const itemsSort = stocktakeSort;
 
   const variant = (search.get("variant") || "full") as
