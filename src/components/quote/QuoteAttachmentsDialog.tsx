@@ -50,6 +50,37 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
     return dt.files;
   };
 
+  const recrop = useRecropImage();
+  const BUCKET = "quote-attachments";
+  const extractPath = (url: string): string | null => {
+    const marker = `/${BUCKET}/`;
+    const idx = url.indexOf(marker);
+    if (idx === -1) return null;
+    return url.slice(idx + marker.length).split("?")[0];
+  };
+  const recropAttachment = (att: Attachment) => {
+    const path = extractPath(att.file_url);
+    if (!path) { toast.error("تعذّر تحديد مسار الملف"); return; }
+    recrop.start({
+      url: att.file_url,
+      name: att.file_name,
+      onCropped: async (cropped) => {
+        const { error: upErr } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, cropped, { contentType: cropped.type, upsert: true });
+        if (upErr) throw upErr;
+        const { error: updErr } = await supabase
+          .from("quote_attachments")
+          .update({ file_size: cropped.size, file_type: cropped.type } as any)
+          .eq("id", att.id);
+        if (updErr) throw updErr;
+        toast.success("تم حفظ الصورة بعد إعادة القص");
+        load();
+      },
+    });
+  };
+
+
 
   const load = async () => {
     if (!quoteId) return;
@@ -322,6 +353,16 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
                       </>
                     ) : (
                       <>
+                        {isImage(att.file_type) && (
+                          <button
+                            onClick={() => recropAttachment(att)}
+                            className="p-1.5 rounded hover:bg-primary/10 text-primary"
+                            title="إعادة قص"
+                            aria-label="إعادة قص الصورة"
+                          >
+                            <Scissors size={15} />
+                          </button>
+                        )}
                         <a
                           href={att.file_url}
                           target="_blank"

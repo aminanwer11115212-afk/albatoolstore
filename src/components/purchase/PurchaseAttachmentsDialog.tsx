@@ -49,6 +49,37 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
     return dt.files;
   };
 
+  const recrop = useRecropImage();
+  const BUCKET = "purchase-attachments";
+  const extractPath = (url: string): string | null => {
+    const marker = `/${BUCKET}/`;
+    const idx = url.indexOf(marker);
+    if (idx === -1) return null;
+    return url.slice(idx + marker.length).split("?")[0];
+  };
+  const recropAttachment = (att: Attachment) => {
+    const path = extractPath(att.file_url);
+    if (!path) { toast.error("تعذّر تحديد مسار الملف"); return; }
+    recrop.start({
+      url: att.file_url,
+      name: att.file_name,
+      onCropped: async (cropped) => {
+        const { error: upErr } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, cropped, { contentType: cropped.type, upsert: true });
+        if (upErr) throw upErr;
+        const { error: updErr } = await (supabase as any)
+          .from("purchase_attachments")
+          .update({ file_size: cropped.size, file_type: cropped.type })
+          .eq("id", att.id);
+        if (updErr) throw updErr;
+        toast.success("تم حفظ الصورة بعد إعادة القص");
+        load();
+      },
+    });
+  };
+
+
 
   const load = async () => {
     if (!purchaseOrderId) return;
