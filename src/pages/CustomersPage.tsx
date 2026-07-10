@@ -835,6 +835,28 @@ export default function CustomersPage() {
         ))}
       </div>
 
+      {/* شريط الترتيب حسب المديونية */}
+      <div className="flex flex-wrap items-center gap-2" dir="rtl">
+        <span className="text-xs text-muted-foreground">ترتيب:</span>
+        {([
+          { v: "name",         label: "الاسم" },
+          { v: "recent",       label: "الأحدث نشاطاً" },
+          { v: "balance_desc", label: "الأعلى مديونية (عليه)" },
+          { v: "balance_asc",  label: "الأقل مديونية (عليه)" },
+          { v: "credit_desc",  label: "الأعلى سلفة (له)" },
+          { v: "credit_asc",   label: "الأقل سلفة (له)" },
+        ] as { v: typeof sortBy; label: string }[]).map(s => (
+          <button
+            key={s.v}
+            type="button"
+            onClick={() => { setSortBy(s.v); setPage(1); }}
+            className={`px-3 py-1 rounded-full text-[11px] font-medium border transition ${sortBy === s.v ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       <Sheet open={recentDebtorsOpen} onOpenChange={(o) => { setRecentDebtorsOpen(o); if (!o) setRecentDebtorsSearch(""); }}>
         <SheetContent side="left" className="w-full min-w-0 sm:max-w-lg overflow-y-auto" dir="rtl">
           <SheetHeader>
