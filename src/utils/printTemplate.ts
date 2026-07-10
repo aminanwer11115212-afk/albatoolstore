@@ -46,9 +46,16 @@ interface PrintData {
   packagingInfo?: string;
   transportInfo?: string;
   customTitle?: string;
+  /** رصيد العميل المدين قبل هذه الفاتورة (لا يشمل متبقّي هذه الفاتورة). */
+  previousDebt?: number;
+  /** رصيد العميل الدائن قبل هذه الفاتورة. */
+  previousCredit?: number;
+  /** إخفاء صندوق "المبلغ المدفوع" في قسم ملخّص الحساب (يُستخدم في المعاينة). */
+  hidePaidBox?: boolean;
 }
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
+import { computeDocumentBalance } from "@/utils/documentBalanceSummary";
 
 function cleanExtraHTML(s?: string): string | undefined {
   if (!s) return undefined;
@@ -73,8 +80,15 @@ export function generatePrintHTML(data: PrintData): string {
     type, isCash, number, date, dueDate, customer, items,
     subtotal, taxTotal, discountTotal, shipping = 0, grandTotal,
     paidAmount = 0, dueAmount = 0, notes, company, status, paymentMethod,
-    variant = "full", noHeader = false, oldBalance = 0, packagingInfo, transportInfo, customTitle
+    variant = "full", noHeader = false, oldBalance = 0, packagingInfo, transportInfo, customTitle,
+    previousDebt = 0, previousCredit = 0, hidePaidBox = false,
   } = data;
+
+  const balSum = computeDocumentBalance({
+    grandTotal, discount: discountTotal, paidAmount,
+    previousDebt, previousCredit,
+  });
+  const fmt = (n: number) => Number(n || 0).toLocaleString();
 
   const title = variant === "stocktake"
     ? "كشف جرد"
@@ -395,17 +409,58 @@ ${showItems ? (variant === "stocktake" ? `
 `) : ""}
 
 ${showAccount ? `
-<!-- Summary Boxes -->
-<div class="summary-row" data-section="account-summary" data-section-label="ملخص الحساب">
+<!-- Financial Summary Rows -->
+<table data-section="account-summary" data-section-label="ملخص الحساب" style="width:100%;margin-top:8px;border-collapse:collapse;font-size:13px;">
+  <tbody>
+    ${balSum.hasDiscount ? `
+    <tr data-section="discount-row" data-section-label="الخصم">
+      <td style="padding:6px 12px;text-align:right;color:#666;">الخصم</td>
+      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#dc2626;">− ${fmt(balSum.discount)}</td>
+    </tr>` : ""}
+    ${balSum.hasPreviousDebt ? `
+    <tr data-section="prev-debt-row" data-section-label="حساب سابق">
+      <td style="padding:6px 12px;text-align:right;color:#666;">الحساب السابق (عليه)</td>
+      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#dc2626;">− ${fmt(balSum.previousDebt)}</td>
+    </tr>` : ""}
+    ${balSum.hasPreviousCredit ? `
+    <tr data-section="prev-credit-row" data-section-label="رصيد سابق دائن">
+      <td style="padding:6px 12px;text-align:right;color:#666;">رصيد سابق له</td>
+      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#16a34a;">+ ${fmt(balSum.previousCredit)}</td>
+    </tr>` : ""}
+    ${!hidePaidBox && paidAmount > 0 ? `
+    <tr data-section="paid-row" data-section-label="المدفوع">
+      <td style="padding:6px 12px;text-align:right;color:#666;">المدفوع</td>
+      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#16a34a;">${fmt(paidAmount)}</td>
+    </tr>` : ""}
+    <tr data-section="final-status" data-section-label="الحالة النهائية" style="border-top:2px solid #1f2937;">
+      ${balSum.remaining > 0 ? `
+        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">المتبقي على العميل</td>
+        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#dc2626;">− ${fmt(balSum.remaining)}</td>
+      ` : balSum.overpaid > 0 ? `
+        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">أُضيفت إلى حسابه</td>
+        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#16a34a;">+ ${fmt(balSum.overpaid)}</td>
+      ` : balSum.isPaid ? `
+        <td colspan="2" style="padding:10px 12px;text-align:center;font-weight:900;font-size:15px;color:#16a34a;">✓ مسددة بالكامل</td>
+      ` : `
+        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">المطلوب</td>
+        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#2980b9;">${fmt(grandTotal)}</td>
+      `}
+    </tr>
+  </tbody>
+</table>
+${!hidePaidBox ? `
+<!-- Legacy summary boxes (kept for share-link parity; suppressed in in-app preview via hidePaidBox) -->
+<div class="summary-row" style="display:none;" aria-hidden="true">
   <div class="summary-box" data-section="paid-amount" data-section-label="المبلغ المدفوع">
     <div class="summary-box-title">المبلغ المدفوع</div>
-    <div class="summary-box-value" style="color:#16a34a;">${paidAmount.toLocaleString()}</div>
+    <div class="summary-box-value" style="color:#16a34a;">${fmt(paidAmount)}</div>
   </div>
   <div class="summary-box" data-section="final-total" data-section-label="المطلوب النهائي" style="border-color:#2980b9;">
     <div class="summary-box-title">المطلوب النهائي</div>
-    <div class="summary-box-value blue">${finalTotal.toLocaleString()}</div>
+    <div class="summary-box-value blue">${fmt(Math.max(0, grandTotal - paidAmount))}</div>
   </div>
 </div>
+` : ""}
 ` : ""}
 
 ${showExtras ? `

@@ -66,7 +66,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
         if (docType === "quote") {
           const { data: quote, error: qErr } = await supabase
             .from("quotes")
-            .select("*, customers(name, phone, address, email, balance)")
+            .select("*, customers(name, phone, address, email, balance, credit_balance)")
             .eq("id", id).maybeSingle();
           if (qErr) throw qErr;
           if (!quote) throw new Error("عرض السعر غير موجود");
@@ -81,15 +81,16 @@ export default function DocumentPreviewPage({ docType }: Props) {
             total: it.total,
           }));
           const extras = await loadQuoteExtras(quote.id);
+          const qCust: any = quote.customers;
           docHtml = generatePrintHTML({
             type: "quote",
             number: quote.quote_number,
             date: quote.date,
-            customer: quote.customers ? {
-              name: (quote.customers as any).name,
-              phone: (quote.customers as any).phone,
-              address: (quote.customers as any).address,
-              email: (quote.customers as any).email,
+            customer: qCust ? {
+              name: qCust.name,
+              phone: qCust.phone,
+              address: qCust.address,
+              email: qCust.email,
             } : null,
             items: sortItems(printItems),
             subtotal: Number(quote.subtotal || 0),
@@ -100,13 +101,16 @@ export default function DocumentPreviewPage({ docType }: Props) {
             company: company as any,
             variant,
             noHeader,
-            oldBalance: Number((quote.customers as any)?.balance || 0),
+            oldBalance: Number(qCust?.balance || 0),
+            previousDebt: Number(qCust?.balance || 0),
+            previousCredit: Number(qCust?.credit_balance || 0),
+            hidePaidBox: true,
             ...extras,
           });
         } else if (docType === "invoice") {
           const { data: invoice, error: iErr } = await supabase
             .from("invoices")
-            .select("*, customers(name, phone, address, email, balance)")
+            .select("*, customers(name, phone, address, email, balance, credit_balance)")
             .eq("id", id).maybeSingle();
           if (iErr) throw iErr;
           if (!invoice) throw new Error("الفاتورة غير موجودة");
@@ -121,6 +125,10 @@ export default function DocumentPreviewPage({ docType }: Props) {
             total: it.total,
           }));
           const extras = await loadInvoiceExtras(invoice.id);
+          const iCust: any = invoice.customers;
+          // اطرح متبقّي هذه الفاتورة من الرصيد المدين حتى لا يُحسب مرتين
+          const invRemaining = Math.max(Number(invoice.total || 0) - Number(invoice.paid_amount || 0), 0);
+          const prevDebt = Math.max(Number(iCust?.balance || 0) - invRemaining, 0);
           docHtml = generatePrintHTML({
             type: "invoice",
             isCash: invoice.type === "cash",
@@ -129,10 +137,10 @@ export default function DocumentPreviewPage({ docType }: Props) {
             dueDate: invoice.due_date,
             customer: invoice.customers
               ? {
-                  name: (invoice.customers as any).name,
-                  phone: (invoice.customers as any).phone,
-                  address: (invoice.customers as any).address,
-                  email: (invoice.customers as any).email,
+                  name: iCust.name,
+                  phone: iCust.phone,
+                  address: iCust.address,
+                  email: iCust.email,
                 }
               : (invoice as any).walk_in_customer_name
                 ? { name: (invoice as any).walk_in_customer_name }
@@ -151,7 +159,10 @@ export default function DocumentPreviewPage({ docType }: Props) {
             paymentMethod: invoice.payment_method,
             variant,
             noHeader,
-            oldBalance: Number((invoice.customers as any)?.balance || 0),
+            oldBalance: Number(iCust?.balance || 0),
+            previousDebt: prevDebt,
+            previousCredit: Number(iCust?.credit_balance || 0),
+            hidePaidBox: true,
             ...extras,
           });
         } else if (docType === "purchase") {
