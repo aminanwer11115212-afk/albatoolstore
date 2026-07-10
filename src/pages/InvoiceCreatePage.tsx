@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
 import { deductStockForLines, applyStockDeltaForLines } from "@/utils/stockDeduction";
+import { checkDuplicateBeforeInsert } from "@/utils/duplicateSaveToast";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { useDocumentCurrency } from "@/hooks/document/useDocumentCurrency";
