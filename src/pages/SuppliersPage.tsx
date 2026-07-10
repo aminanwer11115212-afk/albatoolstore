@@ -268,6 +268,12 @@ export default function SuppliersPage() {
           </div>
         </div>
       </div>
+      <SupplierPaymentDialog
+        open={!!payFor}
+        onOpenChange={(v) => !v && setPayFor(null)}
+        supplierId={payFor?.id || null}
+        supplierName={payFor?.name || null}
+      />
     </div>
   );
 }
