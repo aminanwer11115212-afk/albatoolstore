@@ -110,7 +110,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
             oldBalance: Number(qCust?.balance || 0),
             previousDebt: Number(qCust?.balance || 0),
             previousCredit: Number(qCust?.credit_balance || 0),
-            hidePaidBox: true,
+            hidePaidBox: false,
             ...extras,
           });
         } else if (docType === "invoice") {
@@ -168,7 +168,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
             oldBalance: Number(iCust?.balance || 0),
             previousDebt: prevDebt,
             previousCredit: Number(iCust?.credit_balance || 0),
-            hidePaidBox: true,
+            hidePaidBox: false,
             ...extras,
           });
           setInvMeta({

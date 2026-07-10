@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import DiscountInput from "@/components/shared/DiscountInput";
 
 type Method = "cash" | "bank" | "card" | "mobile";
 
@@ -222,13 +223,12 @@ export default function CustomerPaymentDialog({
               />
             </div>
             <div>
-              <Label>خصم إضافي (اختياري)</Label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-                placeholder="0.00"
+              <DiscountInput
+                label="خصم إضافي (اختياري)"
+                value={Number(discount) || 0}
+                grandBeforeDiscount={remaining}
+                onChange={(v) => setDiscount(v ? String(v) : "")}
+                compact
               />
             </div>
           </div>
