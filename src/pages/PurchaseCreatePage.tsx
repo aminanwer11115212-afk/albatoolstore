@@ -575,9 +575,29 @@ export default function PurchaseCreatePage() {
       }
     }
 
+    // ── Duplicate-save guard: نفس المورد + التاريخ + توقيع البنود خلال 24h ──
+    if (!treatAsEdit && supplierId) {
+      const { checkDuplicateBeforeInsert } = await import("@/utils/duplicateSaveToast");
+      const dup = await checkDuplicateBeforeInsert({
+        table: "purchase_orders",
+        partyColumn: "supplier_id",
+        partyId: supplierId,
+        dateISO: purchaseDate,
+        items: valid.map((r) => ({ product_id: r.product_id, quantity: r.quantity })),
+        excludeId: orderId,
+        docLabel: "أمر الشراء",
+      });
+      if (dup?.existingId) {
+        treatAsEdit = true;
+        setOrderId(dup.existingId);
+        setOrderNumber(dup.existingNumber || orderNumber);
+        lastSavedSupplierRef.current = supplierId;
+      }
+    }
+
     setSaving(true);
     try {
-      let savedId = treatAsEdit ? orderId : null;
+      let savedId = treatAsEdit ? orderId || (lastSavedSupplierRef.current ? orderId : null) : null;
       let savedNumber = orderNumber;
 
       // Snapshot existing state BEFORE mutating, so we can compute stock deltas correctly.
