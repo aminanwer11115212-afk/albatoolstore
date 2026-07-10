@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
 import { useDialogSize } from "@/hooks/useDialogSize";
+import DeleteGeoDialog from "@/components/shared/DeleteGeoDialog";
+import { getGeoImpact, deleteGeoOnly, deleteGeoCascade, EntityKind, kindLabel } from "@/utils/geoMutations";
 
 const sanitizePhone = (val: string) => {
   if (!val) return "";
@@ -60,6 +62,11 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   const [transporters, setTransporters] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
+  const [delReq, setDelReq] = useState<null | {
+    kind: EntityKind; id: string; name: string;
+    customers: number; children: number; childrenLabel: string;
+    allowCascade: boolean;
+  }>(null);
 
   const queryClient = useQueryClient();
   const localCustomers = queryClient.getQueryData<any[]>(["customers"]) || [];
@@ -154,17 +161,40 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     return data.id;
   };
 
-  const removeRegion = async (id: string): Promise<boolean> => {
-    const hasStates = states.some(s => s.region_id === id);
-    if (hasStates) { toast.error("لا يمكن حذف الاتجاه — يحتوي ولايات"); return false; }
-    const { error } = await (supabase as any).from("regions").delete().eq("id", id);
-    if (error) { toast.error(error.message); return false; }
-    setRegions(prev => prev.filter(r => r.id !== id));
-    if (form.region_id === id) setForm(f => ({ ...f, region_id: null, state_id: null, city_id: null, locality_id: null }));
-    toast.success("تم حذف الاتجاه");
-    return true;
+  // ── طلب حذف موحّد ذكي: صفر ارتباطات → confirm بسيط وحذف مباشر، وإلا يفتح DeleteGeoDialog ──
+  const stripFromLocalState = (kind: EntityKind, id: string) => {
+    if (kind === "region")      { setRegions(p => p.filter(x => x.id !== id)); if (form.region_id   === id) setForm(f => ({ ...f, region_id: null, state_id: null, city_id: null, locality_id: null })); }
+    if (kind === "state")       { setStates (p => p.filter(x => x.id !== id)); if (form.state_id    === id) setForm(f => ({ ...f, state_id: null, city_id: null, locality_id: null })); }
+    if (kind === "city")        { setCities (p => p.filter(x => x.id !== id)); if (form.city_id     === id) setForm(f => ({ ...f, city_id: null, locality_id: null })); }
+    if (kind === "locality")    { setLocalities(p => p.filter(x => x.id !== id)); if (form.locality_id === id) setForm(f => ({ ...f, locality_id: null })); }
+    if (kind === "group")       { setGroups(p => p.filter(x => x.id !== id)); if (form.group_id === id) setForm(f => ({ ...f, group_id: null })); }
+    if (kind === "transporter") { setTransporters(p => p.filter(x => x.id !== id)); if (form.preferred_transporter_id === id) setForm(f => ({ ...f, preferred_transporter_id: null })); }
+    if (kind === "destination") { setDestinations(p => p.filter(x => x.id !== id)); if (form.destination_id === id) setForm(f => ({ ...f, destination_id: null })); }
   };
 
+  const requestDelete = async (kind: EntityKind, id: string, name: string): Promise<boolean> => {
+    const impact = await getGeoImpact(kind, id);
+    const allowCascade = kind !== "group" && kind !== "transporter" && kind !== "destination";
+    if (impact.total === 0) {
+      if (!window.confirm(`حذف "${name}"؟`)) return false;
+      const ok = await deleteGeoOnly(kind, id);
+      if (ok) {
+        stripFromLocalState(kind, id);
+        toast.success(`تم حذف ${kindLabel(kind)}`);
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+      }
+      return ok;
+    }
+    setDelReq({
+      kind, id, name,
+      customers: impact.totalCustomers,
+      children: impact.children,
+      childrenLabel: impact.childrenLabel,
+      allowCascade,
+    });
+    return false; // الحوار سيتولّى؛ لا تُغلق popover
+  };
+  // ── دوال إضافة (add) لكل قائمة ──
   const addState = async (name: string): Promise<string | null> => {
     if (!form.region_id) { toast.error("اختر الاتجاه أولاً"); return null; }
     const { data, error } = await (supabase as any).from("states")
@@ -175,18 +205,6 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     toast.success(`تمت إضافة الولاية: ${data.name}`);
     return data.id;
   };
-
-  const removeState = async (id: string): Promise<boolean> => {
-    const hasCities = cities.some(c => c.state_id === id);
-    if (hasCities) { toast.error("لا يمكن حذف الولاية — تحتوي مدن"); return false; }
-    const { error } = await (supabase as any).from("states").delete().eq("id", id);
-    if (error) { toast.error(error.message); return false; }
-    setStates(prev => prev.filter(s => s.id !== id));
-    if (form.state_id === id) setForm(f => ({ ...f, state_id: null, city_id: null, locality_id: null }));
-    toast.success("تم حذف الولاية");
-    return true;
-  };
-
   const addCity = async (name: string): Promise<string | null> => {
     if (!form.state_id) { toast.error("اختر الولاية أولاً"); return null; }
     const { data, error } = await (supabase as any).from("cities")
@@ -197,7 +215,6 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     toast.success(`تمت إضافة المدينة: ${data.name}`);
     return data.id;
   };
-
   const addLocality = async (name: string): Promise<string | null> => {
     if (!form.city_id) { toast.error("اختر المدينة أولاً"); return null; }
     const { data, error } = await (supabase as any).from("localities")
@@ -208,27 +225,6 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     toast.success(`تمت إضافة المحلية: ${data.name}`);
     return data.id;
   };
-
-  const removeCity = async (cityId: string): Promise<boolean> => {
-    const hasLoc = localities.some(l => l.city_id === cityId);
-    if (hasLoc) { toast.error("لا يمكن حذف المدينة — تحتوي محليات"); return false; }
-    const { error } = await (supabase as any).from("cities").delete().eq("id", cityId);
-    if (error) { toast.error(error.message); return false; }
-    setCities(prev => prev.filter(c => c.id !== cityId));
-    if (form.city_id === cityId) setForm(f => ({ ...f, city_id: null, locality_id: null }));
-    toast.success("تم حذف المدينة");
-    return true;
-  };
-
-  const removeLocality = async (locId: string): Promise<boolean> => {
-    const { error } = await (supabase as any).from("localities").delete().eq("id", locId);
-    if (error) { toast.error(error.message); return false; }
-    setLocalities(prev => prev.filter(l => l.id !== locId));
-    if (form.locality_id === locId) setForm(f => ({ ...f, locality_id: null }));
-    toast.success("تم حذف المحلية");
-    return true;
-  };
-
   const addTransporter = async (name: string): Promise<string | null> => {
     const { data, error } = await (supabase as any).from("transporters")
       .insert({ name: name.trim() }).select("id,name").single();
@@ -238,16 +234,6 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     toast.success(`تمت إضافة الترحيل: ${data.name}`);
     return data.id;
   };
-
-  const removeTransporter = async (id: string): Promise<boolean> => {
-    const { error } = await (supabase as any).from("transporters").delete().eq("id", id);
-    if (error) { toast.error(error.message); return false; }
-    setTransporters(prev => prev.filter(t => t.id !== id));
-    if (form.preferred_transporter_id === id) setForm(f => ({ ...f, preferred_transporter_id: null }));
-    toast.success("تم حذف الترحيل");
-    return true;
-  };
-
   const addGroup = async (name: string): Promise<string | null> => {
     const { data, error } = await supabase.from("customer_groups")
       .insert({ name: name.trim() }).select("id,name").single();
@@ -257,16 +243,6 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     toast.success(`تمت إضافة المجموعة: ${data.name}`);
     return data.id;
   };
-
-  const removeGroup = async (id: string): Promise<boolean> => {
-    const { error } = await supabase.from("customer_groups").delete().eq("id", id);
-    if (error) { toast.error(error.message); return false; }
-    setGroups(prev => prev.filter(g => g.id !== id));
-    if (form.group_id === id) setForm(f => ({ ...f, group_id: null }));
-    toast.success("تم حذف المجموعة");
-    return true;
-  };
-
   const addDestination = async (name: string): Promise<string | null> => {
     const { data, error } = await (supabase as any).from("destinations")
       .insert({ name: name.trim() }).select("id,name").single();
@@ -277,14 +253,14 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     return data.id;
   };
 
-  const removeDestination = async (id: string): Promise<boolean> => {
-    const { error } = await (supabase as any).from("destinations").delete().eq("id", id);
-    if (error) { toast.error(error.message); return false; }
-    setDestinations(prev => prev.filter(d => d.id !== id));
-    if (form.destination_id === id) setForm(f => ({ ...f, destination_id: null }));
-    toast.success("تم حذف الوجهة");
-    return true;
-  };
+  // ── حذف موحّد عبر requestDelete ──
+  const removeRegion      = (id: string) => requestDelete("region", id, regions.find(r => r.id === id)?.name || "");
+  const removeState       = (id: string) => requestDelete("state", id, states.find(s => s.id === id)?.name || "");
+  const removeCity        = (id: string) => requestDelete("city", id, cities.find(c => c.id === id)?.name || "");
+  const removeLocality    = (id: string) => requestDelete("locality", id, localities.find(l => l.id === id)?.name || "");
+  const removeGroup       = (id: string) => requestDelete("group", id, groups.find(g => g.id === id)?.name || "");
+  const removeTransporter = (id: string) => requestDelete("transporter", id, transporters.find(t => t.id === id)?.name || "");
+  const removeDestination = (id: string) => requestDelete("destination", id, destinations.find(d => d.id === id)?.name || "");
 
   // ── تعديل الاسم (rename) لكل قائمة ──
   const renameIn = (table: string, setter: React.Dispatch<React.SetStateAction<any[]>>, keepSortByName = true) =>
@@ -457,6 +433,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                   onChange={(v) => setForm({ ...form, region_id: v || null, state_id: null, locality_id: null, city_id: null })}
                   onAdd={addRegion}
                   onDelete={async (o) => await removeRegion(o.value)}
+                  skipDeleteConfirm
                   onRename={async (o, n) => await renameRegion(o.value, n)}
                   onNavigateNext={() => focusAt(k + 1)}
                   placeholder="— اختر أو اكتب —"
@@ -479,6 +456,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                   onChange={(v) => setForm({ ...form, state_id: v || null, city_id: null, locality_id: null })}
                   onAdd={addState}
                   onDelete={async (o) => await removeState(o.value)}
+                  skipDeleteConfirm
                   onRename={async (o, n) => await renameState(o.value, n)}
                   onNavigateNext={() => focusAt(k + 1)}
                   placeholder="— اختر أو اكتب —"
@@ -502,6 +480,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, city_id: v || null, locality_id: null })}
                 onAdd={addCity}
                 onDelete={async (o) => await removeCity(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameCity(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— اختر أو ابحث —"
@@ -535,6 +514,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, locality_id: v || null })}
                 onAdd={addLocality}
                 onDelete={async (o) => await removeLocality(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameLocality(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— اختر أو ابحث —"
@@ -558,6 +538,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, group_id: v || null })}
                 onAdd={addGroup}
                 onDelete={async (o) => await removeGroup(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameGroup(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— اختر —"
@@ -581,6 +562,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, preferred_transporter_id: v || null })}
                 onAdd={addTransporter}
                 onDelete={async (o) => await removeTransporter(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameTransporter(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— بدون —"
@@ -603,6 +585,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, destination_id: v || null })}
                 onAdd={addDestination}
                 onDelete={async (o) => await removeDestination(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameDestination(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— بدون —"
@@ -624,6 +607,36 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
           </button>
         </DialogFooter>
       </DialogContent>
+
+      {delReq && (
+        <DeleteGeoDialog
+          open={!!delReq}
+          onOpenChange={(v) => !v && setDelReq(null)}
+          entityLabel={kindLabel(delReq.kind)}
+          entityName={delReq.name}
+          customers={delReq.customers}
+          children={delReq.children}
+          childrenLabel={delReq.childrenLabel}
+          allowCascade={delReq.allowCascade}
+          onDeleteOnly={async () => {
+            const ok = await deleteGeoOnly(delReq.kind, delReq.id);
+            if (ok) {
+              stripFromLocalState(delReq.kind, delReq.id);
+              toast.success(`تم حذف ${kindLabel(delReq.kind)} وفكّ ربطه عن العملاء`);
+              queryClient.invalidateQueries({ queryKey: ["customers"] });
+            }
+            return ok;
+          }}
+          onDeleteCascade={delReq.allowCascade ? async () => {
+            const ok = await deleteGeoCascade(delReq.kind, delReq.id);
+            if (ok) {
+              stripFromLocalState(delReq.kind, delReq.id);
+              queryClient.invalidateQueries({ queryKey: ["customers"] });
+            }
+            return ok;
+          } : undefined}
+        />
+      )}
     </Dialog>
   );
 }

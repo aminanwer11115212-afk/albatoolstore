@@ -164,20 +164,24 @@ export default function CustomersPage() {
     setDestinations(d.data || []);
   };
 
+  const reloadGeo = async () => {
+    const [r, s, ci, l, g] = await Promise.all([
+      (supabase as any).from("regions").select("id,name").order("name"),
+      (supabase as any).from("states").select("id,name,region_id").order("name"),
+      (supabase as any).from("cities").select("id,name,state_id").order("name"),
+      (supabase as any).from("localities").select("id,name,city_id").order("name"),
+      (supabase as any).from("customer_groups").select("id,name").order("name"),
+    ]);
+    setRegions(r.data || []);
+    setStates(s.data || []);
+    setCities(ci.data || []);
+    setLocalities(l.data || []);
+    setGroups(g.data || []);
+  };
+
   useEffect(() => {
     (async () => {
-      const [r, s, ci, l, g] = await Promise.all([
-        (supabase as any).from("regions").select("id,name").order("name"),
-        (supabase as any).from("states").select("id,name,region_id").order("name"),
-        (supabase as any).from("cities").select("id,name,state_id").order("name"),
-        (supabase as any).from("localities").select("id,name,city_id").order("name"),
-        (supabase as any).from("customer_groups").select("id,name").order("name"),
-      ]);
-      setRegions(r.data || []);
-      setStates(s.data || []);
-      setCities(ci.data || []);
-      setLocalities(l.data || []);
-      setGroups(g.data || []);
+      await reloadGeo();
       await reloadTransportersAndDestinations();
       await reloadCustomerLogisticsMaps();
 
@@ -190,6 +194,9 @@ export default function CustomersPage() {
       });
       setLastActivity(map);
     })();
+    const onGeoChanged = () => { reloadGeo(); };
+    window.addEventListener("geo:changed", onGeoChanged);
+    return () => window.removeEventListener("geo:changed", onGeoChanged);
   }, []);
 
   // تحديث فوري لخرائط الناقل/الوجهة عند أي تغيير من أي شاشة
@@ -1953,6 +1960,7 @@ export default function CustomersPage() {
         localities={localities}
         cities={cities}
         customers={customers || []}
+        onDataChanged={reloadGeo}
       />
       <Sheet open={showLogistics} onOpenChange={setShowLogistics}>
         <SheetContent side="left" className="w-[98vw] sm:max-w-4xl p-0" dir="rtl">
