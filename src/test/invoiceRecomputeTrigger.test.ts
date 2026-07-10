@@ -12,11 +12,14 @@ function simulateTrigger(row: {
   due_date?: string | null;
 }): string {
   if (row.status === "cancelled") return "cancelled";
-  return computeInvoiceStatusAfterPayment({
+  const base = computeInvoiceStatusAfterPayment({
     total: row.total,
     paidAfter: row.paid_amount,
-    dueDate: row.due_date ?? null,
   });
+  if (base === "pending" && row.due_date && row.due_date < new Date().toISOString().slice(0, 10)) {
+    return "overdue";
+  }
+  return base;
 }
 
 describe("trg_invoice_recompute_status — parity", () => {
