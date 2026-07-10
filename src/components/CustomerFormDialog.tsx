@@ -603,6 +603,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, destination_id: v || null })}
                 onAdd={addDestination}
                 onDelete={async (o) => await removeDestination(o.value)}
+                onRename={async (o, n) => await renameDestination(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— بدون —"
                 addLabel="إضافة وجهة"
