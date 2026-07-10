@@ -76,6 +76,18 @@ export async function receiveStockForPurchaseOnce(
   lines: StockLine[],
 ): Promise<{ added: boolean; reason?: string }> {
   if (!purchaseId) return { added: false, reason: "missing_purchase_id" };
+  // الحارس الأساسي: RPC ذرّي على مستوى DB يقفل الصف ويمنع التطبيق المضاعف حتى عند التزامن من جهازين.
+  const { data, error } = await (supabase as any).rpc("receive_purchase_stock_once", {
+    _po_id: purchaseId,
+  });
+  if (!error && data) {
+    if (typeof window !== "undefined") {
+      try { window.dispatchEvent(new Event("products:changed")); } catch {}
+    }
+    if (data.ok) return { added: true };
+    return { added: false, reason: data.reason };
+  }
+  // Fallback (نسخة قديمة من DB بدون RPC): السلوك القديم مع فحص الحالة
   const currentStatus = await getPurchaseStatus(purchaseId);
   if (currentStatus === "received") return { added: false, reason: "already_completed" };
   await addStockForLines(lines);
