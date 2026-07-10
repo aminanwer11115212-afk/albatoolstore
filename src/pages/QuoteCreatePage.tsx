@@ -880,6 +880,25 @@ export default function QuoteCreatePage() {
       setQuoteNumber(_newNum);
       payload.quote_number = _newNum;
     }
+
+    // ── Duplicate-save guard: نفس العميل + التاريخ + توقيع البنود خلال 24h ──
+    if (!effectiveEditId && activeCustomer?.id) {
+      const dup = await checkDuplicateBeforeInsert({
+        table: "quotes",
+        partyColumn: "customer_id",
+        partyId: activeCustomer.id,
+        dateISO: quoteDate,
+        items: validRows.map((r: any) => ({ product_id: r.product_id, quantity: r.quantity })),
+        excludeId: lastSavedIdRef.current,
+        docLabel: isSideMode ? "عرض السعر الجانبي" : "عرض السعر",
+      });
+      if (dup?.existingId) {
+        effectiveEditId = dup.existingId;
+        lastSavedIdRef.current = dup.existingId;
+        setQuoteNumber(dup.existingNumber || quoteNumber);
+        payload.quote_number = dup.existingNumber || payload.quote_number;
+      }
+    }
     let qid: string | undefined = effectiveEditId;
     // إن كنا في وضع التعديل، احسب البصمة الحالية وقارنها بالأصلية لتقرير ما إذا كنا سنعيد كتابة البنود
     const currentItemsHash = quoteItemsHash(validRows);
