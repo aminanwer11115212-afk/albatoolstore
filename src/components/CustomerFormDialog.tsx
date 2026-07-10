@@ -479,6 +479,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                   onChange={(v) => setForm({ ...form, state_id: v || null, city_id: null, locality_id: null })}
                   onAdd={addState}
                   onDelete={async (o) => await removeState(o.value)}
+                  onRename={async (o, n) => await renameState(o.value, n)}
                   onNavigateNext={() => focusAt(k + 1)}
                   placeholder="— اختر أو اكتب —"
                   addLabel="إضافة ولاية"
