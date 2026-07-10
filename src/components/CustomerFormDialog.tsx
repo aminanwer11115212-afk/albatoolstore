@@ -502,6 +502,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, city_id: v || null, locality_id: null })}
                 onAdd={addCity}
                 onDelete={async (o) => await removeCity(o.value)}
+                onRename={async (o, n) => await renameCity(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— اختر أو ابحث —"
                 addLabel="إضافة مدينة"
