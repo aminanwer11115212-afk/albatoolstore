@@ -112,9 +112,22 @@ export async function restoreStockForPurchaseOnce(
 ): Promise<{ restored: boolean; reason?: string }> {
   if (!purchaseId) return { restored: false, reason: "missing_purchase_id" };
 
+  // الحارس الأساسي: RPC ذرّي على مستوى DB — يقفل الصف ويمنع الخصم المضاعف.
+  const { data, error } = await (supabase as any).rpc("restore_purchase_stock_once", {
+    _po_id: purchaseId,
+  });
+  if (!error && data) {
+    if (typeof window !== "undefined") {
+      try { window.dispatchEvent(new Event("products:changed")); } catch {}
+    }
+    if (data.ok) return { restored: true };
+    if (data.reason === "not_applied") return { restored: false, reason: "not_received" };
+    return { restored: false, reason: data.reason };
+  }
+
+  // Fallback (نسخة قديمة من DB): flip-status ثم خصم يدوي
   const currentStatus = await getPurchaseStatus(purchaseId);
   if (currentStatus !== "received") return { restored: false, reason: "not_received" };
-
   const { data: flipped, error: flipErr } = await (supabase as any)
     .from("purchase_orders")
     .update({ status: "cancelled" })
@@ -125,7 +138,6 @@ export async function restoreStockForPurchaseOnce(
   if (!Array.isArray(flipped) || flipped.length === 0) {
     return { restored: false, reason: "already_cancelled" };
   }
-
   const agg = aggregate(lines);
   const deltas = new Map<string, number>();
   agg.forEach((qty, id) => deltas.set(id, -qty));
