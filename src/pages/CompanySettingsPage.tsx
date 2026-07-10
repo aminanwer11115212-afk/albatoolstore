@@ -136,18 +136,29 @@ export default function CompanySettingsPage() {
     setSaving(false);
   };
 
+  const [logoCropFile, setLogoCropFile] = useState<File | null>(null);
+  const [logoCropOpen, setLogoCropOpen] = useState(false);
+
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) { toast.error("حجم الملف يجب أن يكون أقل من 2 ميجابايت"); return; }
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const url = ev.target?.result as string;
-        setLogoPreview(url);
-        setForm(prev => ({ ...prev, logo_url: url }));
-      };
-      reader.readAsDataURL(file);
-    }
+    if (logoInputRef.current) logoInputRef.current.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("يرجى اختيار ملف صورة"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("حجم الملف يجب أن يكون أقل من 2 ميجابايت"); return; }
+    setLogoCropFile(file);
+    setLogoCropOpen(true);
+  };
+
+  const applyLogoCropped = (cropped: File) => {
+    setLogoCropOpen(false);
+    setLogoCropFile(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const url = ev.target?.result as string;
+      setLogoPreview(url);
+      setForm(prev => ({ ...prev, logo_url: url }));
+    };
+    reader.readAsDataURL(cropped);
   };
 
   if (isLoading) return <p className="text-muted-foreground p-6">جاري التحميل...</p>;
