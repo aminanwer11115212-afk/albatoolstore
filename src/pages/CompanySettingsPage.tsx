@@ -3,7 +3,7 @@ import { useCompanySettings } from "@/hooks/useData";
 import { useAppearance, type ThemeColor, type FontSize } from "@/hooks/useAppearance";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, Building, Receipt, Globe, Clock, Palette, Mail, Upload, Image, Phone, MapPin, FileText, Hash, Percent, DollarSign, Check, RotateCcw, Lock, Unlock, Columns3 } from "lucide-react";
+import { Settings, Building, Receipt, Globe, Clock, Palette, Mail, Upload, Image, Phone, MapPin, FileText, Hash, Percent, DollarSign, Check, RotateCcw, Lock, Unlock, Columns3, Scissors } from "lucide-react";
 import { lockAllPagesColumnWidths, unlockAllPagesColumnWidths, resetAllPagesColumnWidths } from "@/hooks/useColumnWidths";
 import { useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -209,9 +209,30 @@ export default function CompanySettingsPage() {
                     <Upload size={14} className="ml-1" /> اختيار صورة
                   </Button>
                   {logoPreview && (
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { setLogoPreview(null); setForm(p => ({ ...p, logo_url: "" })); }}>
-                      إزالة الشعار
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const tid = toast.loading("جارٍ تحميل الشعار...");
+                          try {
+                            const { fetchImageAsFile } = await import("@/utils/fetchImageAsFile");
+                            const f = await fetchImageAsFile(logoPreview, "logo.png");
+                            toast.dismiss(tid);
+                            setLogoCropFile(f);
+                            setLogoCropOpen(true);
+                          } catch (e: any) {
+                            toast.dismiss(tid);
+                            toast.error(e?.message || "تعذّر تحميل الشعار لإعادة القص");
+                          }
+                        }}
+                      >
+                        <Scissors size={14} className="ml-1" /> إعادة قص
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { setLogoPreview(null); setForm(p => ({ ...p, logo_url: "" })); }}>
+                        إزالة الشعار
+                      </Button>
+                    </>
                   )}
                   <p className="text-xs text-muted-foreground">PNG, JPG أو SVG. الحد الأقصى 2 ميجابايت</p>
                 </div>

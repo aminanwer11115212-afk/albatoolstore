@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
-import { Search, Plus, Edit, Trash2, Package as PackageIcon, Boxes, AlertTriangle, CheckCircle2, BarChart3, DollarSign, Upload, X, FileDown, Snowflake } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Package as PackageIcon, Boxes, AlertTriangle, CheckCircle2, BarChart3, DollarSign, Upload, X, FileDown, Snowflake, Scissors } from "lucide-react";
 import { useProductsWithDetails, useProducts, useProductCategories, useWarehouses, useSuppliers } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
@@ -426,6 +426,20 @@ export default function ProductsPage() {
     cropTargetRef.current = onCropped;
     setCropFile(file);
     setCropOpen(true);
+  };
+
+  /** إعادة قص صورة محفوظة: نحمّلها كملف ثم نمرّها لنفس مسار القص. */
+  const startRecrop = async (url: string, onCropped: (f: File) => Promise<void> | void) => {
+    const tid = toast.loading("جارٍ تحميل الصورة لإعادة القص...");
+    try {
+      const { fetchImageAsFile } = await import("@/utils/fetchImageAsFile");
+      const f = await fetchImageAsFile(url, "product-image.jpg");
+      toast.dismiss(tid);
+      openCropForFile(f, onCropped);
+    } catch (e: any) {
+      toast.dismiss(tid);
+      toast.error(e?.message || "تعذّر تحميل الصورة لإعادة القص");
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1489,6 +1503,27 @@ export default function ProductsPage() {
                             aria-label="حذف الصورة">
                             <X size={14} />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => startRecrop(form.image_url, async (cropped) => {
+                              setUploadingImage(true);
+                              try {
+                                const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                const url = await uploadProductImage(cropped);
+                                setForm(f => ({ ...f, image_url: url }));
+                                toast.success("تم تحديث الصورة بعد إعادة القص");
+                              } catch (err: any) {
+                                toast.error(err.message || "فشل رفع الصورة");
+                              } finally {
+                                setUploadingImage(false);
+                              }
+                            })}
+                            className="absolute -bottom-2 -left-2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90"
+                            aria-label="إعادة قص الصورة"
+                            title="إعادة قص"
+                          >
+                            <Scissors size={12} />
+                          </button>
                         </div>
                       ) : (
                         <div className="w-24 h-24 rounded-lg bg-muted border border-dashed border-border flex items-center justify-center">
@@ -2241,6 +2276,32 @@ export default function ProductsPage() {
                               }}
                             />
                           </label>
+                          {p.image_url && (
+                            <button
+                              type="button"
+                              className="p-1 rounded hover:bg-muted text-primary"
+                              title="إعادة قص"
+                              aria-label="إعادة قص الصورة"
+                              onClick={() => startRecrop(p.image_url, async (cropped) => {
+                                const localUrl = URL.createObjectURL(cropped);
+                                const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                                try {
+                                  const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                  const url = await uploadProductImage(cropped);
+                                  patchProductCaches(p.id, { image_url: url });
+                                  await update.mutateAsync({ id: p.id, image_url: url });
+                                  window.dispatchEvent(new Event("products:changed"));
+                                  setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                                } catch (err: any) {
+                                  rollback();
+                                  URL.revokeObjectURL(localUrl);
+                                  toast.error(err.message || "فشل حفظ الصورة الجديدة");
+                                }
+                              })}
+                            >
+                              <Scissors size={12} />
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td style={{ padding: 0 }}>

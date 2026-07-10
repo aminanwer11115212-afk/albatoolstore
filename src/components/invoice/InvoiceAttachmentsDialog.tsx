@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Paperclip, Trash2, Upload, X, FileText, Download, Camera, Receipt, Truck, Image as ImageIcon, Trash, RotateCcw, Clock } from "lucide-react";
+import { Paperclip, Trash2, Upload, X, FileText, Download, Camera, Receipt, Truck, Image as ImageIcon, Trash, RotateCcw, Clock, Scissors } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
@@ -7,6 +7,7 @@ import { useDialogSize } from "@/hooks/useDialogSize";
 import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
 import { useCropQueue } from "@/hooks/useCropQueue";
+import { useRecropImage } from "@/hooks/useRecropImage";
 
 type Category = "receipt" | "running" | "details";
 type TabKey = Category | "trash";
@@ -53,6 +54,37 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
     for (const f of arr) dt.items.add(f);
     return dt.files;
   };
+
+  const recrop = useRecropImage();
+  const BUCKET = "invoice-attachments";
+  const extractPath = (url: string): string | null => {
+    const marker = `/${BUCKET}/`;
+    const idx = url.indexOf(marker);
+    if (idx === -1) return null;
+    return url.slice(idx + marker.length).split("?")[0];
+  };
+  const recropAttachment = (att: Attachment) => {
+    const path = extractPath(att.file_url);
+    if (!path) { toast.error("تعذّر تحديد مسار الملف"); return; }
+    recrop.start({
+      url: att.file_url,
+      name: att.file_name,
+      onCropped: async (cropped) => {
+        const { error: upErr } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, cropped, { contentType: cropped.type, upsert: true });
+        if (upErr) throw upErr;
+        const { error: updErr } = await supabase
+          .from("invoice_attachments")
+          .update({ file_size: cropped.size, file_type: cropped.type } as any)
+          .eq("id", att.id);
+        if (updErr) throw updErr;
+        toast.success("تم حفظ الصورة بعد إعادة القص");
+        load();
+      },
+    });
+  };
+
 
 
   const load = async () => {
@@ -362,6 +394,16 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
                       </>
                     ) : (
                       <>
+                        {isImage(att.file_type) && (
+                          <button
+                            onClick={() => recropAttachment(att)}
+                            className="p-1.5 rounded hover:bg-primary/10 text-primary"
+                            title="إعادة قص"
+                            aria-label="إعادة قص الصورة"
+                          >
+                            <Scissors size={15} />
+                          </button>
+                        )}
                         <a
                           href={att.file_url}
                           target="_blank"
@@ -406,6 +448,14 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
         title={cropQueue.remaining > 0
           ? `قص صورة المرفق (متبقي ${cropQueue.remaining})`
           : "قص صورة المرفق"}
+      />
+      <ImageCropDialog
+        open={recrop.open}
+        file={recrop.file}
+        onCancel={recrop.cancel}
+        onConfirm={recrop.confirm}
+        defaultAspect="free"
+        title="إعادة قص صورة المرفق"
       />
     </div>
   );

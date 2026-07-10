@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Upload, X, Package as PackageIcon, Plus } from "lucide-react";
+import { Upload, X, Package as PackageIcon, Plus, Scissors } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -378,6 +378,27 @@ export default function QuickAddProductDialog({
                       aria-label="حذف الصورة"
                     >
                       <X size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const tid = toast.loading("جارٍ تحميل الصورة...");
+                        try {
+                          const { fetchImageAsFile } = await import("@/utils/fetchImageAsFile");
+                          const f = await fetchImageAsFile(form.image_url, "product-image.jpg");
+                          toast.dismiss(tid);
+                          setCropFile(f);
+                          setCropOpen(true);
+                        } catch (e: any) {
+                          toast.dismiss(tid);
+                          toast.error(e?.message || "تعذّر تحميل الصورة لإعادة القص");
+                        }
+                      }}
+                      className="absolute -bottom-2 -left-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90"
+                      aria-label="إعادة قص"
+                      title="إعادة قص"
+                    >
+                      <Scissors size={10} />
                     </button>
                   </div>
                 ) : (
