@@ -342,16 +342,14 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
       </div>
 
       <ImageCropDialog
-        open={cropOpen}
-        file={cropFile}
-        onCancel={() => { setCropOpen(false); setCropFile(null); }}
-        onConfirm={(cropped) => {
-          setCropOpen(false);
-          setCropFile(null);
-          handleUpload(filesFromOne(cropped));
-        }}
+        open={cropQueue.open}
+        file={cropQueue.current}
+        onCancel={cropQueue.skip}
+        onConfirm={cropQueue.confirm}
         defaultAspect="free"
-        title="قص صورة المرفق"
+        title={cropQueue.remaining > 0
+          ? `قص صورة المرفق (متبقي ${cropQueue.remaining})`
+          : "قص صورة المرفق"}
       />
     </div>
   );
