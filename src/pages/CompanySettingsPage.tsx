@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ImageCropDialog from "@/components/shared/ImageCropDialog";
 import { Separator } from "@/components/ui/separator";
 
 const tabs = [
@@ -135,18 +136,29 @@ export default function CompanySettingsPage() {
     setSaving(false);
   };
 
+  const [logoCropFile, setLogoCropFile] = useState<File | null>(null);
+  const [logoCropOpen, setLogoCropOpen] = useState(false);
+
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) { toast.error("حجم الملف يجب أن يكون أقل من 2 ميجابايت"); return; }
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const url = ev.target?.result as string;
-        setLogoPreview(url);
-        setForm(prev => ({ ...prev, logo_url: url }));
-      };
-      reader.readAsDataURL(file);
-    }
+    if (logoInputRef.current) logoInputRef.current.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("يرجى اختيار ملف صورة"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("حجم الملف يجب أن يكون أقل من 2 ميجابايت"); return; }
+    setLogoCropFile(file);
+    setLogoCropOpen(true);
+  };
+
+  const applyLogoCropped = (cropped: File) => {
+    setLogoCropOpen(false);
+    setLogoCropFile(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const url = ev.target?.result as string;
+      setLogoPreview(url);
+      setForm(prev => ({ ...prev, logo_url: url }));
+    };
+    reader.readAsDataURL(cropped);
   };
 
   if (isLoading) return <p className="text-muted-foreground p-6">جاري التحميل...</p>;
@@ -510,6 +522,15 @@ export default function CompanySettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      <ImageCropDialog
+        open={logoCropOpen}
+        file={logoCropFile}
+        onCancel={() => { setLogoCropOpen(false); setLogoCropFile(null); }}
+        onConfirm={applyLogoCropped}
+        defaultAspect="1:1"
+        title="قص شعار الشركة"
+      />
     </div>
   );
 }

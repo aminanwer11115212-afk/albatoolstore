@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useProducts, useProductCategories, useWarehouses } from "@/hooks/useData";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import InlineSearchSelect from "@/components/InlineSearchSelect";
+import ImageCropDialog from "@/components/shared/ImageCropDialog";
 
 export interface QuickAddProductDialogProps {
   open: boolean;
@@ -81,22 +82,33 @@ export default function QuickAddProductDialog({
     }
   }, [open, initialName]);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // قص الصورة قبل الرفع
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) { toast.error("يرجى اختيار ملف صورة"); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت"); return; }
+    setCropFile(file);
+    setCropOpen(true);
+  };
+
+  const uploadCroppedProductImage = async (cropped: File) => {
+    setCropOpen(false);
     setUploadingImage(true);
     try {
       const { uploadProductImage } = await import("@/utils/productImageUpload");
-      const url = await uploadProductImage(file);
+      const url = await uploadProductImage(cropped);
       setForm(f => ({ ...f, image_url: url }));
       toast.success("تم رفع الصورة");
     } catch (err: any) {
       toast.error(err.message || "فشل رفع الصورة");
     } finally {
       setUploadingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setCropFile(null);
     }
   };
 
@@ -415,6 +427,14 @@ export default function QuickAddProductDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImageCropDialog
+        open={cropOpen}
+        file={cropFile}
+        onCancel={() => { setCropOpen(false); setCropFile(null); }}
+        onConfirm={uploadCroppedProductImage}
+        title="قص صورة المنتج"
+      />
 
       {/* Quick Add Category Dialog */}
       <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>

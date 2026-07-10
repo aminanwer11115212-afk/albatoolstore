@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Paperclip, Trash2, Upload, X, FileText, Download, Camera, Receipt, Truck, Image as ImageIcon, Trash, RotateCcw, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import ImageCropDialog from "@/components/shared/ImageCropDialog";
 
 type Category = "receipt" | "running" | "details";
 type TabKey = Category | "trash";
@@ -36,6 +37,24 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("receipt");
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+
+  const onFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (files.length === 1 && files[0].type.startsWith("image/")) {
+      setCropFile(files[0]);
+      setCropOpen(true);
+      return;
+    }
+    handleUpload(files);
+  };
+
+  const filesFromOne = (file: File): FileList => {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    return dt.files;
+  };
 
   const load = async () => {
     if (!purchaseOrderId) return;
@@ -227,7 +246,7 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
                     multiple
                     accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
                     disabled={uploading}
-                    onChange={(e) => handleUpload(e.target.files)}
+                    onChange={(e) => { onFilesSelected(e.target.files); e.target.value = ""; }}
                     className="hidden"
                   />
                 </label>
@@ -242,7 +261,7 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
                     capture="environment"
                     multiple
                     disabled={uploading}
-                    onChange={(e) => handleUpload(e.target.files)}
+                    onChange={(e) => { onFilesSelected(e.target.files); e.target.value = ""; }}
                     className="hidden"
                   />
                 </label>
@@ -328,6 +347,19 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
           </button>
         </div>
       </div>
+
+      <ImageCropDialog
+        open={cropOpen}
+        file={cropFile}
+        onCancel={() => { setCropOpen(false); setCropFile(null); }}
+        onConfirm={(cropped) => {
+          setCropOpen(false);
+          setCropFile(null);
+          handleUpload(filesFromOne(cropped));
+        }}
+        defaultAspect="free"
+        title="قص صورة المرفق"
+      />
     </div>
   );
 }

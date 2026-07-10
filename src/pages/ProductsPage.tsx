@@ -9,6 +9,7 @@ import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import ImageCropDialog from "@/components/shared/ImageCropDialog";
 
 import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
@@ -414,24 +415,38 @@ export default function ProductsPage() {
     setBrandToAdd("");
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // قص الصورة قبل الرفع (للنموذج الرئيسي وللمعاينة داخل الجدول)
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const cropTargetRef = useRef<null | ((f: File) => Promise<void> | void)>(null);
+
+  const openCropForFile = (file: File, onCropped: (f: File) => Promise<void> | void) => {
     if (!file.type.startsWith("image/")) { toast.error("يرجى اختيار ملف صورة"); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت"); return; }
-    setUploadingImage(true);
-    try {
-      const { uploadProductImage } = await import("@/utils/productImageUpload");
-      const url = await uploadProductImage(file);
-      setForm(f => ({ ...f, image_url: url }));
-      toast.success("تم رفع الصورة");
-    } catch (err: any) {
-      toast.error(err.message || "فشل رفع الصورة");
-    } finally {
-      setUploadingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    cropTargetRef.current = onCropped;
+    setCropFile(file);
+    setCropOpen(true);
   };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file) return;
+    openCropForFile(file, async (cropped) => {
+      setUploadingImage(true);
+      try {
+        const { uploadProductImage } = await import("@/utils/productImageUpload");
+        const url = await uploadProductImage(cropped);
+        setForm(f => ({ ...f, image_url: url }));
+        toast.success("تم رفع الصورة");
+      } catch (err: any) {
+        toast.error(err.message || "فشل رفع الصورة");
+      } finally {
+        setUploadingImage(false);
+      }
+    });
+  };
+
 
   // إعادة كتابة روابط الفئات للمنتج
   const syncProductCategoryLinks = async (productId: string, categoryIds: string[]) => {
@@ -2207,24 +2222,22 @@ export default function ProductsPage() {
                                 const file = e.target.files?.[0];
                                 e.target.value = "";
                                 if (!file) return;
-                                if (file.size > 5 * 1024 * 1024) { toast.error("الحجم > 5MB"); return; }
-                                // اعرض الصورة محلياً فوراً (blob URL) ثم ارفعها بالخلفية
-                                const localUrl = URL.createObjectURL(file);
-                                const rollback = patchProductCaches(p.id, { image_url: localUrl });
-                                (async () => {
-                                   try {
-                                     const { uploadProductImage } = await import("@/utils/productImageUpload");
-                                     const url = await uploadProductImage(file);
-                                     patchProductCaches(p.id, { image_url: url });
-                                     await update.mutateAsync({ id: p.id, image_url: url });
-                                     window.dispatchEvent(new Event("products:changed"));
-                                     setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
-                                   } catch (err: any) {
-                                     rollback();
-                                     URL.revokeObjectURL(localUrl);
-                                     toast.error(err.message || "فشل الرفع");
-                                   }
-                                 })();
+                                openCropForFile(file, async (cropped) => {
+                                  const localUrl = URL.createObjectURL(cropped);
+                                  const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                                  try {
+                                    const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                    const url = await uploadProductImage(cropped);
+                                    patchProductCaches(p.id, { image_url: url });
+                                    await update.mutateAsync({ id: p.id, image_url: url });
+                                    window.dispatchEvent(new Event("products:changed"));
+                                    setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                                  } catch (err: any) {
+                                    rollback();
+                                    URL.revokeObjectURL(localUrl);
+                                    toast.error(err.message || "فشل الرفع");
+                                  }
+                                });
                               }}
                             />
                           </label>
@@ -2304,6 +2317,20 @@ export default function ProductsPage() {
           </div>
         </div>
       </article>
+
+      <ImageCropDialog
+        open={cropOpen}
+        file={cropFile}
+        onCancel={() => { setCropOpen(false); setCropFile(null); cropTargetRef.current = null; }}
+        onConfirm={async (cropped) => {
+          setCropOpen(false);
+          const cb = cropTargetRef.current;
+          cropTargetRef.current = null;
+          setCropFile(null);
+          if (cb) await cb(cropped);
+        }}
+        title="قص صورة المنتج"
+      />
     </div>
   );
 }

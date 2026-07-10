@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
+import ImageCropDialog from "@/components/shared/ImageCropDialog";
 
 type Category = "receipt" | "running" | "details";
 type TabKey = Category | "trash";
@@ -41,7 +42,26 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("receipt");
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const { dlgRef, dlgStyle } = useDialogSize("invoice_attachments_dialog", open, { w: "min(680px, 96vw)", h: "90vh" });
+
+  /** إذا اختار المستخدم صورة واحدة فقط، افتح حوار القص أولاً. */
+  const onFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (files.length === 1 && files[0].type.startsWith("image/")) {
+      setCropFile(files[0]);
+      setCropOpen(true);
+      return;
+    }
+    handleUpload(files);
+  };
+
+  const filesFromOne = (file: File): FileList => {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    return dt.files;
+  };
 
   const load = async () => {
     if (!invoiceId) return;
@@ -262,7 +282,7 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
                     multiple
                     accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
                     disabled={uploading}
-                    onChange={(e) => handleUpload(e.target.files)}
+                    onChange={(e) => { onFilesSelected(e.target.files); e.target.value = ""; }}
                     className="hidden"
                   />
                 </label>
@@ -277,7 +297,7 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
                     capture="environment"
                     multiple
                     disabled={uploading}
-                    onChange={(e) => handleUpload(e.target.files)}
+                    onChange={(e) => { onFilesSelected(e.target.files); e.target.value = ""; }}
                     className="hidden"
                   />
                 </label>
@@ -384,6 +404,19 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
           </button>
         </div>
       </div>
+
+      <ImageCropDialog
+        open={cropOpen}
+        file={cropFile}
+        onCancel={() => { setCropOpen(false); setCropFile(null); }}
+        onConfirm={(cropped) => {
+          setCropOpen(false);
+          setCropFile(null);
+          handleUpload(filesFromOne(cropped));
+        }}
+        defaultAspect="free"
+        title="قص صورة المرفق"
+      />
     </div>
   );
 }
