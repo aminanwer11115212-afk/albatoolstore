@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
-import { Search, Plus, Edit, Trash2, Package as PackageIcon, Boxes, AlertTriangle, CheckCircle2, BarChart3, DollarSign, Upload, X, FileDown, Snowflake } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Package as PackageIcon, Boxes, AlertTriangle, CheckCircle2, BarChart3, DollarSign, Upload, X, FileDown, Snowflake, Scissors } from "lucide-react";
 import { useProductsWithDetails, useProducts, useProductCategories, useWarehouses, useSuppliers } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
@@ -426,6 +426,20 @@ export default function ProductsPage() {
     cropTargetRef.current = onCropped;
     setCropFile(file);
     setCropOpen(true);
+  };
+
+  /** إعادة قص صورة محفوظة: نحمّلها كملف ثم نمرّها لنفس مسار القص. */
+  const startRecrop = async (url: string, onCropped: (f: File) => Promise<void> | void) => {
+    const tid = toast.loading("جارٍ تحميل الصورة لإعادة القص...");
+    try {
+      const { fetchImageAsFile } = await import("@/utils/fetchImageAsFile");
+      const f = await fetchImageAsFile(url, "product-image.jpg");
+      toast.dismiss(tid);
+      openCropForFile(f, onCropped);
+    } catch (e: any) {
+      toast.dismiss(tid);
+      toast.error(e?.message || "تعذّر تحميل الصورة لإعادة القص");
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
