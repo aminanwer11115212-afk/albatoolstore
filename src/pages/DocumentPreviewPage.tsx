@@ -179,6 +179,8 @@ export default function DocumentPreviewPage({ docType }: Props) {
             id: invoice.id,
             number: invoice.invoice_number,
             total: Number(invoice.total || 0),
+            subtotal: Number(invoice.subtotal || 0),
+            discount: Number(invoice.discount || 0),
             paidAmount: Number(invoice.paid_amount || 0),
             customerId: iCust?.id || (invoice as any).customer_id || null,
             customerName: iCust?.name || (invoice as any).walk_in_customer_name || null,
