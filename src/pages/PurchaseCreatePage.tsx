@@ -724,16 +724,15 @@ export default function PurchaseCreatePage() {
       };
 
       if (isNowCompleted && !wasCompleted) {
-        // A/C — استلام لأول مرة: أضف المخزون أولاً، وحدّث الحالة إلى "received" بعد النجاح.
-        await addStockForLines(valid);
-        const { error: statusErr } = await (supabase as any)
-          .from("purchase_orders")
-          .update({ status: "received" })
-          .eq("id", savedId);
-        if (statusErr) throw statusErr;
+        // A/C — استلام لأول مرة: نمرّ عبر RPC ذرّي يقفل الصف، يضيف المخزون،
+        // ويضبط status='received' + stock_applied_at في نفس المعاملة. لا يمكن تطبيقه مرتين.
+        const res = await receiveStockForPurchaseOnce(savedId!, valid);
+        if (!res.added && res.reason && res.reason !== "already_applied") {
+          throw new Error(`تعذّر استلام المخزون: ${res.reason}`);
+        }
         await updatePurchasePrices();
         if (alsoReceive) setStatus("received");
-        toast.success("تم استلام البضاعة وتحديث المخزون");
+        toast.success(res.added ? "تم استلام البضاعة وتحديث المخزون" : "الأمر مستلَم مسبقاً");
       } else if (isNowCompleted && wasCompleted) {
         // B — تعديل أمر مستلَم: طبّق الفارق فقط.
         await applyStockDeltaForPurchaseLines(prevItems, valid);

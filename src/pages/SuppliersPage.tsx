@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, X, FileText, Wallet } from "lucide-react";
 import { useSuppliers } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SupplierDetailView from "@/components/SupplierDetailView";
 import { startsWithAny } from "@/utils/searchMatch";
+import SupplierPaymentDialog from "@/components/purchase/SupplierPaymentDialog";
 const emptyForm = { name: "", phone: "", email: "", address: "", company: "", notes: "", balance: "" };
 
 export default function SuppliersPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -15,6 +18,7 @@ export default function SuppliersPage() {
   const [form, setForm] = useState(emptyForm);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [payFor, setPayFor] = useState<any | null>(null);
   const { data: suppliers, isLoading, insert, update, remove } = useSuppliers();
 
   const filtered = (suppliers || []).filter((s: any) =>
@@ -241,6 +245,8 @@ export default function SuppliersPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button onClick={() => setViewSupplier(s)} className="px-2 py-1 bg-blue-500/10 text-blue-600 rounded text-xs hover:bg-blue-500/20 flex items-center gap-1"><Eye size={12} /> عرض</button>
+                      <button onClick={() => setPayFor(s)} className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 flex items-center gap-1" title="تسجيل دفعة"><Wallet size={12} /> دفعة</button>
+                      <button onClick={() => navigate(`/reports/supplier-statement?supplier=${s.id}`)} className="px-2 py-1 bg-muted text-foreground rounded text-xs hover:bg-muted/70 flex items-center gap-1" title="كشف حساب"><FileText size={12} /> كشف</button>
                       <button onClick={() => handleEdit(s)} className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 flex items-center gap-1"><Edit size={12} /> تعديل</button>
                       <button onClick={() => handleDelete(s.id)}
                         className="px-2 py-1 bg-destructive/10 text-destructive rounded text-xs hover:bg-destructive/20"><Trash2 size={12} /></button>
@@ -262,6 +268,12 @@ export default function SuppliersPage() {
           </div>
         </div>
       </div>
+      <SupplierPaymentDialog
+        open={!!payFor}
+        onOpenChange={(v) => !v && setPayFor(null)}
+        supplierId={payFor?.id || null}
+        supplierName={payFor?.name || null}
+      />
     </div>
   );
 }

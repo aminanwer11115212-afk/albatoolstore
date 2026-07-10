@@ -11,6 +11,7 @@ import { StatusChip } from "@/components/ui/status-chip";
 import { receiveStockForPurchaseOnce, restoreStockForPurchaseOnce } from "@/utils/stockReceive";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
+import SupplierPaymentDialog from "@/components/purchase/SupplierPaymentDialog";
 
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },
@@ -46,6 +47,7 @@ export default function PurchasePage() {
   const [minAmount, setMinAmount] = useState<string>("");
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(1);
+  const [payFor, setPayFor] = useState<any | null>(null);
 
   const { data: orders, isLoading } = usePurchaseOrdersFullList();
   const { remove } = usePurchaseOrders();
@@ -266,6 +268,7 @@ export default function PurchasePage() {
   const fmtMoney = (n: any) => Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
+    <>
     <article className="content purchases-compact">
       <style>{`
         .purchases-compact { font-size: 11px; }
@@ -447,6 +450,17 @@ export default function PurchasePage() {
                             → استلام
                           </button>
                         )}
+                        {(Number(o.total || 0) - Number(o.paid_amount || 0)) > 0.01 && o.status !== "cancelled" && (
+                          <button
+                            type="button"
+                            className="btn-xs"
+                            style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                            onClick={() => setPayFor(o)}
+                            title="تسجيل دفعة للمورد"
+                          >
+                            💳 دفعة
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn-xs btn-danger"
@@ -486,6 +500,9 @@ export default function PurchasePage() {
                     <>
                       {o.status !== "received" && (
                         <button className="btn-xs btn-primary" onClick={() => handleConvertToInvoice(o)} aria-label="استلام">→ استلام</button>
+                      )}
+                      {(Number(o.total || 0) - Number(o.paid_amount || 0)) > 0.01 && o.status !== "cancelled" && (
+                        <button className="btn-xs" style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }} onClick={() => setPayFor(o)} aria-label="دفعة">💳 دفعة</button>
                       )}
                       <button className="btn-xs btn-info" onClick={() => navigate(`/preview/purchase/${o.id}`)} aria-label="طباعة">🖨 طباعة</button>
                       <button className="btn-xs btn-success" onClick={() => navigate(`/purchase/edit/${o.id}`)} aria-label="تعديل">📄 تعديل</button>
@@ -527,5 +544,15 @@ export default function PurchasePage() {
         </div>
       </div>
     </article>
+    <SupplierPaymentDialog
+      open={!!payFor}
+      onOpenChange={(v) => !v && setPayFor(null)}
+      supplierId={payFor?.supplier_id || null}
+      supplierName={supplierMap.get(payFor?.supplier_id)?.name || null}
+      purchaseOrderId={payFor?.id || null}
+      purchaseOrderNumber={payFor?.order_number || null}
+      dueAmount={payFor ? Math.max(0, Number(payFor.total || 0) - Number(payFor.paid_amount || 0)) : null}
+    />
+    </>
   );
 }
