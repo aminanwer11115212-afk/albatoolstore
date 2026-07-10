@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { RotateCw, Check, X, Square, RectangleHorizontal, Maximize2 } from "lucide-react";
+import { buildCroppedFile } from "@/utils/cropImage";
 
 type AspectPreset = "free" | "1:1" | "4:3" | "16:9";
 
@@ -26,11 +27,12 @@ export interface ImageCropDialogProps {
 }
 
 /** يقص الصورة من blob URL بحسب مساحة البكسل ثم يُرجع Blob جديد */
-async function cropToBlob(
+export async function cropToBlob(
   imageSrc: string,
   areaPixels: Area,
   rotation: number,
   mime: string,
+  maxSide?: number,
 ): Promise<Blob> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const el = new Image();
@@ -46,7 +48,6 @@ async function cropToBlob(
   const bBoxWidth = img.width * cos + img.height * sin;
   const bBoxHeight = img.width * sin + img.height * cos;
 
-  // Rotated canvas
   const rot = document.createElement("canvas");
   rot.width = bBoxWidth;
   rot.height = bBoxHeight;
@@ -55,10 +56,17 @@ async function cropToBlob(
   rctx.rotate(rad);
   rctx.drawImage(img, -img.width / 2, -img.height / 2);
 
-  // Crop canvas
+  let outW = Math.round(areaPixels.width);
+  let outH = Math.round(areaPixels.height);
+  if (maxSide && Math.max(outW, outH) > maxSide) {
+    const scale = maxSide / Math.max(outW, outH);
+    outW = Math.round(outW * scale);
+    outH = Math.round(outH * scale);
+  }
+
   const out = document.createElement("canvas");
-  out.width = Math.round(areaPixels.width);
-  out.height = Math.round(areaPixels.height);
+  out.width = outW;
+  out.height = outH;
   const octx = out.getContext("2d")!;
   octx.drawImage(
     rot,
@@ -68,8 +76,8 @@ async function cropToBlob(
     areaPixels.height,
     0,
     0,
-    areaPixels.width,
-    areaPixels.height,
+    outW,
+    outH,
   );
 
   const outMime = mime === "image/png" ? "image/png" : "image/jpeg";
@@ -98,6 +106,9 @@ export default function ImageCropDialog({
   const [aspectKey, setAspectKey] = useState<AspectPreset>(defaultAspect);
   const [areaPixels, setAreaPixels] = useState<Area | null>(null);
   const [busy, setBusy] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewTimer = useRef<number | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open || !file) return;
@@ -107,26 +118,48 @@ export default function ImageCropDialog({
     setZoom(1);
     setRotation(0);
     setAspectKey(defaultAspect);
+    setPreviewUrl(null);
     return () => URL.revokeObjectURL(url);
   }, [open, file, defaultAspect]);
 
-  const onCropComplete = useCallback((_: Area, pixels: Area) => {
-    setAreaPixels(pixels);
+  // نظّف رابط المعاينة عند الإغلاق
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
   }, []);
+
+  const regeneratePreview = useCallback(
+    async (pixels: Area) => {
+      if (!src || !file) return;
+      try {
+        const blob = await cropToBlob(src, pixels, rotation, file.type || "image/jpeg", 220);
+        const url = URL.createObjectURL(blob);
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = url;
+        setPreviewUrl(url);
+      } catch {
+        /* تجاهل — المعاينة اختيارية */
+      }
+    },
+    [src, file, rotation],
+  );
+
+  const onCropComplete = useCallback(
+    (_: Area, pixels: Area) => {
+      setAreaPixels(pixels);
+      if (previewTimer.current) window.clearTimeout(previewTimer.current);
+      previewTimer.current = window.setTimeout(() => regeneratePreview(pixels), 180);
+    },
+    [regeneratePreview],
+  );
 
   const handleConfirm = async () => {
     if (!src || !areaPixels || !file) return;
     setBusy(true);
     try {
       const blob = await cropToBlob(src, areaPixels, rotation, file.type || "image/jpeg");
-      const isPng = (file.type || "").includes("png");
-      const ext = isPng ? "png" : "jpg";
-      const base = (file.name || "image").replace(/\.[^.]+$/, "");
-      const cropped = new File([blob], `${base}-cropped.${ext}`, {
-        type: isPng ? "image/png" : "image/jpeg",
-        lastModified: Date.now(),
-      });
-      onConfirm(cropped);
+      onConfirm(buildCroppedFile(blob, file));
     } catch (e) {
       console.error(e);
     } finally {
@@ -148,7 +181,7 @@ export default function ImageCropDialog({
           <DialogTitle className="text-base font-bold">{title}</DialogTitle>
         </DialogHeader>
 
-        <div className="relative w-full h-[60vh] bg-muted">
+        <div className="relative w-full h-[52vh] bg-muted">
           {src && (
             <Cropper
               image={src}
@@ -163,6 +196,17 @@ export default function ImageCropDialog({
               restrictPosition={false}
               showGrid
             />
+          )}
+          {previewUrl && (
+            <div className="absolute bottom-2 left-2 bg-card/95 backdrop-blur border border-border rounded-lg p-1.5 shadow-lg flex items-center gap-2">
+              <img
+                src={previewUrl}
+                alt="معاينة القص"
+                data-testid="crop-preview"
+                className="w-16 h-16 object-contain rounded bg-muted"
+              />
+              <span className="text-[10px] text-muted-foreground pr-1 pl-2">معاينة النتيجة</span>
+            </div>
           )}
         </div>
 
