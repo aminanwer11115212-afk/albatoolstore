@@ -74,7 +74,7 @@ export default function SupplierPaymentDialog({
   // account options filtered by method
   const accountOptions = useMemo(() => {
     const list = (accounts || []) as any[];
-    if (method === "bank") return filterAllowedBankAccounts(list);
+    if (method === "bank") return filterAccountsForPayment(list, "bank");
     if (method === "cash") return list.filter((a) => (a.account_type || "cash") === "cash");
     return list;
   }, [accounts, method]);
