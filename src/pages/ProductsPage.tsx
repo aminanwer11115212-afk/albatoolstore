@@ -2276,6 +2276,32 @@ export default function ProductsPage() {
                               }}
                             />
                           </label>
+                          {p.image_url && (
+                            <button
+                              type="button"
+                              className="p-1 rounded hover:bg-muted text-primary"
+                              title="إعادة قص"
+                              aria-label="إعادة قص الصورة"
+                              onClick={() => startRecrop(p.image_url, async (cropped) => {
+                                const localUrl = URL.createObjectURL(cropped);
+                                const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                                try {
+                                  const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                  const url = await uploadProductImage(cropped);
+                                  patchProductCaches(p.id, { image_url: url });
+                                  await update.mutateAsync({ id: p.id, image_url: url });
+                                  window.dispatchEvent(new Event("products:changed"));
+                                  setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                                } catch (err: any) {
+                                  rollback();
+                                  URL.revokeObjectURL(localUrl);
+                                  toast.error(err.message || "فشل حفظ الصورة الجديدة");
+                                }
+                              })}
+                            >
+                              <Scissors size={12} />
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td style={{ padding: 0 }}>
