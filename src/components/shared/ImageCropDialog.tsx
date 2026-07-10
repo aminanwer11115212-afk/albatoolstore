@@ -27,11 +27,12 @@ export interface ImageCropDialogProps {
 }
 
 /** يقص الصورة من blob URL بحسب مساحة البكسل ثم يُرجع Blob جديد */
-async function cropToBlob(
+export async function cropToBlob(
   imageSrc: string,
   areaPixels: Area,
   rotation: number,
   mime: string,
+  maxSide?: number,
 ): Promise<Blob> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const el = new Image();
@@ -47,7 +48,6 @@ async function cropToBlob(
   const bBoxWidth = img.width * cos + img.height * sin;
   const bBoxHeight = img.width * sin + img.height * cos;
 
-  // Rotated canvas
   const rot = document.createElement("canvas");
   rot.width = bBoxWidth;
   rot.height = bBoxHeight;
@@ -56,10 +56,17 @@ async function cropToBlob(
   rctx.rotate(rad);
   rctx.drawImage(img, -img.width / 2, -img.height / 2);
 
-  // Crop canvas
+  let outW = Math.round(areaPixels.width);
+  let outH = Math.round(areaPixels.height);
+  if (maxSide && Math.max(outW, outH) > maxSide) {
+    const scale = maxSide / Math.max(outW, outH);
+    outW = Math.round(outW * scale);
+    outH = Math.round(outH * scale);
+  }
+
   const out = document.createElement("canvas");
-  out.width = Math.round(areaPixels.width);
-  out.height = Math.round(areaPixels.height);
+  out.width = outW;
+  out.height = outH;
   const octx = out.getContext("2d")!;
   octx.drawImage(
     rot,
@@ -69,8 +76,8 @@ async function cropToBlob(
     areaPixels.height,
     0,
     0,
-    areaPixels.width,
-    areaPixels.height,
+    outW,
+    outH,
   );
 
   const outMime = mime === "image/png" ? "image/png" : "image/jpeg";
