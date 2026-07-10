@@ -415,24 +415,38 @@ export default function ProductsPage() {
     setBrandToAdd("");
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // قص الصورة قبل الرفع (للنموذج الرئيسي وللمعاينة داخل الجدول)
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const cropTargetRef = useRef<null | ((f: File) => Promise<void> | void)>(null);
+
+  const openCropForFile = (file: File, onCropped: (f: File) => Promise<void> | void) => {
     if (!file.type.startsWith("image/")) { toast.error("يرجى اختيار ملف صورة"); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت"); return; }
-    setUploadingImage(true);
-    try {
-      const { uploadProductImage } = await import("@/utils/productImageUpload");
-      const url = await uploadProductImage(file);
-      setForm(f => ({ ...f, image_url: url }));
-      toast.success("تم رفع الصورة");
-    } catch (err: any) {
-      toast.error(err.message || "فشل رفع الصورة");
-    } finally {
-      setUploadingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    cropTargetRef.current = onCropped;
+    setCropFile(file);
+    setCropOpen(true);
   };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file) return;
+    openCropForFile(file, async (cropped) => {
+      setUploadingImage(true);
+      try {
+        const { uploadProductImage } = await import("@/utils/productImageUpload");
+        const url = await uploadProductImage(cropped);
+        setForm(f => ({ ...f, image_url: url }));
+        toast.success("تم رفع الصورة");
+      } catch (err: any) {
+        toast.error(err.message || "فشل رفع الصورة");
+      } finally {
+        setUploadingImage(false);
+      }
+    });
+  };
+
 
   // إعادة كتابة روابط الفئات للمنتج
   const syncProductCategoryLinks = async (productId: string, categoryIds: string[]) => {
