@@ -1960,6 +1960,7 @@ export default function CustomersPage() {
         localities={localities}
         cities={cities}
         customers={customers || []}
+        onDataChanged={reloadGeo}
       />
       <Sheet open={showLogistics} onOpenChange={setShowLogistics}>
         <SheetContent side="left" className="w-[98vw] sm:max-w-4xl p-0" dir="rtl">
