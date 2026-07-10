@@ -35,7 +35,7 @@ interface Props {
 }
 
 const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function InlineSearchSelect({
-  value, options, onChange, onAdd, onDelete, deleteConfirm, placeholder = "—",
+  value, options, onChange, onAdd, onDelete, onRename, deleteConfirm, placeholder = "—",
   disabled, className, title, addLabel, onNavigateNext, selectAllOnEnter, onSelectAll, showDeleteButton,
 }, ref) {
   const [open, setOpen] = useState(false);
