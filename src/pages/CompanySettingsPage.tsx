@@ -522,6 +522,15 @@ export default function CompanySettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      <ImageCropDialog
+        open={logoCropOpen}
+        file={logoCropFile}
+        onCancel={() => { setLogoCropOpen(false); setLogoCropFile(null); }}
+        onConfirm={applyLogoCropped}
+        defaultAspect="1:1"
+        title="قص شعار الشركة"
+      />
     </div>
   );
 }
