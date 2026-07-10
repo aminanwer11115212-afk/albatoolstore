@@ -501,6 +501,9 @@ export default function PurchasePage() {
                       {o.status !== "received" && (
                         <button className="btn-xs btn-primary" onClick={() => handleConvertToInvoice(o)} aria-label="استلام">→ استلام</button>
                       )}
+                      {(Number(o.total || 0) - Number(o.paid_amount || 0)) > 0.01 && o.status !== "cancelled" && (
+                        <button className="btn-xs" style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }} onClick={() => setPayFor(o)} aria-label="دفعة">💳 دفعة</button>
+                      )}
                       <button className="btn-xs btn-info" onClick={() => navigate(`/preview/purchase/${o.id}`)} aria-label="طباعة">🖨 طباعة</button>
                       <button className="btn-xs btn-success" onClick={() => navigate(`/purchase/edit/${o.id}`)} aria-label="تعديل">📄 تعديل</button>
                       <button className="btn-xs btn-danger" onClick={() => handleDelete(o.id)} aria-label="حذف">🗑 حذف</button>
