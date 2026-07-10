@@ -577,7 +577,21 @@ export default function PurchaseCreatePage() {
       let savedId = treatAsEdit ? orderId : null;
       let savedNumber = orderNumber;
 
-      // ملاحظة أمان: لو كنّا سنستلم البضاعة، احفظ الحالة كـ "pending" مؤقتاً.
+      // Snapshot existing state BEFORE mutating, so we can compute stock deltas correctly.
+      let prevStatusInDb: string | null = null;
+      let prevItems: Array<{ product_id: string | null; quantity: number }> = [];
+      if (savedId) {
+        prevStatusInDb = await getPurchaseStatus(savedId);
+        const { data: prevItemsRows } = await supabase
+          .from("purchase_order_items")
+          .select("product_id, quantity")
+          .eq("purchase_order_id", savedId);
+        prevItems = (prevItemsRows || []).map((r: any) => ({
+          product_id: r.product_id, quantity: Number(r.quantity || 0),
+        }));
+      }
+
+      // ملاحظة أمان: لو كنّا سنستلم البضاعة لأول مرة، احفظ الحالة كـ "pending" مؤقتاً.
       // نُحدّثها إلى "received" فقط بعد نجاح addStockForLines، حتى لا يتسبّب
       // فشل الشبكة في بقاء الحالة "received" بلا زيادة مخزون (سيؤدي ذلك إلى
       // مسار delta في الحفظ التالي ولن يُعوَّض الفارق أبداً).
@@ -597,19 +611,7 @@ export default function PurchaseCreatePage() {
         status: persistedStatus,
       };
 
-      // Snapshot existing state BEFORE mutating, so we can compute stock deltas correctly.
-      let prevStatusInDb: string | null = null;
-      let prevItems: Array<{ product_id: string | null; quantity: number }> = [];
       if (savedId) {
-        prevStatusInDb = await getPurchaseStatus(savedId);
-        const { data: prevItemsRows } = await supabase
-          .from("purchase_order_items")
-          .select("product_id, quantity")
-          .eq("purchase_order_id", savedId);
-        prevItems = (prevItemsRows || []).map((r: any) => ({
-          product_id: r.product_id, quantity: Number(r.quantity || 0),
-        }));
-
         const { error } = await (supabase as any).from("purchase_orders").update(payload).eq("id", savedId);
         if (error) throw error;
         await supabase.from("purchase_order_items").delete().eq("purchase_order_id", savedId);
