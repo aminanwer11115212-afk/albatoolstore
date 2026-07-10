@@ -171,6 +171,15 @@ export default function DocumentPreviewPage({ docType }: Props) {
             hidePaidBox: true,
             ...extras,
           });
+          setInvMeta({
+            id: invoice.id,
+            number: invoice.invoice_number,
+            total: Number(invoice.total || 0),
+            paidAmount: Number(invoice.paid_amount || 0),
+            customerId: iCust?.id || (invoice as any).customer_id || null,
+            customerName: iCust?.name || (invoice as any).walk_in_customer_name || null,
+            isPos: (invoice as any).source === "pos" || invoice.type === "cash",
+          });
         } else if (docType === "purchase") {
           // ===== أمر شراء =====
           const { data: order, error: oErr } = await (supabase as any)
@@ -270,7 +279,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [id, docType, variant, noHeader, stocktakeSort]);
+  }, [id, docType, variant, noHeader, stocktakeSort, reloadTick]);
 
   // استقبال رسالة "إغلاق" من زر ✕ داخل الـiframe → رجوع
   useEffect(() => {
