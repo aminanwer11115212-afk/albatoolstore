@@ -1,111 +1,92 @@
-# خطة تحسين قسم الإجماليات في المعاينة والطباعة
+# خطة: خصم موحّد + زر «سجّل دفعة» في المعاينة + تصحيح حالة الفاتورة
 
-## الهدف
-إعادة تصميم منطقة الإجماليات أسفل جدول البنود في **معاينة الفاتورة، فاتورة الكاش، وعرض السعر** بحيث تعرض:
-- إجمالي البنود (مجموع الكمية × السعر + الضريبة).
-- الخصم أسفله مباشرة (يظهر فقط إن > 0).
-- الرصيد السابق للعميل (مدين/دائن) بلونين مختلفين.
-- المتبقي على العميل (أحمر، بعلامة −) أو المُضاف إلى حسابه (أخضر، بعلامة +).
-- **حذف مربع "المبلغ المدفوع" من المعاينة نهائيًا** (يبقى في السجل الداخلي فقط).
+## المشاكل المطروحة
+1. **الخصم غير موحّد** بين إنشاء الفاتورة، إنشاء عرض السعر، تعديل الفاتورة، وتسجيل الدفعة — يجب أن يظهر كمربع خصم في الجانب على كل هذه الشاشات.
+2. **حالة الفاتورة عند تسجيل الدفع** تنتقل مباشرة إلى "done" في workflow، بينما `status` قد لا يُحدَّث لـ `partial` أو `paid` تلقائيًا حسب `paid_amount` مقابل `total`.
+3. **زر «سجّل دفعة»** غير موجود داخل معاينة الفاتورة — يجب إضافته لتسريع التحصيل.
+4. **TS2305** لدالة `filterAllowedBankAccounts` — تم إصلاحه (alias مُصدَّر).
 
-## نطاق التطبيق
-- `src/utils/printTemplate.ts` (القالب الرئيسي — يخدم الفاتورة، فاتورة الكاش، عرض السعر، المرتجعات).
-- `src/pages/DocumentPreviewPage.tsx` (تمرير الرصيد السابق).
-- `src/pages/InvoiceViewPage.tsx` / `QuoteViewPage.tsx` (نفس منطق الحساب داخل التطبيق).
+## المخرجات المتوقعة
+- مربع خصم موحّد (نسبة % أو مبلغ مقطوع) في: إنشاء/تعديل الفاتورة، فاتورة الكاش، عرض السعر، حوار تسجيل الدفعة.
+- عند تسجيل دفعة → إعادة حساب `status`: `paid` إن `paid >= total`، `partial` إن `paid > 0 && paid < total`، وإلا `pending`.
+- زر «💳 سجّل دفعة» ضمن شريط أدوات `DocumentPreviewPage` (يظهر فقط للفواتير ذات متبقّي > 0 ولعميل مسجّل، ويحترم عزلة POS).
+- Trigger DB اختياري يعيد حساب `status` تلقائيًا عند تحديث `paid_amount` (احتياطي).
 
-## المخرجات المرئية
+---
 
+## توزيع العمل على Sub-Agents
+
+### 🤖 SUBAGENT #1 — مركّب خصم موحّد (Reusable Discount Box)
+**مكان التنفيذ:**
+- إنشاء: `src/components/shared/DiscountInput.tsx`
+- إنشاء: `src/test/discountInput.test.tsx`
+
+**المهمة:** بناء مكوّن `<DiscountInput value onChange grandBeforeDiscount />` يعرض حقلين: **نسبة %** و **مبلغ مقطوع**، متزامنَين تلقائيًا. يستخدم design tokens فقط. يمرَّر لاحقًا لصفحات الإنشاء والتعديل والدفع.
+
+---
+
+### 🤖 SUBAGENT #2 — تركيب مربع الخصم في صفحات الفواتير وعروض الأسعار
+**مكان التنفيذ:**
+- تعديل: `src/pages/InvoiceCreatePage.tsx`
+- تعديل: `src/pages/QuoteCreatePage.tsx`
+- تعديل: أي `InvoiceCashCreatePage` / `InvoiceEditPage` موجود (بحث عبر rg)
+- تعديل: `src/components/purchase/SupplierPaymentDialog.tsx` (وحوار دفع العميل إن وُجد)
+
+**المهمة:**
+1. استبدال حقل الخصم الحالي (أو إضافته إن غاب) بمكوّن `DiscountInput` في الشريط الجانبي/بطاقة الإجماليات.
+2. تمرير القيمة الموحّدة لحقل `discount` في الحفظ.
+3. تأكيد ظهورها في `printTemplate` تلقائيًا (تم في الجولة السابقة).
+
+---
+
+### 🤖 SUBAGENT #3 — تصحيح حالة الفاتورة تلقائيًا + Trigger DB احتياطي
+**مكان التنفيذ:**
+- إنشاء: `src/utils/computeInvoiceStatus.ts` (دالة نقية + اختبار)
+- تعديل: أي مكان يُحدّث `paid_amount` أو ينشئ دفعة عميل — استدعاء `updateInvoiceStatusAfterPayment(invoiceId)`
+- **DB migration** (عبر supabase--migration): trigger `trg_invoice_recompute_status` على `invoices` عند تغيّر `paid_amount` أو `total` يعيد حساب `status` (مع احترام `cancelled`).
+
+**المنطق:**
 ```
-┌───────────────────────────────────────┐
-│  الإجمالي:                 12,000    │
-│  الخصم:                     −500     │  (إن > 0)
-│  ─────────────────────────────────    │
-│  الحساب السابق (عليه):     −5,000    │  (أحمر إن balance>0)
-│  رصيد سابق له:              +2,000    │  (أخضر إن credit>0)
-│  ─────────────────────────────────    │
-│  المتبقي على العميل:       −6,500    │  (أحمر بعلامة ناقص)
-│           أو                          │
-│  أُضيفت إلى حسابه:          +1,500    │  (أخضر بعلامة زائد)
-│           أو                          │
-│  مسددة بالكامل ✓                      │  (أخضر بدون رقم)
-└───────────────────────────────────────┘
+if status='cancelled' → keep
+else if paid >= total-0.01 → 'paid'
+else if paid > 0.01 → 'partial'
+else if due_date && due_date < today → 'overdue'
+else → 'pending'
 ```
 
-## القواعد التقنية
-- استخدم design tokens (`hsl(var(--destructive))` للأحمر، أضف `--success` لو غير موجود). لا ألوان hex ثابتة.
-- RTL و Cairo bold كما هو معتمد.
-- الحساب في helper نقي جديد `src/utils/documentBalanceSummary.ts` يعيد:
-  ```ts
-  { subtotal, discount, previousDebt, previousCredit, remaining, overpaid, isPaid }
-  ```
-- استعلم `customers.balance` و `credit_balance` واطرح متبقّي الفاتورة الحالية لتجنب الازدواج.
-- اختبار vitest للـ helper يغطي: مسددة/جزئية/زائدة/بلا عميل/بحساب سابق مدين/دائن.
+---
+
+### 🤖 SUBAGENT #4 — زر «سجّل دفعة» في معاينة الفاتورة
+**مكان التنفيذ:**
+- إنشاء: `src/components/invoice/CustomerPaymentDialog.tsx` (على غرار SupplierPaymentDialog، بالاتجاه المعاكس: `income` / `customer_payment`).
+- تعديل: `src/pages/DocumentPreviewPage.tsx` (إضافة الزر في شريط الأدوات)
+- تعديل: `src/pages/InvoiceViewPage.tsx` (إن كان يريده هنا أيضًا)
+
+**السلوك:**
+- الزر يظهر فقط إذا `docType==="invoice"` و `remaining > 0` و للفاتورة عميل مسجّل (احترام عزلة POS: للفواتير `source='pos'` استخدم مسار الكاش).
+- بعد الحفظ: إعادة تحميل المعاينة (`react-query invalidate` لمفاتيح `invoices`, `customers`, `transactions`).
 
 ---
 
-## توزيع العمل على Sub-Agents (تنفيذ متوازٍ بعد المراجعة)
-
-### 🤖 SUBAGENT #1 — Helper الحسابات + الاختبارات
-**مكان التنفيذ:**
-- إنشاء: `src/utils/documentBalanceSummary.ts`
-- إنشاء: `src/test/documentBalanceSummary.test.ts`
-
-**المهمة:** كتابة دالة نقية `computeDocumentBalance({ grandTotal, discount, paidAmount, customerBalance, customerCreditBalance, currentInvoiceRemaining })` تُعيد الكائن أعلاه، مع 8+ حالات اختبار vitest.
-
----
-
-### 🤖 SUBAGENT #2 — تحديث قالب الطباعة/المعاينة
-**مكان التنفيذ:**
-- تعديل: `src/utils/printTemplate.ts` (الأسطر ~1-50 لواجهة PrintData، ~338-410 لقسم الإجماليات).
+### 🤖 SUBAGENT #5 — تحقّق شامل (Playwright + vitest)
+**مكان التنفيذ:** `/tmp/browser/`
 
 **المهمة:**
-1. أضف إلى `PrintData` الحقول: `previousDebt?: number`, `previousCredit?: number`, `hidePaidBox?: boolean`.
-2. استبدل قسم `summary-row` (سطر 397-408): احذف صندوق "المبلغ المدفوع" عندما `hidePaidBox=true`.
-3. أضف صفوفًا جديدة داخل جدول totals بعد صف "الإجمالي":
-   - صف الخصم (شرطي).
-   - صف الحساب السابق مدين (أحمر).
-   - صف رصيد سابق دائن (أخضر).
-   - صف نهائي: المتبقي/الإضافة/المسددة بألوان مناسبة.
-4. استخدم CSS variables (`color: hsl(0 84% 60%)` مؤقتًا للطباعة لأن قالب الطباعة معزول عن Tailwind).
-5. حدّث `data-section` labels لتظل قابلة للإخفاء من شريط "تخصيص الرؤية".
-
----
-
-### 🤖 SUBAGENT #3 — تمرير الرصيد السابق من صفحات المعاينة
-**مكان التنفيذ:**
-- تعديل: `src/pages/DocumentPreviewPage.tsx`
-- تعديل: `src/pages/InvoiceViewPage.tsx`
-- تعديل: `src/pages/QuoteViewPage.tsx`
-
-**المهمة:**
-1. قبل استدعاء `generatePrintHTML`، جِب `customers.balance` و `credit_balance` للعميل.
-2. اطرح `max(total - paid, 0)` للفاتورة الحالية من `balance` لتجنب العدّ المزدوج.
-3. مرّر `previousDebt`, `previousCredit`, و `hidePaidBox: true` (للمعاينة فقط).
-4. تأكد من أن فاتورة الكاش (بدون عميل) تمرّر أصفارًا ولا تعرض السطور.
-
----
-
-### 🤖 SUBAGENT #4 — التحقق البصري والانحدار
-**مكان التنفيذ:** Playwright في `/tmp/browser/`
-
-**المهمة:**
-1. سجّل الدخول (session مُحقن)، افتح 3 معاينات: فاتورة عادية لعميل مديون، فاتورة كاش، عرض سعر.
-2. التقط لقطات وتحقق:
-   - عدم ظهور "المبلغ المدفوع".
-   - ظهور صف الخصم فقط عند وجوده.
-   - ظهور صفوف الرصيد السابق باللون الصحيح.
-   - ظهور "المتبقي" بأحمر أو "أضيفت لحسابه" بأخضر.
-3. شغّل `bunx vitest run documentBalanceSummary printTemplate` وتأكد نجاح الاختبارات.
+1. سيناريو: إنشاء فاتورة بخصم 10% → التحقق أنها محفوظة، ثم معاينة تُظهر سطر الخصم.
+2. تسجيل دفعة جزئية من زر المعاينة → التحقق أن `status='partial'` وأن السطر النهائي أحمر بعلامة −.
+3. تسجيل دفعة كاملة → `status='paid'` و "✓ مسددة بالكامل".
+4. دفع زائد → `status='paid'` و "أُضيفت لحسابه" أخضر.
+5. تشغيل `bunx vitest run discountInput computeInvoiceStatus documentBalanceSummary printTemplate`.
 
 ---
 
 ## الترتيب
-- SUBAGENT #1 يبدأ أولًا (يحدّد العقد).
-- #2 و #3 يتوازيان بعد #1.
-- #4 بعد اكتمال #2 و #3.
+- SUBAGENT #1 (المكوّن) و #3 (منطق الحالة + Trigger) بالتوازي أولًا.
+- SUBAGENT #2 (تركيب) و #4 (زر الدفع) بالتوازي بعد #1.
+- SUBAGENT #5 آخر خطوة.
 
-## تحسينات مقترحة لاحقة (لن تُنفّذ الآن)
-- زر "سجّل دفعة" مباشرة من المعاينة.
-- QR code بمبلغ المتبقي لتسهيل التحصيل.
-- Badge ملوّن بدل نص للحالة النهائية.
-- سطر إضافي "إجمالي مديونية العميل بعد هذه الفاتورة".
+## قواعد يجب احترامها
+- **عزلة POS**: زر «سجّل دفعة» يجب ألا يُنشئ `transaction` مرتبطة بعميل حقيقي لفاتورة `source='pos'` (skill: albatool-cash-payment-isolation).
+- Design tokens فقط، RTL/Cairo، لا ألوان hex في مكوّنات React.
+- استخدم `duplicateDocGuard` عند حفظ التعديلات (mem://features/duplicate-save-guard).
+- Trigger DB يجب أن يحترم `SECURITY DEFINER SET search_path = public`.
