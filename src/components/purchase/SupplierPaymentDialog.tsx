@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccounts, useSuppliers } from "@/hooks/useData";
-import { validateBankTransferPayment, isBankPaymentMethod, filterAllowedBankAccounts } from "@/lib/bankTransferValidation";
+import { validateBankTransferPayment, isBankPaymentMethod, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { toast } from "sonner";
 import {
   Dialog,
