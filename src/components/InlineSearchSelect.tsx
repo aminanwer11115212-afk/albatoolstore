@@ -32,11 +32,13 @@ interface Props {
   onSelectAll?: (allValues: string[]) => void;
   /** إظهار زر حذف لكل خيار في القائمة */
   showDeleteButton?: boolean;
+  /** تخطي رسالة التأكيد الافتراضية — يستخدم عندما يعرض الأب حوار تأكيد ذكياً */
+  skipDeleteConfirm?: boolean;
 }
 
 const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function InlineSearchSelect({
   value, options, onChange, onAdd, onDelete, onRename, deleteConfirm, placeholder = "—",
-  disabled, className, title, addLabel, onNavigateNext, selectAllOnEnter, onSelectAll, showDeleteButton,
+  disabled, className, title, addLabel, onNavigateNext, selectAllOnEnter, onSelectAll, showDeleteButton, skipDeleteConfirm,
 }, ref) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
