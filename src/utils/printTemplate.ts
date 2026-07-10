@@ -46,9 +46,16 @@ interface PrintData {
   packagingInfo?: string;
   transportInfo?: string;
   customTitle?: string;
+  /** رصيد العميل المدين قبل هذه الفاتورة (لا يشمل متبقّي هذه الفاتورة). */
+  previousDebt?: number;
+  /** رصيد العميل الدائن قبل هذه الفاتورة. */
+  previousCredit?: number;
+  /** إخفاء صندوق "المبلغ المدفوع" في قسم ملخّص الحساب (يُستخدم في المعاينة). */
+  hidePaidBox?: boolean;
 }
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
+import { computeDocumentBalance } from "@/utils/documentBalanceSummary";
 
 function cleanExtraHTML(s?: string): string | undefined {
   if (!s) return undefined;
@@ -73,8 +80,15 @@ export function generatePrintHTML(data: PrintData): string {
     type, isCash, number, date, dueDate, customer, items,
     subtotal, taxTotal, discountTotal, shipping = 0, grandTotal,
     paidAmount = 0, dueAmount = 0, notes, company, status, paymentMethod,
-    variant = "full", noHeader = false, oldBalance = 0, packagingInfo, transportInfo, customTitle
+    variant = "full", noHeader = false, oldBalance = 0, packagingInfo, transportInfo, customTitle,
+    previousDebt = 0, previousCredit = 0, hidePaidBox = false,
   } = data;
+
+  const balSum = computeDocumentBalance({
+    grandTotal, discount: discountTotal, paidAmount,
+    previousDebt, previousCredit,
+  });
+  const fmt = (n: number) => Number(n || 0).toLocaleString();
 
   const title = variant === "stocktake"
     ? "كشف جرد"
