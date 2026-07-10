@@ -729,8 +729,9 @@ export default function PurchaseCreatePage() {
       // تسجيل المورد المحفوظ — يُستخدم في الضغطة التالية لتقرير "نفس المورد ⇒ تحديث"
       lastSavedSupplierRef.current = supplierId;
       if (!isEdit && savedId) {
-        // استبدل الرابط بدون إعادة تحميل — useParams لن يتحدّث، لذلك نعتمد على lastSavedSupplierRef في الضغطة التالية
-        window.history.replaceState({}, "", `/purchase/edit/${savedId}`);
+        // انتقل إلى مسار التعديل حتى يلتقط useParams المعرّف الجديد ويصبح isEdit=true
+        // في الضغطات التالية — هذا يمنع أي فرصة لإنشاء سجل مكرر.
+        navigate(`/purchase/edit/${savedId}`, { replace: true });
       }
     } catch (e: any) {
       const { reportCriticalError } = await import("@/utils/errorReporter");
