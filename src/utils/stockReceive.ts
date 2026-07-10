@@ -83,6 +83,45 @@ export async function receiveStockForPurchaseOnce(
 }
 
 /**
+ * Idempotent stock RESTORE (subtract) for a purchase order being cancelled/deleted.
+ *
+ * Reservation-first pattern (same as invoice deletion):
+ *   1. Read current status.
+ *   2. If not "received" → nothing to restore.
+ *   3. Atomically flip status "received" → "cancelled" (WHERE status='received').
+ *      Only one caller wins that predicate. Losers short-circuit.
+ *   4. Winner subtracts stock. If subtraction fails, status is already 'cancelled'
+ *      so retries won't double-subtract; caller can surface the failure and re-add
+ *      manually. Under-restore is safer than double-restore.
+ */
+export async function restoreStockForPurchaseOnce(
+  purchaseId: string,
+  lines: StockLine[],
+): Promise<{ restored: boolean; reason?: string }> {
+  if (!purchaseId) return { restored: false, reason: "missing_purchase_id" };
+
+  const currentStatus = await getPurchaseStatus(purchaseId);
+  if (currentStatus !== "received") return { restored: false, reason: "not_received" };
+
+  const { data: flipped, error: flipErr } = await (supabase as any)
+    .from("purchase_orders")
+    .update({ status: "cancelled" })
+    .eq("id", purchaseId)
+    .eq("status", "received")
+    .select("id");
+  if (flipErr) throw new Error(`تعذّر تحديث حالة الأمر: ${flipErr.message}`);
+  if (!Array.isArray(flipped) || flipped.length === 0) {
+    return { restored: false, reason: "already_cancelled" };
+  }
+
+  const agg = aggregate(lines);
+  const deltas = new Map<string, number>();
+  agg.forEach((qty, id) => deltas.set(id, -qty));
+  await applyDeltas(deltas);
+  return { restored: true };
+}
+
+/**
  * Apply delta when editing a purchase order whose stock was already received.
  * delta = newQty - oldQty (positive => add more to stock, negative => remove).
  */
