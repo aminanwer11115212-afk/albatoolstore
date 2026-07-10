@@ -47,6 +47,7 @@ export default function PurchasePage() {
   const [minAmount, setMinAmount] = useState<string>("");
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(1);
+  const [payFor, setPayFor] = useState<any | null>(null);
 
   const { data: orders, isLoading } = usePurchaseOrdersFullList();
   const { remove } = usePurchaseOrders();
