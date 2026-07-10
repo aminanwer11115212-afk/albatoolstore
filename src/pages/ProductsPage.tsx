@@ -2222,24 +2222,22 @@ export default function ProductsPage() {
                                 const file = e.target.files?.[0];
                                 e.target.value = "";
                                 if (!file) return;
-                                if (file.size > 5 * 1024 * 1024) { toast.error("الحجم > 5MB"); return; }
-                                // اعرض الصورة محلياً فوراً (blob URL) ثم ارفعها بالخلفية
-                                const localUrl = URL.createObjectURL(file);
-                                const rollback = patchProductCaches(p.id, { image_url: localUrl });
-                                (async () => {
-                                   try {
-                                     const { uploadProductImage } = await import("@/utils/productImageUpload");
-                                     const url = await uploadProductImage(file);
-                                     patchProductCaches(p.id, { image_url: url });
-                                     await update.mutateAsync({ id: p.id, image_url: url });
-                                     window.dispatchEvent(new Event("products:changed"));
-                                     setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
-                                   } catch (err: any) {
-                                     rollback();
-                                     URL.revokeObjectURL(localUrl);
-                                     toast.error(err.message || "فشل الرفع");
-                                   }
-                                 })();
+                                openCropForFile(file, async (cropped) => {
+                                  const localUrl = URL.createObjectURL(cropped);
+                                  const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                                  try {
+                                    const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                    const url = await uploadProductImage(cropped);
+                                    patchProductCaches(p.id, { image_url: url });
+                                    await update.mutateAsync({ id: p.id, image_url: url });
+                                    window.dispatchEvent(new Event("products:changed"));
+                                    setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                                  } catch (err: any) {
+                                    rollback();
+                                    URL.revokeObjectURL(localUrl);
+                                    toast.error(err.message || "فشل الرفع");
+                                  }
+                                });
                               }}
                             />
                           </label>
