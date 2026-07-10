@@ -448,6 +448,19 @@ ${showAccount ? `
     </tr>
   </tbody>
 </table>
+${!hidePaidBox ? `
+<!-- Legacy summary boxes (kept for share-link parity; suppressed in in-app preview via hidePaidBox) -->
+<div class="summary-row" style="display:none;" aria-hidden="true">
+  <div class="summary-box" data-section="paid-amount" data-section-label="المبلغ المدفوع">
+    <div class="summary-box-title">المبلغ المدفوع</div>
+    <div class="summary-box-value" style="color:#16a34a;">${fmt(paidAmount)}</div>
+  </div>
+  <div class="summary-box" data-section="final-total" data-section-label="المطلوب النهائي" style="border-color:#2980b9;">
+    <div class="summary-box-title">المطلوب النهائي</div>
+    <div class="summary-box-value blue">${fmt(Math.max(0, grandTotal - paidAmount))}</div>
+  </div>
+</div>
+` : ""}
 ` : ""}
 
 ${showExtras ? `
