@@ -404,6 +404,19 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
           </button>
         </div>
       </div>
+
+      <ImageCropDialog
+        open={cropOpen}
+        file={cropFile}
+        onCancel={() => { setCropOpen(false); setCropFile(null); }}
+        onConfirm={(cropped) => {
+          setCropOpen(false);
+          setCropFile(null);
+          handleUpload(filesFromOne(cropped));
+        }}
+        defaultAspect="free"
+        title="قص صورة المرفق"
+      />
     </div>
   );
 }
