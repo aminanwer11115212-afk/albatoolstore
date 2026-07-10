@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCroppedFile, filesFromArray, isImageFile } from "@/utils/cropImage";
+import { buildCroppedFile, isImageFile } from "@/utils/cropImage";
 
 function fakeBlob(mime: string) {
   return new Blob([new Uint8Array([1, 2, 3, 4])], { type: mime });
@@ -51,13 +51,3 @@ describe("isImageFile", () => {
   });
 });
 
-describe("filesFromArray", () => {
-  it("يبني FileList من مصفوفة", () => {
-    const a = new File([""], "a.jpg", { type: "image/jpeg" });
-    const b = new File([""], "b.png", { type: "image/png" });
-    const list = filesFromArray([a, b]);
-    expect(list.length).toBe(2);
-    expect(list[0].name).toBe("a.jpg");
-    expect(list[1].name).toBe("b.png");
-  });
-});
