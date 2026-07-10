@@ -286,6 +286,30 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     return true;
   };
 
+  // ── تعديل الاسم (rename) لكل قائمة ──
+  const renameIn = (table: string, setter: React.Dispatch<React.SetStateAction<any[]>>, keepSortByName = true) =>
+    async (id: string, newName: string): Promise<boolean> => {
+      const name = newName.trim();
+      if (!name) { toast.error("الاسم مطلوب"); return false; }
+      const { error } = await (supabase as any).from(table).update({ name }).eq("id", id);
+      if (error) { toast.error(error.message); return false; }
+      setter(prev => {
+        const next = prev.map(x => x.id === id ? { ...x, name } : x);
+        return keepSortByName ? next.sort((a, b) => (a.name || "").localeCompare(b.name || "")) : next;
+      });
+      toast.success("تم تعديل الاسم");
+      return true;
+    };
+
+  const renameRegion       = renameIn("regions",       setRegions,       false);
+  const renameState        = renameIn("states",        setStates);
+  const renameCity         = renameIn("cities",        setCities);
+  const renameLocality     = renameIn("localities",    setLocalities);
+  const renameGroup        = renameIn("customer_groups", setGroups);
+  const renameTransporter  = renameIn("transporters",  setTransporters);
+  const renameDestination  = renameIn("destinations",  setDestinations);
+
+
   const handleEnter = (idx: number) => (e: KeyboardEvent) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
