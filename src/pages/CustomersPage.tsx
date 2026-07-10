@@ -273,7 +273,10 @@ export default function CustomersPage() {
   const sortedFiltered = useMemo(() => {
     const arr = [...filtered];
     if (sortBy === "recent") arr.sort((a, b) => (lastActivity[b.id] || "").localeCompare(lastActivity[a.id] || ""));
-    else if (sortBy === "balance") arr.sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0));
+    else if (sortBy === "balance_desc") arr.sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0));
+    else if (sortBy === "balance_asc")  arr.sort((a, b) => Number(a.balance || 0) - Number(b.balance || 0));
+    else if (sortBy === "credit_desc")  arr.sort((a, b) => Number(b.credit_balance || 0) - Number(a.credit_balance || 0));
+    else if (sortBy === "credit_asc")   arr.sort((a, b) => Number(a.credit_balance || 0) - Number(b.credit_balance || 0));
     else arr.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     return arr;
   }, [filtered, sortBy, lastActivity]);
