@@ -17,6 +17,7 @@ interface Props {
   onChange: (v: string) => void;
   onAdd?: (name: string) => Promise<string | null>;
   onDelete?: (opt: InlineOption) => Promise<boolean> | boolean;
+  onRename?: (opt: InlineOption, newName: string) => Promise<boolean> | boolean;
   deleteConfirm?: (opt: InlineOption) => string;
   placeholder?: string;
   disabled?: boolean;
