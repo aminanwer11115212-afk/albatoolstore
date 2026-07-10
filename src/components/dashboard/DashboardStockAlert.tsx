@@ -1,6 +1,6 @@
-import { AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import { formatStock } from "@/utils/formatStock";
 
 interface Props {
   products: any[];
@@ -21,19 +21,28 @@ export default function DashboardStockAlert({ products }: Props) {
               لا توجد منتجات منخفضة المخزون
             </li>
           ) : (
-            products.map((p: any) => (
-              <li key={p.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors">
-                <button
-                  onClick={() => navigate("/products")}
-                  className="text-xs text-primary hover:underline truncate max-w-[70%] text-right"
-                >
-                  {p.name}
-                </button>
-                <span className="inline-block text-[11px] font-bold px-2.5 py-1 rounded-full bg-destructive text-white min-w-[32px] text-center">
-                  {p.stock_quantity ?? 0}
-                </span>
-              </li>
-            ))
+            products.map((p: any) => {
+              const s = formatStock(p.stock_quantity);
+              const badgeCls = s.isNegative
+                ? "bg-destructive text-destructive-foreground"
+                : s.isZero
+                ? "bg-muted text-muted-foreground"
+                : "bg-secondary text-secondary-foreground";
+              return (
+                <li key={p.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors">
+                  <button
+                    onClick={() => navigate("/products")}
+                    className="text-xs text-primary hover:underline truncate max-w-[70%] text-right"
+                  >
+                    {p.name}
+                    {s.isNegative && <span className="mr-1 text-[10px] text-destructive">(عجز)</span>}
+                  </button>
+                  <span className={`inline-block text-[11px] font-bold px-2.5 py-1 rounded-full min-w-[32px] text-center ${badgeCls}`}>
+                    {s.text}
+                  </span>
+                </li>
+              );
+            })
           )}
         </ul>
       </CardContent>
