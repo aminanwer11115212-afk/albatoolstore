@@ -433,6 +433,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                   onChange={(v) => setForm({ ...form, region_id: v || null, state_id: null, locality_id: null, city_id: null })}
                   onAdd={addRegion}
                   onDelete={async (o) => await removeRegion(o.value)}
+                  skipDeleteConfirm
                   onRename={async (o, n) => await renameRegion(o.value, n)}
                   onNavigateNext={() => focusAt(k + 1)}
                   placeholder="— اختر أو اكتب —"
@@ -455,6 +456,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                   onChange={(v) => setForm({ ...form, state_id: v || null, city_id: null, locality_id: null })}
                   onAdd={addState}
                   onDelete={async (o) => await removeState(o.value)}
+                  skipDeleteConfirm
                   onRename={async (o, n) => await renameState(o.value, n)}
                   onNavigateNext={() => focusAt(k + 1)}
                   placeholder="— اختر أو اكتب —"
@@ -478,6 +480,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, city_id: v || null, locality_id: null })}
                 onAdd={addCity}
                 onDelete={async (o) => await removeCity(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameCity(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— اختر أو ابحث —"
@@ -511,6 +514,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, locality_id: v || null })}
                 onAdd={addLocality}
                 onDelete={async (o) => await removeLocality(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameLocality(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— اختر أو ابحث —"
@@ -534,6 +538,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, group_id: v || null })}
                 onAdd={addGroup}
                 onDelete={async (o) => await removeGroup(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameGroup(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— اختر —"
@@ -557,6 +562,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, preferred_transporter_id: v || null })}
                 onAdd={addTransporter}
                 onDelete={async (o) => await removeTransporter(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameTransporter(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— بدون —"
@@ -579,6 +585,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, destination_id: v || null })}
                 onAdd={addDestination}
                 onDelete={async (o) => await removeDestination(o.value)}
+                skipDeleteConfirm
                 onRename={async (o, n) => await renameDestination(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— بدون —"
