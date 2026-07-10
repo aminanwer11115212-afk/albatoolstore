@@ -3,6 +3,7 @@ import { Paperclip, Trash2, Upload, X, FileText, Download, Camera, Receipt, Truc
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
+import ImageCropDialog from "@/components/shared/ImageCropDialog";
 
 type Category = "receipt" | "running" | "details";
 type TabKey = Category | "trash";
