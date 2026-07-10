@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
 import { useDialogSize } from "@/hooks/useDialogSize";
+import DeleteGeoDialog from "@/components/shared/DeleteGeoDialog";
+import { getGeoImpact, deleteGeoOnly, deleteGeoCascade, EntityKind, kindLabel } from "@/utils/geoMutations";
 
 const sanitizePhone = (val: string) => {
   if (!val) return "";
