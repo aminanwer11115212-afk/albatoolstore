@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import DiscountInput from "@/components/shared/DiscountInput";
 
 type Method = "cash" | "bank" | "card" | "mobile";
 
