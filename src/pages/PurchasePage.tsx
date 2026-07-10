@@ -540,5 +540,15 @@ export default function PurchasePage() {
         </div>
       </div>
     </article>
+    <SupplierPaymentDialog
+      open={!!payFor}
+      onOpenChange={(v) => !v && setPayFor(null)}
+      supplierId={payFor?.supplier_id || null}
+      supplierName={supplierMap.get(payFor?.supplier_id)?.name || null}
+      purchaseOrderId={payFor?.id || null}
+      purchaseOrderNumber={payFor?.order_number || null}
+      dueAmount={payFor ? Math.max(0, Number(payFor.total || 0) - Number(payFor.paid_amount || 0)) : null}
+    />
+    </>
   );
 }
