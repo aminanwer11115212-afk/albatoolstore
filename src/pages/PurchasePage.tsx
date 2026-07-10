@@ -459,6 +459,7 @@ export default function PurchasePage() {
                           >
                             💳 دفعة
                           </button>
+                        )}
                         <button
                           type="button"
                           className="btn-xs btn-danger"
