@@ -1,111 +1,111 @@
-# خطة أوامر الشراء والموردين — Albatool
+# خطة تحسين قسم الإجماليات في المعاينة والطباعة
 
-## 1. تشخيص المشكلة الحالية (لماذا لا يظهر أمر أمجد؟)
+## الهدف
+إعادة تصميم منطقة الإجماليات أسفل جدول البنود في **معاينة الفاتورة، فاتورة الكاش، وعرض السعر** بحيث تعرض:
+- إجمالي البنود (مجموع الكمية × السعر + الضريبة).
+- الخصم أسفله مباشرة (يظهر فقط إن > 0).
+- الرصيد السابق للعميل (مدين/دائن) بلونين مختلفين.
+- المتبقي على العميل (أحمر، بعلامة −) أو المُضاف إلى حسابه (أخضر، بعلامة +).
+- **حذف مربع "المبلغ المدفوع" من المعاينة نهائيًا** (يبقى في السجل الداخلي فقط).
 
-فحصت قاعدة البيانات مباشرة ووجدت:
+## نطاق التطبيق
+- `src/utils/printTemplate.ts` (القالب الرئيسي — يخدم الفاتورة، فاتورة الكاش، عرض السعر، المرتجعات).
+- `src/pages/DocumentPreviewPage.tsx` (تمرير الرصيد السابق).
+- `src/pages/InvoiceViewPage.tsx` / `QuoteViewPage.tsx` (نفس منطق الحساب داخل التطبيق).
 
-| الفحص | النتيجة |
-|---|---|
-| هل المورد "امجد" موجود؟ | ✅ موجود (`717c98…`) |
-| هل أمر الشراء محفوظ فعلاً؟ | ✅ نعم `PO-48438`، حالته `received`، الإجمالي `1,064,000` |
-| هل صلاحيات RLS تسمح بقراءته؟ | ✅ `USING (true)` |
-| هل عمود `stock_applied_at` مضبوط؟ | ❌ **NULL** رغم أن الحالة `received` |
-| هل مفتاح الكاش `purchase-orders-full` ضمن قوائم "إعادة الجلب عند التركيب"؟ | ❌ **غير موجود** في `App.tsx` |
+## المخرجات المرئية
 
-**الخلاصة:** الأمر محفوظ فعلاً، لكن صفحة `/purchase-orders` تعرض نسخة قديمة من الكاش (staleTime افتراضي = 5 دقائق) لأن مفتاحها ليس ضمن القائمة التي تُجبر على `refetchOnMount:"always"`. كذلك، مسار "حفظ واستلام" الحالي لا يمرّ عبر الـ RPC الذرّي الجديد `receive_purchase_stock_once`، لذلك `stock_applied_at` بقي فارغاً — وهذا سيسبب مشاكل مستقبلية (استلام مزدوج للمخزون).
-
-## 2. الإصلاح الفوري (يحل مشكلة أمجد الآن)
-
-- **إضافة مفاتيح كاش أوامر الشراء إلى قائمة إعادة الجلب** في `src/App.tsx` (السطور 185–206): `purchase-orders-full`, `purchase-orders`, `purchase-order-items` مع `staleTime: 30_000` و`refetchOnMount:"always"` — نفس معاملة الفواتير والعروض.
-- **backfill لعمود `stock_applied_at`** لكل أمر حالته `received` والعمود عنده `NULL` (هجرة قصيرة).
-- **إجبار PurchasePage على refetch عند التركيب** كطبقة دفاع ثانية (`refetchOnMount:"always"` على الاستعلام نفسه).
-- **اشتراك Realtime في `purchase_orders`** ضمن `src/lib/realtimeSync.ts` ليتحدّث الجدول فوراً بين الأجهزة (فحصت — العائلة موجودة لكن نتأكّد من `ADD TABLE` في publication).
-
-## 3. توحيد "حفظ واستلام" على مسار واحد آمن
-
-`PurchaseCreatePage` عند `alsoReceive=true` يمرّ حالياً بمسار قديم (`addStockForLines` مباشرة + تحديث الحالة يدوياً). سنستبدله بـ:
-
-```ts
-// بعد INSERT/UPDATE للأمر:
-const { data } = await supabase.rpc("receive_purchase_stock_once", { _po_id: savedId });
-// data = { ok, reason } — إذا already_applied لا تعيد الإضافة
+```
+┌───────────────────────────────────────┐
+│  الإجمالي:                 12,000    │
+│  الخصم:                     −500     │  (إن > 0)
+│  ─────────────────────────────────    │
+│  الحساب السابق (عليه):     −5,000    │  (أحمر إن balance>0)
+│  رصيد سابق له:              +2,000    │  (أخضر إن credit>0)
+│  ─────────────────────────────────    │
+│  المتبقي على العميل:       −6,500    │  (أحمر بعلامة ناقص)
+│           أو                          │
+│  أُضيفت إلى حسابه:          +1,500    │  (أخضر بعلامة زائد)
+│           أو                          │
+│  مسددة بالكامل ✓                      │  (أخضر بدون رقم)
+└───────────────────────────────────────┘
 ```
 
-فوائد:
-- ذرّي على مستوى DB (`FOR UPDATE`).
-- يضبط `stock_applied_at + status='received'` معاً — استحالة أن يظهر أمر مستلَم بدون ختم.
-- نفس المسار للاستلام من زر "استلام" في `/purchase-orders` (زر يستدعي `receiveStockForPurchaseOnce` الذي بدوره يستخدم RPC — موجود).
+## القواعد التقنية
+- استخدم design tokens (`hsl(var(--destructive))` للأحمر، أضف `--success` لو غير موجود). لا ألوان hex ثابتة.
+- RTL و Cairo bold كما هو معتمد.
+- الحساب في helper نقي جديد `src/utils/documentBalanceSummary.ts` يعيد:
+  ```ts
+  { subtotal, discount, previousDebt, previousCredit, remaining, overpaid, isPaid }
+  ```
+- استعلم `customers.balance` و `credit_balance` واطرح متبقّي الفاتورة الحالية لتجنب الازدواج.
+- اختبار vitest للـ helper يغطي: مسددة/جزئية/زائدة/بلا عميل/بحساب سابق مدين/دائن.
 
-## 4. تسجيل دفعات الموردين
+---
 
-نستخدم جدول `transactions` الحالي (لا جدول جديد) بنفس نمط دفعات العملاء:
+## توزيع العمل على Sub-Agents (تنفيذ متوازٍ بعد المراجعة)
 
-| حقل | القيمة |
-|---|---|
-| `type` | `expense` |
-| `category` | `supplier_payment` |
-| `supplier_id` | معرّف المورد |
-| `reference_id` | معرّف أمر الشراء (اختياري — لدفعة على أمر محدد) |
-| `account_id` | الحساب الذي خرج منه المبلغ (نقد/بنك/محفظة) |
-| `method` | `cash`/`bank`/`card`/`mobile` — مع تحقّق `validateBankTransferPayment` عند البنك |
-| `amount`, `date`, `notes` | كالمعتاد |
+### 🤖 SUBAGENT #1 — Helper الحسابات + الاختبارات
+**مكان التنفيذ:**
+- إنشاء: `src/utils/documentBalanceSummary.ts`
+- إنشاء: `src/test/documentBalanceSummary.test.ts`
 
-**واجهة المستخدم:**
-- في `/purchase-orders`: زر "💳 تسجيل دفعة" على كل صف (يظهر فقط إذا `due_amount > 0`) → يفتح Dialog بسيط.
-- في `/suppliers`: زر "دفعة سريعة" يفتح نفس الـ Dialog بدون أمر محدد (دفعة على الرصيد العام).
-- بعد الحفظ: `recompute_supplier_balance(_supplier_id)` يعمل تلقائياً عبر `trg_po_recompute_supp_balance` — لكن الدفعات في `transactions` لا تحرّكه حالياً. **نضيف تريجر جديد** `trg_tx_recompute_supp_balance` مطابق لتريجر العميل.
+**المهمة:** كتابة دالة نقية `computeDocumentBalance({ grandTotal, discount, paidAmount, customerBalance, customerCreditBalance, currentInvoiceRemaining })` تُعيد الكائن أعلاه، مع 8+ حالات اختبار vitest.
 
-**تعديل `recompute_supplier_balance`** ليطرح `Σ(supplier_payment)` من إجمالي المتبقّي:
-```sql
-balance = Σ GREATEST(po.total - po.paid_amount, 0) - Σ(transactions.amount WHERE category='supplier_payment')
-```
-أو الأنظف: نُحدّث `purchase_orders.paid_amount` مباشرة عند الدفعة (كما نفعل مع الفواتير)، ونترك التريجر الحالي يعمل كما هو.
+---
 
-## 5. صفحة كشف حساب مورد `/reports/supplier-statement`
+### 🤖 SUBAGENT #2 — تحديث قالب الطباعة/المعاينة
+**مكان التنفيذ:**
+- تعديل: `src/utils/printTemplate.ts` (الأسطر ~1-50 لواجهة PrintData، ~338-410 لقسم الإجماليات).
 
-مطابقة تصميمياً لـ `CustomerStatementPage` لكن الاتجاه معكوس:
+**المهمة:**
+1. أضف إلى `PrintData` الحقول: `previousDebt?: number`, `previousCredit?: number`, `hidePaidBox?: boolean`.
+2. استبدل قسم `summary-row` (سطر 397-408): احذف صندوق "المبلغ المدفوع" عندما `hidePaidBox=true`.
+3. أضف صفوفًا جديدة داخل جدول totals بعد صف "الإجمالي":
+   - صف الخصم (شرطي).
+   - صف الحساب السابق مدين (أحمر).
+   - صف رصيد سابق دائن (أخضر).
+   - صف نهائي: المتبقي/الإضافة/المسددة بألوان مناسبة.
+4. استخدم CSS variables (`color: hsl(0 84% 60%)` مؤقتًا للطباعة لأن قالب الطباعة معزول عن Tailwind).
+5. حدّث `data-section` labels لتظل قابلة للإخفاء من شريط "تخصيص الرؤية".
 
-| العمود | المصدر |
-|---|---|
-| التاريخ | `po.date` أو `transaction.date` |
-| البيان | "أمر شراء #PO-XXXX" / "دفعة نقدية" / "تحويل بنكي" |
-| مدين (له علينا) | `po.total` (يزيد ما لدينا للمورد) |
-| دائن (دفعنا) | `transaction.amount` (يقلّل ما لدينا) |
-| الرصيد الجاري | تراكمي |
+---
 
-- فترة قابلة للاختيار (from/to).
-- إجماليات في الأسفل: إجمالي المشتريات، إجمالي المدفوع، الرصيد النهائي.
-- زر طباعة A4 RTL بنفس تصميم كشف العميل.
-- زر مشاركة WhatsApp (اختياري لاحقاً).
+### 🤖 SUBAGENT #3 — تمرير الرصيد السابق من صفحات المعاينة
+**مكان التنفيذ:**
+- تعديل: `src/pages/DocumentPreviewPage.tsx`
+- تعديل: `src/pages/InvoiceViewPage.tsx`
+- تعديل: `src/pages/QuoteViewPage.tsx`
 
-## 6. التحقق (بعد التنفيذ)
+**المهمة:**
+1. قبل استدعاء `generatePrintHTML`، جِب `customers.balance` و `credit_balance` للعميل.
+2. اطرح `max(total - paid, 0)` للفاتورة الحالية من `balance` لتجنب العدّ المزدوج.
+3. مرّر `previousDebt`, `previousCredit`, و `hidePaidBox: true` (للمعاينة فقط).
+4. تأكد من أن فاتورة الكاش (بدون عميل) تمرّر أصفارًا ولا تعرض السطور.
 
-- فتح `/purchase-orders` → **يظهر PO-48438 لأمجد فوراً**.
-- إنشاء أمر شراء جديد + "حفظ واستلام" → يظهر في القائمة والمخزون ويُختم `stock_applied_at`.
-- تسجيل دفعة 500,000 على PO-48438 → `paid_amount=500,000`، `due_amount=564,000`، ورصيد المورد يعكس ذلك.
-- فتح `/reports/supplier-statement?supplier=717c98…` → يعرض الأمر + الدفعة + الرصيد.
+---
 
-## ملاحظات تقنية
+### 🤖 SUBAGENT #4 — التحقق البصري والانحدار
+**مكان التنفيذ:** Playwright في `/tmp/browser/`
 
-- **الهجرة (Migration واحدة):**
-  1. `UPDATE purchase_orders SET stock_applied_at = COALESCE(stock_applied_at, updated_at) WHERE status='received' AND stock_applied_at IS NULL` — backfill.
-  2. إضافة `trg_tx_recompute_supp_balance` على `transactions` بحيث كل INSERT/UPDATE/DELETE بفئة `supplier_payment` يستدعي `recompute_supplier_balance(NEW.supplier_id)`.
-  3. تعديل `recompute_supplier_balance` ليخصم دفعات الموردين من الرصيد (أو الاعتماد على تحديث `paid_amount` مباشرة — أختار النهج الثاني الأنظف).
-- **ملفات جديدة:**
-  - `src/components/purchase/SupplierPaymentDialog.tsx`
-  - `src/pages/SupplierStatementPage.tsx`
-  - `src/utils/supplierStatementPrint.ts` (نسخة معدّلة من `statementPrintTemplate.ts`)
-- **ملفات معدّلة:**
-  - `src/App.tsx` — إضافة كاش overrides + مسار الصفحة الجديدة.
-  - `src/pages/PurchasePage.tsx` — زر "تسجيل دفعة" + refetchOnMount:"always" على الاستعلام.
-  - `src/pages/PurchaseCreatePage.tsx` — استبدال مسار `alsoReceive` بـ RPC.
-  - `src/pages/SuppliersPage.tsx` — زر "دفعة سريعة" + رابط "كشف حساب".
-  - `src/lib/realtimeSync.ts` — تأكيد `purchase_orders` ضمن العائلات النشطة.
+**المهمة:**
+1. سجّل الدخول (session مُحقن)، افتح 3 معاينات: فاتورة عادية لعميل مديون، فاتورة كاش، عرض سعر.
+2. التقط لقطات وتحقق:
+   - عدم ظهور "المبلغ المدفوع".
+   - ظهور صف الخصم فقط عند وجوده.
+   - ظهور صفوف الرصيد السابق باللون الصحيح.
+   - ظهور "المتبقي" بأحمر أو "أضيفت لحسابه" بأخضر.
+3. شغّل `bunx vitest run documentBalanceSummary printTemplate` وتأكد نجاح الاختبارات.
 
-## خطة التنفيذ (ثلاث دفعات)
+---
 
-1. **الآن (إصلاح ظهور أمر أمجد):** كاش overrides + backfill `stock_applied_at` + refetchOnMount على PurchasePage.
-2. **الدفعة الثانية:** توحيد "حفظ واستلام" على RPC + Dialog دفعات المورد + تريجر `trg_tx_recompute_supp_balance`.
-3. **الدفعة الثالثة:** صفحة `SupplierStatementPage` كاملة مع الطباعة.
+## الترتيب
+- SUBAGENT #1 يبدأ أولًا (يحدّد العقد).
+- #2 و #3 يتوازيان بعد #1.
+- #4 بعد اكتمال #2 و #3.
 
-هل أبدأ بالدفعة الأولى؟
+## تحسينات مقترحة لاحقة (لن تُنفّذ الآن)
+- زر "سجّل دفعة" مباشرة من المعاينة.
+- QR code بمبلغ المتبقي لتسهيل التحصيل.
+- Badge ملوّن بدل نص للحالة النهائية.
+- سطر إضافي "إجمالي مديونية العميل بعد هذه الفاتورة".
