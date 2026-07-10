@@ -106,6 +106,9 @@ export default function ImageCropDialog({
   const [aspectKey, setAspectKey] = useState<AspectPreset>(defaultAspect);
   const [areaPixels, setAreaPixels] = useState<Area | null>(null);
   const [busy, setBusy] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewTimer = useRef<number | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open || !file) return;
@@ -115,26 +118,48 @@ export default function ImageCropDialog({
     setZoom(1);
     setRotation(0);
     setAspectKey(defaultAspect);
+    setPreviewUrl(null);
     return () => URL.revokeObjectURL(url);
   }, [open, file, defaultAspect]);
 
-  const onCropComplete = useCallback((_: Area, pixels: Area) => {
-    setAreaPixels(pixels);
+  // نظّف رابط المعاينة عند الإغلاق
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
   }, []);
+
+  const regeneratePreview = useCallback(
+    async (pixels: Area) => {
+      if (!src || !file) return;
+      try {
+        const blob = await cropToBlob(src, pixels, rotation, file.type || "image/jpeg", 220);
+        const url = URL.createObjectURL(blob);
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = url;
+        setPreviewUrl(url);
+      } catch {
+        /* تجاهل — المعاينة اختيارية */
+      }
+    },
+    [src, file, rotation],
+  );
+
+  const onCropComplete = useCallback(
+    (_: Area, pixels: Area) => {
+      setAreaPixels(pixels);
+      if (previewTimer.current) window.clearTimeout(previewTimer.current);
+      previewTimer.current = window.setTimeout(() => regeneratePreview(pixels), 180);
+    },
+    [regeneratePreview],
+  );
 
   const handleConfirm = async () => {
     if (!src || !areaPixels || !file) return;
     setBusy(true);
     try {
       const blob = await cropToBlob(src, areaPixels, rotation, file.type || "image/jpeg");
-      const isPng = (file.type || "").includes("png");
-      const ext = isPng ? "png" : "jpg";
-      const base = (file.name || "image").replace(/\.[^.]+$/, "");
-      const cropped = new File([blob], `${base}-cropped.${ext}`, {
-        type: isPng ? "image/png" : "image/jpeg",
-        lastModified: Date.now(),
-      });
-      onConfirm(cropped);
+      onConfirm(buildCroppedFile(blob, file));
     } catch (e) {
       console.error(e);
     } finally {
