@@ -5,6 +5,9 @@ import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 import { loadInvoiceExtras, loadQuoteExtras } from "@/utils/printExtras";
 import { ArrowRight, Loader2, Wallet } from "lucide-react";
 import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
+import DiscountInput from "@/components/shared/DiscountInput";
+import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
+import { toast } from "sonner";
 
 /**
  * صفحة معاينة داخلية للمستندات (عرض سعر / فاتورة).
@@ -34,10 +37,11 @@ export default function DocumentPreviewPage({ docType }: Props) {
   const [stocktakeSort, setStocktakeSort] = useState<"default" | "name-asc" | "name-desc" | "qty-desc" | "qty-asc">("default");
   const [payOpen, setPayOpen] = useState(false);
   const [invMeta, setInvMeta] = useState<{
-    id: string; number: string; total: number; paidAmount: number;
+    id: string; number: string; total: number; subtotal: number; discount: number; paidAmount: number;
     customerId: string | null; customerName: string | null; isPos: boolean;
   } | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [savingDisc, setSavingDisc] = useState(false);
   const itemsSort = stocktakeSort;
 
   const variant = (search.get("variant") || "full") as
