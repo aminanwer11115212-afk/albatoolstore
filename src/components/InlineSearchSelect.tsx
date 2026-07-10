@@ -345,8 +345,10 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
                         title="حذف"
                         onClick={async (e) => {
                           e.stopPropagation();
-                          const msg = deleteConfirm ? deleteConfirm(o) : `حذف "${o.label}"؟`;
-                          if (!window.confirm(msg)) return;
+                          if (!skipDeleteConfirm) {
+                            const msg = deleteConfirm ? deleteConfirm(o) : `حذف "${o.label}"؟`;
+                            if (!window.confirm(msg)) return;
+                          }
                           const ok = await onDelete(o);
                           if (ok && o.value === value) onChange("");
                         }}
