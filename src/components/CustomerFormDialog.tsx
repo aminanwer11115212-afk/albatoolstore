@@ -458,6 +458,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                   onAdd={addRegion}
                   onDelete={async (o) => await removeRegion(o.value)}
                   onRename={async (o, n) => await renameRegion(o.value, n)}
+                  onNavigateNext={() => focusAt(k + 1)}
                   placeholder="— اختر أو اكتب —"
                   addLabel="إضافة اتجاه"
                   className="bg-transparent border-0 outline-none px-3 text-sm w-full h-full text-right truncate"
