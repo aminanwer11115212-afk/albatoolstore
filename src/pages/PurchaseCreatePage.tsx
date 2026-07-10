@@ -577,20 +577,6 @@ export default function PurchaseCreatePage() {
       let savedId = treatAsEdit ? orderId : null;
       let savedNumber = orderNumber;
 
-      const payload: any = {
-        supplier_id: supplierId,
-        warehouse_id: warehouseId || null,
-        date: purchaseDate,
-        expected_delivery_date: expectedDate || null,
-        supplier_invoice_number: supplierInvoiceNumber || null,
-        subtotal: totals.subtotal,
-        discount: totals.discountTotal,
-        total: totals.grandTotal,
-        notes,
-        user_note: userNote,
-        status: alsoReceive ? "received" : status,
-      };
-
       // Snapshot existing state BEFORE mutating, so we can compute stock deltas correctly.
       let prevStatusInDb: string | null = null;
       let prevItems: Array<{ product_id: string | null; quantity: number }> = [];
@@ -603,7 +589,29 @@ export default function PurchaseCreatePage() {
         prevItems = (prevItemsRows || []).map((r: any) => ({
           product_id: r.product_id, quantity: Number(r.quantity || 0),
         }));
+      }
 
+      // ملاحظة أمان: لو كنّا سنستلم البضاعة لأول مرة، احفظ الحالة كـ "pending" مؤقتاً.
+      // نُحدّثها إلى "received" فقط بعد نجاح addStockForLines، حتى لا يتسبّب
+      // فشل الشبكة في بقاء الحالة "received" بلا زيادة مخزون (سيؤدي ذلك إلى
+      // مسار delta في الحفظ التالي ولن يُعوَّض الفارق أبداً).
+      const persistedStatus =
+        alsoReceive ? (prevStatusInDb === "received" ? "received" : "pending") : status;
+      const payload: any = {
+        supplier_id: supplierId,
+        warehouse_id: warehouseId || null,
+        date: purchaseDate,
+        expected_delivery_date: expectedDate || null,
+        supplier_invoice_number: supplierInvoiceNumber || null,
+        subtotal: totals.subtotal,
+        discount: totals.discountTotal,
+        total: totals.grandTotal,
+        notes,
+        user_note: userNote,
+        status: persistedStatus,
+      };
+
+      if (savedId) {
         const { error } = await (supabase as any).from("purchase_orders").update(payload).eq("id", savedId);
         if (error) throw error;
         await supabase.from("purchase_order_items").delete().eq("purchase_order_id", savedId);
@@ -674,31 +682,39 @@ export default function PurchaseCreatePage() {
       if (itemsErr) throw itemsErr;
 
       // ── Stock sync ───────────────────────────────────────────────────────
-      // Three cases:
-      //  A) was NOT completed and now becoming completed → add all new lines (once).
-      //  B) was already completed and still completed (edit) → apply delta old vs new.
-      //  C) creating brand new with alsoReceive → add all lines (no prior state).
-      // Update purchase_price on the products as a side-effect of receiving.
+      // A) لم يكن مستلَماً ← يصبح مستلَماً: أضف الكميات ثم اقلب الحالة إلى "received".
+      // B) مستلَم بالفعل ويُعدَّل: طبّق الفارق (delta) بين القديم والجديد.
+      // C) إنشاء جديد مع alsoReceive: يمرّ عبر (A) لأن prevStatusInDb لن يكون "received".
       const newStatus = alsoReceive ? "received" : status;
       const wasCompleted = prevStatusInDb === "received";
       const isNowCompleted = newStatus === "received";
 
+      const updatePurchasePrices = async () => {
+        // توازي التحديثات بدل التسلسل — أسرع بكثير للأوامر الكبيرة.
+        await Promise.all(
+          valid
+            .filter((it) => it.product_id)
+            .map((it) =>
+              supabase.from("products").update({ purchase_price: it.unit_price }).eq("id", it.product_id!),
+            ),
+        );
+      };
+
       if (isNowCompleted && !wasCompleted) {
-        // Case A or C — first time receiving
+        // A/C — استلام لأول مرة: أضف المخزون أولاً، وحدّث الحالة إلى "received" بعد النجاح.
         await addStockForLines(valid);
-        for (const it of valid) {
-          if (!it.product_id) continue;
-          await supabase.from("products").update({ purchase_price: it.unit_price }).eq("id", it.product_id);
-        }
+        const { error: statusErr } = await (supabase as any)
+          .from("purchase_orders")
+          .update({ status: "received" })
+          .eq("id", savedId);
+        if (statusErr) throw statusErr;
+        await updatePurchasePrices();
         if (alsoReceive) setStatus("received");
         toast.success("تم استلام البضاعة وتحديث المخزون");
       } else if (isNowCompleted && wasCompleted) {
-        // Case B — edit of received order: apply delta
+        // B — تعديل أمر مستلَم: طبّق الفارق فقط.
         await applyStockDeltaForPurchaseLines(prevItems, valid);
-        for (const it of valid) {
-          if (!it.product_id) continue;
-          await supabase.from("products").update({ purchase_price: it.unit_price }).eq("id", it.product_id);
-        }
+        await updatePurchasePrices();
         toast.success(isEdit ? "تم تحديث أمر الشراء والمخزون" : "تم الحفظ");
       } else {
         toast.success(isEdit ? "تم تحديث أمر الشراء" : "تم إنشاء أمر الشراء");

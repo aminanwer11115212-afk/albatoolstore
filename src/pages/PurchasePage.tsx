@@ -8,7 +8,7 @@ import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { StatusChip } from "@/components/ui/status-chip";
-import { receiveStockForPurchaseOnce } from "@/utils/stockReceive";
+import { receiveStockForPurchaseOnce, restoreStockForPurchaseOnce } from "@/utils/stockReceive";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
 
@@ -121,22 +121,19 @@ export default function PurchasePage() {
           }
         : undefined,
       onConfirm: async ({ extraChecked }) => {
+        // 1) استرداد المخزون بحارس idempotency — يقلب الحالة إلى "cancelled" أولاً
+        //    ثم يخصم؛ الفشل هنا يُوقف الحذف قبل حدوث أي تلف.
         if (willRestore) {
           const { data: items } = await supabase
             .from("purchase_order_items")
             .select("product_id, quantity")
             .eq("purchase_order_id", id);
-          if (items && items.length > 0) {
-            await Promise.all(
-              (items as any[])
-                .filter((it) => it.product_id)
-                .map((it) =>
-                  (supabase as any).rpc("decrement_product_stock", {
-                    _product_id: it.product_id,
-                    _qty: Number(it.quantity || 0),
-                  }),
-                ),
-            );
+          const lines = ((items || []) as any[])
+            .filter((it) => it.product_id)
+            .map((it) => ({ product_id: it.product_id, quantity: Number(it.quantity || 0) }));
+          const res = await restoreStockForPurchaseOnce(id, lines);
+          if (!res.restored && res.reason !== "not_received" && res.reason !== "already_cancelled") {
+            throw new Error("تعذّر إرجاع المخزون — لم يُحذف الأمر");
           }
         }
         await supabase.from("purchase_order_items").delete().eq("purchase_order_id", id);
