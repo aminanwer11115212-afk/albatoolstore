@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, X, FileText, Wallet } from "lucide-react";
 import { useSuppliers } from "@/hooks/useData";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SupplierDetailView from "@/components/SupplierDetailView";
 import { startsWithAny } from "@/utils/searchMatch";
+import SupplierPaymentDialog from "@/components/purchase/SupplierPaymentDialog";
 const emptyForm = { name: "", phone: "", email: "", address: "", company: "", notes: "", balance: "" };
 
 export default function SuppliersPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -15,6 +18,7 @@ export default function SuppliersPage() {
   const [form, setForm] = useState(emptyForm);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [payFor, setPayFor] = useState<any | null>(null);
   const { data: suppliers, isLoading, insert, update, remove } = useSuppliers();
 
   const filtered = (suppliers || []).filter((s: any) =>
