@@ -268,6 +268,7 @@ export default function PurchasePage() {
   const fmtMoney = (n: any) => Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
+    <>
     <article className="content purchases-compact">
       <style>{`
         .purchases-compact { font-size: 11px; }
