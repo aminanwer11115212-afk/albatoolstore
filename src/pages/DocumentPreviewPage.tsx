@@ -3,7 +3,8 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 import { loadInvoiceExtras, loadQuoteExtras } from "@/utils/printExtras";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Wallet } from "lucide-react";
+import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 
 /**
  * صفحة معاينة داخلية للمستندات (عرض سعر / فاتورة).
@@ -31,7 +32,12 @@ export default function DocumentPreviewPage({ docType }: Props) {
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [stocktakeSort, setStocktakeSort] = useState<"default" | "name-asc" | "name-desc" | "qty-desc" | "qty-asc">("default");
-  // alias لإيضاح أنّه يعمل لجميع أنواع المعاينة وليس كشف الجرد فقط
+  const [payOpen, setPayOpen] = useState(false);
+  const [invMeta, setInvMeta] = useState<{
+    id: string; number: string; total: number; paidAmount: number;
+    customerId: string | null; customerName: string | null; isPos: boolean;
+  } | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const itemsSort = stocktakeSort;
 
   const variant = (search.get("variant") || "full") as
@@ -165,6 +171,15 @@ export default function DocumentPreviewPage({ docType }: Props) {
             hidePaidBox: true,
             ...extras,
           });
+          setInvMeta({
+            id: invoice.id,
+            number: invoice.invoice_number,
+            total: Number(invoice.total || 0),
+            paidAmount: Number(invoice.paid_amount || 0),
+            customerId: iCust?.id || (invoice as any).customer_id || null,
+            customerName: iCust?.name || (invoice as any).walk_in_customer_name || null,
+            isPos: (invoice as any).source === "pos" || invoice.type === "cash",
+          });
         } else if (docType === "purchase") {
           // ===== أمر شراء =====
           const { data: order, error: oErr } = await (supabase as any)
@@ -264,7 +279,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [id, docType, variant, noHeader, stocktakeSort]);
+  }, [id, docType, variant, noHeader, stocktakeSort, reloadTick]);
 
   // استقبال رسالة "إغلاق" من زر ✕ داخل الـiframe → رجوع
   useEffect(() => {
@@ -340,6 +355,16 @@ export default function DocumentPreviewPage({ docType }: Props) {
         </button>
         <div className="text-sm font-bold text-foreground">{title}</div>
         <div className="ms-auto flex items-center gap-2">
+          {docType === "invoice" && invMeta && invMeta.total - invMeta.paidAmount > 0.01 && (
+            <button
+              type="button"
+              onClick={() => setPayOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+              title="تسجيل دفعة من العميل على هذه الفاتورة"
+            >
+              <Wallet size={16} /> سجّل دفعة
+            </button>
+          )}
           <label className="text-xs text-muted-foreground">ترتيب البنود:</label>
           <select
             value={stocktakeSort}
@@ -355,6 +380,21 @@ export default function DocumentPreviewPage({ docType }: Props) {
           </select>
         </div>
       </div>
+
+      {invMeta && (
+        <CustomerPaymentDialog
+          open={payOpen}
+          onOpenChange={setPayOpen}
+          invoiceId={invMeta.id}
+          invoiceNumber={invMeta.number}
+          customerId={invMeta.customerId}
+          customerName={invMeta.customerName}
+          total={invMeta.total}
+          paidBefore={invMeta.paidAmount}
+          isPos={invMeta.isPos}
+          onSaved={() => setReloadTick((t) => t + 1)}
+        />
+      )}
 
       {loading && (
         <div className="flex-1 flex items-center justify-center text-muted-foreground gap-2">
