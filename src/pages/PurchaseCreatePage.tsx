@@ -555,7 +555,10 @@ export default function PurchaseCreatePage() {
     if (valid.length === 0) { toast.error("أضف منتج واحد على الأقل"); return; }
 
     // حارس متزامن: يمنع الإدراج المضاعف عند الضغط المتكرر على زر الحفظ
-    if (isSavingRef.current) return;
+    if (isSavingRef.current) {
+      toast.info("يتم حفظ الأمر بالفعل — انتظر لحظة", { id: "po-save-inflight" });
+      return;
+    }
     isSavingRef.current = true;
 
     // ميزة موحّدة "تحديث بدل التكرار" — إذا سبق الحفظ في هذه الجلسة ولم يتغيّر المورد
