@@ -282,7 +282,7 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
                     multiple
                     accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
                     disabled={uploading}
-                    onChange={(e) => handleUpload(e.target.files)}
+                    onChange={(e) => { onFilesSelected(e.target.files); e.target.value = ""; }}
                     className="hidden"
                   />
                 </label>
@@ -297,7 +297,7 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
                     capture="environment"
                     multiple
                     disabled={uploading}
-                    onChange={(e) => handleUpload(e.target.files)}
+                    onChange={(e) => { onFilesSelected(e.target.files); e.target.value = ""; }}
                     className="hidden"
                   />
                 </label>
