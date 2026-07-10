@@ -198,6 +198,9 @@ const queryClient = new QueryClient({
   ["suppliers"],
   ["products"],
   ["products-with-details"],
+  ["purchase-orders"],
+  ["purchase-orders-full"],
+  ["purchase-order-items"],
 ].forEach((key) => {
   queryClient.setQueryDefaults(key, {
     staleTime: 30_000,
