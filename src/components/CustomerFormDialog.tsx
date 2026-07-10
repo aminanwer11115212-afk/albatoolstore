@@ -581,6 +581,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
                 onChange={(v) => setForm({ ...form, preferred_transporter_id: v || null })}
                 onAdd={addTransporter}
                 onDelete={async (o) => await removeTransporter(o.value)}
+                onRename={async (o, n) => await renameTransporter(o.value, n)}
                 onNavigateNext={() => focusAt(k + 1)}
                 placeholder="— بدون —"
                 addLabel="إضافة ترحيل"
