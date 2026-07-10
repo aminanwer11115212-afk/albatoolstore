@@ -52,6 +52,7 @@ import type { ParsedLine } from "@/hooks/useMessageImport";
 import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { CustomerInfoStrip } from "@/utils/balanceDisplay";
+import DiscountInput from "@/components/shared/DiscountInput";
 
 /**
  * تنقّل بالـ Arrow keys / Enter / Tab بين الحقول.

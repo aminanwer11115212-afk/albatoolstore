@@ -62,6 +62,7 @@ import { splitPayment } from "@/utils/overpayment";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { CustomerInfoStrip } from "@/utils/balanceDisplay";
 import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
+import DiscountInput from "@/components/shared/DiscountInput";
 import { useInvoiceKeyboardNav } from "@/hooks/document/useInvoiceKeyboardNav";
 import {
   type Customer,
