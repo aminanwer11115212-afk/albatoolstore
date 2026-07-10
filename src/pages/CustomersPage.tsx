@@ -105,7 +105,7 @@ export default function CustomersPage() {
   const [filterDestination, setFilterDestination] = useState("");
 
   const [filterActivity, setFilterActivity] = useState<ActivityFilter>("all");
-  const [sortBy, setSortBy] = useState<"name" | "recent" | "balance">("name");
+  const [sortBy, setSortBy] = useState<"name" | "recent" | "balance_desc" | "balance_asc" | "credit_desc" | "credit_asc">("name");
   const [openFilter, setOpenFilter] = useState<{ key: string; mode: "list" | "search" } | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
   const [filterHighlight, setFilterHighlight] = useState(0);
