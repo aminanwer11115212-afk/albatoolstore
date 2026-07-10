@@ -355,6 +355,16 @@ export default function DocumentPreviewPage({ docType }: Props) {
         </button>
         <div className="text-sm font-bold text-foreground">{title}</div>
         <div className="ms-auto flex items-center gap-2">
+          {docType === "invoice" && invMeta && invMeta.total - invMeta.paidAmount > 0.01 && (
+            <button
+              type="button"
+              onClick={() => setPayOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+              title="تسجيل دفعة من العميل على هذه الفاتورة"
+            >
+              <Wallet size={16} /> سجّل دفعة
+            </button>
+          )}
           <label className="text-xs text-muted-foreground">ترتيب البنود:</label>
           <select
             value={stocktakeSort}
@@ -370,6 +380,21 @@ export default function DocumentPreviewPage({ docType }: Props) {
           </select>
         </div>
       </div>
+
+      {invMeta && (
+        <CustomerPaymentDialog
+          open={payOpen}
+          onOpenChange={setPayOpen}
+          invoiceId={invMeta.id}
+          invoiceNumber={invMeta.number}
+          customerId={invMeta.customerId}
+          customerName={invMeta.customerName}
+          total={invMeta.total}
+          paidBefore={invMeta.paidAmount}
+          isPos={invMeta.isPos}
+          onSaved={() => setReloadTick((t) => t + 1)}
+        />
+      )}
 
       {loading && (
         <div className="flex-1 flex items-center justify-center text-muted-foreground gap-2">
