@@ -29,6 +29,9 @@ function usePurchaseOrdersFullList() {
       if (error) throw error;
       return data;
     },
+    staleTime: 15_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }
 
