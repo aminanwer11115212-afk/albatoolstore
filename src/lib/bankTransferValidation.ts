@@ -67,6 +67,17 @@ export function filterAccountsForPayment(
 }
 
 /**
+ * Alias مُصدَّر لتوافق واجهات قديمة قد تستدعي `filterAllowedBankAccounts`.
+ * يفلتر لطريقة "bank" افتراضيًا (يمكن تمرير method لتخصيصه).
+ */
+export function filterAllowedBankAccounts(
+  accounts: BankAccountLike[] | null | undefined,
+  method: string | null | undefined = "bank",
+): BankAccountLike[] {
+  return filterAccountsForPayment(accounts, method);
+}
+
+/**
  * تحقق نهائي قبل حفظ دفعة بطريقة التحويل البنكي.
  * @returns null عند النجاح، وإلا رسالة خطأ بالعربية.
  */
