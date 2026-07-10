@@ -121,6 +121,8 @@ export default function CustomerPaymentDialog({
     try {
       // 1) تسجيل transaction (إن كان هناك مبلغ فعلي) — نتجاوزها لفواتير POS بلا عميل
       if (n > 0) {
+        const baseNote = notes || (invoiceNumber ? `دفعة على الفاتورة ${invoiceNumber}` : "دفعة من العميل");
+        const description = referenceNo ? `${baseNote} — مرجع: ${referenceNo}` : baseNote;
         const txPayload: any = {
           type: "income",
           category: "customer_payment",
@@ -129,9 +131,8 @@ export default function CustomerPaymentDialog({
           amount: n,
           date,
           method,
-          reference_no: referenceNo || null,
           reference_id: invoiceId,
-          notes: notes || (invoiceNumber ? `دفعة على الفاتورة ${invoiceNumber}` : "دفعة من العميل"),
+          description,
         };
         const { error: txErr } = await (supabase as any).from("transactions").insert(txPayload);
         if (txErr) throw txErr;
