@@ -101,6 +101,7 @@ export default function ImageCropDialog({
   lockAspect = false,
   title = "قص الصورة",
 }: ImageCropDialogProps) {
+  const isMobile = useIsMobile();
   const [src, setSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
