@@ -607,6 +607,36 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
           </button>
         </DialogFooter>
       </DialogContent>
+
+      {delReq && (
+        <DeleteGeoDialog
+          open={!!delReq}
+          onOpenChange={(v) => !v && setDelReq(null)}
+          entityLabel={kindLabel(delReq.kind)}
+          entityName={delReq.name}
+          customers={delReq.customers}
+          children={delReq.children}
+          childrenLabel={delReq.childrenLabel}
+          allowCascade={delReq.allowCascade}
+          onDeleteOnly={async () => {
+            const ok = await deleteGeoOnly(delReq.kind, delReq.id);
+            if (ok) {
+              stripFromLocalState(delReq.kind, delReq.id);
+              toast.success(`تم حذف ${kindLabel(delReq.kind)} وفكّ ربطه عن العملاء`);
+              queryClient.invalidateQueries({ queryKey: ["customers"] });
+            }
+            return ok;
+          }}
+          onDeleteCascade={delReq.allowCascade ? async () => {
+            const ok = await deleteGeoCascade(delReq.kind, delReq.id);
+            if (ok) {
+              stripFromLocalState(delReq.kind, delReq.id);
+              queryClient.invalidateQueries({ queryKey: ["customers"] });
+            }
+            return ok;
+          } : undefined}
+        />
+      )}
     </Dialog>
   );
 }
