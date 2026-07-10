@@ -177,6 +177,30 @@ export default function ImageCropDialog({
     { key: "free", label: "حر", icon: Maximize2 },
   ];
 
+  // Mobile fullscreen cropper (touch-optimized)
+  if (open && isMobile && src && file) {
+    return (
+      <MobileImageCropper
+        imageUrl={src}
+        title={title}
+        onSave={async (dataUrl) => {
+          if (!dataUrl) {
+            onCancel();
+            return;
+          }
+          try {
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            onConfirm(buildCroppedFile(blob, file));
+          } catch (e) {
+            console.error(e);
+            onCancel();
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
       <DialogContent className="max-w-[min(720px,96vw)] p-0 overflow-hidden">
