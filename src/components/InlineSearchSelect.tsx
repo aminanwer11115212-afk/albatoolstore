@@ -17,6 +17,7 @@ interface Props {
   onChange: (v: string) => void;
   onAdd?: (name: string) => Promise<string | null>;
   onDelete?: (opt: InlineOption) => Promise<boolean> | boolean;
+  onRename?: (opt: InlineOption, newName: string) => Promise<boolean> | boolean;
   deleteConfirm?: (opt: InlineOption) => string;
   placeholder?: string;
   disabled?: boolean;
@@ -34,7 +35,7 @@ interface Props {
 }
 
 const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function InlineSearchSelect({
-  value, options, onChange, onAdd, onDelete, deleteConfirm, placeholder = "—",
+  value, options, onChange, onAdd, onDelete, onRename, deleteConfirm, placeholder = "—",
   disabled, className, title, addLabel, onNavigateNext, selectAllOnEnter, onSelectAll, showDeleteButton,
 }, ref) {
   const [open, setOpen] = useState(false);
@@ -306,7 +307,8 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
               )}
               {filtered.map((o, i) => {
                 const idx = canAdd ? i + 1 : i;
-                const canDelete = showDeleteButton || (onDelete && o.value === value);
+                const canDelete = !!onDelete && (showDeleteButton || onDelete);
+                const canRename = !!onRename;
                 return (
                   <div
                     key={o.value}
@@ -320,6 +322,23 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
                     >
                       {o.label}
                     </button>
+                    {canRename && onRename && (
+                      <button
+                        type="button"
+                        title="تعديل الاسم"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const next = window.prompt(`تعديل اسم "${o.label}"`, o.label);
+                          if (next == null) return;
+                          const trimmed = next.trim();
+                          if (!trimmed || trimmed === o.label) return;
+                          await onRename(o, trimmed);
+                        }}
+                        className="px-2 py-2.5 text-sm text-muted-foreground hover:text-primary hover:bg-primary/10"
+                      >
+                        ✎
+                      </button>
+                    )}
                     {canDelete && onDelete && (
                       <button
                         type="button"

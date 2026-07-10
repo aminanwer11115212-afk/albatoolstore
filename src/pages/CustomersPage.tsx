@@ -105,7 +105,7 @@ export default function CustomersPage() {
   const [filterDestination, setFilterDestination] = useState("");
 
   const [filterActivity, setFilterActivity] = useState<ActivityFilter>("all");
-  const [sortBy, setSortBy] = useState<"name" | "recent" | "balance">("name");
+  const [sortBy, setSortBy] = useState<"name" | "recent" | "balance_desc" | "balance_asc" | "credit_desc" | "credit_asc">("name");
   const [openFilter, setOpenFilter] = useState<{ key: string; mode: "list" | "search" } | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
   const [filterHighlight, setFilterHighlight] = useState(0);
@@ -273,7 +273,10 @@ export default function CustomersPage() {
   const sortedFiltered = useMemo(() => {
     const arr = [...filtered];
     if (sortBy === "recent") arr.sort((a, b) => (lastActivity[b.id] || "").localeCompare(lastActivity[a.id] || ""));
-    else if (sortBy === "balance") arr.sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0));
+    else if (sortBy === "balance_desc") arr.sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0));
+    else if (sortBy === "balance_asc")  arr.sort((a, b) => Number(a.balance || 0) - Number(b.balance || 0));
+    else if (sortBy === "credit_desc")  arr.sort((a, b) => Number(b.credit_balance || 0) - Number(a.credit_balance || 0));
+    else if (sortBy === "credit_asc")   arr.sort((a, b) => Number(a.credit_balance || 0) - Number(b.credit_balance || 0));
     else arr.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     return arr;
   }, [filtered, sortBy, lastActivity]);
@@ -826,6 +829,28 @@ export default function CustomersPage() {
             type="button"
             onClick={() => { setFilterActivity(s.v); setPage(1); }}
             className={`px-3 py-1 rounded-full text-xs font-medium border transition ${filterActivity === s.v ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* شريط الترتيب حسب المديونية */}
+      <div className="flex flex-wrap items-center gap-2" dir="rtl">
+        <span className="text-xs text-muted-foreground">ترتيب:</span>
+        {([
+          { v: "name",         label: "الاسم" },
+          { v: "recent",       label: "الأحدث نشاطاً" },
+          { v: "balance_desc", label: "الأعلى مديونية (عليه)" },
+          { v: "balance_asc",  label: "الأقل مديونية (عليه)" },
+          { v: "credit_desc",  label: "الأعلى سلفة (له)" },
+          { v: "credit_asc",   label: "الأقل سلفة (له)" },
+        ] as { v: typeof sortBy; label: string }[]).map(s => (
+          <button
+            key={s.v}
+            type="button"
+            onClick={() => { setSortBy(s.v); setPage(1); }}
+            className={`px-3 py-1 rounded-full text-[11px] font-medium border transition ${sortBy === s.v ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
           >
             {s.label}
           </button>
