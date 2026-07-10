@@ -194,8 +194,73 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     });
     return false; // الحوار سيتولّى؛ لا تُغلق popover
   };
+  // ── دوال إضافة (add) لكل قائمة ──
+  const addState = async (name: string): Promise<string | null> => {
+    if (!form.region_id) { toast.error("اختر الاتجاه أولاً"); return null; }
+    const { data, error } = await (supabase as any).from("states")
+      .insert({ name: name.trim(), region_id: form.region_id }).select("id,name,region_id").single();
+    if (error) { toast.error(error.message); return null; }
+    setStates(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    setForm(f => ({ ...f, state_id: data.id, city_id: null, locality_id: null }));
+    toast.success(`تمت إضافة الولاية: ${data.name}`);
+    return data.id;
+  };
+  const addCity = async (name: string): Promise<string | null> => {
+    if (!form.state_id) { toast.error("اختر الولاية أولاً"); return null; }
+    const { data, error } = await (supabase as any).from("cities")
+      .insert({ name: name.trim(), state_id: form.state_id }).select("id,name,state_id").single();
+    if (error) { toast.error(error.message); return null; }
+    setCities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    setForm(f => ({ ...f, city_id: data.id, locality_id: null }));
+    toast.success(`تمت إضافة المدينة: ${data.name}`);
+    return data.id;
+  };
+  const addLocality = async (name: string): Promise<string | null> => {
+    if (!form.city_id) { toast.error("اختر المدينة أولاً"); return null; }
+    const { data, error } = await (supabase as any).from("localities")
+      .insert({ name: name.trim(), city_id: form.city_id }).select("id,name,city_id").single();
+    if (error) { toast.error(error.message); return null; }
+    setLocalities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    setForm(f => ({ ...f, locality_id: data.id }));
+    toast.success(`تمت إضافة المحلية: ${data.name}`);
+    return data.id;
+  };
+  const addTransporter = async (name: string): Promise<string | null> => {
+    const { data, error } = await (supabase as any).from("transporters")
+      .insert({ name: name.trim() }).select("id,name").single();
+    if (error) { toast.error(error.message); return null; }
+    setTransporters(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    setForm(f => ({ ...f, preferred_transporter_id: data.id }));
+    toast.success(`تمت إضافة الترحيل: ${data.name}`);
+    return data.id;
+  };
+  const addGroup = async (name: string): Promise<string | null> => {
+    const { data, error } = await supabase.from("customer_groups")
+      .insert({ name: name.trim() }).select("id,name").single();
+    if (error) { toast.error(error.message); return null; }
+    setGroups(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    setForm(f => ({ ...f, group_id: data.id }));
+    toast.success(`تمت إضافة المجموعة: ${data.name}`);
+    return data.id;
+  };
+  const addDestination = async (name: string): Promise<string | null> => {
+    const { data, error } = await (supabase as any).from("destinations")
+      .insert({ name: name.trim() }).select("id,name").single();
+    if (error) { toast.error(error.message); return null; }
+    setDestinations(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    setForm(f => ({ ...f, destination_id: data.id }));
+    toast.success(`تمت إضافة الوجهة: ${data.name}`);
+    return data.id;
+  };
 
-
+  // ── حذف موحّد عبر requestDelete ──
+  const removeRegion      = (id: string) => requestDelete("region", id, regions.find(r => r.id === id)?.name || "");
+  const removeState       = (id: string) => requestDelete("state", id, states.find(s => s.id === id)?.name || "");
+  const removeCity        = (id: string) => requestDelete("city", id, cities.find(c => c.id === id)?.name || "");
+  const removeLocality    = (id: string) => requestDelete("locality", id, localities.find(l => l.id === id)?.name || "");
+  const removeGroup       = (id: string) => requestDelete("group", id, groups.find(g => g.id === id)?.name || "");
+  const removeTransporter = (id: string) => requestDelete("transporter", id, transporters.find(t => t.id === id)?.name || "");
+  const removeDestination = (id: string) => requestDelete("destination", id, destinations.find(d => d.id === id)?.name || "");
 
   // ── تعديل الاسم (rename) لكل قائمة ──
   const renameIn = (table: string, setter: React.Dispatch<React.SetStateAction<any[]>>, keepSortByName = true) =>
