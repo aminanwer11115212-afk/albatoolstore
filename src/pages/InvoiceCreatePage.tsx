@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
 import { deductStockForLines, applyStockDeltaForLines } from "@/utils/stockDeduction";
+import { checkDuplicateBeforeInsert } from "@/utils/duplicateSaveToast";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { useDocumentCurrency } from "@/hooks/document/useDocumentCurrency";
@@ -903,6 +904,29 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         effectiveInvoiceNumber = await generateRandomDocNumber("invoices", "invoice_number", _prefix, {
           scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
         });
+        setInvoiceNumber(effectiveInvoiceNumber);
+      }
+    }
+
+    // ── Duplicate-save guard (طبقة قاعدة البيانات، عبر الأجهزة/الجلسات) ──
+    // إذا لم نكن في وضع تعديل ولا سبق حفظ في الجلسة، ابحث عن فاتورة موجودة
+    // بنفس (العميل + التاريخ + توقيع البنود) خلال آخر 24 ساعة → حوّل إلى UPDATE.
+    if (!effectiveEditId && !pos) {
+      const partyId = activeCustomer?.id || null;
+      const dup = await checkDuplicateBeforeInsert({
+        table: "invoices",
+        partyColumn: "customer_id",
+        partyId,
+        dateISO: invoiceDate,
+        items: validRows.map((r) => ({ product_id: r.product_id, quantity: r.quantity })),
+        excludeId: lastSavedIdRef.current,
+        docLabel: "الفاتورة",
+      });
+      if (dup?.existingId) {
+        effectiveEditId = dup.existingId;
+        effectiveInvoiceNumber = dup.existingNumber || effectiveInvoiceNumber;
+        lastSavedIdRef.current = dup.existingId;
+        setSavedInvoiceId(dup.existingId);
         setInvoiceNumber(effectiveInvoiceNumber);
       }
     }
