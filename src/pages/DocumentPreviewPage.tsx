@@ -361,6 +361,42 @@ export default function DocumentPreviewPage({ docType }: Props) {
         </button>
         <div className="text-sm font-bold text-foreground">{title}</div>
         <div className="ms-auto flex items-center gap-2">
+          {docType === "invoice" && invMeta && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-muted/40" title="خصم حي — يُطبَّق فورًا على الإجمالي والمتبقي والحالة">
+              <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">خصم حي</span>
+              <div style={{ width: 170 }}>
+                <DiscountInput
+                  label=""
+                  value={invMeta.discount}
+                  grandBeforeDiscount={invMeta.subtotal || invMeta.total + invMeta.discount}
+                  onChange={async (nextDisc) => {
+                    if (savingDisc || !invMeta) return;
+                    const cur = Number(invMeta.discount || 0);
+                    if (Math.abs(nextDisc - cur) < 0.01) return;
+                    setSavingDisc(true);
+                    try {
+                      const base = (invMeta.subtotal || invMeta.total + cur);
+                      const nextTotal = Math.max(0, base - nextDisc);
+                      const nextDue = Math.max(0, nextTotal - invMeta.paidAmount);
+                      const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: invMeta.paidAmount });
+                      const { error } = await (supabase as any)
+                        .from("invoices")
+                        .update({ discount: nextDisc, total: nextTotal, due_amount: nextDue, status: nextStatus })
+                        .eq("id", invMeta.id);
+                      if (error) throw error;
+                      toast.success(`تم تحديث الخصم — الإجمالي ${nextTotal.toLocaleString()} — الحالة ${nextStatus}`);
+                      setReloadTick((t) => t + 1);
+                    } catch (e: any) {
+                      toast.error(e?.message || "تعذّر حفظ الخصم");
+                    } finally {
+                      setSavingDisc(false);
+                    }
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+          )}
           {docType === "invoice" && invMeta && invMeta.total - invMeta.paidAmount > 0.01 && (
             <button
               type="button"
