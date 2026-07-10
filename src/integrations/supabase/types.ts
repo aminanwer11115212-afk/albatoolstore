@@ -1794,6 +1794,8 @@ export type Database = {
           paid_amount: number | null
           shipping: number | null
           status: string | null
+          stock_applied_at: string | null
+          stock_applied_op: string | null
           subtotal: number | null
           supplier_id: string | null
           supplier_invoice_number: string | null
@@ -1819,6 +1821,8 @@ export type Database = {
           paid_amount?: number | null
           shipping?: number | null
           status?: string | null
+          stock_applied_at?: string | null
+          stock_applied_op?: string | null
           subtotal?: number | null
           supplier_id?: string | null
           supplier_invoice_number?: string | null
@@ -1844,6 +1848,8 @@ export type Database = {
           paid_amount?: number | null
           shipping?: number | null
           status?: string | null
+          stock_applied_at?: string | null
+          stock_applied_op?: string | null
           subtotal?: number | null
           supplier_id?: string | null
           supplier_invoice_number?: string | null
@@ -2815,6 +2821,7 @@ export type Database = {
       }
       is_workflow_automation_enabled: { Args: never; Returns: boolean }
       mark_overdue_invoices: { Args: never; Returns: number }
+      receive_purchase_stock_once: { Args: { _po_id: string }; Returns: Json }
       recompute_account_balance: {
         Args: { _account_id: string }
         Returns: undefined
@@ -2827,6 +2834,7 @@ export type Database = {
         Args: { _supplier_id: string }
         Returns: undefined
       }
+      restore_purchase_stock_once: { Args: { _po_id: string }; Returns: Json }
       workflow_rank: { Args: { _s: string }; Returns: number }
     }
     Enums: {
