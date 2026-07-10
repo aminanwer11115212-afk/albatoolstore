@@ -449,6 +449,16 @@ export default function PurchasePage() {
                             → استلام
                           </button>
                         )}
+                        {(Number(o.total || 0) - Number(o.paid_amount || 0)) > 0.01 && o.status !== "cancelled" && (
+                          <button
+                            type="button"
+                            className="btn-xs"
+                            style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                            onClick={() => setPayFor(o)}
+                            title="تسجيل دفعة للمورد"
+                          >
+                            💳 دفعة
+                          </button>
                         <button
                           type="button"
                           className="btn-xs btn-danger"
