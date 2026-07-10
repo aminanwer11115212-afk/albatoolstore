@@ -62,6 +62,11 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   const [transporters, setTransporters] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
+  const [delReq, setDelReq] = useState<null | {
+    kind: EntityKind; id: string; name: string;
+    customers: number; children: number; childrenLabel: string;
+    allowCascade: boolean;
+  }>(null);
 
   const queryClient = useQueryClient();
   const localCustomers = queryClient.getQueryData<any[]>(["customers"]) || [];
