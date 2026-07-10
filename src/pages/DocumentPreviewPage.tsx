@@ -5,6 +5,9 @@ import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 import { loadInvoiceExtras, loadQuoteExtras } from "@/utils/printExtras";
 import { ArrowRight, Loader2, Wallet } from "lucide-react";
 import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
+import DiscountInput from "@/components/shared/DiscountInput";
+import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
+import { toast } from "sonner";
 
 /**
  * صفحة معاينة داخلية للمستندات (عرض سعر / فاتورة).
@@ -34,10 +37,11 @@ export default function DocumentPreviewPage({ docType }: Props) {
   const [stocktakeSort, setStocktakeSort] = useState<"default" | "name-asc" | "name-desc" | "qty-desc" | "qty-asc">("default");
   const [payOpen, setPayOpen] = useState(false);
   const [invMeta, setInvMeta] = useState<{
-    id: string; number: string; total: number; paidAmount: number;
+    id: string; number: string; total: number; subtotal: number; discount: number; paidAmount: number;
     customerId: string | null; customerName: string | null; isPos: boolean;
   } | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [savingDisc, setSavingDisc] = useState(false);
   const itemsSort = stocktakeSort;
 
   const variant = (search.get("variant") || "full") as
@@ -175,6 +179,8 @@ export default function DocumentPreviewPage({ docType }: Props) {
             id: invoice.id,
             number: invoice.invoice_number,
             total: Number(invoice.total || 0),
+            subtotal: Number(invoice.subtotal || 0),
+            discount: Number(invoice.discount || 0),
             paidAmount: Number(invoice.paid_amount || 0),
             customerId: iCust?.id || (invoice as any).customer_id || null,
             customerName: iCust?.name || (invoice as any).walk_in_customer_name || null,
@@ -355,6 +361,42 @@ export default function DocumentPreviewPage({ docType }: Props) {
         </button>
         <div className="text-sm font-bold text-foreground">{title}</div>
         <div className="ms-auto flex items-center gap-2">
+          {docType === "invoice" && invMeta && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-muted/40" title="خصم حي — يُطبَّق فورًا على الإجمالي والمتبقي والحالة">
+              <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">خصم حي</span>
+              <div style={{ width: 170 }}>
+                <DiscountInput
+                  label=""
+                  value={invMeta.discount}
+                  grandBeforeDiscount={invMeta.subtotal || invMeta.total + invMeta.discount}
+                  onChange={async (nextDisc) => {
+                    if (savingDisc || !invMeta) return;
+                    const cur = Number(invMeta.discount || 0);
+                    if (Math.abs(nextDisc - cur) < 0.01) return;
+                    setSavingDisc(true);
+                    try {
+                      const base = (invMeta.subtotal || invMeta.total + cur);
+                      const nextTotal = Math.max(0, base - nextDisc);
+                      const nextDue = Math.max(0, nextTotal - invMeta.paidAmount);
+                      const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: invMeta.paidAmount });
+                      const { error } = await (supabase as any)
+                        .from("invoices")
+                        .update({ discount: nextDisc, total: nextTotal, due_amount: nextDue, status: nextStatus })
+                        .eq("id", invMeta.id);
+                      if (error) throw error;
+                      toast.success(`تم تحديث الخصم — الإجمالي ${nextTotal.toLocaleString()} — الحالة ${nextStatus}`);
+                      setReloadTick((t) => t + 1);
+                    } catch (e: any) {
+                      toast.error(e?.message || "تعذّر حفظ الخصم");
+                    } finally {
+                      setSavingDisc(false);
+                    }
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+          )}
           {docType === "invoice" && invMeta && invMeta.total - invMeta.paidAmount > 0.01 && (
             <button
               type="button"
