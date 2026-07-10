@@ -11,6 +11,7 @@ import { StatusChip } from "@/components/ui/status-chip";
 import { receiveStockForPurchaseOnce, restoreStockForPurchaseOnce } from "@/utils/stockReceive";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
+import SupplierPaymentDialog from "@/components/purchase/SupplierPaymentDialog";
 
 const statusMap: Record<string, { label: string; cls: string }> = {
   pending:   { label: "معلق",  cls: "st-pending" },
