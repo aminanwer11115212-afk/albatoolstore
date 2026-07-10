@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Paperclip, Trash2, Upload, X, FileText, Download, Camera, Receipt, Truck, Image as ImageIcon, Trash, RotateCcw, Clock } from "lucide-react";
+import { Paperclip, Trash2, Upload, X, FileText, Download, Camera, Receipt, Truck, Image as ImageIcon, Trash, RotateCcw, Clock, Scissors } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
 import { useCropQueue } from "@/hooks/useCropQueue";
+import { useRecropImage } from "@/hooks/useRecropImage";
 
 type Category = "receipt" | "running" | "details";
 type TabKey = Category | "trash";
