@@ -394,6 +394,16 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
                       </>
                     ) : (
                       <>
+                        {isImage(att.file_type) && (
+                          <button
+                            onClick={() => recropAttachment(att)}
+                            className="p-1.5 rounded hover:bg-primary/10 text-primary"
+                            title="إعادة قص"
+                            aria-label="إعادة قص الصورة"
+                          >
+                            <Scissors size={15} />
+                          </button>
+                        )}
                         <a
                           href={att.file_url}
                           target="_blank"
@@ -438,6 +448,14 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
         title={cropQueue.remaining > 0
           ? `قص صورة المرفق (متبقي ${cropQueue.remaining})`
           : "قص صورة المرفق"}
+      />
+      <ImageCropDialog
+        open={recrop.open}
+        file={recrop.file}
+        onCancel={recrop.cancel}
+        onConfirm={recrop.confirm}
+        defaultAspect="free"
+        title="إعادة قص صورة المرفق"
       />
     </div>
   );
