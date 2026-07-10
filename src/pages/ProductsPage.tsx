@@ -1503,6 +1503,27 @@ export default function ProductsPage() {
                             aria-label="حذف الصورة">
                             <X size={14} />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => startRecrop(form.image_url, async (cropped) => {
+                              setUploadingImage(true);
+                              try {
+                                const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                const url = await uploadProductImage(cropped);
+                                setForm(f => ({ ...f, image_url: url }));
+                                toast.success("تم تحديث الصورة بعد إعادة القص");
+                              } catch (err: any) {
+                                toast.error(err.message || "فشل رفع الصورة");
+                              } finally {
+                                setUploadingImage(false);
+                              }
+                            })}
+                            className="absolute -bottom-2 -left-2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90"
+                            aria-label="إعادة قص الصورة"
+                            title="إعادة قص"
+                          >
+                            <Scissors size={12} />
+                          </button>
                         </div>
                       ) : (
                         <div className="w-24 h-24 rounded-lg bg-muted border border-dashed border-border flex items-center justify-center">
