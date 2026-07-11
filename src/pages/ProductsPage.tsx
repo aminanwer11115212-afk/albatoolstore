@@ -2037,8 +2037,29 @@ export default function ProductsPage() {
                 return (
                 <tr
                   key={p.id}
-                  className={(isAllProducts ? ((page - 1) * perPage + idx) : idx) % 2 === 0 ? "odd" : "even"}
-                  style={{ position: "relative", ...(rowH ? { height: rowH } : {}) }}
+                  tabIndex={0}
+                  data-row-uid={p.id}
+                  data-nav-table="products"
+                  data-nav-row={idx}
+                  data-nav-col="row"
+                  className={`${(isAllProducts ? ((page - 1) * perPage + idx) : idx) % 2 === 0 ? "odd" : "even"} ${isRowPendingDelete(p.id) ? "row-pending-delete-products" : ""}`}
+                  style={{
+                    position: "relative",
+                    outline: "none",
+                    ...(rowH ? { height: rowH } : {}),
+                    ...(isRowPendingDelete(p.id)
+                      ? { background: "hsl(0 84% 60% / 0.18)", boxShadow: "inset 0 0 0 2px hsl(0 84% 60% / 0.55)" }
+                      : {}),
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                      const dir = e.key === "ArrowDown" ? 1 : -1;
+                      const next = document.querySelector<HTMLElement>(
+                        `[data-nav-table="products"][data-nav-row="${idx + dir}"][data-nav-col="row"]`
+                      );
+                      if (next) { e.preventDefault(); next.focus(); }
+                    }
+                  }}
                   onMouseMove={(e) => {
                     if (rowsLocked) return;
                     const tr = e.currentTarget as HTMLTableRowElement;
@@ -2060,6 +2081,7 @@ export default function ProductsPage() {
                     resetRowH(p.id);
                   }}
                 >
+
                   <td className="px-2 py-3 text-muted-foreground" style={{ background: selectedIds.has(p.id) ? "hsl(var(--primary) / 0.18)" : undefined }}>
                     {isAllProducts ? (
                       <div className="flex items-center gap-1.5 justify-center">
