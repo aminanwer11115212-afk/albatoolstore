@@ -93,6 +93,12 @@ export default function ProductsPage() {
   });
   useEffect(() => { try { localStorage.setItem(PP_PER_PAGE, String(perPage)); } catch {} }, [perPage]);
 
+  // ترتيب أبجدي اختياري للجدول الرئيسي (تصاعدي/تنازلي/إيقاف = ترتيب الإدخال)
+  const [nameSortDir, setNameSortDir] = useState<"none" | "asc" | "desc">(() => {
+    try { return (localStorage.getItem("products_name_sort") as any) || "none"; } catch { return "none"; }
+  });
+  useEffect(() => { try { localStorage.setItem("products_name_sort", nameSortDir); } catch {} }, [nameSortDir]);
+
   // مزامنة: أعد جلب المنتجات عند أي تغيير من فاتورة/مرتجع/تحويل (يبث events بنفس الاسم)
   useEffect(() => {
     const onChanged = () => {
@@ -328,6 +334,18 @@ export default function ProductsPage() {
     });
   }, [pageProducts, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, showFrozen, onlyFrozen, search]);
 
+  // تطبيق الترتيب الأبجدي على القائمة المفلترة (بدون تعديل الأصل)
+  const sortedFiltered = useMemo(() => {
+    if (nameSortDir === "none") return filtered;
+    const arr = [...filtered];
+    arr.sort((a: any, b: any) =>
+      String(a?.name || "").localeCompare(String(b?.name || ""), "ar") *
+      (nameSortDir === "asc" ? 1 : -1),
+    );
+    return arr;
+  }, [filtered, nameSortDir]);
+
+
   const activeFiltersCount = [filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter !== "all" ? stockFilter : "", frozenMode !== "all" ? "frozen" : ""].filter(Boolean).length;
   const clearFilters = () => {
     setFilterWarehouse(""); setFilterCategory(""); setFilterCompany(""); setFilterSupplier("");
@@ -336,10 +354,10 @@ export default function ProductsPage() {
   };
 
   // Pagination (only for /products) — memoized
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / perPage));
   const paginated = useMemo(
-    () => isAllProducts ? filtered.slice((page - 1) * perPage, page * perPage) : filtered,
-    [filtered, isAllProducts, page, perPage],
+    () => isAllProducts ? sortedFiltered.slice((page - 1) * perPage, page * perPage) : sortedFiltered,
+    [sortedFiltered, isAllProducts, page, perPage],
   );
   const didMountRef = useRef(false);
   useEffect(() => {
@@ -1181,7 +1199,7 @@ export default function ProductsPage() {
 <meta charset="utf-8">
 <title>كتالوج المنتجات — ${escHtml(companyName)}</title>
 <style>
-  @page { size: A4; margin: 12mm 8mm 14mm 8mm; }
+  @page { size: A4; margin: 8mm 6mm 10mm 6mm; }
   * { box-sizing: border-box; }
   html, body { font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; color: #1f2937; }
   body { margin: 0; padding: 0; background: #fff; }
@@ -1197,37 +1215,37 @@ export default function ProductsPage() {
   }
   .toolbar button.ghost { background: transparent; border: 1px solid #334155; }
 
-  .page { padding: 8px 12px; }
+  .page { padding: 6px 8px; }
 
-  /* ترويسة الشركة — نفس نمط قوالب الفواتير */
+  /* ترويسة الشركة — مضغوطة للطباعة لتوفير مساحة المنتجات */
   .letterhead {
-    display: flex; align-items: center; gap: 14px;
-    padding: 10px 12px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px; margin-bottom: 6px;
     background: linear-gradient(135deg, #5b2c8e, #7e3eb5);
-    color: #fff; border-radius: 10px;
+    color: #fff; border-radius: 8px;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   .letterhead .logo {
-    width: 58px; height: 58px; background: #fff; border-radius: 8px; padding: 4px;
+    width: 40px; height: 40px; background: #fff; border-radius: 6px; padding: 3px;
     display: flex; align-items: center; justify-content: center;
-    color: #5b2c8e; font-weight: 800; font-size: 22px;
+    color: #5b2c8e; font-weight: 800; font-size: 16px;
   }
   .letterhead .logo img { width: 100%; height: 100%; object-fit: contain; }
   .letterhead .co { flex: 1; min-width: 0; }
-  .letterhead .co h2 { margin: 0 0 3px; font-size: 17px; font-weight: 800; }
-  .letterhead .co .meta { font-size: 11px; opacity: 0.95; line-height: 1.6; }
+  .letterhead .co h2 { margin: 0 0 2px; font-size: 13px; font-weight: 800; }
+  .letterhead .co .meta { font-size: 9.5px; opacity: 0.95; line-height: 1.4; }
   .letterhead .side {
-    text-align: center; padding: 6px 12px; min-width: 180px;
-    background: rgba(255,255,255,0.16); border-radius: 8px;
+    text-align: center; padding: 4px 8px; min-width: 140px;
+    background: rgba(255,255,255,0.16); border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.28);
   }
-  .letterhead .side .t { font-size: 14px; font-weight: 800; }
-  .letterhead .side .st { font-size: 11px; opacity: 0.92; margin-top: 2px; }
+  .letterhead .side .t { font-size: 11px; font-weight: 800; }
+  .letterhead .side .st { font-size: 9.5px; opacity: 0.92; margin-top: 1px; }
 
   .filters-note {
-    background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px;
-    padding: 6px 10px; margin-bottom: 8px; font-size: 11px; color: #475569;
-    display: flex; flex-wrap: wrap; gap: 8px;
+    background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 5px;
+    padding: 3px 8px; margin-bottom: 5px; font-size: 9.5px; color: #475569;
+    display: flex; flex-wrap: wrap; gap: 6px;
   }
   .filters-note b { color: #0f172a; }
 
@@ -1235,39 +1253,39 @@ export default function ProductsPage() {
   table.products thead { display: table-header-group; } /* تكرار الترويسة كل صفحة */
   table.products tfoot { display: table-footer-group; }
   table.products th, table.products td {
-    border: 1px solid #e5e7eb; padding: 4px 6px; vertical-align: middle;
-    font-size: 11.5px;
+    border: 1px solid #e5e7eb; padding: 2px 4px; vertical-align: middle;
+    font-size: 9.5px; line-height: 1.15;
   }
   table.products thead th {
-    background: #f1f5f9; color: #0f172a; font-weight: 800; font-size: 11.5px;
+    background: #f1f5f9; color: #0f172a; font-weight: 800; font-size: 10px;
+    padding: 3px 4px;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  /* الترويسة الصغيرة (اسم الشركة) تُطبع في أعلى كل صفحة داخل thead */
   .repeat-brand td {
     background: #ede9fe; color: #4c1d95; font-weight: 800; text-align: center;
-    padding: 4px; font-size: 11px;
+    padding: 2px; font-size: 9.5px;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   table.products tr { page-break-inside: avoid; break-inside: avoid; }
 
-  .c-num  { width: 32px; text-align: center; color: #64748b; }
-  .c-img  { width: 60px; }
+  .c-num  { width: 24px; text-align: center; color: #64748b; }
+  .c-img  { width: 34px; }
   .c-name { font-weight: 700; color: #0f172a; }
-  .c-meta { width: 110px; color: #334155; }
-  .c-sku  { width: 90px; font-family: ui-monospace, monospace; color: #0369a1; font-size: 10.5px; }
-  .c-price{ width: 90px; text-align: center; font-weight: 700; color: #059669; }
+  .c-meta { width: 90px; color: #334155; }
+  .c-sku  { width: 75px; font-family: ui-monospace, monospace; color: #0369a1; font-size: 9px; }
+  .c-price{ width: 70px; text-align: center; font-weight: 700; color: #059669; }
 
-  /* الصورة مربعة دائماً بغضّ النظر عن أبعاد الأصل */
+  /* الصورة مربعة مضغوطة للطباعة (28×28) لتوفير أكبر عدد من الصفوف */
   .thumb {
-    width: 46px; height: 46px; background: #f8fafc; border: 1px solid #e5e7eb;
-    border-radius: 4px; overflow: hidden; margin: auto;
+    width: 26px; height: 26px; background: #f8fafc; border: 1px solid #e5e7eb;
+    border-radius: 3px; overflow: hidden; margin: auto;
     display: flex; align-items: center; justify-content: center;
   }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
   .footer {
-    margin-top: 10px; padding-top: 6px; border-top: 1px dashed #cbd5e1;
-    color: #64748b; font-size: 10.5px; text-align: center;
+    margin-top: 6px; padding-top: 4px; border-top: 1px dashed #cbd5e1;
+    color: #64748b; font-size: 9px; text-align: center;
   }
 
   @media print {
@@ -2064,7 +2082,17 @@ export default function ProductsPage() {
         )}
         {isAllProducts && (
           <div className="p-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
-            <span className="text-sm text-muted-foreground">{filtered.length} منتج</span>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-muted-foreground">{sortedFiltered.length} منتج</span>
+              <button
+                type="button"
+                onClick={() => setNameSortDir(nameSortDir === "none" ? "asc" : nameSortDir === "asc" ? "desc" : "none")}
+                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium border ${nameSortDir === "none" ? "bg-muted border-border text-foreground" : "bg-primary/10 border-primary text-primary"}`}
+                title="ترتيب أبجدي حسب اسم المنتج"
+              >
+                {nameSortDir === "asc" ? "أ↓ ي" : nameSortDir === "desc" ? "ي↓ أ" : "ترتيب أبجدي"}
+              </button>
+            </div>
             <button
               type="button"
               disabled={isExportingPdf}
@@ -2858,10 +2886,10 @@ export default function ProductsPage() {
 
         {/* Mobile cards list removed — desktop table is shown on mobile too (desktop-on-mobile). */}
 
-        {isAllProducts && !isLoading && filtered.length > 0 && (
+        {isAllProducts && !isLoading && sortedFiltered.length > 0 && (
           <>
             <div className="legacy-dt-info">
-              إظهار {(page - 1) * perPage + 1} إلى {Math.min(page * perPage, filtered.length)} من إجمالي {filtered.length} منتج
+              إظهار {(page - 1) * perPage + 1} إلى {Math.min(page * perPage, sortedFiltered.length)} من إجمالي {sortedFiltered.length} منتج
             </div>
             <ul className="legacy-pagination">
               <li className={`page-item ${page === 1 ? "disabled" : ""}`}>

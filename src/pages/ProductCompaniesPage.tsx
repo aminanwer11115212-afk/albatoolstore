@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ZoomControls from "@/components/ZoomControls";
-import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import { startsWithMatch } from "@/utils/searchMatch";
 function useProductCompanies() {
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -42,7 +42,21 @@ function useProductCompanies() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["product_companies"] }),
   });
 
-  return { ...query, insert, update, remove };
+  const bulkRemove = useMutation({
+    mutationFn: async (ids: string[]) => {
+      // فكّ ربط المنتجات من هذه الماركات قبل الحذف حتى لا تفشل القيود
+      await (supabase as any).from("product_brand_links").delete().in("brand_id", ids);
+      await (supabase as any).from("products").update({ company_id: null }).in("company_id", ids);
+      const { error } = await (supabase as any).from("product_companies").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["product_companies"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+    },
+  });
+
+  return { ...query, insert, update, remove, bulkRemove };
 }
 
 function useProductCompanyStats() {
@@ -69,14 +83,32 @@ export default function ProductCompaniesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", description: "" });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const { data: companies, isLoading } = useProductCompanies();
-  const { insert, update, remove } = useProductCompanies();
+  const { insert, update, remove, bulkRemove } = useProductCompanies();
   const { data: stats } = useProductCompanyStats();
 
-  const filtered = (companies || []).filter((c: any) =>
-    !search.trim() || startsWithMatch(c.name, search),
-  );
+  const filtered = (companies || [])
+    .filter((c: any) => !search.trim() || startsWithMatch(c.name, search))
+    .slice()
+    .sort((a: any, b: any) =>
+      String(a?.name || "").localeCompare(String(b?.name || ""), "ar") * (sortDir === "asc" ? 1 : -1),
+    );
+
+  const allSelected = filtered.length > 0 && filtered.every((c: any) => selected.has(c.id));
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(filtered.map((c: any) => c.id)));
+  };
+  const toggleOne = (id: string) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
 
   const handleSubmit = async () => {
     if (!form.name) { toast.error("اسم الماركة مطلوب"); return; }
@@ -85,6 +117,17 @@ export default function ProductCompaniesPage() {
       else { await insert.mutateAsync(form); toast.success("تم الإضافة"); }
       setShowForm(false); setEditId(null); setForm({ name: "", description: "" });
     } catch (e: any) { toast.error(e.message); }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    if (!confirm(`حذف ${ids.length} ماركة؟ سيتم فكّ ارتباط المنتجات المرتبطة بها.`)) return;
+    try {
+      await bulkRemove.mutateAsync(ids);
+      toast.success(`تم حذف ${ids.length} ماركة`);
+      setSelected(new Set());
+    } catch (e: any) { toast.error(e.message || "فشل الحذف الجماعي"); }
   };
 
   const inputClass = "bg-muted rounded-lg px-4 py-2.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary w-full";
@@ -117,16 +160,43 @@ export default function ProductCompaniesPage() {
       )}
 
       <div className="legacy-card card-block">
-        <div className="p-4 border-b border-border flex items-center gap-3">
+        <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
           <div className="flex items-center bg-muted rounded-lg px-3 py-2 max-w-sm w-full">
             <Search size={16} className="text-muted-foreground ml-2" />
             <input type="text" placeholder="بحث..." value={search} onChange={(e) => setSearch(e.target.value)} className="bg-transparent border-none outline-none text-sm flex-1 text-foreground placeholder:text-muted-foreground" />
           </div>
+          <button
+            type="button"
+            onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+            className="px-3 py-2 rounded-lg text-sm font-medium border bg-muted border-border text-foreground"
+            title="ترتيب أبجدي حسب الاسم"
+          >
+            {sortDir === "asc" ? "أ ↓ ي (تصاعدي)" : "ي ↓ أ (تنازلي)"}
+          </button>
+          {selected.size > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={bulkRemove.isPending}
+              className="mr-auto flex items-center gap-2 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60"
+            >
+              <Trash2 size={15} /> حذف المحدَّد ({selected.size})
+            </button>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm mobile-stack-table">
             <thead>
               <tr className="bg-muted">
+                <th className="text-right px-3 py-3 font-semibold text-muted-foreground w-10">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    aria-label="تحديد الكل"
+                    className="cursor-pointer w-4 h-4"
+                  />
+                </th>
                 <th className="text-right px-5 py-3 font-semibold text-muted-foreground">#</th>
                 <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الاسم</th>
                 <th className="text-right px-5 py-3 font-semibold text-muted-foreground">إجمالي المنتجات</th>
@@ -137,13 +207,23 @@ export default function ProductCompaniesPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا توجد شركات</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد شركات</td></tr>
               ) : filtered.map((c: any, i: number) => {
                 const s = stats?.[c.id] || { totalProducts: 0, stockQty: 0, stockValue: 0 };
+                const isSel = selected.has(c.id);
                 return (
-                  <tr key={c.id} className="border-b border-border hover:bg-muted/50">
+                  <tr key={c.id} className={`border-b border-border hover:bg-muted/50 ${isSel ? "bg-primary/5" : ""}`}>
+                    <td data-label="تحديد" className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={isSel}
+                        onChange={() => toggleOne(c.id)}
+                        aria-label={`تحديد ${c.name}`}
+                        className="cursor-pointer w-4 h-4"
+                      />
+                    </td>
                     <td data-label="#" className="px-5 py-3 text-muted-foreground">{i + 1}</td>
                     <td data-label="الاسم" className="px-5 py-3 font-medium text-foreground">
                       <span className="inline-flex items-center gap-2"><Building2 size={16} className="text-primary" /> {c.name}</span>
