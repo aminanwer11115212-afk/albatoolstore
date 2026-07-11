@@ -1675,7 +1675,7 @@ export default function ProductsPage() {
             const idx = () => i++;
             return (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-2 px-6 overflow-y-auto flex-1 min-h-0">
                   {/* الصف 1: اسم المنتج | كود | الوحدة */}
                   {(() => { const k = idx(); return (
                     <div>
