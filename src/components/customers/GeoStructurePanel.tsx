@@ -111,6 +111,7 @@ export default function GeoStructurePanel({
       children: impact.children,
       childrenLabel: impact.childrenLabel,
       customerNames: impact.customerNames,
+      childrenNames: impact.childrenNames,
     });
   };
 
