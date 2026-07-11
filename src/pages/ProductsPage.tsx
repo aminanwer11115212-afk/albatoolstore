@@ -14,6 +14,7 @@ import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDi
 
 import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
+import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 
 type Focusable = { focus: () => void } | null;
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
@@ -219,17 +220,16 @@ export default function ProductsPage() {
 
   const { data: products, isLoading, error } = useProductsWithDetails();
   const { insert, update, remove } = useProducts();
-  const handleDeleteProduct = async (pId: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+  // النواة: تنفيذ الحذف الفعلي بعد فحص الارتباطات (بلا confirm — للاستخدام من مسطرة الحذف)
+  const performProductDelete = async (pId: string): Promise<boolean> => {
     try {
       const [invoiceCheck, quoteCheck, purchaseCheck, returnCheck, transferCheck] = await Promise.all([
         supabase.from("invoice_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
         supabase.from("quote_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
         supabase.from("purchase_order_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
         supabase.from("stock_return_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
-        supabase.from("stock_transfers").select("id", { count: "exact", head: true }).eq("product_id", pId)
+        supabase.from("stock_transfers").select("id", { count: "exact", head: true }).eq("product_id", pId),
       ]);
-
       if (
         (invoiceCheck.count ?? 0) > 0 ||
         (quoteCheck.count ?? 0) > 0 ||
@@ -238,15 +238,26 @@ export default function ProductsPage() {
         (transferCheck.count ?? 0) > 0
       ) {
         toast.error("لا يمكن حذف المنتج لأنه مرتبط بحركات في النظام (فواتير، عروض أسعار، مشتريات، أو تحويلات). يمكنك تجميده بدلاً من ذلك.");
-        return;
+        return false;
       }
-
       await remove.mutateAsync(pId);
       toast.success("تم حذف المنتج بنجاح");
+      return true;
     } catch (e: any) {
       toast.error(e.message || "حدث خطأ أثناء محاولة الحذف");
+      return false;
     }
   };
+
+  const handleDeleteProduct = async (pId: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+    await performProductDelete(pId);
+  };
+
+  // مسطرة → تحديد الصف، مسطرة مضاعفة → حذف كل المحدَّدين (نفس نمط جدول البنود)
+  const { isPending: isRowPendingDelete } = useSpaceToDelete(async (uid) => {
+    await performProductDelete(uid);
+  });
   const { data: categories, insert: insertCategory } = useProductCategories();
   const { data: warehouses } = useWarehouses();
   const { data: companies } = useProductCompanies();
@@ -986,26 +997,132 @@ export default function ProductsPage() {
       const escHtml = (s: any) => String(s ?? "")
         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-      const rows = filtered.map((p: any) => `
-        <tr>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;width:90px">
-            ${p.image_url ? `<img src="${escHtml(p.image_url)}" style="width:70px;height:70px;object-fit:cover;border-radius:6px"/>` : ""}
-          </td>
-          <td style="padding:8px;border:1px solid #ddd;font-size:14px">${escHtml(p.name || "")}</td>
-        </tr>`).join("");
-      const html = `
-        <!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>كشف المنتجات</title>
-        <style>@page{size:A4;margin:10mm}body{font-family:Arial,sans-serif;padding:20px}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:12px;page-break-inside:auto}thead{display:table-header-group}tr,td,th{page-break-inside:avoid;break-inside:avoid}th{background:#f3f3f3;padding:8px;border:1px solid #ddd}@media print{body{padding:0}}</style>
-        </head><body><h2>كشف المنتجات (${filtered.length})</h2>
-        <table><thead><tr><th style="width:90px">الصورة</th><th>اسم الصنف</th></tr></thead><tbody>${rows}</tbody></table>
-        <script>window.onload=()=>{setTimeout(()=>window.print(),300)}</script>
-        </body></html>`;
+
+      // اجمع اسم الشركة من إعدادات الشركة (اختياري — لا يفشل إن لم يوجد)
+      let companyName = "المنتجات";
+      try {
+        const { data: cs } = await (supabase as any)
+          .from("company_settings").select("company_name").limit(1).maybeSingle();
+        if (cs?.company_name) companyName = cs.company_name;
+      } catch { /* ignore */ }
+
+      const cards = filtered.map((p: any) => {
+        const brandName = p.brands?.[0]?.name || p.product_companies?.name || "";
+        const catName = p.categories?.[0]?.name || p.product_categories?.name || "";
+        const img = p.image_url
+          ? `<img src="${escHtml(p.image_url)}" alt="${escHtml(p.name || "")}" loading="lazy"/>`
+          : `<div class="no-img">لا توجد صورة</div>`;
+        const metaBits = [
+          p.sku ? `<span class="sku">${escHtml(p.sku)}</span>` : "",
+          catName ? `<span class="chip">${escHtml(catName)}</span>` : "",
+          brandName ? `<span class="chip brand">${escHtml(brandName)}</span>` : "",
+        ].filter(Boolean).join("");
+        return `
+          <div class="card">
+            <div class="thumb">${img}</div>
+            <div class="body">
+              <div class="name">${escHtml(p.name || "")}</div>
+              ${metaBits ? `<div class="meta">${metaBits}</div>` : ""}
+            </div>
+          </div>`;
+      }).join("");
+
+      const today = new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+
+      const html = `<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<title>كتالوج المنتجات — ${escHtml(companyName)}</title>
+<style>
+  @page { size: A4; margin: 12mm 10mm; }
+  * { box-sizing: border-box; }
+  html, body { font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; color: #1f2937; }
+  body { margin: 0; padding: 0; background: #fff; }
+  .header {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    border-bottom: 3px solid #0ea5e9; padding: 0 6px 10px; margin-bottom: 14px;
+  }
+  .header h1 { margin: 0; font-size: 22px; color: #0f172a; font-weight: 800; }
+  .header .sub { color: #64748b; font-size: 12px; margin-top: 4px; }
+  .header .side { text-align: left; color: #475569; font-size: 12px; }
+  .header .side .big { font-size: 15px; color: #0f172a; font-weight: 700; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .card {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  }
+  .thumb {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #f8fafc;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .no-img { color: #94a3b8; font-size: 11px; }
+  .body { padding: 8px 10px 10px; }
+  .name {
+    font-size: 13px; font-weight: 700; color: #0f172a;
+    line-height: 1.35;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 34px;
+  }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .meta .sku {
+    font-size: 10px; color: #0369a1; background: #e0f2fe; padding: 2px 6px;
+    border-radius: 4px; font-family: ui-monospace, monospace;
+  }
+  .meta .chip {
+    font-size: 10px; color: #334155; background: #f1f5f9; padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .meta .chip.brand { background: #ecfccb; color: #3f6212; }
+  .footer {
+    margin-top: 14px; padding-top: 8px; border-top: 1px dashed #cbd5e1;
+    color: #64748b; font-size: 11px; text-align: center;
+  }
+  @media print {
+    .card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>كتالوج المنتجات</h1>
+      <div class="sub">${escHtml(companyName)} • ${escHtml(today)}</div>
+    </div>
+    <div class="side">
+      <div>إجمالي الأصناف</div>
+      <div class="big">${filtered.length}</div>
+    </div>
+  </div>
+  <div class="grid">${cards}</div>
+  <div class="footer">تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار.</div>
+  <script>window.onload=()=>{setTimeout(()=>window.print(),500)}</script>
+</body>
+</html>`;
       const w = window.open("", "_blank");
       if (!w) { toast.error("افتح نافذة المتصفح المنبثقة"); return; }
       w.document.write(html);
       w.document.close();
     } catch (e: any) { toast.error(e.message || "فشل التصدير"); }
   };
+
 
   const inputClass = "bg-muted rounded-lg px-4 py-2.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary w-full min-w-0";
   const selectClass = "bg-muted rounded-lg px-3 py-2 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary";
@@ -2026,8 +2143,29 @@ export default function ProductsPage() {
                 return (
                 <tr
                   key={p.id}
-                  className={(isAllProducts ? ((page - 1) * perPage + idx) : idx) % 2 === 0 ? "odd" : "even"}
-                  style={{ position: "relative", ...(rowH ? { height: rowH } : {}) }}
+                  tabIndex={0}
+                  data-row-uid={p.id}
+                  data-nav-table="products"
+                  data-nav-row={idx}
+                  data-nav-col="row"
+                  className={`${(isAllProducts ? ((page - 1) * perPage + idx) : idx) % 2 === 0 ? "odd" : "even"} ${isRowPendingDelete(p.id) ? "row-pending-delete-products" : ""}`}
+                  style={{
+                    position: "relative",
+                    outline: "none",
+                    ...(rowH ? { height: rowH } : {}),
+                    ...(isRowPendingDelete(p.id)
+                      ? { background: "hsl(0 84% 60% / 0.18)", boxShadow: "inset 0 0 0 2px hsl(0 84% 60% / 0.55)" }
+                      : {}),
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                      const dir = e.key === "ArrowDown" ? 1 : -1;
+                      const next = document.querySelector<HTMLElement>(
+                        `[data-nav-table="products"][data-nav-row="${idx + dir}"][data-nav-col="row"]`
+                      );
+                      if (next) { e.preventDefault(); next.focus(); }
+                    }
+                  }}
                   onMouseMove={(e) => {
                     if (rowsLocked) return;
                     const tr = e.currentTarget as HTMLTableRowElement;
@@ -2049,6 +2187,7 @@ export default function ProductsPage() {
                     resetRowH(p.id);
                   }}
                 >
+
                   <td className="px-2 py-3 text-muted-foreground" style={{ background: selectedIds.has(p.id) ? "hsl(var(--primary) / 0.18)" : undefined }}>
                     {isAllProducts ? (
                       <div className="flex items-center gap-1.5 justify-center">
