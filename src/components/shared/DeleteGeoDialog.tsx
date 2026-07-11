@@ -120,7 +120,11 @@ export default function DeleteGeoDialog(props: DeleteGeoDialogProps) {
             disabled={!!busy}
             className="px-4 py-2 rounded-md text-sm bg-secondary text-secondary-foreground border border-border disabled:opacity-50"
           >
-            {busy === "only" ? "جاري..." : `حذف ${entityLabel} فقط`}
+            {busy === "only"
+              ? "جاري..."
+              : (children > 0 && childrenLabel
+                  ? `حذف ${entityLabel} + ${children} ${childrenLabel}`
+                  : `حذف ${entityLabel} فقط`)}
           </button>
           {allowCascade && onDeleteCascade && (
             <button
