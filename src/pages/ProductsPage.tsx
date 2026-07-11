@@ -2529,9 +2529,18 @@ export default function ProductsPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isMobileUI) setImgActionProduct(p);
+                            else if (p.image_url) setImgLightbox({ url: p.image_url, name: p.name || "" });
+                          }}
+                          title={isMobileUI ? "خيارات الصورة" : (p.image_url ? "عرض الصورة" : "لا توجد صورة")}
+                          className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
                           {p.image_url ? <img src={p.image_url} className="w-8 h-8 rounded object-cover" /> : <PackageIcon size={14} className="text-muted-foreground" />}
-                        </div>
+                        </button>
                         {(() => {
                           const brs: any[] = (p.brands && p.brands.length > 0) ? p.brands : (p.product_companies ? [p.product_companies] : []);
                           const brandNames = brs.map((b: any) => b?.name).filter(Boolean).join("، ");
