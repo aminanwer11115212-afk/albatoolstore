@@ -1973,7 +1973,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                <DialogFooter className="gap-2 flex-row-reverse items-center justify-between">
+                <DialogFooter className="shrink-0 gap-2 flex-row-reverse items-center justify-between border-t border-border px-6 py-3 bg-background">
                   <div className="flex items-center gap-2">
                     <button onClick={() => { setShowForm(false); setEditId(null); }}
                       className="px-5 py-2 rounded-lg text-sm bg-muted text-foreground">إلغاء</button>
