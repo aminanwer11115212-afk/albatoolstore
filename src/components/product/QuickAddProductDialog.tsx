@@ -229,12 +229,16 @@ export default function QuickAddProductDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent ref={dlgRef} style={{ ...dlgStyle, overflowY: "auto" }} dir="rtl">
-          <DialogHeader>
+        <DialogContent
+          ref={dlgRef}
+          style={{ ...dlgStyle, display: "flex", flexDirection: "column", overflow: "hidden" }}
+          dir="rtl"
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-base">إضافة منتج جديد</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto flex-1 min-h-0 pe-1">
             {/* الصف 1: اسم المنتج (2 col) + كود */}
             <div className="col-span-2">
               <label className={labelClass}>اسم المنتج *</label>
