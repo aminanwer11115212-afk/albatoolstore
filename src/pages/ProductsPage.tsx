@@ -162,6 +162,17 @@ export default function ProductsPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // حوار حذف ذكي مع فكّ الربط (فئة/ماركة/مستودع/مورد)
+  const [unlinkDialog, setUnlinkDialog] = useState<{
+    entityLabel: string;
+    entityName: string;
+    usageLabel: string;
+    usageNames: string[];
+    usageCount: number;
+    warning?: string;
+    onConfirm: () => Promise<boolean>;
+  } | null>(null);
+
   // Refs لتنقّل Enter/Tab بنمط نافذة العميل
   const fieldRefs = useRef<Focusable[]>([]);
   const saveBtnRef = useRef<HTMLButtonElement | null>(null);
