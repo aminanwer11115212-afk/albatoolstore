@@ -220,17 +220,16 @@ export default function ProductsPage() {
 
   const { data: products, isLoading, error } = useProductsWithDetails();
   const { insert, update, remove } = useProducts();
-  const handleDeleteProduct = async (pId: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+  // النواة: تنفيذ الحذف الفعلي بعد فحص الارتباطات (بلا confirm — للاستخدام من مسطرة الحذف)
+  const performProductDelete = async (pId: string): Promise<boolean> => {
     try {
       const [invoiceCheck, quoteCheck, purchaseCheck, returnCheck, transferCheck] = await Promise.all([
         supabase.from("invoice_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
         supabase.from("quote_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
         supabase.from("purchase_order_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
         supabase.from("stock_return_items").select("id", { count: "exact", head: true }).eq("product_id", pId),
-        supabase.from("stock_transfers").select("id", { count: "exact", head: true }).eq("product_id", pId)
+        supabase.from("stock_transfers").select("id", { count: "exact", head: true }).eq("product_id", pId),
       ]);
-
       if (
         (invoiceCheck.count ?? 0) > 0 ||
         (quoteCheck.count ?? 0) > 0 ||
@@ -239,15 +238,26 @@ export default function ProductsPage() {
         (transferCheck.count ?? 0) > 0
       ) {
         toast.error("لا يمكن حذف المنتج لأنه مرتبط بحركات في النظام (فواتير، عروض أسعار، مشتريات، أو تحويلات). يمكنك تجميده بدلاً من ذلك.");
-        return;
+        return false;
       }
-
       await remove.mutateAsync(pId);
       toast.success("تم حذف المنتج بنجاح");
+      return true;
     } catch (e: any) {
       toast.error(e.message || "حدث خطأ أثناء محاولة الحذف");
+      return false;
     }
   };
+
+  const handleDeleteProduct = async (pId: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+    await performProductDelete(pId);
+  };
+
+  // مسطرة → تحديد الصف، مسطرة مضاعفة → حذف كل المحدَّدين (نفس نمط جدول البنود)
+  const { isPending: isRowPendingDelete } = useSpaceToDelete(async (uid) => {
+    await performProductDelete(uid);
+  });
   const { data: categories, insert: insertCategory } = useProductCategories();
   const { data: warehouses } = useWarehouses();
   const { data: companies } = useProductCompanies();
