@@ -2036,8 +2036,20 @@ export default function ProductsPage() {
           </div>
         )}
         {isAllProducts && (
-          <div className="p-3 border-b border-border text-sm text-muted-foreground">{filtered.length} منتج</div>
+          <div className="p-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-sm text-muted-foreground">{filtered.length} منتج</span>
+            <button
+              type="button"
+              disabled={isExportingPdf}
+              onClick={openPdfPreview}
+              className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60"
+              title="فتح معاينة PDF مع فلاتر وترتيب قبل الطباعة"
+            >
+              <FileDown size={16} /> {isExportingPdf ? "جارٍ الإنشاء..." : "معاينة / طباعة PDF"}
+            </button>
+          </div>
         )}
+
 
         <style>{mobileDocListCSS}</style>
         <style>{`
