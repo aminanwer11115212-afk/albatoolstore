@@ -14,6 +14,7 @@ import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDi
 
 import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
+import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 
 type Focusable = { focus: () => void } | null;
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
