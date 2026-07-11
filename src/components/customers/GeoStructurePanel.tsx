@@ -278,6 +278,7 @@ export default function GeoStructurePanel({
             customers={delReq.customers}
             children={delReq.children}
             childrenLabel={delReq.childrenLabel}
+            customerNames={delReq.customerNames}
             allowCascade={true}
             onDeleteOnly={async () => {
               const ok = await deleteGeoOnly(delReq.kind, delReq.id);
