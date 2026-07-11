@@ -362,11 +362,8 @@ export default function QuickAddProductDialog({
             </div>
             <div></div>
 
-            {/* الصف 6: الوصف (2 col) + الصورة */}
-            <div className="col-span-2">
-              <label className={labelClass}>وصف</label>
-              <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inputClass + " min-h-[80px]"} />
-            </div>
+            {/* الصف 6: الصورة */}
+            <div className="col-span-2"></div>
             <div>
               <label className={labelClass}>صورة المنتج</label>
               <div className="flex items-center gap-2 flex-wrap">
