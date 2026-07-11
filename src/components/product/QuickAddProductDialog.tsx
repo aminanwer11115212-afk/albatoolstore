@@ -168,7 +168,7 @@ export default function QuickAddProductDialog({
       name: form.name, sku: form.sku || null,
       category_id: null,
       warehouse_id: form.warehouse_id || null, company_id: form.company_id || null,
-      purchase_price: parseFloat(form.purchase_price) || 0, sale_price: parseFloat(form.sale_price) || 0,
+      purchase_price: parseFloat(form.foreign_price) || 0, sale_price: parseFloat(form.sale_price) || 0,
       stock_quantity: parseInt(form.stock_quantity) || 0, min_stock: parseInt(form.min_stock) || 0,
       unit: form.unit, description: form.description || null,
       foreign_price: parseFloat(form.foreign_price) || null,
@@ -229,12 +229,16 @@ export default function QuickAddProductDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent ref={dlgRef} style={{ ...dlgStyle, overflowY: "auto" }} dir="rtl">
-          <DialogHeader>
+        <DialogContent
+          ref={dlgRef}
+          style={{ ...dlgStyle, display: "flex", flexDirection: "column", overflow: "hidden" }}
+          dir="rtl"
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-base">إضافة منتج جديد</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto flex-1 min-h-0 pe-1">
             {/* الصف 1: اسم المنتج (2 col) + كود */}
             <div className="col-span-2">
               <label className={labelClass}>اسم المنتج *</label>
@@ -335,19 +339,17 @@ export default function QuickAddProductDialog({
             </div>
             <div></div>
 
-            {/* الصف 4: الأسعار */}
+            {/* الصف 4: الأسعار (بدون سعر الجملة) */}
             <div>
               <label className={labelClass}>سعر البيع بالتجزئة</label>
               <input type="number" value={form.sale_price} onChange={e => setForm({ ...form, sale_price: e.target.value })} className={inputClass} placeholder="0.00" />
             </div>
             <div>
-              <label className={labelClass}>سعر الجملة</label>
-              <input type="number" value={form.purchase_price} onChange={e => setForm({ ...form, purchase_price: e.target.value })} className={inputClass} placeholder="0.00" />
-            </div>
-            <div>
               <label className={labelClass}>السعر الأجنبي</label>
               <input type="number" value={form.foreign_price} onChange={e => setForm({ ...form, foreign_price: e.target.value })} className={inputClass} placeholder="0.00" />
             </div>
+            <div></div>
+
 
             {/* الصف 5: المخزون + الحد الأدنى + (فراغ) */}
             <div>
@@ -428,7 +430,8 @@ export default function QuickAddProductDialog({
             </div>
           </div>
 
-          <DialogFooter className="flex flex-row-reverse gap-2 sm:justify-start mt-2">
+          <DialogFooter className="shrink-0 flex flex-row-reverse gap-2 sm:justify-start mt-2 border-t border-border pt-2">
+
             <Button onClick={handleSubmit} disabled={saving} size="sm">
               {saving ? "جارٍ الحفظ..." : "إضافة"}
             </Button>

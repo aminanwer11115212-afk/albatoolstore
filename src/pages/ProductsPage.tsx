@@ -780,7 +780,7 @@ export default function ProductsPage() {
       category_id: selectedCategoryIds[0] || null,
       warehouse_id: form.warehouse_id || null, company_id: primaryBrandId,
       supplier_id: form.supplier_id || null,
-      purchase_price: parseFloat(form.purchase_price) || 0, sale_price: parseFloat(form.sale_price) || 0,
+      purchase_price: (parseFloat(form.foreign_price) > 0 ? (parseFloat(form.foreign_price) * exchangeRate) : (parseFloat(form.purchase_price) || 0)), sale_price: parseFloat(form.sale_price) || 0,
       min_stock: parseInt(form.min_stock) || 0,
       unit: form.unit, description: form.description || null,
       foreign_price: parseFloat(form.foreign_price) || null,
@@ -1662,8 +1662,8 @@ export default function ProductsPage() {
 
       {/* Add/Edit form - Dialog (نمط نافذة العميل) */}
       <Dialog open={shouldShowForm} onOpenChange={(o) => { if (!o) { setShowForm(false); setEditId(null); } }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0" dir="rtl">
+          <DialogHeader className="shrink-0 px-6 pt-6">
             <DialogTitle>{editId ? "تعديل المنتج" : "إضافة منتج جديد"}</DialogTitle>
           </DialogHeader>
           {shouldShowForm && (() => {
@@ -1675,7 +1675,7 @@ export default function ProductsPage() {
             const idx = () => i++;
             return (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-2 px-6 overflow-y-auto flex-1 min-h-0">
                   {/* الصف 1: اسم المنتج | كود | الوحدة */}
                   {(() => { const k = idx(); return (
                     <div>
@@ -1800,7 +1800,7 @@ export default function ProductsPage() {
                     </div>
                   ); })()}
 
-                  {/* الصف 3: المورد | سعر الجملة | سعر القطاعي */}
+                  {/* الصف 3: المورد | (السعر الأجنبي في الصف 4) */}
                   {(() => { const k = idx(); return (
                     <div>
                       <label className={lbl}>المورد</label>
@@ -1820,14 +1820,6 @@ export default function ProductsPage() {
                     </div>
                   ); })()}
 
-                  {(() => { const k = idx(); return (
-                    <div>
-                      <label className={lbl}>سعر الجملة</label>
-                      <input ref={el => fieldRefs.current[k] = el} type="number" value={form.purchase_price}
-                        onChange={e => setForm({ ...form, purchase_price: e.target.value })}
-                        onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0.00" />
-                    </div>
-                  ); })()}
 
                   {(() => { const k = idx(); return (
                     <div>
@@ -1836,7 +1828,8 @@ export default function ProductsPage() {
                         onChange={e => setForm({ ...form, sale_price: e.target.value })}
                         onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0.00" />
                       {(() => {
-                        const pVal = parseFloat(form.purchase_price) || 0;
+                        const fVal = parseFloat(form.foreign_price) || 0;
+                        const pVal = fVal > 0 ? fVal * exchangeRate : (parseFloat(form.purchase_price) || 0);
                         const sVal = parseFloat(form.sale_price) || 0;
                         if (pVal > 0 && sVal > 0) {
                           const diff = sVal - pVal;
@@ -1854,6 +1847,7 @@ export default function ProductsPage() {
                         }
                         return null;
                       })()}
+
                     </div>
                   ); })()}
 
@@ -1973,7 +1967,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                <DialogFooter className="gap-2 flex-row-reverse items-center justify-between">
+                <DialogFooter className="shrink-0 gap-2 flex-row-reverse items-center justify-between border-t border-border px-6 py-3 bg-background">
                   <div className="flex items-center gap-2">
                     <button onClick={() => { setShowForm(false); setEditId(null); }}
                       className="px-5 py-2 rounded-lg text-sm bg-muted text-foreground">إلغاء</button>
