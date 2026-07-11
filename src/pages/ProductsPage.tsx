@@ -3038,6 +3038,7 @@ export default function ProductsPage() {
                     <th className="border border-border p-1 text-right">الاسم</th>
                     <th className="border border-border p-1 text-right w-24">الفئة</th>
                     <th className="border border-border p-1 text-right w-24">الماركة</th>
+                    {pv.showPrice && <th className="border border-border p-1 text-center w-20">السعر</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -3054,10 +3055,11 @@ export default function ProductsPage() {
                       <td className="border border-border p-1 font-medium">{p.name}</td>
                       <td className="border border-border p-1 text-muted-foreground">{p.categories?.[0]?.name || p.product_categories?.name || ""}</td>
                       <td className="border border-border p-1 text-muted-foreground">{p.brands?.[0]?.name || p.product_companies?.name || ""}</td>
+                      {pv.showPrice && <td className="border border-border p-1 text-center font-semibold text-emerald-600">{Number(p.sale_price || 0).toLocaleString("ar-EG")}</td>}
                     </tr>
                   ))}
                   {pdfList.length === 0 && (
-                    <tr><td colSpan={5} className="text-center text-muted-foreground py-6">لا توجد منتجات مطابقة</td></tr>
+                    <tr><td colSpan={pv.showPrice ? 6 : 5} className="text-center text-muted-foreground py-6">لا توجد منتجات مطابقة</td></tr>
                   )}
                 </tbody>
               </table>
