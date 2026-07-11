@@ -2953,7 +2953,7 @@ export default function ProductsPage() {
               >✕</button>
             </div>
 
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-3">
               {/* حذف */}
               <button
                 type="button"
@@ -2962,33 +2962,49 @@ export default function ProductsPage() {
                   setImgActionProduct(null);
                   await handleDeleteProduct(p.id);
                 }}
-                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+                className="flex flex-col items-center gap-2 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-5 px-2 min-h-[92px]"
               >
-                <Trash2 size={22} className="text-rose-400" />
-                <span className="text-xs font-semibold text-rose-300">حذف</span>
+                <Trash2 size={30} className="text-rose-400" />
+                <span className="text-sm font-bold text-rose-300">حذف</span>
               </button>
-              {/* مشاركة */}
+              {/* مشاركة الصورة نفسها */}
               <button
                 type="button"
                 onClick={async () => {
                   const p = imgActionProduct;
                   setImgActionProduct(null);
-                  const lines = [p.name || "منتج"];
-                  if (p.sku) lines.push(`SKU: ${p.sku}`);
-                  if (p.image_url) lines.push(p.image_url);
-                  const text = lines.join("\n");
+                  if (!p.image_url) { toast.error("لا توجد صورة للمشاركة"); return; }
+                  const tid = toast.loading("جارٍ تحضير الصورة...");
                   try {
-                    if ((navigator as any).share) {
-                      await (navigator as any).share({ title: p.name || "منتج", text });
-                      return;
+                    const { fetchImageAsFile } = await import("@/utils/fetchImageAsFile");
+                    const file = await fetchImageAsFile(p.image_url, `${(p.name || "product").replace(/[\\/:*?"<>|]+/g, "_")}.jpg`);
+                    toast.dismiss(tid);
+                    const nav: any = navigator;
+                    const canShareFiles = typeof nav.canShare === "function" && nav.canShare({ files: [file] });
+                    if (canShareFiles && typeof nav.share === "function") {
+                      try {
+                        await nav.share({ files: [file], title: p.name || "منتج", text: p.name || "" });
+                        return;
+                      } catch (err: any) {
+                        if (err?.name === "AbortError") return;
+                      }
                     }
-                  } catch { /* ignore */ }
-                  openWhatsApp(undefined, text);
+                    // Fallback: تنزيل الصورة على الجهاز حتى يمكن مشاركتها من المعرض
+                    const url = URL.createObjectURL(file);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = file.name;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 1500);
+                    toast.success("تم تنزيل الصورة — شاركها من معرض الصور");
+                  } catch (e: any) {
+                    toast.dismiss(tid);
+                    toast.error(e?.message || "تعذر تحضير الصورة للمشاركة");
+                  }
                 }}
-                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+                className="flex flex-col items-center gap-2 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-5 px-2 min-h-[92px]"
               >
-                <svg viewBox="0 0 24 24" width="22" height="22" className="text-sky-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                <span className="text-xs font-semibold text-sky-200">مشاركة</span>
+                <svg viewBox="0 0 24 24" width="30" height="30" className="text-sky-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span className="text-sm font-bold text-sky-200">مشاركة</span>
               </button>
               {/* عرض الصورة */}
               <button
@@ -2999,24 +3015,40 @@ export default function ProductsPage() {
                   if (p.image_url) setImgLightbox({ url: p.image_url, name: p.name || "" });
                   else toast.error("لا توجد صورة");
                 }}
-                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+                className="flex flex-col items-center gap-2 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-5 px-2 min-h-[92px]"
               >
-                <svg viewBox="0 0 24 24" width="22" height="22" className="text-slate-200" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                <span className="text-xs font-semibold text-slate-200">عرض الصورة</span>
+                <svg viewBox="0 0 24 24" width="30" height="30" className="text-slate-200" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span className="text-sm font-bold text-slate-200">عرض الصورة</span>
               </button>
-              {/* تعديل */}
+              {/* تعديل = إعادة قص الصورة */}
               <button
                 type="button"
                 onClick={() => {
                   const p = imgActionProduct;
                   setImgActionProduct(null);
-                  handleEdit(p);
-                  setShowForm(true);
+                  if (!p.image_url) { toast.error("لا توجد صورة لقصّها"); return; }
+                  startRecrop(p.image_url, async (cropped) => {
+                    const localUrl = URL.createObjectURL(cropped);
+                    const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                    try {
+                      const { uploadProductImage } = await import("@/utils/productImageUpload");
+                      const url = await uploadProductImage(cropped);
+                      patchProductCaches(p.id, { image_url: url });
+                      await update.mutateAsync({ id: p.id, image_url: url });
+                      window.dispatchEvent(new Event("products:changed"));
+                      setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                      toast.success("تم قصّ الصورة");
+                    } catch (err: any) {
+                      rollback();
+                      URL.revokeObjectURL(localUrl);
+                      toast.error(err?.message || "فشل حفظ الصورة الجديدة");
+                    }
+                  });
                 }}
-                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+                className="flex flex-col items-center gap-2 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-5 px-2 min-h-[92px]"
               >
-                <Edit size={22} className="text-sky-300" />
-                <span className="text-xs font-semibold text-sky-200">تعديل</span>
+                <Scissors size={30} className="text-sky-300" />
+                <span className="text-sm font-bold text-sky-200">قص الصورة</span>
               </button>
             </div>
           </div>
