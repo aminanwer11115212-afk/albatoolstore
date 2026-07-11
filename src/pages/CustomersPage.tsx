@@ -21,6 +21,7 @@ import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect from "@/components/InlineSearchSelect";
 import GeoStructurePanel from "@/components/customers/GeoStructurePanel";
 import CustomerLogisticsTable from "@/components/customers/CustomerLogisticsTable";
+import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDialog";
 const emptyForm = { name: "", phone: "", address: "", notes: "", city: "", region_id: "" as string | null | "", state_id: "" as string | null | "", locality_id: "" as string | null | "", city_id: "" as string | null | "" };
 
 type ActivityFilter = "all" | "active_30" | "active_90" | "inactive_90" | "no_activity" | "with_balance" | "with_credit";
