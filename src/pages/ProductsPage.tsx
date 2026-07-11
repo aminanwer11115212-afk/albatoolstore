@@ -354,10 +354,10 @@ export default function ProductsPage() {
   };
 
   // Pagination (only for /products) — memoized
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / perPage));
   const paginated = useMemo(
-    () => isAllProducts ? filtered.slice((page - 1) * perPage, page * perPage) : filtered,
-    [filtered, isAllProducts, page, perPage],
+    () => isAllProducts ? sortedFiltered.slice((page - 1) * perPage, page * perPage) : sortedFiltered,
+    [sortedFiltered, isAllProducts, page, perPage],
   );
   const didMountRef = useRef(false);
   useEffect(() => {
