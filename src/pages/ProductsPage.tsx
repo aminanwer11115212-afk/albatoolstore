@@ -1828,7 +1828,8 @@ export default function ProductsPage() {
                         onChange={e => setForm({ ...form, sale_price: e.target.value })}
                         onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0.00" />
                       {(() => {
-                        const pVal = parseFloat(form.purchase_price) || 0;
+                        const fVal = parseFloat(form.foreign_price) || 0;
+                        const pVal = fVal > 0 ? fVal * exchangeRate : (parseFloat(form.purchase_price) || 0);
                         const sVal = parseFloat(form.sale_price) || 0;
                         if (pVal > 0 && sVal > 0) {
                           const diff = sVal - pVal;
@@ -1846,6 +1847,7 @@ export default function ProductsPage() {
                         }
                         return null;
                       })()}
+
                     </div>
                   ); })()}
 
