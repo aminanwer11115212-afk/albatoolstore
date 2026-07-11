@@ -2361,7 +2361,9 @@ export default function ProductsPage() {
                   data-nav-table="products"
                   data-nav-row={idx}
                   data-nav-col="row"
+                  data-nospace-delete
                   className={`${(isAllProducts ? ((page - 1) * perPage + idx) : idx) % 2 === 0 ? "odd" : "even"} ${isRowPendingDelete(p.id) ? "row-pending-delete-products" : ""}`}
+
                   style={{
                     position: "relative",
                     outline: "none",
