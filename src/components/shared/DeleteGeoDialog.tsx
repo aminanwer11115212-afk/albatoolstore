@@ -12,6 +12,7 @@ export interface DeleteGeoDialogProps {
   childrenLabel?: string;   // "مدن"، "محليات"...
   allowCascade?: boolean;   // false للمجموعات/الترحيلات/الوجهات
   customerNames?: string[]; // عيّنة أسماء العملاء المرتبطين
+  childrenNames?: string[]; // أسماء الأبناء (مثلاً محليات مدينة)
   onDeleteOnly: () => Promise<boolean>;
   onDeleteCascade?: () => Promise<boolean>;
   onDone?: () => void;      // بعد نجاح الحذف
