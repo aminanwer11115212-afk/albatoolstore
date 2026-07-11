@@ -520,6 +520,7 @@ export default function CustomersPage() {
     if (error) { toast.error(error.message); return null; }
     setRegions(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     toast.success(`تمت إضافة الاتجاه: ${name}`);
+    try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return data.id;
   };
   const createState = async (name: string, regionId: string): Promise<string | null> => {
@@ -528,6 +529,7 @@ export default function CustomersPage() {
     if (error) { toast.error(error.message); return null; }
     setStates(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     toast.success(`تمت إضافة الولاية: ${name}`);
+    try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return data.id;
   };
   const createCity = async (name: string, stateId: string | null | undefined): Promise<string | null> => {
@@ -536,6 +538,7 @@ export default function CustomersPage() {
     if (error) { toast.error(error.message); return null; }
     setCities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     toast.success(`تمت إضافة المدينة: ${name}`);
+    try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return data.id;
   };
   const createLocality = async (name: string, cityId: string | null | undefined): Promise<string | null> => {
@@ -544,6 +547,7 @@ export default function CustomersPage() {
     if (error) { toast.error(error.message); return null; }
     setLocalities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     toast.success(`تمت إضافة المحلية: ${name}`);
+    try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return data.id;
   };
   const deleteCity = async (cityId: string): Promise<boolean> => {
@@ -555,6 +559,7 @@ export default function CustomersPage() {
     if (error) { toast.error(error.message); return false; }
     setCities(prev => prev.filter(c => c.id !== cityId));
     toast.success("تم حذف المدينة");
+    try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return true;
   };
   const deleteLocality = async (locId: string): Promise<boolean> => {
@@ -564,6 +569,7 @@ export default function CustomersPage() {
     if (error) { toast.error(error.message); return false; }
     setLocalities(prev => prev.filter(l => l.id !== locId));
     toast.success("تم حذف المحلية");
+    try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return true;
   };
   const createGroup = async (name: string): Promise<string | null> => {
