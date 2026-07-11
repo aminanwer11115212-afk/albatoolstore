@@ -148,12 +148,14 @@ export async function deleteGeoOnly(kind: EntityKind, id: string): Promise<boole
     // 3) احذف السجل نفسه
     const { error } = await (supabase as any).from(meta.table).delete().eq("id", id);
     if (error) throw error;
+    try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return true;
   } catch (e: any) {
     toast.error(e?.message || "فشل الحذف");
     return false;
   }
 }
+
 
 /** يعيد قائمة العملاء المرتبطين بهذا الكيان (مباشرة أو عبر أبنائه) الذين لديهم فواتير/عروض/معاملات. */
 async function findBlockedCustomers(kind: EntityKind, id: string): Promise<{ id: string; name: string }[]> {
