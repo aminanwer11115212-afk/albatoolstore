@@ -2456,6 +2456,21 @@ export default function ProductsPage() {
         }}
         title="قص صورة المنتج"
       />
+
+      {unlinkDialog && (
+        <ConfirmUnlinkDeleteDialog
+          open={!!unlinkDialog}
+          onOpenChange={(v) => { if (!v) setUnlinkDialog(null); }}
+          entityLabel={unlinkDialog.entityLabel}
+          entityName={unlinkDialog.entityName}
+          usageLabel={unlinkDialog.usageLabel}
+          usageNames={unlinkDialog.usageNames}
+          usageCount={unlinkDialog.usageCount}
+          warning={unlinkDialog.warning}
+          onConfirm={unlinkDialog.onConfirm}
+          onDone={() => setUnlinkDialog(null)}
+        />
+      )}
     </div>
   );
 }
