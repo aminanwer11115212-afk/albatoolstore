@@ -2248,9 +2248,18 @@ export default function ProductsPage() {
                         <input
                           type="checkbox"
                           checked={selectedIds.has(p.id)}
-                          onChange={() => toggleSelected(p.id)}
+                          onChange={() => {}}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                              selectWithModifiers(idx, { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
+                            } else {
+                              toggleSelected(p.id);
+                              lastSelectedIdxRef.current = idx;
+                            }
+                          }}
                           className="w-3.5 h-3.5"
-                          title="تحديد (Shift+Enter لتجميد المحدد)"
+                          title="تحديد (Shift للنطاق • Ctrl للتحديد المتعدد • Shift+Enter لتجميد المحدد)"
                         />
                         <span className="text-[11px]">{(page - 1) * perPage + idx + 1}</span>
                       </div>
