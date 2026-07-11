@@ -65,6 +65,18 @@ export default function DeleteGeoDialog(props: DeleteGeoDialogProps) {
             )}
           </div>
 
+          {customerNames.length > 0 && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-xs max-h-40 overflow-auto">
+              <div className="text-muted-foreground mb-1">هذا العنصر مستخدم لدى:</div>
+              <ul className="space-y-0.5">
+                {customerNames.map((n, i) => (<li key={i}>• {n}</li>))}
+              </ul>
+              {customers > customerNames.length && (
+                <div className="mt-1 text-muted-foreground">و {customers - customerNames.length} عميل آخر...</div>
+              )}
+            </div>
+          )}
+
           {allowCascade ? (
             <div className="text-xs text-muted-foreground leading-relaxed space-y-1">
               <div>
