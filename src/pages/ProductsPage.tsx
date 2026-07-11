@@ -1303,7 +1303,7 @@ export default function ProductsPage() {
 
     <table class="products">
       <thead>
-        <tr class="repeat-brand"><td colspan="7">${escHtml(companyName)} — كتالوج المنتجات</td></tr>
+        <tr class="repeat-brand"><td colspan="${pv.showPrice ? 8 : 7}">${escHtml(companyName)} — كتالوج المنتجات</td></tr>
         <tr>
           <th class="c-num">#</th>
           <th class="c-img">الصورة</th>
@@ -1312,12 +1312,13 @@ export default function ProductsPage() {
           <th class="c-meta">الماركة</th>
           <th class="c-meta">المستودع</th>
           <th class="c-sku">SKU</th>
+          ${pv.showPrice ? `<th class="c-price">السعر</th>` : ""}
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
 
-    <div class="footer">تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار.</div>
+    <div class="footer">${pv.showPrice ? "الكتالوج مع الأسعار — قابلة للتغيير." : "تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار."}</div>
   </div>
   ${autoPrint ? `<script>
     window.addEventListener('load', () => {
