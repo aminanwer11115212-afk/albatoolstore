@@ -1897,15 +1897,6 @@ export default function ProductsPage() {
                     </div>
                   ); })()}
 
-                  {/* الوصف بعرض كامل */}
-                  {(() => { const k = idx(); return (
-                    <div className="md:col-span-3">
-                      <label className={lbl}>الوصف</label>
-                      <textarea ref={el => fieldRefs.current[k] = el} value={form.description}
-                        onChange={e => setForm({ ...form, description: e.target.value })}
-                        className={inp + " min-h-[80px]"} />
-                    </div>
-                  ); })()}
 
                   {/* صورة + تجميد */}
                   <div className="md:col-span-3">
