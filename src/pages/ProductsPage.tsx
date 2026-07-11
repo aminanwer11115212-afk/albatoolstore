@@ -2193,10 +2193,31 @@ export default function ProductsPage() {
                   onKeyDown={(e) => {
                     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                       const dir = e.key === "ArrowDown" ? 1 : -1;
+                      const nextIdx = idx + dir;
                       const next = document.querySelector<HTMLElement>(
-                        `[data-nav-table="products"][data-nav-row="${idx + dir}"][data-nav-col="row"]`
+                        `[data-nav-table="products"][data-nav-row="${nextIdx}"][data-nav-col="row"]`
                       );
-                      if (next) { e.preventDefault(); next.focus(); }
+                      if (next) {
+                        e.preventDefault();
+                        next.focus();
+                        // Shift+Arrow extends selection from the anchor
+                        if (e.shiftKey) {
+                          selectWithModifiers(nextIdx, { shift: true, ctrl: e.ctrlKey || e.metaKey });
+                        }
+                      }
+                    } else if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+                      e.preventDefault();
+                      selectAllVisible();
+                    }
+                  }}
+                  onClick={(e) => {
+                    // Row click with Ctrl/Shift enables multi-select; ignore clicks originating from
+                    // form controls so cell editing still works normally.
+                    const tgt = e.target as HTMLElement;
+                    if (tgt.closest('input,select,textarea,button,a,label')) return;
+                    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                      e.preventDefault();
+                      selectWithModifiers(idx, { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
                     }
                   }}
                   onMouseMove={(e) => {
