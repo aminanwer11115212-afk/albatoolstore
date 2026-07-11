@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
+import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDialog";
 
 import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
@@ -160,6 +161,17 @@ export default function ProductsPage() {
 
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // حوار حذف ذكي مع فكّ الربط (فئة/ماركة/مستودع/مورد)
+  const [unlinkDialog, setUnlinkDialog] = useState<{
+    entityLabel: string;
+    entityName: string;
+    usageLabel: string;
+    usageNames: string[];
+    usageCount: number;
+    warning?: string;
+    onConfirm: () => Promise<boolean>;
+  } | null>(null);
 
   // Refs لتنقّل Enter/Tab بنمط نافذة العميل
   const fieldRefs = useRef<Focusable[]>([]);
@@ -578,21 +590,11 @@ export default function ProductsPage() {
     return shown + extra;
   };
 
-  // حذف فئة من النظام كلياً إن لم تكن مستخدمة في أي منتج
-  const deleteCategoryFromSystem = async (categoryId: string): Promise<boolean> => {
+  // حذف فعلي للفئة (بعد فكّ الروابط)
+  const performDeleteCategory = async (categoryId: string): Promise<boolean> => {
     try {
-      const { data: links, error: lerr } = await (supabase as any)
-        .from("product_category_links").select("product_id").eq("category_id", categoryId);
-      if (lerr) throw lerr;
-      const { data: legacy, error: perr } = await (supabase as any)
-        .from("products").select("id").eq("category_id", categoryId);
-      if (perr) throw perr;
-      const ids = new Set<string>([...(links || []).map((x: any) => x.product_id), ...(legacy || []).map((x: any) => x.id)]);
-      if (ids.size > 0) {
-        const names = (products || []).filter((p: any) => ids.has(p.id)).map((p: any) => p.name);
-        toast.error(`لا يمكن حذف الفئة، مستخدمة في: ${formatUsageList(names)}`);
-        return false;
-      }
+      await (supabase as any).from("product_category_links").delete().eq("category_id", categoryId);
+      await (supabase as any).from("products").update({ category_id: null }).eq("category_id", categoryId);
       const { error: derr } = await (supabase as any).from("product_categories").delete().eq("id", categoryId);
       if (derr) throw derr;
       queryClient.invalidateQueries({ queryKey: ["product_categories"] });
@@ -602,21 +604,33 @@ export default function ProductsPage() {
     } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
   };
 
-  // حذف ماركة من النظام كلياً إن لم تكن مستخدمة في أي منتج
-  const deleteBrandFromSystem = async (brandId: string): Promise<boolean> => {
+  const deleteCategoryFromSystem = async (categoryId: string): Promise<boolean> => {
     try {
-      const { data: links, error: lerr } = await (supabase as any)
-        .from("product_brand_links").select("product_id").eq("brand_id", brandId);
-      if (lerr) throw lerr;
-      const { data: legacy, error: perr } = await (supabase as any)
-        .from("products").select("id").eq("company_id", brandId);
-      if (perr) throw perr;
+      const [{ data: links }, { data: legacy }, { data: catRow }] = await Promise.all([
+        (supabase as any).from("product_category_links").select("product_id").eq("category_id", categoryId),
+        (supabase as any).from("products").select("id").eq("category_id", categoryId),
+        (supabase as any).from("product_categories").select("name").eq("id", categoryId).maybeSingle(),
+      ]);
       const ids = new Set<string>([...(links || []).map((x: any) => x.product_id), ...(legacy || []).map((x: any) => x.id)]);
-      if (ids.size > 0) {
-        const names = (products || []).filter((p: any) => ids.has(p.id)).map((p: any) => p.name);
-        toast.error(`لا يمكن حذف الماركة، مستخدمة في: ${formatUsageList(names)}`);
-        return false;
-      }
+      if (ids.size === 0) return await performDeleteCategory(categoryId);
+      const names = (products || []).filter((p: any) => ids.has(p.id)).map((p: any) => p.name);
+      setUnlinkDialog({
+        entityLabel: "الفئة",
+        entityName: catRow?.name || "",
+        usageLabel: "منتج",
+        usageNames: names,
+        usageCount: ids.size,
+        onConfirm: () => performDeleteCategory(categoryId),
+      });
+      return false;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+  // حذف فعلي للماركة (بعد فكّ الروابط)
+  const performDeleteBrand = async (brandId: string): Promise<boolean> => {
+    try {
+      await (supabase as any).from("product_brand_links").delete().eq("brand_id", brandId);
+      await (supabase as any).from("products").update({ company_id: null }).eq("company_id", brandId);
       const { error: derr } = await (supabase as any).from("product_companies").delete().eq("id", brandId);
       if (derr) throw derr;
       queryClient.invalidateQueries({ queryKey: ["product_companies"] });
@@ -626,17 +640,32 @@ export default function ProductsPage() {
     } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
   };
 
-  // حذف مستودع من النظام كلياً إن لم يكن مستخدماً
-  const deleteWarehouseFromSystem = async (warehouseId: string): Promise<boolean> => {
+  const deleteBrandFromSystem = async (brandId: string): Promise<boolean> => {
     try {
-      const { data: used, error: uerr } = await (supabase as any)
-        .from("products").select("id, name").eq("warehouse_id", warehouseId).limit(20);
-      if (uerr) throw uerr;
-      if ((used || []).length > 0) {
-        const names = (used || []).map((p: any) => p.name);
-        toast.error(`لا يمكن حذف المستودع، مستخدم في: ${formatUsageList(names)}`);
-        return false;
-      }
+      const [{ data: links }, { data: legacy }, { data: brRow }] = await Promise.all([
+        (supabase as any).from("product_brand_links").select("product_id").eq("brand_id", brandId),
+        (supabase as any).from("products").select("id").eq("company_id", brandId),
+        (supabase as any).from("product_companies").select("name").eq("id", brandId).maybeSingle(),
+      ]);
+      const ids = new Set<string>([...(links || []).map((x: any) => x.product_id), ...(legacy || []).map((x: any) => x.id)]);
+      if (ids.size === 0) return await performDeleteBrand(brandId);
+      const names = (products || []).filter((p: any) => ids.has(p.id)).map((p: any) => p.name);
+      setUnlinkDialog({
+        entityLabel: "الماركة",
+        entityName: brRow?.name || "",
+        usageLabel: "منتج",
+        usageNames: names,
+        usageCount: ids.size,
+        onConfirm: () => performDeleteBrand(brandId),
+      });
+      return false;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+  // حذف فعلي للمستودع (بعد فكّ الربط)
+  const performDeleteWarehouse = async (warehouseId: string): Promise<boolean> => {
+    try {
+      await (supabase as any).from("products").update({ warehouse_id: null }).eq("warehouse_id", warehouseId);
       const { error: derr } = await (supabase as any).from("warehouses").delete().eq("id", warehouseId);
       if (derr) throw derr;
       queryClient.invalidateQueries({ queryKey: ["warehouses"] });
@@ -646,24 +675,32 @@ export default function ProductsPage() {
     } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
   };
 
-  // حذف مورد من النظام كلياً إن لم يكن مستخدماً
-  const deleteSupplierFromSystem = async (supplierId: string): Promise<boolean> => {
+  const deleteWarehouseFromSystem = async (warehouseId: string): Promise<boolean> => {
     try {
-      const { data: usedP, error: uerr } = await (supabase as any)
-        .from("products").select("id, name").eq("supplier_id", supplierId).limit(20);
-      if (uerr) throw uerr;
-      const { data: usedPO, error: poerr } = await (supabase as any)
-        .from("purchase_orders").select("id").eq("supplier_id", supplierId).limit(1);
-      if (poerr) throw poerr;
-      if ((usedP || []).length > 0) {
-        const names = (usedP || []).map((p: any) => p.name);
-        toast.error(`لا يمكن حذف المورد، مستخدم في منتجات: ${formatUsageList(names)}`);
-        return false;
-      }
-      if ((usedPO || []).length > 0) {
-        toast.error("لا يمكن حذف المورد، يوجد فواتير شراء مرتبطة به");
-        return false;
-      }
+      const [{ data: used }, { data: whRow }] = await Promise.all([
+        (supabase as any).from("products").select("id, name").eq("warehouse_id", warehouseId),
+        (supabase as any).from("warehouses").select("name").eq("id", warehouseId).maybeSingle(),
+      ]);
+      const rows = (used || []) as any[];
+      if (rows.length === 0) return await performDeleteWarehouse(warehouseId);
+      const names = rows.map((p: any) => p.name);
+      setUnlinkDialog({
+        entityLabel: "المستودع",
+        entityName: whRow?.name || "",
+        usageLabel: "منتج",
+        usageNames: names,
+        usageCount: rows.length,
+        warning: `سيصبح ${rows.length} منتج بدون مستودع محدد.`,
+        onConfirm: () => performDeleteWarehouse(warehouseId),
+      });
+      return false;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
+  // حذف فعلي للمورد (بعد فكّ الربط من المنتجات) — يُرفض إن كانت هناك فواتير شراء
+  const performDeleteSupplier = async (supplierId: string): Promise<boolean> => {
+    try {
+      await (supabase as any).from("products").update({ supplier_id: null }).eq("supplier_id", supplierId);
       const { error: derr } = await (supabase as any).from("suppliers").delete().eq("id", supplierId);
       if (derr) throw derr;
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
@@ -672,6 +709,33 @@ export default function ProductsPage() {
       return true;
     } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
   };
+
+  const deleteSupplierFromSystem = async (supplierId: string): Promise<boolean> => {
+    try {
+      const [{ data: usedP }, { data: usedPO }, { data: sRow }] = await Promise.all([
+        (supabase as any).from("products").select("id, name").eq("supplier_id", supplierId),
+        (supabase as any).from("purchase_orders").select("id").eq("supplier_id", supplierId).limit(1),
+        (supabase as any).from("suppliers").select("name").eq("id", supplierId).maybeSingle(),
+      ]);
+      if ((usedPO || []).length > 0) {
+        toast.error("لا يمكن حذف المورد — يوجد فواتير شراء مرتبطة به");
+        return false;
+      }
+      const rows = (usedP || []) as any[];
+      if (rows.length === 0) return await performDeleteSupplier(supplierId);
+      const names = rows.map((p: any) => p.name);
+      setUnlinkDialog({
+        entityLabel: "المورد",
+        entityName: sRow?.name || "",
+        usageLabel: "منتج",
+        usageNames: names,
+        usageCount: rows.length,
+        onConfirm: () => performDeleteSupplier(supplierId),
+      });
+      return false;
+    } catch (err: any) { toast.error(err.message || "فشل الحذف"); return false; }
+  };
+
 
 
   const handleSubmit = async () => {
@@ -2392,6 +2456,21 @@ export default function ProductsPage() {
         }}
         title="قص صورة المنتج"
       />
+
+      {unlinkDialog && (
+        <ConfirmUnlinkDeleteDialog
+          open={!!unlinkDialog}
+          onOpenChange={(v) => { if (!v) setUnlinkDialog(null); }}
+          entityLabel={unlinkDialog.entityLabel}
+          entityName={unlinkDialog.entityName}
+          usageLabel={unlinkDialog.usageLabel}
+          usageNames={unlinkDialog.usageNames}
+          usageCount={unlinkDialog.usageCount}
+          warning={unlinkDialog.warning}
+          onConfirm={unlinkDialog.onConfirm}
+          onDone={() => setUnlinkDialog(null)}
+        />
+      )}
     </div>
   );
 }

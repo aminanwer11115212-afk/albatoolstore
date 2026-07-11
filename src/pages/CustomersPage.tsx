@@ -21,6 +21,7 @@ import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect from "@/components/InlineSearchSelect";
 import GeoStructurePanel from "@/components/customers/GeoStructurePanel";
 import CustomerLogisticsTable from "@/components/customers/CustomerLogisticsTable";
+import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDialog";
 const emptyForm = { name: "", phone: "", address: "", notes: "", city: "", region_id: "" as string | null | "", state_id: "" as string | null | "", locality_id: "" as string | null | "", city_id: "" as string | null | "" };
 
 type ActivityFilter = "all" | "active_30" | "active_90" | "inactive_90" | "no_activity" | "with_balance" | "with_credit";
@@ -117,8 +118,9 @@ export default function CustomersPage() {
   const [groups, setGroups] = useState<any[]>([]);
   const [transporters, setTransporters] = useState<any[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
-  const [customerTransporter, setCustomerTransporter] = useState<Record<string, string>>({});
-  const [customerDestination, setCustomerDestination] = useState<Record<string, string>>({});
+ const [customerTransporter, setCustomerTransporter] = useState<Record<string, string>>({});
+ const [customerDestination, setCustomerDestination] = useState<Record<string, string>>({});
+ const [unlinkDialog, setUnlinkDialog] = useState<{ entityLabel: string; entityName: string; usageLabel: string; usageNames: string[]; usageCount: number; onConfirm: () => Promise<boolean>; } | null>(null);
   const [lastActivity, setLastActivity] = useState<Record<string, string>>({});
   const [savingRow, setSavingRow] = useState<string | null>(null);
   const [quickAdd, setQuickAdd] = useState<{ name: string; address: string; phone: string; region_id: string; state_id: string; city: string; city_id: string; locality_id: string; group_id: string; transporter_id: string; destination_id: string }>({ name: "", address: "", phone: "", region_id: "", state_id: "", city: "", city_id: "", locality_id: "", group_id: "", transporter_id: "", destination_id: "" });
@@ -586,32 +588,93 @@ export default function CustomersPage() {
     return data.id;
   };
 
-  const deleteGroup = async (groupId: string): Promise<boolean> => {
-    const used = (customers || []).some((c: any) => c.group_id === groupId);
-    if (used) { toast.error("لا يمكن حذف المجموعة — مستخدمة من قبل عملاء"); return false; }
+  // مساعد لاستخراج أسماء العملاء المرتبطين
+  const customerNamesByIds = (ids: Set<string>) =>
+    (customers || []).filter((c: any) => ids.has(c.id)).map((c: any) => c.name).filter(Boolean);
+
+  const performDeleteGroup = async (groupId: string): Promise<boolean> => {
+    await (supabase as any).from("customers").update({ group_id: null }).eq("group_id", groupId);
     const { error } = await (supabase as any).from("customer_groups").delete().eq("id", groupId);
     if (error) { toast.error(error.message); return false; }
     setGroups(prev => prev.filter(g => g.id !== groupId));
+    queryClient.invalidateQueries({ queryKey: ["customers"] });
     toast.success("تم حذف المجموعة");
     return true;
   };
-  const deleteTransporter = async (id: string): Promise<boolean> => {
-    const used = Object.values(customerTransporter || {}).some((v) => v === id);
-    if (used) { toast.error("لا يمكن حذف الترحيلات — مستخدمة من قبل عملاء"); return false; }
+
+  const deleteGroup = async (groupId: string): Promise<boolean> => {
+    const usedIds = new Set<string>((customers || []).filter((c: any) => c.group_id === groupId).map((c: any) => c.id));
+    if (usedIds.size === 0) return await performDeleteGroup(groupId);
+    const row = groups.find(g => g.id === groupId);
+    setUnlinkDialog({
+      entityLabel: "المجموعة",
+      entityName: row?.name || "",
+      usageLabel: "عميل",
+      usageNames: customerNamesByIds(usedIds),
+      usageCount: usedIds.size,
+      onConfirm: () => performDeleteGroup(groupId),
+    });
+    return false;
+  };
+
+  const performDeleteTransporter = async (id: string): Promise<boolean> => {
+    await (supabase as any).from("customer_preferred_transporter").delete().eq("transporter_id", id);
     const { error } = await (supabase as any).from("transporters").delete().eq("id", id);
     if (error) { toast.error(error.message); return false; }
     setTransporters(prev => prev.filter(t => t.id !== id));
+    setCustomerTransporter(prev => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) if (v !== id) next[k] = v;
+      return next;
+    });
+    queryClient.invalidateQueries({ queryKey: ["customers"] });
     toast.success("تم حذف الترحيلات");
     return true;
   };
-  const deleteDestination = async (id: string): Promise<boolean> => {
-    const used = Object.values(customerDestination || {}).some((v) => v === id);
-    if (used) { toast.error("لا يمكن حذف الوجهة — مستخدمة من قبل عملاء"); return false; }
+
+  const deleteTransporter = async (id: string): Promise<boolean> => {
+    const usedIds = new Set<string>(Object.entries(customerTransporter || {}).filter(([_, v]) => v === id).map(([k]) => k));
+    if (usedIds.size === 0) return await performDeleteTransporter(id);
+    const row = transporters.find(t => t.id === id);
+    setUnlinkDialog({
+      entityLabel: "الترحيلات",
+      entityName: row?.name || "",
+      usageLabel: "عميل",
+      usageNames: customerNamesByIds(usedIds),
+      usageCount: usedIds.size,
+      onConfirm: () => performDeleteTransporter(id),
+    });
+    return false;
+  };
+
+  const performDeleteDestination = async (id: string): Promise<boolean> => {
+    await (supabase as any).from("customer_destinations").delete().eq("destination_id", id);
     const { error } = await (supabase as any).from("destinations").delete().eq("id", id);
     if (error) { toast.error(error.message); return false; }
     setDestinations(prev => prev.filter(d => d.id !== id));
+    setCustomerDestination(prev => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) if (v !== id) next[k] = v;
+      return next;
+    });
+    queryClient.invalidateQueries({ queryKey: ["customers"] });
     toast.success("تم حذف الوجهة");
     return true;
+  };
+
+  const deleteDestination = async (id: string): Promise<boolean> => {
+    const usedIds = new Set<string>(Object.entries(customerDestination || {}).filter(([_, v]) => v === id).map(([k]) => k));
+    if (usedIds.size === 0) return await performDeleteDestination(id);
+    const row = destinations.find(d => d.id === id);
+    setUnlinkDialog({
+      entityLabel: "الوجهة",
+      entityName: row?.name || "",
+      usageLabel: "عميل",
+      usageNames: customerNamesByIds(usedIds),
+      usageCount: usedIds.size,
+      onConfirm: () => performDeleteDestination(id),
+    });
+    return false;
   };
 
   const updateCustomerTransporter = async (customerId: string, transporterId: string) => {
@@ -1972,6 +2035,20 @@ export default function CustomersPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {unlinkDialog && (
+        <ConfirmUnlinkDeleteDialog
+          open={!!unlinkDialog}
+          onOpenChange={(v) => { if (!v) setUnlinkDialog(null); }}
+          entityLabel={unlinkDialog.entityLabel}
+          entityName={unlinkDialog.entityName}
+          usageLabel={unlinkDialog.usageLabel}
+          usageNames={unlinkDialog.usageNames}
+          usageCount={unlinkDialog.usageCount}
+          onConfirm={unlinkDialog.onConfirm}
+          onDone={() => setUnlinkDialog(null)}
+        />
+      )}
     </div>
   );
 }
