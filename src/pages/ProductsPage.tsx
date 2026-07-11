@@ -3202,18 +3202,48 @@ export default function ProductsPage() {
                   <option value="desc">تنازلي</option>
                 </select>
               </div>
-              <div className="sm:col-span-2 md:col-span-3 flex items-center gap-2 pt-1">
-                <label className="inline-flex items-center gap-2 cursor-pointer select-none px-3 py-2 rounded-lg border border-border bg-muted/40 hover:bg-muted">
-                  <input
-                    type="checkbox"
-                    checked={pv.showPrice}
-                    onChange={(e) => setPv({ ...pv, showPrice: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm font-medium">
-                    {pv.showPrice ? "إظهار السعر في PDF والمشاركة" : "إخفاء السعر في PDF والمشاركة"}
-                  </span>
-                </label>
+              <div className="sm:col-span-2 md:col-span-3">
+                <div className="text-xs text-muted-foreground mb-1 font-semibold">
+                  الأعمدة المعروضة في المعاينة والطباعة و PDF (اسم المنتج يظهر دائماً):
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { key: "image", label: "الصورة" },
+                    { key: "category", label: "الفئة" },
+                    { key: "brand", label: "الماركة" },
+                    { key: "warehouse", label: "المستودع" },
+                    { key: "sku", label: "SKU" },
+                    { key: "price", label: "السعر" },
+                  ] as { key: keyof PvCols; label: string }[]).map((c) => {
+                    const checked = pv.cols[c.key];
+                    return (
+                      <label
+                        key={c.key}
+                        className={`inline-flex items-center gap-1.5 cursor-pointer select-none px-2.5 py-1.5 rounded-lg border text-xs font-medium ${
+                          checked
+                            ? "border-primary/60 bg-primary/10 text-primary"
+                            : "border-border bg-muted/40 text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = { ...pv.cols, [c.key]: e.target.checked };
+                            // مزامنة showPrice مع تبديل عمود السعر (توافق خلفي)
+                            setPv({
+                              ...pv,
+                              cols: next,
+                              showPrice: c.key === "price" ? e.target.checked : pv.showPrice,
+                            });
+                          }}
+                          className="w-3.5 h-3.5"
+                        />
+                        {c.label}
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -3225,32 +3255,40 @@ export default function ProductsPage() {
                 <thead className="bg-muted sticky top-0">
                   <tr>
                     <th className="border border-border p-1 w-8">#</th>
-                    <th className="border border-border p-1 w-12">صورة</th>
+                    {pv.cols.image && <th className="border border-border p-1 w-12">صورة</th>}
                     <th className="border border-border p-1 text-right">الاسم</th>
-                    <th className="border border-border p-1 text-right w-24">الفئة</th>
-                    <th className="border border-border p-1 text-right w-24">الماركة</th>
-                    {pv.showPrice && <th className="border border-border p-1 text-center w-20">السعر</th>}
+                    {pv.cols.category && <th className="border border-border p-1 text-right w-24">الفئة</th>}
+                    {pv.cols.brand && <th className="border border-border p-1 text-right w-24">الماركة</th>}
+                    {pv.cols.warehouse && <th className="border border-border p-1 text-right w-24">المستودع</th>}
+                    {pv.cols.sku && <th className="border border-border p-1 text-right w-20">SKU</th>}
+                    {pv.cols.price && <th className="border border-border p-1 text-center w-20">السعر</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {pdfList.slice(0, 60).map((p: any, i: number) => (
+                  {pdfList.slice(0, 60).map((p: any, i: number) => {
+                    const whName = p.warehouse_id ? ((warehouses || []).find((w: any) => w.id === p.warehouse_id)?.name || "") : "";
+                    return (
                     <tr key={p.id} className="odd:bg-background even:bg-muted/30">
                       <td className="border border-border p-1 text-center text-muted-foreground">{i + 1}</td>
-                      <td className="border border-border p-1">
-                        <div className="w-8 h-8 mx-auto rounded bg-muted overflow-hidden flex items-center justify-center">
-                          {p.image_url
-                            ? <img src={p.image_url} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-                            : <PackageIcon size={12} className="text-muted-foreground" />}
-                        </div>
-                      </td>
+                      {pv.cols.image && (
+                        <td className="border border-border p-1">
+                          <div className="w-8 h-8 mx-auto rounded bg-muted overflow-hidden flex items-center justify-center">
+                            {p.image_url
+                              ? <img src={p.image_url} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                              : <PackageIcon size={12} className="text-muted-foreground" />}
+                          </div>
+                        </td>
+                      )}
                       <td className="border border-border p-1 font-medium">{p.name}</td>
-                      <td className="border border-border p-1 text-muted-foreground">{p.categories?.[0]?.name || p.product_categories?.name || ""}</td>
-                      <td className="border border-border p-1 text-muted-foreground">{p.brands?.[0]?.name || p.product_companies?.name || ""}</td>
-                      {pv.showPrice && <td className="border border-border p-1 text-center font-semibold text-emerald-600">{Number(p.sale_price || 0).toLocaleString("ar-EG")}</td>}
+                      {pv.cols.category && <td className="border border-border p-1 text-muted-foreground">{p.categories?.[0]?.name || p.product_categories?.name || ""}</td>}
+                      {pv.cols.brand && <td className="border border-border p-1 text-muted-foreground">{p.brands?.[0]?.name || p.product_companies?.name || ""}</td>}
+                      {pv.cols.warehouse && <td className="border border-border p-1 text-muted-foreground">{whName}</td>}
+                      {pv.cols.sku && <td className="border border-border p-1 text-muted-foreground font-mono text-[10px]">{p.sku || ""}</td>}
+                      {pv.cols.price && <td className="border border-border p-1 text-center font-semibold text-emerald-600">{Number(p.sale_price || 0).toLocaleString("ar-EG")}</td>}
                     </tr>
-                  ))}
+                  );})}
                   {pdfList.length === 0 && (
-                    <tr><td colSpan={pv.showPrice ? 6 : 5} className="text-center text-muted-foreground py-6">لا توجد منتجات مطابقة</td></tr>
+                    <tr><td colSpan={2 + (pv.cols.image?1:0) + (pv.cols.category?1:0) + (pv.cols.brand?1:0) + (pv.cols.warehouse?1:0) + (pv.cols.sku?1:0) + (pv.cols.price?1:0)} className="text-center text-muted-foreground py-6">لا توجد منتجات مطابقة</td></tr>
                   )}
                 </tbody>
               </table>
