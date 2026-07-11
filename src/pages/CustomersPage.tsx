@@ -118,8 +118,9 @@ export default function CustomersPage() {
   const [groups, setGroups] = useState<any[]>([]);
   const [transporters, setTransporters] = useState<any[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
-  const [customerTransporter, setCustomerTransporter] = useState<Record<string, string>>({});
-  const [customerDestination, setCustomerDestination] = useState<Record<string, string>>({});
+ const [customerTransporter, setCustomerTransporter] = useState<Record<string, string>>({});
+ const [customerDestination, setCustomerDestination] = useState<Record<string, string>>({});
+ const [unlinkDialog, setUnlinkDialog] = useState<{ entityLabel: string; entityName: string; usageLabel: string; usageNames: string[]; usageCount: number; onConfirm: () => Promise<boolean>; } | null>(null);
   const [lastActivity, setLastActivity] = useState<Record<string, string>>({});
   const [savingRow, setSavingRow] = useState<string | null>(null);
   const [quickAdd, setQuickAdd] = useState<{ name: string; address: string; phone: string; region_id: string; state_id: string; city: string; city_id: string; locality_id: string; group_id: string; transporter_id: string; destination_id: string }>({ name: "", address: "", phone: "", region_id: "", state_id: "", city: "", city_id: "", locality_id: "", group_id: "", transporter_id: "", destination_id: "" });
