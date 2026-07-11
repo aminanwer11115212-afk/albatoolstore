@@ -28,7 +28,7 @@ export default function GeoStructurePanel({
   const [allOpen, setAllOpen] = useState(false);
   const [delReq, setDelReq] = useState<null | {
     kind: EntityKind; id: string; name: string;
-    customers: number; children: number; childrenLabel: string; customerNames: string[];
+    customers: number; children: number; childrenLabel: string; customerNames: string[]; childrenNames: string[];
   }>(null);
 
   const toggle = (k: string) => setExpanded(p => ({ ...p, [k]: !p[k] }));
@@ -111,6 +111,7 @@ export default function GeoStructurePanel({
       children: impact.children,
       childrenLabel: impact.childrenLabel,
       customerNames: impact.customerNames,
+      childrenNames: impact.childrenNames,
     });
   };
 
@@ -279,6 +280,7 @@ export default function GeoStructurePanel({
             children={delReq.children}
             childrenLabel={delReq.childrenLabel}
             customerNames={delReq.customerNames}
+            childrenNames={delReq.childrenNames}
             allowCascade={true}
             onDeleteOnly={async () => {
               const ok = await deleteGeoOnly(delReq.kind, delReq.id);

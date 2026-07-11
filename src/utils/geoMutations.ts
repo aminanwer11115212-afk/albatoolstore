@@ -39,6 +39,7 @@ export async function getGeoImpact(kind: EntityKind, id: string): Promise<{
   totalCustomers: number;
   total: number;
   customerNames: string[];
+  childrenNames: string[];
 }> {
   const meta = META[kind];
   let customers = 0;
@@ -75,14 +76,18 @@ export async function getGeoImpact(kind: EntityKind, id: string): Promise<{
   }
 
   // الأبناء (لكيانات geo فقط) + العملاء المرتبطين ضمناً
+  let childrenNames: string[] = [];
   if (meta.childKind && meta.childFk) {
     const childMeta = META[meta.childKind];
     const { data: childRows } = await (supabase as any)
       .from(childMeta.table)
-      .select("id")
-      .eq(meta.childFk, id);
+      .select("id,name")
+      .eq(meta.childFk, id)
+      .order("name")
+      .limit(50);
     const childIds = (childRows || []).map((r: any) => r.id);
     children = childIds.length;
+    childrenNames = (childRows || []).slice(0, 10).map((r: any) => r.name).filter(Boolean);
     if (childIds.length && childMeta.customerFk) {
       const { data: cRows, count } = await (supabase as any)
         .from("customers")
@@ -109,6 +114,7 @@ export async function getGeoImpact(kind: EntityKind, id: string): Promise<{
     totalCustomers,
     total: totalCustomers + children,
     customerNames,
+    childrenNames,
   };
 }
 

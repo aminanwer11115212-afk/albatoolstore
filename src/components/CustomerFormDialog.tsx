@@ -65,7 +65,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   const [delReq, setDelReq] = useState<null | {
     kind: EntityKind; id: string; name: string;
     customers: number; children: number; childrenLabel: string;
-    allowCascade: boolean; customerNames: string[];
+    allowCascade: boolean; customerNames: string[]; childrenNames: string[];
   }>(null);
 
   const queryClient = useQueryClient();
@@ -202,6 +202,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
       childrenLabel: impact.childrenLabel,
       allowCascade,
       customerNames: impact.customerNames,
+      childrenNames: impact.childrenNames,
     });
     return false; // الحوار سيتولّى؛ لا تُغلق popover
   };
@@ -637,6 +638,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
           childrenLabel={delReq.childrenLabel}
           allowCascade={delReq.allowCascade}
           customerNames={delReq.customerNames}
+          childrenNames={delReq.childrenNames}
           onDeleteOnly={async () => {
             const ok = await deleteGeoOnly(delReq.kind, delReq.id);
             if (ok) {

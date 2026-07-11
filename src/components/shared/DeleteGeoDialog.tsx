@@ -12,6 +12,7 @@ export interface DeleteGeoDialogProps {
   childrenLabel?: string;   // "مدن"، "محليات"...
   allowCascade?: boolean;   // false للمجموعات/الترحيلات/الوجهات
   customerNames?: string[]; // عيّنة أسماء العملاء المرتبطين
+  childrenNames?: string[]; // أسماء الأبناء (مثلاً محليات مدينة)
   onDeleteOnly: () => Promise<boolean>;
   onDeleteCascade?: () => Promise<boolean>;
   onDone?: () => void;      // بعد نجاح الحذف
@@ -21,7 +22,8 @@ export default function DeleteGeoDialog(props: DeleteGeoDialogProps) {
   const {
     open, onOpenChange, entityLabel, entityName,
     customers, children = 0, childrenLabel = "",
-    allowCascade = true, customerNames = [], onDeleteOnly, onDeleteCascade, onDone,
+    allowCascade = true, customerNames = [], childrenNames = [],
+    onDeleteOnly, onDeleteCascade, onDone,
   } = props;
   const [busy, setBusy] = useState<"" | "only" | "cascade">("");
 
@@ -65,6 +67,18 @@ export default function DeleteGeoDialog(props: DeleteGeoDialogProps) {
             )}
           </div>
 
+          {childrenNames.length > 0 && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-xs max-h-40 overflow-auto">
+              <div className="text-muted-foreground mb-1">{childrenLabel ? `${childrenLabel} التابعة:` : "التوابع:"}</div>
+              <ul className="space-y-0.5">
+                {childrenNames.map((n, i) => (<li key={i}>• {n}</li>))}
+              </ul>
+              {children > childrenNames.length && (
+                <div className="mt-1 text-muted-foreground">و {children - childrenNames.length} {childrenLabel} أخرى...</div>
+              )}
+            </div>
+          )}
+
           {customerNames.length > 0 && (
             <div className="rounded-md border border-border bg-muted/30 p-3 text-xs max-h-40 overflow-auto">
               <div className="text-muted-foreground mb-1">هذا العنصر مستخدم لدى:</div>
@@ -106,7 +120,11 @@ export default function DeleteGeoDialog(props: DeleteGeoDialogProps) {
             disabled={!!busy}
             className="px-4 py-2 rounded-md text-sm bg-secondary text-secondary-foreground border border-border disabled:opacity-50"
           >
-            {busy === "only" ? "جاري..." : `حذف ${entityLabel} فقط`}
+            {busy === "only"
+              ? "جاري..."
+              : (children > 0 && childrenLabel
+                  ? `حذف ${entityLabel} + ${children} ${childrenLabel}`
+                  : `حذف ${entityLabel} فقط`)}
           </button>
           {allowCascade && onDeleteCascade && (
             <button
