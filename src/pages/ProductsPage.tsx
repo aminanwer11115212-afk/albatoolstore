@@ -1025,56 +1025,126 @@ export default function ProductsPage() {
     toast.success(freeze ? "تم تجميد كل المعروض" : "تم إلغاء التجميد عن كل المعروض");
   };
 
+  // ============ PDF export (Excel-like table + company letterhead) ============
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const exportFilteredPdf = async (mode: "print" | "preview" = "print") => {
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  // خيارات المعاينة (فلترة/ترتيب) — مستقلّة عن فلاتر الجدول الرئيسي
+  const [pv, setPv] = useState<{
+    search: string;
+    category: string;
+    brand: string;
+    warehouse: string;
+    sortBy: "name" | "category" | "brand";
+    sortDir: "asc" | "desc";
+  }>({ search: "", category: "", brand: "", warehouse: "", sortBy: "name", sortDir: "asc" });
+
+  // ورّث فلاتر الصفحة عند فتح المعاينة
+  const openPdfPreview = () => {
+    setPv({
+      search: (searchTerm as string) || "",
+      category: filterCategory || "",
+      brand: filterCompany || "",
+      warehouse: filterWarehouse || "",
+      sortBy: "name",
+      sortDir: "asc",
+    });
+    setPdfPreviewOpen(true);
+  };
+
+  const pdfList = useMemo(() => {
+    const src = filtered as any[];
+    const q = pv.search.trim().toLowerCase();
+    const catByProd = (p: any) => p.categories?.[0]?.id || p.product_categories?.id || p.category_id || "";
+    const brandByProd = (p: any) => p.brands?.[0]?.id || p.product_companies?.id || p.company_id || "";
+    const rows = src.filter(p => {
+      if (q && !((p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q))) return false;
+      if (pv.category && catByProd(p) !== pv.category) return false;
+      if (pv.brand && brandByProd(p) !== pv.brand) return false;
+      if (pv.warehouse && p.warehouse_id !== pv.warehouse) return false;
+      return true;
+    });
+    const keyOf = (p: any) => {
+      if (pv.sortBy === "category") return String(p.categories?.[0]?.name || p.product_categories?.name || "");
+      if (pv.sortBy === "brand") return String(p.brands?.[0]?.name || p.product_companies?.name || "");
+      return String(p.name || "");
+    };
+    rows.sort((a, b) => keyOf(a).localeCompare(keyOf(b), "ar") * (pv.sortDir === "asc" ? 1 : -1));
+    return rows;
+  }, [filtered, pv]);
+
+  const exportFilteredPdf = async (mode: "print" | "preview" = "print", listOverride?: any[]) => {
     if (isExportingPdf) return;
+    const list = listOverride || (filtered as any[]);
     setIsExportingPdf(true);
-    const toastId = toast.loading(`جارٍ إنشاء كتالوج PDF لـ ${filtered.length} منتج...`);
+    const toastId = toast.loading(`جارٍ إنشاء كتالوج PDF لـ ${list.length} منتج...`);
     try {
       const escHtml = (s: any) => String(s ?? "")
         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-      // اجمع اسم الشركة من إعدادات الشركة (اختياري — لا يفشل إن لم يوجد)
-      let companyName = "المنتجات";
+      // ترويسة الشركة الكاملة (نفس حقول قوالب الفواتير)
+      let company: any = {};
       try {
         const { data: cs } = await (supabase as any)
-          .from("company_settings").select("company_name").limit(1).maybeSingle();
-        if (cs?.company_name) companyName = cs.company_name;
+          .from("company_settings").select("*").maybeSingle();
+        if (cs) company = cs;
       } catch { /* ignore */ }
+      const companyName = company.company_name || "الشركة";
+      const logoUrl = company.logo_url || "";
 
-      // SVG placeholder inlined as data URI — يعمل بدون شبكة ويظل مربعاً دائماً
+      // SVG placeholder مضمَّن — يظهر مربعاً عند غياب الصورة أو فشل تحميلها
       const placeholderSvg =
         `data:image/svg+xml;utf8,` + encodeURIComponent(
           `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'>
             <rect width='100%' height='100%' fill='#f1f5f9'/>
-            <g fill='#94a3b8' font-family='Cairo,Arial,sans-serif' font-size='11' text-anchor='middle'>
+            <g fill='#94a3b8' font-family='Cairo,Arial,sans-serif' font-size='10' text-anchor='middle'>
               <rect x='30' y='34' width='60' height='44' rx='4' fill='none' stroke='#cbd5e1' stroke-width='2'/>
               <circle cx='47' cy='52' r='4' fill='#cbd5e1'/>
               <path d='M35 74 L55 58 L70 70 L85 60 L85 78 L35 78 Z' fill='#cbd5e1'/>
-              <text x='60' y='96'>لا توجد صورة</text>
+              <text x='60' y='96'>بدون صورة</text>
             </g>
           </svg>`
         );
 
-      const cards = filtered.map((p: any) => {
+      const wById = new Map<string, string>((warehouses || []).map((w: any) => [w.id, w.name]));
+
+      // ملخّص الفلاتر المطبّقة يظهر تحت العنوان
+      const activeFilters: string[] = [];
+      if (pv.category) {
+        const c = (categories || []).find((x: any) => x.id === pv.category);
+        if (c) activeFilters.push(`الفئة: ${c.name}`);
+      }
+      if (pv.brand) {
+        const b = (companies || []).find((x: any) => x.id === pv.brand);
+        if (b) activeFilters.push(`الماركة: ${b.name}`);
+      }
+      if (pv.warehouse) {
+        const w = (warehouses || []).find((x: any) => x.id === pv.warehouse);
+        if (w) activeFilters.push(`المستودع: ${w.name}`);
+      }
+      if (pv.search.trim()) activeFilters.push(`بحث: ${pv.search.trim()}`);
+      activeFilters.push(
+        `الترتيب: ${pv.sortBy === "name" ? "الاسم" : pv.sortBy === "category" ? "الفئة" : "الماركة"} (${pv.sortDir === "asc" ? "تصاعدي" : "تنازلي"})`
+      );
+
+      const rows = list.map((p: any, i: number) => {
         const brandName = p.brands?.[0]?.name || p.product_companies?.name || "";
         const catName = p.categories?.[0]?.name || p.product_categories?.name || "";
+        const whName = p.warehouse_id ? (wById.get(p.warehouse_id) || "") : "";
         const src = p.image_url ? escHtml(p.image_url) : placeholderSvg;
-        const img = `<img src="${src}" alt="${escHtml(p.name || "")}" loading="lazy" onerror="this.onerror=null;this.src='${placeholderSvg}'"/>`;
-        const metaBits = [
-          p.sku ? `<span class="sku">${escHtml(p.sku)}</span>` : "",
-          catName ? `<span class="chip">${escHtml(catName)}</span>` : "",
-          brandName ? `<span class="chip brand">${escHtml(brandName)}</span>` : "",
-        ].filter(Boolean).join("");
         return `
-          <div class="card">
-            <div class="thumb">${img}</div>
-            <div class="body">
-              <div class="name">${escHtml(p.name || "")}</div>
-              ${metaBits ? `<div class="meta">${metaBits}</div>` : ""}
-            </div>
-          </div>`;
+          <tr>
+            <td class="c-num">${i + 1}</td>
+            <td class="c-img"><div class="thumb">
+              <img src="${src}" alt="${escHtml(p.name || "")}" loading="lazy"
+                   onerror="this.onerror=null;this.src='${placeholderSvg}'"/>
+            </div></td>
+            <td class="c-name">${escHtml(p.name || "")}</td>
+            <td class="c-meta">${escHtml(catName)}</td>
+            <td class="c-meta">${escHtml(brandName)}</td>
+            <td class="c-meta">${escHtml(whName)}</td>
+            <td class="c-sku">${escHtml(p.sku || "")}</td>
+          </tr>`;
       }).join("");
 
       const today = new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
@@ -1086,11 +1156,11 @@ export default function ProductsPage() {
 <meta charset="utf-8">
 <title>كتالوج المنتجات — ${escHtml(companyName)}</title>
 <style>
-  /* حجم صفحة A4 مع هوامش صغيرة لضمان عدم قص أي بطاقة */
-  @page { size: A4; margin: 10mm 8mm; }
+  @page { size: A4; margin: 12mm 8mm 14mm 8mm; }
   * { box-sizing: border-box; }
   html, body { font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; color: #1f2937; }
   body { margin: 0; padding: 0; background: #fff; }
+
   .toolbar {
     position: sticky; top: 0; z-index: 10;
     display: flex; gap: 8px; padding: 10px 14px;
@@ -1101,67 +1171,82 @@ export default function ProductsPage() {
     padding: 8px 14px; font: 600 13px "Cairo",sans-serif; cursor: pointer;
   }
   .toolbar button.ghost { background: transparent; border: 1px solid #334155; }
-  .page { padding: 12px; }
-  .header {
-    display: flex; justify-content: space-between; align-items: flex-end;
-    border-bottom: 3px solid #0ea5e9; padding: 0 6px 10px; margin-bottom: 14px;
+
+  .page { padding: 8px 12px; }
+
+  /* ترويسة الشركة — نفس نمط قوالب الفواتير */
+  .letterhead {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 12px; margin-bottom: 8px;
+    background: linear-gradient(135deg, #5b2c8e, #7e3eb5);
+    color: #fff; border-radius: 10px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .header h1 { margin: 0; font-size: 22px; color: #0f172a; font-weight: 800; }
-  .header .sub { color: #64748b; font-size: 12px; margin-top: 4px; }
-  .header .side { text-align: left; color: #475569; font-size: 12px; }
-  .header .side .big { font-size: 15px; color: #0f172a; font-weight: 700; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-  }
-  .card {
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    overflow: hidden;
-    background: #fff;
-    page-break-inside: avoid;
-    break-inside: avoid;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 1px 2px rgba(15,23,42,0.04);
-  }
-  /* الصور مربعة دائمًا بغضّ النظر عن نسبة الصورة الأصلية */
-  .thumb {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    background: #f8fafc;
+  .letterhead .logo {
+    width: 58px; height: 58px; background: #fff; border-radius: 8px; padding: 4px;
     display: flex; align-items: center; justify-content: center;
-    overflow: hidden;
-    border-bottom: 1px solid #e5e7eb;
+    color: #5b2c8e; font-weight: 800; font-size: 22px;
+  }
+  .letterhead .logo img { width: 100%; height: 100%; object-fit: contain; }
+  .letterhead .co { flex: 1; min-width: 0; }
+  .letterhead .co h2 { margin: 0 0 3px; font-size: 17px; font-weight: 800; }
+  .letterhead .co .meta { font-size: 11px; opacity: 0.95; line-height: 1.6; }
+  .letterhead .side {
+    text-align: center; padding: 6px 12px; min-width: 180px;
+    background: rgba(255,255,255,0.16); border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.28);
+  }
+  .letterhead .side .t { font-size: 14px; font-weight: 800; }
+  .letterhead .side .st { font-size: 11px; opacity: 0.92; margin-top: 2px; }
+
+  .filters-note {
+    background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px;
+    padding: 6px 10px; margin-bottom: 8px; font-size: 11px; color: #475569;
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .filters-note b { color: #0f172a; }
+
+  table.products { width: 100%; border-collapse: collapse; }
+  table.products thead { display: table-header-group; } /* تكرار الترويسة كل صفحة */
+  table.products tfoot { display: table-footer-group; }
+  table.products th, table.products td {
+    border: 1px solid #e5e7eb; padding: 4px 6px; vertical-align: middle;
+    font-size: 11.5px;
+  }
+  table.products thead th {
+    background: #f1f5f9; color: #0f172a; font-weight: 800; font-size: 11.5px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  /* الترويسة الصغيرة (اسم الشركة) تُطبع في أعلى كل صفحة داخل thead */
+  .repeat-brand td {
+    background: #ede9fe; color: #4c1d95; font-weight: 800; text-align: center;
+    padding: 4px; font-size: 11px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  table.products tr { page-break-inside: avoid; break-inside: avoid; }
+
+  .c-num  { width: 32px; text-align: center; color: #64748b; }
+  .c-img  { width: 60px; }
+  .c-name { font-weight: 700; color: #0f172a; }
+  .c-meta { width: 110px; color: #334155; }
+  .c-sku  { width: 90px; font-family: ui-monospace, monospace; color: #0369a1; font-size: 10.5px; }
+
+  /* الصورة مربعة دائماً بغضّ النظر عن أبعاد الأصل */
+  .thumb {
+    width: 46px; height: 46px; background: #f8fafc; border: 1px solid #e5e7eb;
+    border-radius: 4px; overflow: hidden; margin: auto;
+    display: flex; align-items: center; justify-content: center;
   }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .body { padding: 8px 10px 10px; }
-  .name {
-    font-size: 13px; font-weight: 700; color: #0f172a;
-    line-height: 1.35;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-    overflow: hidden;
-    min-height: 34px;
-  }
-  .meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-  .meta .sku {
-    font-size: 10px; color: #0369a1; background: #e0f2fe; padding: 2px 6px;
-    border-radius: 4px; font-family: ui-monospace, monospace;
-  }
-  .meta .chip {
-    font-size: 10px; color: #334155; background: #f1f5f9; padding: 2px 6px;
-    border-radius: 4px;
-  }
-  .meta .chip.brand { background: #ecfccb; color: #3f6212; }
+
   .footer {
-    margin-top: 14px; padding-top: 8px; border-top: 1px dashed #cbd5e1;
-    color: #64748b; font-size: 11px; text-align: center;
+    margin-top: 10px; padding-top: 6px; border-top: 1px dashed #cbd5e1;
+    color: #64748b; font-size: 10.5px; text-align: center;
   }
+
   @media print {
     .toolbar { display: none !important; }
     .page { padding: 0; }
-    .card { box-shadow: none; }
   }
 </style>
 </head>
@@ -1170,25 +1255,47 @@ export default function ProductsPage() {
     <button onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
     <button class="ghost" onclick="window.close()">إغلاق</button>
     <div style="margin-inline-start:auto; align-self:center; font-size:12px; color:#94a3b8;">
-      ${filtered.length} منتج • ${escHtml(companyName)}
+      ${list.length} منتج • ${escHtml(companyName)}
     </div>
   </div>
   <div class="page">
-    <div class="header">
-      <div>
-        <h1>كتالوج المنتجات</h1>
-        <div class="sub">${escHtml(companyName)} • ${escHtml(today)}</div>
+    <div class="letterhead">
+      <div class="logo">${logoUrl ? `<img src="${escHtml(logoUrl)}" alt="logo"/>` : escHtml(companyName.charAt(0))}</div>
+      <div class="co">
+        <h2>${escHtml(companyName)}</h2>
+        <div class="meta">
+          ${company.phone ? `📞 ${escHtml(company.phone)} &nbsp;` : ""}
+          ${company.email ? `✉️ ${escHtml(company.email)} &nbsp;` : ""}
+          ${company.address ? `📍 ${escHtml(company.address)}` : ""}
+        </div>
       </div>
       <div class="side">
-        <div>إجمالي الأصناف</div>
-        <div class="big">${filtered.length}</div>
+        <div class="t">كتالوج المنتجات</div>
+        <div class="st">${escHtml(today)} • ${list.length} صنف</div>
       </div>
     </div>
-    <div class="grid">${cards}</div>
+
+    ${activeFilters.length ? `<div class="filters-note"><b>الفلاتر المطبَّقة:</b> ${activeFilters.map(f => escHtml(f)).join(" • ")}</div>` : ""}
+
+    <table class="products">
+      <thead>
+        <tr class="repeat-brand"><td colspan="7">${escHtml(companyName)} — كتالوج المنتجات</td></tr>
+        <tr>
+          <th class="c-num">#</th>
+          <th class="c-img">الصورة</th>
+          <th class="c-name">اسم المنتج</th>
+          <th class="c-meta">الفئة</th>
+          <th class="c-meta">الماركة</th>
+          <th class="c-meta">المستودع</th>
+          <th class="c-sku">SKU</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
     <div class="footer">تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار.</div>
   </div>
   ${autoPrint ? `<script>
-    // انتظر تحميل الصور قبل فتح مربع الطباعة لضمان دقة القص
     window.addEventListener('load', () => {
       const imgs = Array.from(document.images);
       Promise.all(imgs.map(img => img.complete ? Promise.resolve() :
@@ -1202,13 +1309,14 @@ export default function ProductsPage() {
       if (!w) { toast.error("افتح نافذة المتصفح المنبثقة", { id: toastId }); return; }
       w.document.write(html);
       w.document.close();
-      toast.success(`تم إنشاء الكتالوج بنجاح (${filtered.length} منتج)`, { id: toastId });
+      toast.success(`تم إنشاء الكتالوج بنجاح (${list.length} منتج)`, { id: toastId });
     } catch (e: any) {
       toast.error(e.message || "فشل التصدير", { id: toastId });
     } finally {
       setIsExportingPdf(false);
     }
   };
+
 
 
 
