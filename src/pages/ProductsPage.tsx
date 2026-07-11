@@ -1041,7 +1041,7 @@ export default function ProductsPage() {
   // ورّث فلاتر الصفحة عند فتح المعاينة
   const openPdfPreview = () => {
     setPv({
-      search: (searchTerm as string) || "",
+      search: (search as string) || "",
       category: filterCategory || "",
       brand: filterCompany || "",
       warehouse: filterWarehouse || "",
