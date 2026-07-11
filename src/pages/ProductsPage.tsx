@@ -1344,16 +1344,16 @@ export default function ProductsPage() {
 
     <table class="products">
       <thead>
-        <tr class="repeat-brand"><td colspan="${pv.showPrice ? 8 : 7}">${escHtml(companyName)} — كتالوج المنتجات</td></tr>
+        <tr class="repeat-brand"><td colspan="${totalCols}">${escHtml(companyName)} — كتالوج المنتجات</td></tr>
         <tr>
           <th class="c-num">#</th>
-          <th class="c-img">الصورة</th>
+          ${cols.image ? `<th class="c-img">الصورة</th>` : ""}
           <th class="c-name">اسم المنتج</th>
-          <th class="c-meta">الفئة</th>
-          <th class="c-meta">الماركة</th>
-          <th class="c-meta">المستودع</th>
-          <th class="c-sku">SKU</th>
-          ${pv.showPrice ? `<th class="c-price">السعر</th>` : ""}
+          ${cols.category ? `<th class="c-meta">الفئة</th>` : ""}
+          ${cols.brand ? `<th class="c-meta">الماركة</th>` : ""}
+          ${cols.warehouse ? `<th class="c-meta">المستودع</th>` : ""}
+          ${cols.sku ? `<th class="c-sku">SKU</th>` : ""}
+          ${cols.price ? `<th class="c-price">السعر</th>` : ""}
         </tr>
       </thead>
       <tbody>${rows}</tbody>
