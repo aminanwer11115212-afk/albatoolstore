@@ -1359,7 +1359,7 @@ export default function ProductsPage() {
       <tbody>${rows}</tbody>
     </table>
 
-    <div class="footer">${pv.showPrice ? "الكتالوج مع الأسعار — قابلة للتغيير." : "تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار."}</div>
+    <div class="footer">${cols.price ? "الكتالوج مع الأسعار — قابلة للتغيير." : "تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار."}</div>
   </div>
   ${autoPrint ? `<script>
     window.addEventListener('load', () => {
