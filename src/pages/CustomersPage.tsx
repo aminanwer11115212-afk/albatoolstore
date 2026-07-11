@@ -588,32 +588,93 @@ export default function CustomersPage() {
     return data.id;
   };
 
-  const deleteGroup = async (groupId: string): Promise<boolean> => {
-    const used = (customers || []).some((c: any) => c.group_id === groupId);
-    if (used) { toast.error("لا يمكن حذف المجموعة — مستخدمة من قبل عملاء"); return false; }
+  // مساعد لاستخراج أسماء العملاء المرتبطين
+  const customerNamesByIds = (ids: Set<string>) =>
+    (customers || []).filter((c: any) => ids.has(c.id)).map((c: any) => c.name).filter(Boolean);
+
+  const performDeleteGroup = async (groupId: string): Promise<boolean> => {
+    await (supabase as any).from("customers").update({ group_id: null }).eq("group_id", groupId);
     const { error } = await (supabase as any).from("customer_groups").delete().eq("id", groupId);
     if (error) { toast.error(error.message); return false; }
     setGroups(prev => prev.filter(g => g.id !== groupId));
+    queryClient.invalidateQueries({ queryKey: ["customers"] });
     toast.success("تم حذف المجموعة");
     return true;
   };
-  const deleteTransporter = async (id: string): Promise<boolean> => {
-    const used = Object.values(customerTransporter || {}).some((v) => v === id);
-    if (used) { toast.error("لا يمكن حذف الترحيلات — مستخدمة من قبل عملاء"); return false; }
+
+  const deleteGroup = async (groupId: string): Promise<boolean> => {
+    const usedIds = new Set<string>((customers || []).filter((c: any) => c.group_id === groupId).map((c: any) => c.id));
+    if (usedIds.size === 0) return await performDeleteGroup(groupId);
+    const row = groups.find(g => g.id === groupId);
+    setUnlinkDialog({
+      entityLabel: "المجموعة",
+      entityName: row?.name || "",
+      usageLabel: "عميل",
+      usageNames: customerNamesByIds(usedIds),
+      usageCount: usedIds.size,
+      onConfirm: () => performDeleteGroup(groupId),
+    });
+    return false;
+  };
+
+  const performDeleteTransporter = async (id: string): Promise<boolean> => {
+    await (supabase as any).from("customer_preferred_transporter").delete().eq("transporter_id", id);
     const { error } = await (supabase as any).from("transporters").delete().eq("id", id);
     if (error) { toast.error(error.message); return false; }
     setTransporters(prev => prev.filter(t => t.id !== id));
+    setCustomerTransporter(prev => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) if (v !== id) next[k] = v;
+      return next;
+    });
+    queryClient.invalidateQueries({ queryKey: ["customers"] });
     toast.success("تم حذف الترحيلات");
     return true;
   };
-  const deleteDestination = async (id: string): Promise<boolean> => {
-    const used = Object.values(customerDestination || {}).some((v) => v === id);
-    if (used) { toast.error("لا يمكن حذف الوجهة — مستخدمة من قبل عملاء"); return false; }
+
+  const deleteTransporter = async (id: string): Promise<boolean> => {
+    const usedIds = new Set<string>(Object.entries(customerTransporter || {}).filter(([_, v]) => v === id).map(([k]) => k));
+    if (usedIds.size === 0) return await performDeleteTransporter(id);
+    const row = transporters.find(t => t.id === id);
+    setUnlinkDialog({
+      entityLabel: "الترحيلات",
+      entityName: row?.name || "",
+      usageLabel: "عميل",
+      usageNames: customerNamesByIds(usedIds),
+      usageCount: usedIds.size,
+      onConfirm: () => performDeleteTransporter(id),
+    });
+    return false;
+  };
+
+  const performDeleteDestination = async (id: string): Promise<boolean> => {
+    await (supabase as any).from("customer_destinations").delete().eq("destination_id", id);
     const { error } = await (supabase as any).from("destinations").delete().eq("id", id);
     if (error) { toast.error(error.message); return false; }
     setDestinations(prev => prev.filter(d => d.id !== id));
+    setCustomerDestination(prev => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) if (v !== id) next[k] = v;
+      return next;
+    });
+    queryClient.invalidateQueries({ queryKey: ["customers"] });
     toast.success("تم حذف الوجهة");
     return true;
+  };
+
+  const deleteDestination = async (id: string): Promise<boolean> => {
+    const usedIds = new Set<string>(Object.entries(customerDestination || {}).filter(([_, v]) => v === id).map(([k]) => k));
+    if (usedIds.size === 0) return await performDeleteDestination(id);
+    const row = destinations.find(d => d.id === id);
+    setUnlinkDialog({
+      entityLabel: "الوجهة",
+      entityName: row?.name || "",
+      usageLabel: "عميل",
+      usageNames: customerNamesByIds(usedIds),
+      usageCount: usedIds.size,
+      onConfirm: () => performDeleteDestination(id),
+    });
+    return false;
   };
 
   const updateCustomerTransporter = async (customerId: string, transporterId: string) => {
