@@ -3011,6 +3011,19 @@ export default function ProductsPage() {
                   <option value="desc">تنازلي</option>
                 </select>
               </div>
+              <div className="sm:col-span-2 md:col-span-3 flex items-center gap-2 pt-1">
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none px-3 py-2 rounded-lg border border-border bg-muted/40 hover:bg-muted">
+                  <input
+                    type="checkbox"
+                    checked={pv.showPrice}
+                    onChange={(e) => setPv({ ...pv, showPrice: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm font-medium">
+                    {pv.showPrice ? "إظهار السعر في PDF والمشاركة" : "إخفاء السعر في PDF والمشاركة"}
+                  </span>
+                </label>
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto p-3 text-sm">
