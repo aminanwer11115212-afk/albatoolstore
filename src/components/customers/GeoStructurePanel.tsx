@@ -28,7 +28,7 @@ export default function GeoStructurePanel({
   const [allOpen, setAllOpen] = useState(false);
   const [delReq, setDelReq] = useState<null | {
     kind: EntityKind; id: string; name: string;
-    customers: number; children: number; childrenLabel: string;
+    customers: number; children: number; childrenLabel: string; customerNames: string[];
   }>(null);
 
   const toggle = (k: string) => setExpanded(p => ({ ...p, [k]: !p[k] }));
