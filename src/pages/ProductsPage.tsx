@@ -2923,6 +2923,132 @@ export default function ProductsPage() {
         />
       )}
 
+      {/* ================ ورقة إجراءات صورة المنتج (موبايل) ================ */}
+      {imgActionProduct && (
+        <div
+          className="fixed inset-0 z-[10000] bg-black/70 flex items-end sm:items-center justify-center"
+          onClick={() => setImgActionProduct(null)}
+        >
+          <div
+            dir="rtl"
+            className="w-full sm:max-w-md bg-[#1f1f24] text-white rounded-t-2xl sm:rounded-2xl p-4 shadow-2xl border-t border-white/10 sm:border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-12 h-12 rounded-lg bg-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                {imgActionProduct.image_url
+                  ? <img src={imgActionProduct.image_url} className="w-full h-full object-cover" />
+                  : <PackageIcon size={20} className="text-white/60" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold truncate">{imgActionProduct.name || "منتج"}</div>
+                {imgActionProduct.sku && (
+                  <div className="text-xs text-white/60 truncate">SKU: {imgActionProduct.sku}</div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setImgActionProduct(null)}
+                className="text-white/70 hover:text-white text-xl px-2"
+              >✕</button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
+              {/* حذف */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const p = imgActionProduct;
+                  setImgActionProduct(null);
+                  await handleDeleteProduct(p.id);
+                }}
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+              >
+                <Trash2 size={22} className="text-rose-400" />
+                <span className="text-xs font-semibold text-rose-300">حذف</span>
+              </button>
+              {/* مشاركة */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const p = imgActionProduct;
+                  setImgActionProduct(null);
+                  const lines = [p.name || "منتج"];
+                  if (p.sku) lines.push(`SKU: ${p.sku}`);
+                  if (p.image_url) lines.push(p.image_url);
+                  const text = lines.join("\n");
+                  try {
+                    if ((navigator as any).share) {
+                      await (navigator as any).share({ title: p.name || "منتج", text });
+                      return;
+                    }
+                  } catch { /* ignore */ }
+                  openWhatsApp(undefined, text);
+                }}
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" className="text-sky-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span className="text-xs font-semibold text-sky-200">مشاركة</span>
+              </button>
+              {/* عرض الصورة */}
+              <button
+                type="button"
+                onClick={() => {
+                  const p = imgActionProduct;
+                  setImgActionProduct(null);
+                  if (p.image_url) setImgLightbox({ url: p.image_url, name: p.name || "" });
+                  else toast.error("لا توجد صورة");
+                }}
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" className="text-slate-200" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span className="text-xs font-semibold text-slate-200">عرض الصورة</span>
+              </button>
+              {/* تعديل */}
+              <button
+                type="button"
+                onClick={() => {
+                  const p = imgActionProduct;
+                  setImgActionProduct(null);
+                  handleEdit(p);
+                  setShowForm(true);
+                }}
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+              >
+                <Edit size={22} className="text-sky-300" />
+                <span className="text-xs font-semibold text-sky-200">تعديل</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================ عارض الصورة (Lightbox) ================ */}
+      {imgLightbox && (
+        <div
+          className="fixed inset-0 z-[10001] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setImgLightbox(null)}
+        >
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setImgLightbox(null); }}
+            className="absolute top-4 left-4 text-white/90 hover:text-white text-2xl w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center"
+          >✕</button>
+          <div className="max-w-[95vw] max-h-[90vh] flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={imgLightbox.url}
+              alt={imgLightbox.name}
+              className="max-w-[95vw] max-h-[80vh] object-contain rounded-lg shadow-2xl"
+            />
+            {imgLightbox.name && (
+              <div className="text-white/90 text-sm font-semibold text-center max-w-full truncate" dir="rtl">
+                {imgLightbox.name}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ================ نافذة معاينة PDF مع فلاتر وترتيب ================ */}
       {pdfPreviewOpen && (
         <div
