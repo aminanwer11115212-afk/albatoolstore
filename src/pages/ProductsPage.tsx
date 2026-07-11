@@ -957,12 +957,45 @@ export default function ProductsPage() {
 
   // تحديد متعدد للمنتجات
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const lastSelectedIdxRef = useRef<number | null>(null);
   const toggleSelected = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+  // Multi-select: Ctrl toggles a single row, Shift extends range from the last anchor.
+  const selectWithModifiers = (
+    index: number,
+    opts: { shift?: boolean; ctrl?: boolean } = {}
+  ) => {
+    const list = paginated as any[];
+    const id = list[index]?.id;
+    if (!id) return;
+    const anchor = lastSelectedIdxRef.current;
+    if (opts.shift && anchor !== null && anchor !== undefined) {
+      const [a, b] = anchor <= index ? [anchor, index] : [index, anchor];
+      const rangeIds = list.slice(a, b + 1).map(p => p.id);
+      setSelectedIds(prev => {
+        const next = opts.ctrl ? new Set(prev) : new Set<string>();
+        rangeIds.forEach(rid => next.add(rid));
+        return next;
+      });
+    } else if (opts.ctrl) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
+      lastSelectedIdxRef.current = index;
+    } else {
+      setSelectedIds(prev => {
+        if (prev.size === 1 && prev.has(id)) return new Set();
+        return new Set([id]);
+      });
+      lastSelectedIdxRef.current = index;
+    }
   };
   const freezeSelected = async () => {
     const ids = Array.from(selectedIds);
