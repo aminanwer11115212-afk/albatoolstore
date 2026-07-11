@@ -22,7 +22,8 @@ export default function DeleteGeoDialog(props: DeleteGeoDialogProps) {
   const {
     open, onOpenChange, entityLabel, entityName,
     customers, children = 0, childrenLabel = "",
-    allowCascade = true, customerNames = [], onDeleteOnly, onDeleteCascade, onDone,
+    allowCascade = true, customerNames = [], childrenNames = [],
+    onDeleteOnly, onDeleteCascade, onDone,
   } = props;
   const [busy, setBusy] = useState<"" | "only" | "cascade">("");
 
