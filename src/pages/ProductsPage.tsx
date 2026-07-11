@@ -1067,6 +1067,7 @@ export default function ProductsPage() {
       warehouse: filterWarehouse || "",
       sortBy: "name",
       sortDir: "asc",
+      showPrice: false,
     });
     setPdfPreviewOpen(true);
   };
