@@ -1060,15 +1060,16 @@ export default function ProductsPage() {
 
   // ورّث فلاتر الصفحة عند فتح المعاينة
   const openPdfPreview = () => {
-    setPv({
+    setPv((prev) => ({
+      ...prev,
       search: (search as string) || "",
       category: filterCategory || "",
       brand: filterCompany || "",
       warehouse: filterWarehouse || "",
       sortBy: "name",
       sortDir: "asc",
-      showPrice: false,
-    });
+      // showPrice: يُحافَظ عليه من الحالة السابقة
+    }));
     setPdfPreviewOpen(true);
   };
 
