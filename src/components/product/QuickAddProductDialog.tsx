@@ -430,7 +430,8 @@ export default function QuickAddProductDialog({
             </div>
           </div>
 
-          <DialogFooter className="flex flex-row-reverse gap-2 sm:justify-start mt-2">
+          <DialogFooter className="shrink-0 flex flex-row-reverse gap-2 sm:justify-start mt-2 border-t border-border pt-2">
+
             <Button onClick={handleSubmit} disabled={saving} size="sm">
               {saving ? "جارٍ الحفظ..." : "إضافة"}
             </Button>
