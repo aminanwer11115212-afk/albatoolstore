@@ -2410,7 +2410,11 @@ export default function ProductsPage() {
                   }}
                 >
 
-                  <td className="px-2 py-3 text-muted-foreground" style={{ background: selectedIds.has(p.id) ? "hsl(var(--primary) / 0.18)" : undefined }}>
+                  <td
+                    data-nospace-delete
+                    className="px-2 py-3 text-muted-foreground"
+                    style={{ background: selectedIds.has(p.id) ? "hsl(var(--primary) / 0.18)" : undefined }}
+                  >
                     {isAllProducts ? (
                       <div className="flex items-center gap-1.5 justify-center">
                         <input
@@ -2422,6 +2426,15 @@ export default function ProductsPage() {
                             if (e.shiftKey || e.ctrlKey || e.metaKey) {
                               selectWithModifiers(idx, { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
                             } else {
+                              toggleSelected(p.id);
+                              lastSelectedIdxRef.current = idx;
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            // مسطرة داخل خانة الشيك = تبديل التحديد فقط (لا حذف)
+                            if (e.key === " " || e.code === "Space") {
+                              e.preventDefault();
+                              e.stopPropagation();
                               toggleSelected(p.id);
                               lastSelectedIdxRef.current = idx;
                             }
