@@ -1896,8 +1896,6 @@ export default function ProductsPage() {
                         onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0" />
                     </div>
                   ); })()}
-
-
                   {/* صورة + تجميد */}
                   <div className="md:col-span-3">
                     <label className={lbl}>صورة المنتج</label>
