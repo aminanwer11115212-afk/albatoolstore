@@ -1899,14 +1899,26 @@ export default function ProductsPage() {
                 <option value="only">المجمّدة فقط</option>
               </select>
             </div>
-            <button
-              type="button"
-              onClick={exportFilteredPdf}
-              className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 md:ml-auto col-span-full sm:col-span-2 md:col-span-1"
-              title="إرسال كشف بالاسم والصورة فقط"
-            >
-              <FileDown size={16} /> تصدير PDF
-            </button>
+            <div className="flex items-center gap-2 md:ml-auto col-span-full sm:col-span-2 md:col-span-1">
+              <button
+                type="button"
+                disabled={isExportingPdf}
+                onClick={() => exportFilteredPdf("preview")}
+                className="flex-1 flex items-center justify-center gap-2 bg-muted text-foreground border border-border px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted/70 disabled:opacity-60"
+                title="فتح معاينة PDF بدون طباعة تلقائية"
+              >
+                <FileDown size={16} /> معاينة
+              </button>
+              <button
+                type="button"
+                disabled={isExportingPdf}
+                onClick={() => exportFilteredPdf("print")}
+                className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60"
+                title="إنشاء كتالوج PDF مع طباعة تلقائية"
+              >
+                <FileDown size={16} /> {isExportingPdf ? "جارٍ الإنشاء..." : "طباعة / PDF"}
+              </button>
+            </div>
           </div>
         </div>
       )}
