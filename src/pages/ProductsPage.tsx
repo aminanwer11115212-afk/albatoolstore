@@ -1800,7 +1800,7 @@ export default function ProductsPage() {
                     </div>
                   ); })()}
 
-                  {/* الصف 3: المورد | سعر الجملة | سعر القطاعي */}
+                  {/* الصف 3: المورد | (السعر الأجنبي في الصف 4) */}
                   {(() => { const k = idx(); return (
                     <div>
                       <label className={lbl}>المورد</label>
@@ -1820,14 +1820,6 @@ export default function ProductsPage() {
                     </div>
                   ); })()}
 
-                  {(() => { const k = idx(); return (
-                    <div>
-                      <label className={lbl}>سعر الجملة</label>
-                      <input ref={el => fieldRefs.current[k] = el} type="number" value={form.purchase_price}
-                        onChange={e => setForm({ ...form, purchase_price: e.target.value })}
-                        onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0.00" />
-                    </div>
-                  ); })()}
 
                   {(() => { const k = idx(); return (
                     <div>
