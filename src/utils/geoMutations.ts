@@ -38,35 +38,40 @@ export async function getGeoImpact(kind: EntityKind, id: string): Promise<{
   childrenLabel: string;
   totalCustomers: number;
   total: number;
+  customerNames: string[];
 }> {
   const meta = META[kind];
   let customers = 0;
   let totalCustomers = 0;
   let children = 0;
   const childrenLabel = meta.childrenLabel || "";
+  const customerIds = new Set<string>();
 
   // العملاء المرتبطون مباشرة
   if (meta.customerFk) {
-    const { count } = await (supabase as any)
+    const { data, count } = await (supabase as any)
       .from("customers")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "exact" })
       .eq(meta.customerFk, id);
     customers = count || 0;
     totalCustomers = customers;
+    (data || []).forEach((r: any) => customerIds.add(r.id));
   } else if (kind === "transporter") {
-    const { count } = await (supabase as any)
+    const { data, count } = await (supabase as any)
       .from("customer_preferred_transporter")
-      .select("customer_id", { count: "exact", head: true })
+      .select("customer_id", { count: "exact" })
       .eq("transporter_id", id);
     customers = count || 0;
     totalCustomers = customers;
+    (data || []).forEach((r: any) => r.customer_id && customerIds.add(r.customer_id));
   } else if (kind === "destination") {
-    const { count } = await (supabase as any)
+    const { data, count } = await (supabase as any)
       .from("customer_destinations")
-      .select("customer_id", { count: "exact", head: true })
+      .select("customer_id", { count: "exact" })
       .eq("destination_id", id);
     customers = count || 0;
     totalCustomers = customers;
+    (data || []).forEach((r: any) => r.customer_id && customerIds.add(r.customer_id));
   }
 
   // الأبناء (لكيانات geo فقط) + العملاء المرتبطين ضمناً
@@ -78,14 +83,23 @@ export async function getGeoImpact(kind: EntityKind, id: string): Promise<{
       .eq(meta.childFk, id);
     const childIds = (childRows || []).map((r: any) => r.id);
     children = childIds.length;
-    // احسب العملاء المرتبطين عبر السلسلة كلها
     if (childIds.length && childMeta.customerFk) {
-      const { count } = await (supabase as any)
+      const { data: cRows, count } = await (supabase as any)
         .from("customers")
-        .select("id", { count: "exact", head: true })
+        .select("id", { count: "exact" })
         .in(childMeta.customerFk, childIds);
       totalCustomers = Math.max(totalCustomers, customers + (count || 0));
+      (cRows || []).forEach((r: any) => customerIds.add(r.id));
     }
+  }
+
+  // أسماء عيّنة من العملاء (أول 8)
+  let customerNames: string[] = [];
+  if (customerIds.size > 0) {
+    const ids = Array.from(customerIds).slice(0, 20);
+    const { data: names } = await (supabase as any)
+      .from("customers").select("name").in("id", ids).limit(8);
+    customerNames = (names || []).map((r: any) => r.name).filter(Boolean);
   }
 
   return {
@@ -94,8 +108,10 @@ export async function getGeoImpact(kind: EntityKind, id: string): Promise<{
     childrenLabel,
     totalCustomers,
     total: totalCustomers + children,
+    customerNames,
   };
 }
+
 
 /** يحذف كل الأبناء تحت هذا الكيان بشكل تعاودي (nullify للعملاء أيضاً). */
 async function deleteChildrenNullify(kind: EntityKind, id: string): Promise<void> {
