@@ -15,6 +15,8 @@ import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDi
 import EditableCell from "@/components/EditableCell";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { openWhatsApp } from "@/utils/whatsapp";
 
 type Focusable = { focus: () => void } | null;
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
@@ -1041,6 +1043,10 @@ export default function ProductsPage() {
   // ============ PDF export (Excel-like table + company letterhead) ============
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const isMobileUI = useIsMobile();
+  // ورقة إجراءات صورة المنتج (موبايل): تعديل / عرض الصورة / مشاركة / حذف
+  const [imgActionProduct, setImgActionProduct] = useState<any | null>(null);
+  const [imgLightbox, setImgLightbox] = useState<{ url: string; name: string } | null>(null);
   // خيارات المعاينة (فلترة/ترتيب) — مستقلّة عن فلاتر الجدول الرئيسي
   const [pv, setPv] = useState<{
     search: string;
@@ -1049,7 +1055,8 @@ export default function ProductsPage() {
     warehouse: string;
     sortBy: "name" | "category" | "brand";
     sortDir: "asc" | "desc";
-  }>({ search: "", category: "", brand: "", warehouse: "", sortBy: "name", sortDir: "asc" });
+    showPrice: boolean;
+  }>({ search: "", category: "", brand: "", warehouse: "", sortBy: "name", sortDir: "asc", showPrice: false });
 
   // ورّث فلاتر الصفحة عند فتح المعاينة
   const openPdfPreview = () => {
@@ -1060,6 +1067,7 @@ export default function ProductsPage() {
       warehouse: filterWarehouse || "",
       sortBy: "name",
       sortDir: "asc",
+      showPrice: false,
     });
     setPdfPreviewOpen(true);
   };
@@ -1140,6 +1148,8 @@ export default function ProductsPage() {
         `الترتيب: ${pv.sortBy === "name" ? "الاسم" : pv.sortBy === "category" ? "الفئة" : "الماركة"} (${pv.sortDir === "asc" ? "تصاعدي" : "تنازلي"})`
       );
 
+      const showPriceCol = !!pv.showPrice;
+      const priceFmt = (n: any) => Number(n || 0).toLocaleString("ar-EG");
       const rows = list.map((p: any, i: number) => {
         const brandName = p.brands?.[0]?.name || p.product_companies?.name || "";
         const catName = p.categories?.[0]?.name || p.product_categories?.name || "";
@@ -1157,6 +1167,7 @@ export default function ProductsPage() {
             <td class="c-meta">${escHtml(brandName)}</td>
             <td class="c-meta">${escHtml(whName)}</td>
             <td class="c-sku">${escHtml(p.sku || "")}</td>
+            ${showPriceCol ? `<td class="c-price">${priceFmt(p.sale_price)}</td>` : ""}
           </tr>`;
       }).join("");
 
@@ -1243,6 +1254,7 @@ export default function ProductsPage() {
   .c-name { font-weight: 700; color: #0f172a; }
   .c-meta { width: 110px; color: #334155; }
   .c-sku  { width: 90px; font-family: ui-monospace, monospace; color: #0369a1; font-size: 10.5px; }
+  .c-price{ width: 90px; text-align: center; font-weight: 700; color: #059669; }
 
   /* الصورة مربعة دائماً بغضّ النظر عن أبعاد الأصل */
   .thumb {
@@ -1292,7 +1304,7 @@ export default function ProductsPage() {
 
     <table class="products">
       <thead>
-        <tr class="repeat-brand"><td colspan="7">${escHtml(companyName)} — كتالوج المنتجات</td></tr>
+        <tr class="repeat-brand"><td colspan="${pv.showPrice ? 8 : 7}">${escHtml(companyName)} — كتالوج المنتجات</td></tr>
         <tr>
           <th class="c-num">#</th>
           <th class="c-img">الصورة</th>
@@ -1301,12 +1313,13 @@ export default function ProductsPage() {
           <th class="c-meta">الماركة</th>
           <th class="c-meta">المستودع</th>
           <th class="c-sku">SKU</th>
+          ${pv.showPrice ? `<th class="c-price">السعر</th>` : ""}
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
 
-    <div class="footer">تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار.</div>
+    <div class="footer">${pv.showPrice ? "الكتالوج مع الأسعار — قابلة للتغيير." : "تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار."}</div>
   </div>
   ${autoPrint ? `<script>
     window.addEventListener('load', () => {
@@ -2486,9 +2499,18 @@ export default function ProductsPage() {
                   <td className={isAllProducts ? "" : "px-5 py-3"} style={isAllProducts ? { padding: 0 } : undefined}>
                     {isAllProducts ? (
                       <div className="flex items-center gap-2 px-1">
-                        <div className="w-7 h-7 rounded bg-muted flex items-center justify-center shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isMobileUI) setImgActionProduct(p);
+                            else if (p.image_url) setImgLightbox({ url: p.image_url, name: p.name || "" });
+                          }}
+                          title={isMobileUI ? "خيارات الصورة" : (p.image_url ? "عرض الصورة" : "لا توجد صورة")}
+                          className="w-7 h-7 rounded bg-muted flex items-center justify-center shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
                           {p.image_url ? <img src={p.image_url} className="w-7 h-7 rounded object-cover" /> : <PackageIcon size={12} className="text-muted-foreground" />}
-                        </div>
+                        </button>
                         <div className="flex-1 min-w-0">
                           <EditableCell
                             value={p.name || ""}
@@ -2507,9 +2529,18 @@ export default function ProductsPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isMobileUI) setImgActionProduct(p);
+                            else if (p.image_url) setImgLightbox({ url: p.image_url, name: p.name || "" });
+                          }}
+                          title={isMobileUI ? "خيارات الصورة" : (p.image_url ? "عرض الصورة" : "لا توجد صورة")}
+                          className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
                           {p.image_url ? <img src={p.image_url} className="w-8 h-8 rounded object-cover" /> : <PackageIcon size={14} className="text-muted-foreground" />}
-                        </div>
+                        </button>
                         {(() => {
                           const brs: any[] = (p.brands && p.brands.length > 0) ? p.brands : (p.product_companies ? [p.product_companies] : []);
                           const brandNames = brs.map((b: any) => b?.name).filter(Boolean).join("، ");
@@ -2892,6 +2923,132 @@ export default function ProductsPage() {
         />
       )}
 
+      {/* ================ ورقة إجراءات صورة المنتج (موبايل) ================ */}
+      {imgActionProduct && (
+        <div
+          className="fixed inset-0 z-[10000] bg-black/70 flex items-end sm:items-center justify-center"
+          onClick={() => setImgActionProduct(null)}
+        >
+          <div
+            dir="rtl"
+            className="w-full sm:max-w-md bg-[#1f1f24] text-white rounded-t-2xl sm:rounded-2xl p-4 shadow-2xl border-t border-white/10 sm:border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-12 h-12 rounded-lg bg-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                {imgActionProduct.image_url
+                  ? <img src={imgActionProduct.image_url} className="w-full h-full object-cover" />
+                  : <PackageIcon size={20} className="text-white/60" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold truncate">{imgActionProduct.name || "منتج"}</div>
+                {imgActionProduct.sku && (
+                  <div className="text-xs text-white/60 truncate">SKU: {imgActionProduct.sku}</div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setImgActionProduct(null)}
+                className="text-white/70 hover:text-white text-xl px-2"
+              >✕</button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
+              {/* حذف */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const p = imgActionProduct;
+                  setImgActionProduct(null);
+                  await handleDeleteProduct(p.id);
+                }}
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+              >
+                <Trash2 size={22} className="text-rose-400" />
+                <span className="text-xs font-semibold text-rose-300">حذف</span>
+              </button>
+              {/* مشاركة */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const p = imgActionProduct;
+                  setImgActionProduct(null);
+                  const lines = [p.name || "منتج"];
+                  if (p.sku) lines.push(`SKU: ${p.sku}`);
+                  if (p.image_url) lines.push(p.image_url);
+                  const text = lines.join("\n");
+                  try {
+                    if ((navigator as any).share) {
+                      await (navigator as any).share({ title: p.name || "منتج", text });
+                      return;
+                    }
+                  } catch { /* ignore */ }
+                  openWhatsApp(undefined, text);
+                }}
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" className="text-sky-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span className="text-xs font-semibold text-sky-200">مشاركة</span>
+              </button>
+              {/* عرض الصورة */}
+              <button
+                type="button"
+                onClick={() => {
+                  const p = imgActionProduct;
+                  setImgActionProduct(null);
+                  if (p.image_url) setImgLightbox({ url: p.image_url, name: p.name || "" });
+                  else toast.error("لا توجد صورة");
+                }}
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" className="text-slate-200" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span className="text-xs font-semibold text-slate-200">عرض الصورة</span>
+              </button>
+              {/* تعديل */}
+              <button
+                type="button"
+                onClick={() => {
+                  const p = imgActionProduct;
+                  setImgActionProduct(null);
+                  handleEdit(p);
+                  setShowForm(true);
+                }}
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 py-3 px-2"
+              >
+                <Edit size={22} className="text-sky-300" />
+                <span className="text-xs font-semibold text-sky-200">تعديل</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================ عارض الصورة (Lightbox) ================ */}
+      {imgLightbox && (
+        <div
+          className="fixed inset-0 z-[10001] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setImgLightbox(null)}
+        >
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setImgLightbox(null); }}
+            className="absolute top-4 left-4 text-white/90 hover:text-white text-2xl w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center"
+          >✕</button>
+          <div className="max-w-[95vw] max-h-[90vh] flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={imgLightbox.url}
+              alt={imgLightbox.name}
+              className="max-w-[95vw] max-h-[80vh] object-contain rounded-lg shadow-2xl"
+            />
+            {imgLightbox.name && (
+              <div className="text-white/90 text-sm font-semibold text-center max-w-full truncate" dir="rtl">
+                {imgLightbox.name}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ================ نافذة معاينة PDF مع فلاتر وترتيب ================ */}
       {pdfPreviewOpen && (
         <div
@@ -2980,6 +3137,19 @@ export default function ProductsPage() {
                   <option value="desc">تنازلي</option>
                 </select>
               </div>
+              <div className="sm:col-span-2 md:col-span-3 flex items-center gap-2 pt-1">
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none px-3 py-2 rounded-lg border border-border bg-muted/40 hover:bg-muted">
+                  <input
+                    type="checkbox"
+                    checked={pv.showPrice}
+                    onChange={(e) => setPv({ ...pv, showPrice: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm font-medium">
+                    {pv.showPrice ? "إظهار السعر في PDF والمشاركة" : "إخفاء السعر في PDF والمشاركة"}
+                  </span>
+                </label>
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto p-3 text-sm">
@@ -2994,6 +3164,7 @@ export default function ProductsPage() {
                     <th className="border border-border p-1 text-right">الاسم</th>
                     <th className="border border-border p-1 text-right w-24">الفئة</th>
                     <th className="border border-border p-1 text-right w-24">الماركة</th>
+                    {pv.showPrice && <th className="border border-border p-1 text-center w-20">السعر</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -3010,10 +3181,11 @@ export default function ProductsPage() {
                       <td className="border border-border p-1 font-medium">{p.name}</td>
                       <td className="border border-border p-1 text-muted-foreground">{p.categories?.[0]?.name || p.product_categories?.name || ""}</td>
                       <td className="border border-border p-1 text-muted-foreground">{p.brands?.[0]?.name || p.product_companies?.name || ""}</td>
+                      {pv.showPrice && <td className="border border-border p-1 text-center font-semibold text-emerald-600">{Number(p.sale_price || 0).toLocaleString("ar-EG")}</td>}
                     </tr>
                   ))}
                   {pdfList.length === 0 && (
-                    <tr><td colSpan={5} className="text-center text-muted-foreground py-6">لا توجد منتجات مطابقة</td></tr>
+                    <tr><td colSpan={pv.showPrice ? 6 : 5} className="text-center text-muted-foreground py-6">لا توجد منتجات مطابقة</td></tr>
                   )}
                 </tbody>
               </table>
