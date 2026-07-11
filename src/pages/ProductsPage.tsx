@@ -780,7 +780,7 @@ export default function ProductsPage() {
       category_id: selectedCategoryIds[0] || null,
       warehouse_id: form.warehouse_id || null, company_id: primaryBrandId,
       supplier_id: form.supplier_id || null,
-      purchase_price: parseFloat(form.purchase_price) || 0, sale_price: parseFloat(form.sale_price) || 0,
+      purchase_price: (parseFloat(form.foreign_price) > 0 ? (parseFloat(form.foreign_price) * exchangeRate) : (parseFloat(form.purchase_price) || 0)), sale_price: parseFloat(form.sale_price) || 0,
       min_stock: parseInt(form.min_stock) || 0,
       unit: form.unit, description: form.description || null,
       foreign_price: parseFloat(form.foreign_price) || null,
