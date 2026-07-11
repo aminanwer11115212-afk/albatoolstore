@@ -1065,7 +1065,8 @@ export default function ProductsPage() {
   // ورقة إجراءات صورة المنتج (موبايل): تعديل / عرض الصورة / مشاركة / حذف
   const [imgActionProduct, setImgActionProduct] = useState<any | null>(null);
   const [imgLightbox, setImgLightbox] = useState<{ url: string; name: string } | null>(null);
-  // خيارات المعاينة (فلترة/ترتيب) — مستقلّة عن فلاتر الجدول الرئيسي
+  // خيارات المعاينة (فلترة/ترتيب/أعمدة) — مستقلّة عن فلاتر الجدول الرئيسي
+  type PvCols = { image: boolean; category: boolean; brand: boolean; warehouse: boolean; sku: boolean; price: boolean };
   const [pv, setPv] = useState<{
     search: string;
     category: string;
@@ -1074,7 +1075,12 @@ export default function ProductsPage() {
     sortBy: "name" | "category" | "brand";
     sortDir: "asc" | "desc";
     showPrice: boolean;
-  }>({ search: "", category: "", brand: "", warehouse: "", sortBy: "name", sortDir: "asc", showPrice: false });
+    cols: PvCols;
+  }>({
+    search: "", category: "", brand: "", warehouse: "",
+    sortBy: "name", sortDir: "asc", showPrice: false,
+    cols: { image: true, category: true, brand: true, warehouse: true, sku: true, price: false },
+  });
 
   // ورّث فلاتر الصفحة عند فتح المعاينة
   const openPdfPreview = () => {
@@ -1086,7 +1092,7 @@ export default function ProductsPage() {
       warehouse: filterWarehouse || "",
       sortBy: "name",
       sortDir: "asc",
-      // showPrice: يُحافَظ عليه من الحالة السابقة
+      // الأعمدة و showPrice: يُحافَظ عليها من الحالة السابقة
     }));
     setPdfPreviewOpen(true);
   };
