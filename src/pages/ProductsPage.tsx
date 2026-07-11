@@ -958,6 +958,18 @@ export default function ProductsPage() {
   // تحديد متعدد للمنتجات
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const lastSelectedIdxRef = useRef<number | null>(null);
+  const lastSpaceTapRef = useRef<number>(0);
+  const selectedIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => { selectedIdsRef.current = selectedIds; }, [selectedIds]);
+  const deleteSelected = async () => {
+    const ids = Array.from(selectedIdsRef.current);
+    if (ids.length === 0) return;
+    for (const id of ids) {
+      try { await performProductDelete(id); } catch (err) { console.error("[deleteSelected]", err); }
+    }
+    setSelectedIds(new Set());
+    toast.success(`تم حذف ${ids.length} منتج`);
+  };
   const toggleSelected = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -965,6 +977,7 @@ export default function ProductsPage() {
       return next;
     });
   };
+
   // Multi-select: Ctrl toggles a single row, Shift extends range from the last anchor.
   const selectWithModifiers = (
     index: number,
