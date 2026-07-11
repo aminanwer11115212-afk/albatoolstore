@@ -334,6 +334,18 @@ export default function ProductsPage() {
     });
   }, [pageProducts, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, showFrozen, onlyFrozen, search]);
 
+  // تطبيق الترتيب الأبجدي على القائمة المفلترة (بدون تعديل الأصل)
+  const sortedFiltered = useMemo(() => {
+    if (nameSortDir === "none") return filtered;
+    const arr = [...filtered];
+    arr.sort((a: any, b: any) =>
+      String(a?.name || "").localeCompare(String(b?.name || ""), "ar") *
+      (nameSortDir === "asc" ? 1 : -1),
+    );
+    return arr;
+  }, [filtered, nameSortDir]);
+
+
   const activeFiltersCount = [filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, stockFilter !== "all" ? stockFilter : "", frozenMode !== "all" ? "frozen" : ""].filter(Boolean).length;
   const clearFilters = () => {
     setFilterWarehouse(""); setFilterCategory(""); setFilterCompany(""); setFilterSupplier("");
