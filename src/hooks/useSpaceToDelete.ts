@@ -21,6 +21,8 @@ function isNavModeCell(el: Element | null): boolean {
   const he = el as HTMLElement;
   if (!he.hasAttribute?.("data-nav-col")) return false;
   if (he.getAttribute("data-edit-mode") === "true") return false;
+  // خانات معلَّمة صراحةً لتعطيل الحذف بالمسطرة (مثل خانة تحديد المنتج).
+  if (he.closest?.("[data-nospace-delete]")) return false;
   // صف الإضافة السريعة ليس ضمن وضع التنقّل — Space يجب أن يكتب مسافة عادية.
   if (he.closest?.(".quick-add-row") || he.closest?.('[data-nav-zone="quick"]')) return false;
   // يجب أن يكون داخل جدول بنود فعلي.
