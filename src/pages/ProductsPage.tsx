@@ -1254,6 +1254,7 @@ export default function ProductsPage() {
   .c-name { font-weight: 700; color: #0f172a; }
   .c-meta { width: 110px; color: #334155; }
   .c-sku  { width: 90px; font-family: ui-monospace, monospace; color: #0369a1; font-size: 10.5px; }
+  .c-price{ width: 90px; text-align: center; font-weight: 700; color: #059669; }
 
   /* الصورة مربعة دائماً بغضّ النظر عن أبعاد الأصل */
   .thumb {
