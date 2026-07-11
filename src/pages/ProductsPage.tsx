@@ -2854,6 +2854,163 @@ export default function ProductsPage() {
           onDone={() => setUnlinkDialog(null)}
         />
       )}
+
+      {/* ================ نافذة معاينة PDF مع فلاتر وترتيب ================ */}
+      {pdfPreviewOpen && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-3"
+          onClick={() => setPdfPreviewOpen(false)}
+        >
+          <div
+            dir="rtl"
+            className="bg-card text-foreground rounded-xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col border border-border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
+              <div className="font-bold text-base flex items-center gap-2">
+                <FileDown size={18} /> معاينة كتالوج PDF
+              </div>
+              <button
+                type="button"
+                onClick={() => setPdfPreviewOpen(false)}
+                className="text-muted-foreground hover:text-foreground text-lg leading-none px-2"
+              >✕</button>
+            </div>
+
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 border-b border-border">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">بحث بالاسم / SKU</label>
+                <input
+                  value={pv.search}
+                  onChange={(e) => setPv({ ...pv, search: e.target.value })}
+                  placeholder="اكتب للبحث..."
+                  className="bg-muted rounded-lg px-3 py-2 text-sm border border-border w-full outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">الفئة</label>
+                <select
+                  value={pv.category}
+                  onChange={(e) => setPv({ ...pv, category: e.target.value })}
+                  className="bg-muted rounded-lg px-3 py-2 text-sm border border-border w-full outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">الكل</option>
+                  {(categories || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">الماركة</label>
+                <select
+                  value={pv.brand}
+                  onChange={(e) => setPv({ ...pv, brand: e.target.value })}
+                  className="bg-muted rounded-lg px-3 py-2 text-sm border border-border w-full outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">الكل</option>
+                  {(companies || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">المستودع</label>
+                <select
+                  value={pv.warehouse}
+                  onChange={(e) => setPv({ ...pv, warehouse: e.target.value })}
+                  className="bg-muted rounded-lg px-3 py-2 text-sm border border-border w-full outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">الكل</option>
+                  {(warehouses || []).map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">ترتيب حسب</label>
+                <select
+                  value={pv.sortBy}
+                  onChange={(e) => setPv({ ...pv, sortBy: e.target.value as any })}
+                  className="bg-muted rounded-lg px-3 py-2 text-sm border border-border w-full outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="name">الاسم</option>
+                  <option value="category">الفئة</option>
+                  <option value="brand">الماركة</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">اتجاه الترتيب</label>
+                <select
+                  value={pv.sortDir}
+                  onChange={(e) => setPv({ ...pv, sortDir: e.target.value as any })}
+                  className="bg-muted rounded-lg px-3 py-2 text-sm border border-border w-full outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="asc">تصاعدي</option>
+                  <option value="desc">تنازلي</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-3 text-sm">
+              <div className="mb-2 text-muted-foreground text-xs">
+                {pdfList.length} منتج مطابق — يُطبع الجدول بشعار وترويسة الشركة أعلى كل صفحة.
+              </div>
+              <table className="w-full border-collapse text-xs">
+                <thead className="bg-muted sticky top-0">
+                  <tr>
+                    <th className="border border-border p-1 w-8">#</th>
+                    <th className="border border-border p-1 w-12">صورة</th>
+                    <th className="border border-border p-1 text-right">الاسم</th>
+                    <th className="border border-border p-1 text-right w-24">الفئة</th>
+                    <th className="border border-border p-1 text-right w-24">الماركة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pdfList.slice(0, 60).map((p: any, i: number) => (
+                    <tr key={p.id} className="odd:bg-background even:bg-muted/30">
+                      <td className="border border-border p-1 text-center text-muted-foreground">{i + 1}</td>
+                      <td className="border border-border p-1">
+                        <div className="w-8 h-8 mx-auto rounded bg-muted overflow-hidden flex items-center justify-center">
+                          {p.image_url
+                            ? <img src={p.image_url} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                            : <PackageIcon size={12} className="text-muted-foreground" />}
+                        </div>
+                      </td>
+                      <td className="border border-border p-1 font-medium">{p.name}</td>
+                      <td className="border border-border p-1 text-muted-foreground">{p.categories?.[0]?.name || p.product_categories?.name || ""}</td>
+                      <td className="border border-border p-1 text-muted-foreground">{p.brands?.[0]?.name || p.product_companies?.name || ""}</td>
+                    </tr>
+                  ))}
+                  {pdfList.length === 0 && (
+                    <tr><td colSpan={5} className="text-center text-muted-foreground py-6">لا توجد منتجات مطابقة</td></tr>
+                  )}
+                </tbody>
+              </table>
+              {pdfList.length > 60 && (
+                <div className="text-xs text-muted-foreground text-center mt-2">
+                  عُرِضت أول 60 نتيجة فقط للمعاينة — الطباعة تشمل جميع {pdfList.length} منتج.
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 p-3 border-t border-border bg-muted/40">
+              <button
+                type="button"
+                onClick={() => setPdfPreviewOpen(false)}
+                className="px-4 py-2 rounded-lg text-sm bg-muted border border-border hover:bg-muted/70"
+              >إلغاء</button>
+              <button
+                type="button"
+                disabled={isExportingPdf || pdfList.length === 0}
+                onClick={() => exportFilteredPdf("preview", pdfList)}
+                className="px-4 py-2 rounded-lg text-sm border border-primary text-primary hover:bg-primary/10 disabled:opacity-60"
+              >فتح معاينة فقط</button>
+              <button
+                type="button"
+                disabled={isExportingPdf || pdfList.length === 0}
+                onClick={() => { exportFilteredPdf("print", pdfList); }}
+                className="px-4 py-2 rounded-lg text-sm bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60 flex items-center gap-2"
+              >
+                <FileDown size={16} /> {isExportingPdf ? "جارٍ الإنشاء..." : "طباعة الآن"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
