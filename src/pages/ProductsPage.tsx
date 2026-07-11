@@ -957,12 +957,45 @@ export default function ProductsPage() {
 
   // تحديد متعدد للمنتجات
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const lastSelectedIdxRef = useRef<number | null>(null);
   const toggleSelected = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+  // Multi-select: Ctrl toggles a single row, Shift extends range from the last anchor.
+  const selectWithModifiers = (
+    index: number,
+    opts: { shift?: boolean; ctrl?: boolean } = {}
+  ) => {
+    const list = paginated as any[];
+    const id = list[index]?.id;
+    if (!id) return;
+    const anchor = lastSelectedIdxRef.current;
+    if (opts.shift && anchor !== null && anchor !== undefined) {
+      const [a, b] = anchor <= index ? [anchor, index] : [index, anchor];
+      const rangeIds = list.slice(a, b + 1).map(p => p.id);
+      setSelectedIds(prev => {
+        const next = opts.ctrl ? new Set(prev) : new Set<string>();
+        rangeIds.forEach(rid => next.add(rid));
+        return next;
+      });
+    } else if (opts.ctrl) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
+      lastSelectedIdxRef.current = index;
+    } else {
+      setSelectedIds(prev => {
+        if (prev.size === 1 && prev.has(id)) return new Set();
+        return new Set([id]);
+      });
+      lastSelectedIdxRef.current = index;
+    }
   };
   const freezeSelected = async () => {
     const ids = Array.from(selectedIds);
@@ -992,7 +1025,11 @@ export default function ProductsPage() {
     toast.success(freeze ? "تم تجميد كل المعروض" : "تم إلغاء التجميد عن كل المعروض");
   };
 
-  const exportFilteredPdf = async () => {
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const exportFilteredPdf = async (mode: "print" | "preview" = "print") => {
+    if (isExportingPdf) return;
+    setIsExportingPdf(true);
+    const toastId = toast.loading(`جارٍ إنشاء كتالوج PDF لـ ${filtered.length} منتج...`);
     try {
       const escHtml = (s: any) => String(s ?? "")
         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -1006,12 +1043,25 @@ export default function ProductsPage() {
         if (cs?.company_name) companyName = cs.company_name;
       } catch { /* ignore */ }
 
+      // SVG placeholder inlined as data URI — يعمل بدون شبكة ويظل مربعاً دائماً
+      const placeholderSvg =
+        `data:image/svg+xml;utf8,` + encodeURIComponent(
+          `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'>
+            <rect width='100%' height='100%' fill='#f1f5f9'/>
+            <g fill='#94a3b8' font-family='Cairo,Arial,sans-serif' font-size='11' text-anchor='middle'>
+              <rect x='30' y='34' width='60' height='44' rx='4' fill='none' stroke='#cbd5e1' stroke-width='2'/>
+              <circle cx='47' cy='52' r='4' fill='#cbd5e1'/>
+              <path d='M35 74 L55 58 L70 70 L85 60 L85 78 L35 78 Z' fill='#cbd5e1'/>
+              <text x='60' y='96'>لا توجد صورة</text>
+            </g>
+          </svg>`
+        );
+
       const cards = filtered.map((p: any) => {
         const brandName = p.brands?.[0]?.name || p.product_companies?.name || "";
         const catName = p.categories?.[0]?.name || p.product_categories?.name || "";
-        const img = p.image_url
-          ? `<img src="${escHtml(p.image_url)}" alt="${escHtml(p.name || "")}" loading="lazy"/>`
-          : `<div class="no-img">لا توجد صورة</div>`;
+        const src = p.image_url ? escHtml(p.image_url) : placeholderSvg;
+        const img = `<img src="${src}" alt="${escHtml(p.name || "")}" loading="lazy" onerror="this.onerror=null;this.src='${placeholderSvg}'"/>`;
         const metaBits = [
           p.sku ? `<span class="sku">${escHtml(p.sku)}</span>` : "",
           catName ? `<span class="chip">${escHtml(catName)}</span>` : "",
@@ -1028,6 +1078,7 @@ export default function ProductsPage() {
       }).join("");
 
       const today = new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+      const autoPrint = mode === "print";
 
       const html = `<!doctype html>
 <html dir="rtl" lang="ar">
@@ -1035,10 +1086,22 @@ export default function ProductsPage() {
 <meta charset="utf-8">
 <title>كتالوج المنتجات — ${escHtml(companyName)}</title>
 <style>
-  @page { size: A4; margin: 12mm 10mm; }
+  /* حجم صفحة A4 مع هوامش صغيرة لضمان عدم قص أي بطاقة */
+  @page { size: A4; margin: 10mm 8mm; }
   * { box-sizing: border-box; }
   html, body { font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; color: #1f2937; }
   body { margin: 0; padding: 0; background: #fff; }
+  .toolbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; gap: 8px; padding: 10px 14px;
+    background: #0f172a; color: #fff; border-bottom: 1px solid #1e293b;
+  }
+  .toolbar button {
+    background: #0ea5e9; color: #fff; border: 0; border-radius: 6px;
+    padding: 8px 14px; font: 600 13px "Cairo",sans-serif; cursor: pointer;
+  }
+  .toolbar button.ghost { background: transparent; border: 1px solid #334155; }
+  .page { padding: 12px; }
   .header {
     display: flex; justify-content: space-between; align-items: flex-end;
     border-bottom: 3px solid #0ea5e9; padding: 0 6px 10px; margin-bottom: 14px;
@@ -1063,6 +1126,7 @@ export default function ProductsPage() {
     flex-direction: column;
     box-shadow: 0 1px 2px rgba(15,23,42,0.04);
   }
+  /* الصور مربعة دائمًا بغضّ النظر عن نسبة الصورة الأصلية */
   .thumb {
     width: 100%;
     aspect-ratio: 1 / 1;
@@ -1072,7 +1136,6 @@ export default function ProductsPage() {
     border-bottom: 1px solid #e5e7eb;
   }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .thumb .no-img { color: #94a3b8; font-size: 11px; }
   .body { padding: 8px 10px 10px; }
   .name {
     font-size: 13px; font-weight: 700; color: #0f172a;
@@ -1096,32 +1159,57 @@ export default function ProductsPage() {
     color: #64748b; font-size: 11px; text-align: center;
   }
   @media print {
+    .toolbar { display: none !important; }
+    .page { padding: 0; }
     .card { box-shadow: none; }
   }
 </style>
 </head>
 <body>
-  <div class="header">
-    <div>
-      <h1>كتالوج المنتجات</h1>
-      <div class="sub">${escHtml(companyName)} • ${escHtml(today)}</div>
-    </div>
-    <div class="side">
-      <div>إجمالي الأصناف</div>
-      <div class="big">${filtered.length}</div>
+  <div class="toolbar">
+    <button onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+    <button class="ghost" onclick="window.close()">إغلاق</button>
+    <div style="margin-inline-start:auto; align-self:center; font-size:12px; color:#94a3b8;">
+      ${filtered.length} منتج • ${escHtml(companyName)}
     </div>
   </div>
-  <div class="grid">${cards}</div>
-  <div class="footer">تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار.</div>
-  <script>window.onload=()=>{setTimeout(()=>window.print(),500)}</script>
+  <div class="page">
+    <div class="header">
+      <div>
+        <h1>كتالوج المنتجات</h1>
+        <div class="sub">${escHtml(companyName)} • ${escHtml(today)}</div>
+      </div>
+      <div class="side">
+        <div>إجمالي الأصناف</div>
+        <div class="big">${filtered.length}</div>
+      </div>
+    </div>
+    <div class="grid">${cards}</div>
+    <div class="footer">تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار.</div>
+  </div>
+  ${autoPrint ? `<script>
+    // انتظر تحميل الصور قبل فتح مربع الطباعة لضمان دقة القص
+    window.addEventListener('load', () => {
+      const imgs = Array.from(document.images);
+      Promise.all(imgs.map(img => img.complete ? Promise.resolve() :
+        new Promise(res => { img.onload = img.onerror = () => res(null); })
+      )).then(() => setTimeout(() => window.print(), 300));
+    });
+  </script>` : ``}
 </body>
 </html>`;
       const w = window.open("", "_blank");
-      if (!w) { toast.error("افتح نافذة المتصفح المنبثقة"); return; }
+      if (!w) { toast.error("افتح نافذة المتصفح المنبثقة", { id: toastId }); return; }
       w.document.write(html);
       w.document.close();
-    } catch (e: any) { toast.error(e.message || "فشل التصدير"); }
+      toast.success(`تم إنشاء الكتالوج بنجاح (${filtered.length} منتج)`, { id: toastId });
+    } catch (e: any) {
+      toast.error(e.message || "فشل التصدير", { id: toastId });
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
+
 
 
   const inputClass = "bg-muted rounded-lg px-4 py-2.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary w-full min-w-0";
@@ -1811,14 +1899,26 @@ export default function ProductsPage() {
                 <option value="only">المجمّدة فقط</option>
               </select>
             </div>
-            <button
-              type="button"
-              onClick={exportFilteredPdf}
-              className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 md:ml-auto col-span-full sm:col-span-2 md:col-span-1"
-              title="إرسال كشف بالاسم والصورة فقط"
-            >
-              <FileDown size={16} /> تصدير PDF
-            </button>
+            <div className="flex items-center gap-2 md:ml-auto col-span-full sm:col-span-2 md:col-span-1">
+              <button
+                type="button"
+                disabled={isExportingPdf}
+                onClick={() => exportFilteredPdf("preview")}
+                className="flex-1 flex items-center justify-center gap-2 bg-muted text-foreground border border-border px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted/70 disabled:opacity-60"
+                title="فتح معاينة PDF بدون طباعة تلقائية"
+              >
+                <FileDown size={16} /> معاينة
+              </button>
+              <button
+                type="button"
+                disabled={isExportingPdf}
+                onClick={() => exportFilteredPdf("print")}
+                className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60"
+                title="إنشاء كتالوج PDF مع طباعة تلقائية"
+              >
+                <FileDown size={16} /> {isExportingPdf ? "جارٍ الإنشاء..." : "طباعة / PDF"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2160,10 +2260,31 @@ export default function ProductsPage() {
                   onKeyDown={(e) => {
                     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                       const dir = e.key === "ArrowDown" ? 1 : -1;
+                      const nextIdx = idx + dir;
                       const next = document.querySelector<HTMLElement>(
-                        `[data-nav-table="products"][data-nav-row="${idx + dir}"][data-nav-col="row"]`
+                        `[data-nav-table="products"][data-nav-row="${nextIdx}"][data-nav-col="row"]`
                       );
-                      if (next) { e.preventDefault(); next.focus(); }
+                      if (next) {
+                        e.preventDefault();
+                        next.focus();
+                        // Shift+Arrow extends selection from the anchor
+                        if (e.shiftKey) {
+                          selectWithModifiers(nextIdx, { shift: true, ctrl: e.ctrlKey || e.metaKey });
+                        }
+                      }
+                    } else if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+                      e.preventDefault();
+                      selectAllVisible();
+                    }
+                  }}
+                  onClick={(e) => {
+                    // Row click with Ctrl/Shift enables multi-select; ignore clicks originating from
+                    // form controls so cell editing still works normally.
+                    const tgt = e.target as HTMLElement;
+                    if (tgt.closest('input,select,textarea,button,a,label')) return;
+                    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                      e.preventDefault();
+                      selectWithModifiers(idx, { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
                     }
                   }}
                   onMouseMove={(e) => {
@@ -2194,9 +2315,18 @@ export default function ProductsPage() {
                         <input
                           type="checkbox"
                           checked={selectedIds.has(p.id)}
-                          onChange={() => toggleSelected(p.id)}
+                          onChange={() => {}}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                              selectWithModifiers(idx, { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
+                            } else {
+                              toggleSelected(p.id);
+                              lastSelectedIdxRef.current = idx;
+                            }
+                          }}
                           className="w-3.5 h-3.5"
-                          title="تحديد (Shift+Enter لتجميد المحدد)"
+                          title="تحديد (Shift للنطاق • Ctrl للتحديد المتعدد • Shift+Enter لتجميد المحدد)"
                         />
                         <span className="text-[11px]">{(page - 1) * perPage + idx + 1}</span>
                       </div>
