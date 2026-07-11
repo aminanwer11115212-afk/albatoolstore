@@ -638,6 +638,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
           childrenLabel={delReq.childrenLabel}
           allowCascade={delReq.allowCascade}
           customerNames={delReq.customerNames}
+          childrenNames={delReq.childrenNames}
           onDeleteOnly={async () => {
             const ok = await deleteGeoOnly(delReq.kind, delReq.id);
             if (ok) {
