@@ -1662,8 +1662,8 @@ export default function ProductsPage() {
 
       {/* Add/Edit form - Dialog (نمط نافذة العميل) */}
       <Dialog open={shouldShowForm} onOpenChange={(o) => { if (!o) { setShowForm(false); setEditId(null); } }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0" dir="rtl">
+          <DialogHeader className="shrink-0 px-6 pt-6">
             <DialogTitle>{editId ? "تعديل المنتج" : "إضافة منتج جديد"}</DialogTitle>
           </DialogHeader>
           {shouldShowForm && (() => {
