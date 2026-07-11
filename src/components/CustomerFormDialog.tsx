@@ -191,6 +191,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
       children: impact.children,
       childrenLabel: impact.childrenLabel,
       allowCascade,
+      customerNames: impact.customerNames,
     });
     return false; // الحوار سيتولّى؛ لا تُغلق popover
   };
