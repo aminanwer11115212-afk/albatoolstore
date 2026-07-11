@@ -65,7 +65,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   const [delReq, setDelReq] = useState<null | {
     kind: EntityKind; id: string; name: string;
     customers: number; children: number; childrenLabel: string;
-    allowCascade: boolean;
+    allowCascade: boolean; customerNames: string[];
   }>(null);
 
   const queryClient = useQueryClient();
