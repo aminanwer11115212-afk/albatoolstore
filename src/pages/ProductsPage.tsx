@@ -2458,14 +2458,24 @@ export default function ProductsPage() {
                             }
                           }}
                           onKeyDown={(e) => {
-                            // مسطرة داخل خانة الشيك = تبديل التحديد فقط (لا حذف)
+                            // مسطرة داخل خانة الشيك = تبديل التحديد
+                            // مسطرة مضاعفة سريعة = حذف كل المحدَّدين
                             if (e.key === " " || e.code === "Space") {
                               e.preventDefault();
                               e.stopPropagation();
+                              const now = Date.now();
+                              const isDouble = now - lastSpaceTapRef.current <= 350;
+                              lastSpaceTapRef.current = now;
+                              if (isDouble && selectedIdsRef.current.size > 0) {
+                                lastSpaceTapRef.current = 0;
+                                void deleteSelected();
+                                return;
+                              }
                               toggleSelected(p.id);
                               lastSelectedIdxRef.current = idx;
                             }
                           }}
+
                           className="w-3.5 h-3.5"
                           title="تحديد (Shift للنطاق • Ctrl للتحديد المتعدد • Shift+Enter لتجميد المحدد)"
                         />
