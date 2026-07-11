@@ -255,6 +255,8 @@ export async function deleteGeoCascade(kind: EntityKind, id: string): Promise<bo
     if (e2) throw e2;
 
     toast.success(`تم حذف ${meta.label} و ${customerIds.size} عميل مرتبط`);
+    try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
+    try { window.dispatchEvent(new CustomEvent("customers:changed")); } catch {}
     return true;
   } catch (e: any) {
     toast.error(e?.message || "فشل الحذف الكامل");
