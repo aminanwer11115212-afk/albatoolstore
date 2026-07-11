@@ -150,6 +150,13 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     })();
   }, [form.city_id]);
 
+  const notifyGeoChanged = () => {
+    try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
+  };
+  const notifyLogisticsChanged = () => {
+    try { window.dispatchEvent(new CustomEvent("customer-logistics:changed")); } catch {}
+  };
+
   const addRegion = async (name: string): Promise<string | null> => {
     const nextSort = (regions.reduce((m, r) => Math.max(m, r.sort_order || 0), 0) || 0) + 1;
     const { data, error } = await (supabase as any).from("regions")
@@ -158,6 +165,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     setRegions(prev => [...prev, data].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
     setForm(f => ({ ...f, region_id: data.id, state_id: null, city_id: null, locality_id: null }));
     toast.success(`تمت إضافة الاتجاه: ${data.name}`);
+    notifyGeoChanged();
     return data.id;
   };
 
@@ -170,6 +178,8 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     if (kind === "group")       { setGroups(p => p.filter(x => x.id !== id)); if (form.group_id === id) setForm(f => ({ ...f, group_id: null })); }
     if (kind === "transporter") { setTransporters(p => p.filter(x => x.id !== id)); if (form.preferred_transporter_id === id) setForm(f => ({ ...f, preferred_transporter_id: null })); }
     if (kind === "destination") { setDestinations(p => p.filter(x => x.id !== id)); if (form.destination_id === id) setForm(f => ({ ...f, destination_id: null })); }
+    notifyGeoChanged();
+    if (kind === "transporter" || kind === "destination" || kind === "group") notifyLogisticsChanged();
   };
 
   const requestDelete = async (kind: EntityKind, id: string, name: string): Promise<boolean> => {
@@ -204,6 +214,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     setStates(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, state_id: data.id, city_id: null, locality_id: null }));
     toast.success(`تمت إضافة الولاية: ${data.name}`);
+    notifyGeoChanged();
     return data.id;
   };
   const addCity = async (name: string): Promise<string | null> => {
@@ -214,6 +225,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     setCities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, city_id: data.id, locality_id: null }));
     toast.success(`تمت إضافة المدينة: ${data.name}`);
+    notifyGeoChanged();
     return data.id;
   };
   const addLocality = async (name: string): Promise<string | null> => {
@@ -224,6 +236,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     setLocalities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, locality_id: data.id }));
     toast.success(`تمت إضافة المحلية: ${data.name}`);
+    notifyGeoChanged();
     return data.id;
   };
   const addTransporter = async (name: string): Promise<string | null> => {
@@ -233,6 +246,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     setTransporters(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, preferred_transporter_id: data.id }));
     toast.success(`تمت إضافة الترحيل: ${data.name}`);
+    notifyLogisticsChanged();
     return data.id;
   };
   const addGroup = async (name: string): Promise<string | null> => {
@@ -242,6 +256,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     setGroups(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, group_id: data.id }));
     toast.success(`تمت إضافة المجموعة: ${data.name}`);
+    notifyLogisticsChanged();
     return data.id;
   };
   const addDestination = async (name: string): Promise<string | null> => {
@@ -251,8 +266,10 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     setDestinations(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, destination_id: data.id }));
     toast.success(`تمت إضافة الوجهة: ${data.name}`);
+    notifyLogisticsChanged();
     return data.id;
   };
+
 
   // ── حذف موحّد عبر requestDelete ──
   const removeRegion      = (id: string) => requestDelete("region", id, regions.find(r => r.id === id)?.name || "");
