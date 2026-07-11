@@ -93,6 +93,12 @@ export default function ProductsPage() {
   });
   useEffect(() => { try { localStorage.setItem(PP_PER_PAGE, String(perPage)); } catch {} }, [perPage]);
 
+  // ترتيب أبجدي اختياري للجدول الرئيسي (تصاعدي/تنازلي/إيقاف = ترتيب الإدخال)
+  const [nameSortDir, setNameSortDir] = useState<"none" | "asc" | "desc">(() => {
+    try { return (localStorage.getItem("products_name_sort") as any) || "none"; } catch { return "none"; }
+  });
+  useEffect(() => { try { localStorage.setItem("products_name_sort", nameSortDir); } catch {} }, [nameSortDir]);
+
   // مزامنة: أعد جلب المنتجات عند أي تغيير من فاتورة/مرتجع/تحويل (يبث events بنفس الاسم)
   useEffect(() => {
     const onChanged = () => {
