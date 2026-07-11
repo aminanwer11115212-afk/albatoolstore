@@ -1148,6 +1148,8 @@ export default function ProductsPage() {
         `الترتيب: ${pv.sortBy === "name" ? "الاسم" : pv.sortBy === "category" ? "الفئة" : "الماركة"} (${pv.sortDir === "asc" ? "تصاعدي" : "تنازلي"})`
       );
 
+      const showPriceCol = !!pv.showPrice;
+      const priceFmt = (n: any) => Number(n || 0).toLocaleString("ar-EG");
       const rows = list.map((p: any, i: number) => {
         const brandName = p.brands?.[0]?.name || p.product_companies?.name || "";
         const catName = p.categories?.[0]?.name || p.product_categories?.name || "";
@@ -1165,6 +1167,7 @@ export default function ProductsPage() {
             <td class="c-meta">${escHtml(brandName)}</td>
             <td class="c-meta">${escHtml(whName)}</td>
             <td class="c-sku">${escHtml(p.sku || "")}</td>
+            ${showPriceCol ? `<td class="c-price">${priceFmt(p.sale_price)}</td>` : ""}
           </tr>`;
       }).join("");
 
