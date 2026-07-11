@@ -2082,7 +2082,17 @@ export default function ProductsPage() {
         )}
         {isAllProducts && (
           <div className="p-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
-            <span className="text-sm text-muted-foreground">{filtered.length} منتج</span>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-muted-foreground">{sortedFiltered.length} منتج</span>
+              <button
+                type="button"
+                onClick={() => setNameSortDir(nameSortDir === "none" ? "asc" : nameSortDir === "asc" ? "desc" : "none")}
+                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium border ${nameSortDir === "none" ? "bg-muted border-border text-foreground" : "bg-primary/10 border-primary text-primary"}`}
+                title="ترتيب أبجدي حسب اسم المنتج"
+              >
+                {nameSortDir === "asc" ? "أ↓ ي" : nameSortDir === "desc" ? "ي↓ أ" : "ترتيب أبجدي"}
+              </button>
+            </div>
             <button
               type="button"
               disabled={isExportingPdf}
