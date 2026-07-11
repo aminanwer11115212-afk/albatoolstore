@@ -339,19 +339,17 @@ export default function QuickAddProductDialog({
             </div>
             <div></div>
 
-            {/* الصف 4: الأسعار */}
+            {/* الصف 4: الأسعار (بدون سعر الجملة) */}
             <div>
               <label className={labelClass}>سعر البيع بالتجزئة</label>
               <input type="number" value={form.sale_price} onChange={e => setForm({ ...form, sale_price: e.target.value })} className={inputClass} placeholder="0.00" />
             </div>
             <div>
-              <label className={labelClass}>سعر الجملة</label>
-              <input type="number" value={form.purchase_price} onChange={e => setForm({ ...form, purchase_price: e.target.value })} className={inputClass} placeholder="0.00" />
-            </div>
-            <div>
               <label className={labelClass}>السعر الأجنبي</label>
               <input type="number" value={form.foreign_price} onChange={e => setForm({ ...form, foreign_price: e.target.value })} className={inputClass} placeholder="0.00" />
             </div>
+            <div></div>
+
 
             {/* الصف 5: المخزون + الحد الأدنى + (فراغ) */}
             <div>
