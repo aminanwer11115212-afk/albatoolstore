@@ -319,7 +319,7 @@ export default function QuickAddProductDialog({
               </div>
             </div>
 
-            {/* الصف 3: المستودع + الوحدة + (فراغ) */}
+            {/* الصف 3: المستودع + الوحدة + سعر البيع */}
             <div>
               <label className={labelClass}>مستودع</label>
               <div className={inputClass + " !p-0"} style={{ minHeight: 38 }}>
@@ -337,21 +337,16 @@ export default function QuickAddProductDialog({
               <label className={labelClass}>الوحدة</label>
               <input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className={inputClass} placeholder="قطعة" />
             </div>
-            <div></div>
-
-            {/* الصف 4: الأسعار (بدون سعر الجملة) */}
             <div>
               <label className={labelClass}>سعر البيع بالتجزئة</label>
               <input type="number" value={form.sale_price} onChange={e => setForm({ ...form, sale_price: e.target.value })} className={inputClass} placeholder="0.00" />
             </div>
+
+            {/* الصف 4: السعر الأجنبي + المخزون + الحد الأدنى */}
             <div>
               <label className={labelClass}>السعر الأجنبي</label>
               <input type="number" value={form.foreign_price} onChange={e => setForm({ ...form, foreign_price: e.target.value })} className={inputClass} placeholder="0.00" />
             </div>
-            <div></div>
-
-
-            {/* الصف 5: المخزون + الحد الأدنى + (فراغ) */}
             <div>
               <label className={labelClass}>الوحدات بالمخزن</label>
               <input type="number" value={form.stock_quantity} onChange={e => setForm({ ...form, stock_quantity: e.target.value })} className={inputClass} placeholder="0" />
@@ -360,11 +355,9 @@ export default function QuickAddProductDialog({
               <label className={labelClass}>الحد الأدنى للتنبيه</label>
               <input type="number" value={form.min_stock} onChange={e => setForm({ ...form, min_stock: e.target.value })} className={inputClass} placeholder="0" />
             </div>
-            <div></div>
 
-            {/* الصف 6: الصورة */}
-            <div className="col-span-2"></div>
-            <div>
+            {/* الصف 5: الصورة (عرض كامل) */}
+            <div className="col-span-2 md:col-span-3">
               <label className={labelClass}>صورة المنتج</label>
               <div className="flex items-center gap-2 flex-wrap">
                 {form.image_url ? (
