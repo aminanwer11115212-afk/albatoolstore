@@ -2886,10 +2886,10 @@ export default function ProductsPage() {
 
         {/* Mobile cards list removed — desktop table is shown on mobile too (desktop-on-mobile). */}
 
-        {isAllProducts && !isLoading && filtered.length > 0 && (
+        {isAllProducts && !isLoading && sortedFiltered.length > 0 && (
           <>
             <div className="legacy-dt-info">
-              إظهار {(page - 1) * perPage + 1} إلى {Math.min(page * perPage, filtered.length)} من إجمالي {filtered.length} منتج
+              إظهار {(page - 1) * perPage + 1} إلى {Math.min(page * perPage, sortedFiltered.length)} من إجمالي {sortedFiltered.length} منتج
             </div>
             <ul className="legacy-pagination">
               <li className={`page-item ${page === 1 ? "disabled" : ""}`}>
