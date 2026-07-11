@@ -39,6 +39,7 @@ export async function getGeoImpact(kind: EntityKind, id: string): Promise<{
   totalCustomers: number;
   total: number;
   customerNames: string[];
+  childrenNames: string[];
 }> {
   const meta = META[kind];
   let customers = 0;
