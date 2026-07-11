@@ -2499,9 +2499,18 @@ export default function ProductsPage() {
                   <td className={isAllProducts ? "" : "px-5 py-3"} style={isAllProducts ? { padding: 0 } : undefined}>
                     {isAllProducts ? (
                       <div className="flex items-center gap-2 px-1">
-                        <div className="w-7 h-7 rounded bg-muted flex items-center justify-center shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isMobileUI) setImgActionProduct(p);
+                            else if (p.image_url) setImgLightbox({ url: p.image_url, name: p.name || "" });
+                          }}
+                          title={isMobileUI ? "خيارات الصورة" : (p.image_url ? "عرض الصورة" : "لا توجد صورة")}
+                          className="w-7 h-7 rounded bg-muted flex items-center justify-center shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
                           {p.image_url ? <img src={p.image_url} className="w-7 h-7 rounded object-cover" /> : <PackageIcon size={12} className="text-muted-foreground" />}
-                        </div>
+                        </button>
                         <div className="flex-1 min-w-0">
                           <EditableCell
                             value={p.name || ""}
