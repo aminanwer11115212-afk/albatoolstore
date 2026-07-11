@@ -1173,7 +1173,15 @@ export default function ProductsPage() {
         `الترتيب: ${pv.sortBy === "name" ? "الاسم" : pv.sortBy === "category" ? "الفئة" : "الماركة"} (${pv.sortDir === "asc" ? "تصاعدي" : "تنازلي"})`
       );
 
-      const showPriceCol = !!pv.showPrice;
+      // pv.cols: كل عمود قابل للإخفاء بشكل مستقل. price يعكس أيضاً showPrice (توافق خلفي).
+      const cols = {
+        image: pv.cols?.image ?? true,
+        category: pv.cols?.category ?? true,
+        brand: pv.cols?.brand ?? true,
+        warehouse: pv.cols?.warehouse ?? true,
+        sku: pv.cols?.sku ?? true,
+        price: (pv.cols?.price ?? false) && !!pv.showPrice,
+      };
       const priceFmt = (n: any) => Number(n || 0).toLocaleString("ar-EG");
       const rows = list.map((p: any, i: number) => {
         const brandName = p.brands?.[0]?.name || p.product_companies?.name || "";
@@ -1183,18 +1191,25 @@ export default function ProductsPage() {
         return `
           <tr>
             <td class="c-num">${i + 1}</td>
-            <td class="c-img"><div class="thumb">
+            ${cols.image ? `<td class="c-img"><div class="thumb">
               <img src="${src}" alt="${escHtml(p.name || "")}" loading="lazy"
                    onerror="this.onerror=null;this.src='${placeholderSvg}'"/>
-            </div></td>
+            </div></td>` : ""}
             <td class="c-name">${escHtml(p.name || "")}</td>
-            <td class="c-meta">${escHtml(catName)}</td>
-            <td class="c-meta">${escHtml(brandName)}</td>
-            <td class="c-meta">${escHtml(whName)}</td>
-            <td class="c-sku">${escHtml(p.sku || "")}</td>
-            ${showPriceCol ? `<td class="c-price">${priceFmt(p.sale_price)}</td>` : ""}
+            ${cols.category ? `<td class="c-meta">${escHtml(catName)}</td>` : ""}
+            ${cols.brand ? `<td class="c-meta">${escHtml(brandName)}</td>` : ""}
+            ${cols.warehouse ? `<td class="c-meta">${escHtml(whName)}</td>` : ""}
+            ${cols.sku ? `<td class="c-sku">${escHtml(p.sku || "")}</td>` : ""}
+            ${cols.price ? `<td class="c-price">${priceFmt(p.sale_price)}</td>` : ""}
           </tr>`;
       }).join("");
+      const totalCols = 2 /* # + name */
+        + (cols.image ? 1 : 0)
+        + (cols.category ? 1 : 0)
+        + (cols.brand ? 1 : 0)
+        + (cols.warehouse ? 1 : 0)
+        + (cols.sku ? 1 : 0)
+        + (cols.price ? 1 : 0);
 
       const today = new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
       const autoPrint = mode === "print";
