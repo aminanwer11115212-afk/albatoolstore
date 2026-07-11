@@ -1043,6 +1043,10 @@ export default function ProductsPage() {
   // ============ PDF export (Excel-like table + company letterhead) ============
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const isMobileUI = useIsMobile();
+  // ورقة إجراءات صورة المنتج (موبايل): تعديل / عرض الصورة / مشاركة / حذف
+  const [imgActionProduct, setImgActionProduct] = useState<any | null>(null);
+  const [imgLightbox, setImgLightbox] = useState<{ url: string; name: string } | null>(null);
   // خيارات المعاينة (فلترة/ترتيب) — مستقلّة عن فلاتر الجدول الرئيسي
   const [pv, setPv] = useState<{
     search: string;
@@ -1051,7 +1055,8 @@ export default function ProductsPage() {
     warehouse: string;
     sortBy: "name" | "category" | "brand";
     sortDir: "asc" | "desc";
-  }>({ search: "", category: "", brand: "", warehouse: "", sortBy: "name", sortDir: "asc" });
+    showPrice: boolean;
+  }>({ search: "", category: "", brand: "", warehouse: "", sortBy: "name", sortDir: "asc", showPrice: false });
 
   // ورّث فلاتر الصفحة عند فتح المعاينة
   const openPdfPreview = () => {
