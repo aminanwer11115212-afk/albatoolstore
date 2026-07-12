@@ -189,6 +189,7 @@ export default function InvoiceViewPage() {
       setShowPayment(false);
       setPayRef("");
       setPayAmount("");
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
       loadInvoice();
     } catch (e: any) { toast.error(e.message); }
     finally { setPaySubmitting(false); }
