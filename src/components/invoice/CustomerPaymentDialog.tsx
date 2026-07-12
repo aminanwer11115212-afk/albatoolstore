@@ -243,6 +243,31 @@ export default function CustomerPaymentDialog({
       qc.invalidateQueries({ queryKey: ["invoices-full"] });
       try { window.dispatchEvent(new Event("customers:changed")); } catch {}
 
+      // audit + balance-refresh toast (fire-and-forget so UX stays snappy)
+      if (customerId && !isPos) {
+        const prevNet = custBalance
+          ? netBalanceOf({ balance: custBalance.debt, credit_balance: custBalance.credit })
+          : null;
+        if (disc > 0) {
+          logDiscountEvent({
+            entity_type: "invoice",
+            entity_id: invoiceId,
+            entity_number: invoiceNumber || null,
+            customer_id: customerId,
+            discount_before: Number(inv?.discount || 0),
+            discount_added: disc,
+            discount_after: nextDiscount,
+            total_before: Number(inv?.total || 0),
+            total_after: nextTotal,
+            balance_before: prevNet,
+            balance_after: prevNet !== null ? prevNet - disc : null,
+            source: "customer_payment_dialog",
+            note: notes || null,
+          });
+        }
+        refetchAndToastCustomerBalance(customerId, { previousNet: prevNet });
+      }
+
       onSaved?.();
       onOpenChange(false);
     } catch (e: any) {
