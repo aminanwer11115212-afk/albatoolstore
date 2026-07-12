@@ -1079,7 +1079,9 @@ export default function ProductsPage() {
   }>({
     search: "", category: "", brand: "", warehouse: "",
     sortBy: "name", sortDir: "asc", showPrice: false,
-    cols: { image: true, category: true, brand: true, warehouse: true, sku: true, price: false },
+    // افتراضياً: صورة + اسم فقط (بدون أي فلاتر أو أعمدة إضافية).
+    // كل عمود إضافي يفعّله المستخدم يُصغّر الصورة تلقائياً في الطباعة.
+    cols: { image: true, category: false, brand: false, warehouse: false, sku: false, price: false },
   });
 
   // ورّث فلاتر الصفحة عند فتح المعاينة
