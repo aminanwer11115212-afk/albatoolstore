@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
 import type { StatementData } from "@/utils/statementPrintTemplate";
+import { netBalanceOf } from "@/utils/balanceDisplay";
 import { toast } from "sonner";
 import {
   FileText, RotateCcw, Receipt, Wallet, AlertTriangle, CheckCircle2,
@@ -118,7 +119,7 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
                     phone: customer.phone,
                     address: customer.address || customer.city,
                     email: customer.email,
-                    balance: Number(customer.balance || 0),
+                    balance: netBalanceOf(customer as any),
                   },
                   company: (companyRow as any) || undefined,
                   invoices: invoices.map((inv: any) => ({
