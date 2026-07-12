@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccounts, useSuppliers } from "@/hooks/useData";
 import { validateBankTransferPayment, isBankPaymentMethod, filterAccountsForPayment } from "@/lib/bankTransferValidation";
+import { refetchAndToastSupplierBalance } from "@/utils/balanceRefreshToast";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -170,6 +171,9 @@ export default function SupplierPaymentDialog({
       qc.invalidateQueries({ queryKey: ["purchase-orders-full"] });
       qc.invalidateQueries({ queryKey: ["purchase-orders"] });
       try { window.dispatchEvent(new Event("suppliers:changed")); } catch {}
+
+      const sid = supplierId || (resolvedSupplier as any)?.id;
+      if (sid) refetchAndToastSupplierBalance(sid);
 
       onOpenChange(false);
     } catch (e: any) {

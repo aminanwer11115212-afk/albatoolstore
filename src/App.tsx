@@ -113,6 +113,7 @@ const DeletedItemsPage = lazy(() => import("./pages/DeletedItemsPage"));
 const CurrenciesPage = lazy(() => import("./pages/CurrenciesPage"));
 const IncomeStatementPage = lazy(() => import("./pages/IncomeStatementPage"));
 const TrialBalancePage = lazy(() => import("./pages/TrialBalancePage"));
+const DiscountAuditPage = lazy(() => import("./pages/DiscountAuditPage"));
 const ExpenseStatementPage = lazy(() => import("./pages/ExpenseStatementPage"));
 const FinancialReportPreviewPage = lazy(() => import("./pages/FinancialReportPreviewPage"));
 const CloudUsagePage = lazy(() => import("./pages/CloudUsagePage"));
@@ -449,6 +450,7 @@ const App = () => {
             <Route path="/finance/currencies" element={lazyEl(<CurrenciesPage />, "العملات")} />
             <Route path="/reports/income-statement" element={lazyEl(<IncomeStatementPage />, "قائمة الدخل")} />
             <Route path="/reports/trial-balance" element={lazyEl(<TrialBalancePage />, "ميزان المراجعة")} />
+            <Route path="/reports/discount-audit" element={lazyEl(<DiscountAuditPage />, "سجل تدقيق الخصومات")} />
             <Route path="/reports/expense-statement" element={lazyEl(<ExpenseStatementPage />, "كشف المصروفات")} />
             <Route path="/reports/financial-preview" element={lazyEl(<FinancialReportPreviewPage />, "معاينة التقرير المالي")} />
             <Route path="/settings/cloud-usage" element={lazyEl(<CloudUsagePage />, "استهلاك Cloud")} />

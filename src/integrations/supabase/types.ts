@@ -708,6 +708,66 @@ export type Database = {
         }
         Relationships: []
       }
+      discount_audit_log: {
+        Row: {
+          balance_after: number | null
+          balance_before: number | null
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          discount_added: number
+          discount_after: number
+          discount_before: number
+          entity_id: string | null
+          entity_number: string | null
+          entity_type: string
+          id: string
+          note: string | null
+          source: string | null
+          supplier_id: string | null
+          total_after: number
+          total_before: number
+        }
+        Insert: {
+          balance_after?: number | null
+          balance_before?: number | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          discount_added?: number
+          discount_after?: number
+          discount_before?: number
+          entity_id?: string | null
+          entity_number?: string | null
+          entity_type: string
+          id?: string
+          note?: string | null
+          source?: string | null
+          supplier_id?: string | null
+          total_after?: number
+          total_before?: number
+        }
+        Update: {
+          balance_after?: number | null
+          balance_before?: number | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          discount_added?: number
+          discount_after?: number
+          discount_before?: number
+          entity_id?: string | null
+          entity_number?: string | null
+          entity_type?: string
+          id?: string
+          note?: string | null
+          source?: string | null
+          supplier_id?: string | null
+          total_after?: number
+          total_before?: number
+        }
+        Relationships: []
+      }
       document_share_tokens: {
         Row: {
           created_at: string

@@ -12,6 +12,7 @@ import { useDialogSize } from "@/hooks/useDialogSize";
 import { startsWithAny } from "@/utils/searchMatch";
 import { openWhatsApp } from "@/utils/whatsapp";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Customer = {
@@ -157,6 +158,9 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       qc.invalidateQueries({ queryKey: ["accounts"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
       try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+      const chargedCustomerId = (selectedCustomer as any)?.id || null;
+      const prevNet = selectedCustomer ? netBalanceOf(selectedCustomer as any) : null;
+      if (chargedCustomerId) refetchAndToastCustomerBalance(chargedCustomerId, { previousNet: prevNet });
       onOpenChange(false);
       onSaved?.();
     } catch (e: any) {
