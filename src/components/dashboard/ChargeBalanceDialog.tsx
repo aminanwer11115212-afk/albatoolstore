@@ -68,6 +68,13 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       setBankAccounts((accs || []) as Account[]);
       const defaultAcc = (accs || []).find((a: any) => a.is_default) || (accs || [])[0];
       if (defaultAcc) setAccountId((defaultAcc as any).id);
+      // استرجاع آخر حساب بنكي مستخدَم
+      try {
+        const lastBank = localStorage.getItem("lov:last-bank-account");
+        if (lastBank && (accs || []).some((a: any) => a.id === lastBank && a.account_type === "bank")) {
+          setBankAccountId(lastBank);
+        }
+      } catch {}
     })();
   }, [open]);
 
