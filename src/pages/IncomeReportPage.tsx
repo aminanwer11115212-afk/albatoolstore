@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTransactionsWithAccounts } from "@/hooks/useData";
 import { TrendingUp, TrendingDown, DollarSign, Calendar } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { getBaseCurrency, getLatestRate } from "@/utils/currency";
 
 export default function IncomeReportPage() {
   const [dateFrom, setDateFrom] = useState(() => {
@@ -12,23 +13,51 @@ export default function IncomeReportPage() {
   const [dateTo, setDateTo] = useState(new Date().toISOString().split("T")[0]);
   const { data: transactions, isLoading } = useTransactionsWithAccounts();
 
+  const [baseSymbol, setBaseSymbol] = useState("");
+  const [rateCache, setRateCache] = useState<Record<string, number>>({});
+
   const filtered = (transactions || []).filter((t: any) => t.date >= dateFrom && t.date <= dateTo);
+
+  // Fetch base currency + rates for currency codes lacking a stored rate
+  useEffect(() => {
+    (async () => {
+      const base = await getBaseCurrency();
+      setBaseSymbol(base?.symbol || base?.code || "");
+      const needed = Array.from(new Set(
+        filtered
+          .filter((t: any) => t.currency_code && !t.exchange_rate_to_base && !rateCache[t.currency_code])
+          .map((t: any) => t.currency_code as string)
+      ));
+      if (needed.length === 0) return;
+      const next: Record<string, number> = { ...rateCache };
+      await Promise.all(needed.map(async (code) => { next[code] = await getLatestRate(code); }));
+      setRateCache(next);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, dateFrom, dateTo]);
+
+  // Convert each transaction amount to base currency
+  const toBase = (t: any) => {
+    const rate = Number(t.exchange_rate_to_base || rateCache[t.currency_code] || 1);
+    return Number(t.amount || 0) * rate;
+  };
+
   const income = filtered.filter((t: any) => t.type === "income");
   const expenses = filtered.filter((t: any) => t.type === "expense");
-  const totalIncome = income.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-  const totalExpenses = expenses.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+  const totalIncome = income.reduce((s: number, t: any) => s + toBase(t), 0);
+  const totalExpenses = expenses.reduce((s: number, t: any) => s + toBase(t), 0);
   const net = totalIncome - totalExpenses;
 
-  // Group by category
+  // Group by category (in base currency)
   const incomeByCategory: Record<string, number> = {};
   income.forEach((t: any) => {
     const cat = t.category || "غير مصنف";
-    incomeByCategory[cat] = (incomeByCategory[cat] || 0) + Number(t.amount || 0);
+    incomeByCategory[cat] = (incomeByCategory[cat] || 0) + toBase(t);
   });
   const expensesByCategory: Record<string, number> = {};
   expenses.forEach((t: any) => {
     const cat = t.category || "غير مصنف";
-    expensesByCategory[cat] = (expensesByCategory[cat] || 0) + Number(t.amount || 0);
+    expensesByCategory[cat] = (expensesByCategory[cat] || 0) + toBase(t);
   });
 
   const sections = [
