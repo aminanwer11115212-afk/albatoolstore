@@ -134,6 +134,11 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       } as any);
       if (txErr) throw txErr;
 
+      // احفظ آخر حساب بنكي مستخدَم للاسترجاع لاحقًا
+      if (method === "bank_transfer" && bankAccountId) {
+        try { localStorage.setItem("lov:last-bank-account", bankAccountId); } catch {}
+      }
+
       // ملاحظة: لا نعرض "المتبقي" في رسالة شحن الرصيد بناءً على طلب المستخدم
       toast.success(`تم شحن ${amt.toLocaleString()} بنجاح`);
 
