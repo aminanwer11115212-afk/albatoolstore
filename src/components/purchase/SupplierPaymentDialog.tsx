@@ -172,6 +172,9 @@ export default function SupplierPaymentDialog({
       qc.invalidateQueries({ queryKey: ["purchase-orders"] });
       try { window.dispatchEvent(new Event("suppliers:changed")); } catch {}
 
+      const sid = supplierId || (resolvedSupplier as any)?.id;
+      if (sid) refetchAndToastSupplierBalance(sid);
+
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message || "تعذّر حفظ الدفعة");
