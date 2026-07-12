@@ -214,11 +214,11 @@ export default function ProductsPage() {
   // Dashboard removed — table-only view
 
   // أعمدة قابلة للسحب لجدول إدارة جميع المنتجات
-  // [#, الاسم, الفئة, الشركة, المستودع, السعر, السعر الأجنبي, الصورة, المورد, تجميد, إعدادات]
-  // 11 columns for isAllProducts: #, اسم, الفئة, الشركة, المستودع, السعر, السعر الأجنبي, الصورة, المورد, تجميد, إعدادات
-  const PRODUCTS_COLS_KEY = userScopedLegacyKey("products-page:colWidths:v1");
+  // [#, الاسم, الصورة, الفئة, الشركة, المستودع, السعر, السعر الأجنبي, المورد, تجميد, إعدادات]
+  // 11 columns for isAllProducts: الصورة تظهر مباشرة بعد اسم المنتج.
+  const PRODUCTS_COLS_KEY = userScopedLegacyKey("products-page:colWidths:v2");
   const PRODUCTS_LOCK_KEY = userScopedLegacyKey("products-page:colsLocked:v1");
-  const PRODUCTS_DEFAULTS: (number | null)[] = [60, null, 140, 140, 140, 110, 110, 130, 140, 80, 110];
+  const PRODUCTS_DEFAULTS: (number | null)[] = [60, null, 130, 140, 140, 140, 110, 110, 140, 80, 110];
   const [colsLocked, setColsLocked] = useSharedColsLocked(() => localStorage.getItem(PRODUCTS_LOCK_KEY) === "true");
   const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, reset: resetColWidths, saveAsUserDefault: saveColDefault, tableProps } = useColumnWidths(
     PRODUCTS_COLS_KEY,
@@ -2312,24 +2312,24 @@ export default function ProductsPage() {
                   </>
                 ) : (
                   <>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>الصورة<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(2, e); }} hidden={colsLocked} /></th>
                     <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative", cursor: "pointer", background: filterCategory ? "hsl(var(--primary) / 0.15)" : undefined, userSelect: "none" }} onClick={headerClickFor("category", "select")} title="ضغطة للفلترة">
                       الفئة{filterIndicator(!!filterCategory)}
                       {renderFilterPopover({ key: "category", kind: "select", value: filterCategory, setValue: setFilterCategory, options: (categories || []).map((c: any) => ({ value: c.id, label: c.name })) })}
-                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(2, e); }} hidden={colsLocked} />
+                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(3, e); }} hidden={colsLocked} />
                     </th>
                     <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative", cursor: "pointer", background: filterCompany ? "hsl(var(--primary) / 0.15)" : undefined, userSelect: "none" }} onClick={headerClickFor("company", "select")} title="ضغطة للفلترة">
                       الماركة{filterIndicator(!!filterCompany)}
                       {renderFilterPopover({ key: "company", kind: "select", value: filterCompany, setValue: setFilterCompany, options: (companies || []).map((c: any) => ({ value: c.id, label: c.name })) })}
-                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(3, e); }} hidden={colsLocked} />
+                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(4, e); }} hidden={colsLocked} />
                     </th>
                     <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative", cursor: "pointer", background: filterWarehouse ? "hsl(var(--primary) / 0.15)" : undefined, userSelect: "none" }} onClick={headerClickFor("warehouse", "select")} title="ضغطة للفلترة">
                       المستودع{filterIndicator(!!filterWarehouse)}
                       {renderFilterPopover({ key: "warehouse", kind: "select", value: filterWarehouse, setValue: setFilterWarehouse, options: (warehouses || []).map((w: any) => ({ value: w.id, label: w.name })) })}
-                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(4, e); }} hidden={colsLocked} />
+                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(5, e); }} hidden={colsLocked} />
                     </th>
-                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>السعر<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(5, e); }} hidden={colsLocked} /></th>
-                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>السعر الأجنبي<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(6, e); }} hidden={colsLocked} /></th>
-                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>الصورة<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(7, e); }} hidden={colsLocked} /></th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>السعر<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(6, e); }} hidden={colsLocked} /></th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>السعر الأجنبي<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(7, e); }} hidden={colsLocked} /></th>
                     <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative", cursor: "pointer", background: filterSupplier ? "hsl(var(--primary) / 0.15)" : undefined, userSelect: "none" }} onClick={headerClickFor("supplier", "select")} title="ضغطة للفلترة">
                       المورد{filterIndicator(!!filterSupplier)}
                       {renderFilterPopover({ key: "supplier", kind: "select", value: filterSupplier, setValue: setFilterSupplier, options: (suppliers || []).map((s: any) => ({ value: s.id, label: s.name })) })}
@@ -2543,18 +2543,6 @@ export default function ProductsPage() {
                   <td className={isAllProducts ? "" : "px-5 py-3"} style={isAllProducts ? { padding: 0 } : undefined}>
                     {isAllProducts ? (
                       <div className="flex items-center gap-2 px-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (isMobileUI) setImgActionProduct(p);
-                            else if (p.image_url) setImgLightbox({ url: p.image_url, name: p.name || "" });
-                          }}
-                          title={isMobileUI ? "خيارات الصورة" : (p.image_url ? "عرض الصورة" : "لا توجد صورة")}
-                          className="w-7 h-7 rounded bg-muted flex items-center justify-center shrink-0 focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                          {p.image_url ? <img src={p.image_url} className="w-7 h-7 rounded object-cover" /> : <PackageIcon size={12} className="text-muted-foreground" />}
-                        </button>
                         <div className="flex-1 min-w-0">
                           <EditableCell
                             value={p.name || ""}
@@ -2601,6 +2589,90 @@ export default function ProductsPage() {
                       </div>
                     )}
                   </td>
+                  {isAllProducts && !isPriceReport && !isInStockPage && !isOutOfStockPage && !isReportPage && (
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        {p.image_url ? (
+                          <img
+                            src={p.image_url}
+                            className="w-10 h-10 rounded object-cover border border-border cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isMobileUI) setImgActionProduct(p);
+                              else setImgLightbox({ url: p.image_url, name: p.name || "" });
+                            }}
+                            title="عرض الصورة"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded bg-muted flex items-center justify-center"><PackageIcon size={14} className="text-muted-foreground" /></div>
+                        )}
+                        <label
+                          className="text-xs text-primary cursor-pointer hover:underline"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              (e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement | null)?.click();
+                            }
+                          }}
+                          tabIndex={0}
+                        >
+                          {p.image_url ? "تغيير" : "ارفع"}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = "";
+                              if (!file) return;
+                              openCropForFile(file, async (cropped) => {
+                                const localUrl = URL.createObjectURL(cropped);
+                                const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                                try {
+                                  const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                  const url = await uploadProductImage(cropped);
+                                  patchProductCaches(p.id, { image_url: url });
+                                  await update.mutateAsync({ id: p.id, image_url: url });
+                                  window.dispatchEvent(new Event("products:changed"));
+                                  setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                                } catch (err: any) {
+                                  rollback();
+                                  URL.revokeObjectURL(localUrl);
+                                  toast.error(err.message || "فشل الرفع");
+                                }
+                              });
+                            }}
+                          />
+                        </label>
+                        {p.image_url && (
+                          <button
+                            type="button"
+                            className="p-1 rounded hover:bg-muted text-primary"
+                            title="إعادة قص"
+                            aria-label="إعادة قص الصورة"
+                            onClick={() => startRecrop(p.image_url, async (cropped) => {
+                              const localUrl = URL.createObjectURL(cropped);
+                              const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                              try {
+                                const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                const url = await uploadProductImage(cropped);
+                                patchProductCaches(p.id, { image_url: url });
+                                await update.mutateAsync({ id: p.id, image_url: url });
+                                window.dispatchEvent(new Event("products:changed"));
+                                setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                              } catch (err: any) {
+                                rollback();
+                                URL.revokeObjectURL(localUrl);
+                                toast.error(err.message || "فشل حفظ الصورة الجديدة");
+                              }
+                            })}
+                          >
+                            <Scissors size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                   {isPriceReport ? (
                     <td className="px-5 py-3 font-semibold text-foreground">{Number(p.sale_price || 0).toLocaleString()}</td>
                   ) : (isInStockPage || isOutOfStockPage) ? (
@@ -2789,79 +2861,6 @@ export default function ProductsPage() {
                           inputClassName="text-[12px] tabular-nums"
                           placeholder="—"
                         />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          {p.image_url ? (
-                            <img src={p.image_url} className="w-10 h-10 rounded object-cover border border-border" />
-                          ) : (
-                            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center"><PackageIcon size={14} className="text-muted-foreground" /></div>
-                          )}
-                          <label
-                            className="text-xs text-primary cursor-pointer hover:underline"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                (e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement | null)?.click();
-                              }
-                            }}
-                            tabIndex={0}
-                          >
-                            {p.image_url ? "تغيير" : "ارفع"}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                e.target.value = "";
-                                if (!file) return;
-                                openCropForFile(file, async (cropped) => {
-                                  const localUrl = URL.createObjectURL(cropped);
-                                  const rollback = patchProductCaches(p.id, { image_url: localUrl });
-                                  try {
-                                    const { uploadProductImage } = await import("@/utils/productImageUpload");
-                                    const url = await uploadProductImage(cropped);
-                                    patchProductCaches(p.id, { image_url: url });
-                                    await update.mutateAsync({ id: p.id, image_url: url });
-                                    window.dispatchEvent(new Event("products:changed"));
-                                    setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
-                                  } catch (err: any) {
-                                    rollback();
-                                    URL.revokeObjectURL(localUrl);
-                                    toast.error(err.message || "فشل الرفع");
-                                  }
-                                });
-                              }}
-                            />
-                          </label>
-                          {p.image_url && (
-                            <button
-                              type="button"
-                              className="p-1 rounded hover:bg-muted text-primary"
-                              title="إعادة قص"
-                              aria-label="إعادة قص الصورة"
-                              onClick={() => startRecrop(p.image_url, async (cropped) => {
-                                const localUrl = URL.createObjectURL(cropped);
-                                const rollback = patchProductCaches(p.id, { image_url: localUrl });
-                                try {
-                                  const { uploadProductImage } = await import("@/utils/productImageUpload");
-                                  const url = await uploadProductImage(cropped);
-                                  patchProductCaches(p.id, { image_url: url });
-                                  await update.mutateAsync({ id: p.id, image_url: url });
-                                  window.dispatchEvent(new Event("products:changed"));
-                                  setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
-                                } catch (err: any) {
-                                  rollback();
-                                  URL.revokeObjectURL(localUrl);
-                                  toast.error(err.message || "فشل حفظ الصورة الجديدة");
-                                }
-                              })}
-                            >
-                              <Scissors size={12} />
-                            </button>
-                          )}
-                        </div>
                       </td>
                       <td style={{ padding: 0 }}>
                         <InlineSearchSelect
