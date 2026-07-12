@@ -1120,7 +1120,7 @@ export default function ProductsPage() {
     return rows;
   }, [filtered, pv]);
 
-  const exportFilteredPdf = async (mode: "print" | "preview" = "print", listOverride?: any[]) => {
+  const exportFilteredPdf = async (mode: "print" | "preview" | "share" = "print", listOverride?: any[]) => {
     if (isExportingPdf) return;
     const list = listOverride || (filtered as any[]);
     setIsExportingPdf(true);
@@ -1156,35 +1156,35 @@ export default function ProductsPage() {
 
       const wById = new Map<string, string>((warehouses || []).map((w: any) => [w.id, w.name]));
 
-      // ملخّص الفلاتر المطبّقة يظهر تحت العنوان
-      const activeFilters: string[] = [];
-      if (pv.category) {
-        const c = (categories || []).find((x: any) => x.id === pv.category);
-        if (c) activeFilters.push(`الفئة: ${c.name}`);
-      }
-      if (pv.brand) {
-        const b = (companies || []).find((x: any) => x.id === pv.brand);
-        if (b) activeFilters.push(`الماركة: ${b.name}`);
-      }
-      if (pv.warehouse) {
-        const w = (warehouses || []).find((x: any) => x.id === pv.warehouse);
-        if (w) activeFilters.push(`المستودع: ${w.name}`);
-      }
-      if (pv.search.trim()) activeFilters.push(`بحث: ${pv.search.trim()}`);
-      activeFilters.push(
-        `الترتيب: ${pv.sortBy === "name" ? "الاسم" : pv.sortBy === "category" ? "الفئة" : "الماركة"} (${pv.sortDir === "asc" ? "تصاعدي" : "تنازلي"})`
-      );
-
       // pv.cols: كل عمود قابل للإخفاء بشكل مستقل. price يعكس أيضاً showPrice (توافق خلفي).
       const cols = {
         image: pv.cols?.image ?? true,
-        category: pv.cols?.category ?? true,
-        brand: pv.cols?.brand ?? true,
-        warehouse: pv.cols?.warehouse ?? true,
-        sku: pv.cols?.sku ?? true,
+        category: pv.cols?.category ?? false,
+        brand: pv.cols?.brand ?? false,
+        warehouse: pv.cols?.warehouse ?? false,
+        sku: pv.cols?.sku ?? false,
         price: (pv.cols?.price ?? false) && !!pv.showPrice,
       };
+      // كم عمود إضافي ظاهر بجانب (# + الاسم + الصورة) — يحدد حجم الصورة والصفوف.
+      const extraCols =
+        (cols.category ? 1 : 0) +
+        (cols.brand ? 1 : 0) +
+        (cols.warehouse ? 1 : 0) +
+        (cols.sku ? 1 : 0) +
+        (cols.price ? 1 : 0);
+
+      // بدون فلاتر إضافية → صورة كبيرة (~55×55mm) لتوفير 12 منتج/صفحة A4.
+      // كل عمود إضافي يُصغّر الصورة تدريجياً بحيث تبقى الصفحة متوازنة.
+      const thumbPx = extraCols === 0 ? 140
+        : extraCols === 1 ? 110
+        : extraCols === 2 ? 85
+        : extraCols === 3 ? 60
+        : 40;
+      const rowFontPx = extraCols === 0 ? 15 : extraCols <= 2 ? 13 : 11;
+      const nameFontPx = extraCols === 0 ? 17 : extraCols <= 2 ? 14 : 12;
+
       const priceFmt = (n: any) => Number(n || 0).toLocaleString("ar-EG");
+      // ترتيب الخلايا: # → الاسم (يمين) → الصورة (يسار الاسم) → باقي الأعمدة.
       const rows = list.map((p: any, i: number) => {
         const brandName = p.brands?.[0]?.name || p.product_companies?.name || "";
         const catName = p.categories?.[0]?.name || p.product_categories?.name || "";
@@ -1193,11 +1193,11 @@ export default function ProductsPage() {
         return `
           <tr>
             <td class="c-num">${i + 1}</td>
+            <td class="c-name">${escHtml(p.name || "")}</td>
             ${cols.image ? `<td class="c-img"><div class="thumb">
               <img src="${src}" alt="${escHtml(p.name || "")}" loading="lazy"
                    onerror="this.onerror=null;this.src='${placeholderSvg}'"/>
             </div></td>` : ""}
-            <td class="c-name">${escHtml(p.name || "")}</td>
             ${cols.category ? `<td class="c-meta">${escHtml(catName)}</td>` : ""}
             ${cols.brand ? `<td class="c-meta">${escHtml(brandName)}</td>` : ""}
             ${cols.warehouse ? `<td class="c-meta">${escHtml(whName)}</td>` : ""}
@@ -1207,11 +1207,7 @@ export default function ProductsPage() {
       }).join("");
       const totalCols = 2 /* # + name */
         + (cols.image ? 1 : 0)
-        + (cols.category ? 1 : 0)
-        + (cols.brand ? 1 : 0)
-        + (cols.warehouse ? 1 : 0)
-        + (cols.sku ? 1 : 0)
-        + (cols.price ? 1 : 0);
+        + extraCols;
 
       const today = new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
       const autoPrint = mode === "print";
