@@ -138,21 +138,8 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       } as any);
       if (txErr) throw txErr;
 
-      // اقرأ الرصيد الصافي الفعلي بعد التريغر
-      const { data: freshCust } = await supabase
-        .from("customers")
-        .select("balance, credit_balance, net_balance")
-        .eq("id", customerId)
-        .maybeSingle();
-      const net = netBalanceOf(freshCust as any);
-      const netLine =
-        net > 0.001
-          ? `صافي المتبقي على العميل: ${net.toLocaleString()}`
-          : net < -0.001
-            ? `رصيد دائن للعميل: ${Math.abs(net).toLocaleString()}`
-            : `الحساب مسدّد بالكامل`;
-
-      toast.success(`تم شحن ${amt.toLocaleString()} بنجاح`, { description: netLine });
+      // ملاحظة: لا نعرض "المتبقي" في رسالة شحن الرصيد بناءً على طلب المستخدم
+      toast.success(`تم شحن ${amt.toLocaleString()} بنجاح`);
 
       if (sendWhatsApp) {
         if (!selectedCustomer?.phone) {
