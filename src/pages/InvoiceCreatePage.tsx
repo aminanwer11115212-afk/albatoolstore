@@ -319,7 +319,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     window.addEventListener("focus", handleFocus);
     return () => {
       window.removeEventListener("products:changed", refetchProducts);
-      window.removeEventListener("customers:changed", refetchCustomers);
+      window.removeEventListener("customers:changed", onCustomersChanged);
       window.removeEventListener("focus", handleFocus);
     };
   }, [editId]);
