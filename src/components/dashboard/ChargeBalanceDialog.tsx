@@ -82,24 +82,13 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     if (!selectedCustomer) return "";
     const [yy, mm, dd] = (date || "").split("-");
     const dateFmt = yy && mm && dd ? `${dd}/${mm}/${yy}` : date;
-    const beforeLine = netBefore > 0
-      ? `الحساب السابق: عليه ${netBefore.toLocaleString()}`
-      : netBefore < 0
-        ? `الحساب السابق: له ${Math.abs(netBefore).toLocaleString()}`
-        : `الحساب السابق: مسوّى`;
-    const afterLine = netAfter > 0
-      ? `المتبقي: عليه ${netAfter.toLocaleString()}`
-      : netAfter < 0
-        ? `رصيد دائن: له ${Math.abs(netAfter).toLocaleString()}`
-        : `الحساب: مسوّى بالكامل`;
+    // ملاحظة: لا نعرض سطر "المتبقي" في رسالة شحن الرصيد بناءً على طلب المستخدم.
     return [
       `مرحبا ${selectedCustomer.name}`,
-      beforeLine,
       `تم شحن مبلغ ${amt.toLocaleString()}`,
-      afterLine,
       `التاريخ ${dateFmt}`,
     ].join("\n");
-  }, [selectedCustomer, amt, date, netBefore, netAfter]);
+  }, [selectedCustomer, amt, date]);
 
   function reset() {
     setCustomerId(""); setCustomerSearch(""); setAmount(""); setMethod("cash");
