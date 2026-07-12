@@ -25,7 +25,7 @@ import { useCreatePageNav } from "@/utils/createPageNav";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 import { useQuickRowWidths, ExpandFieldButton } from "@/hooks/useQuickRowWidths";
 import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
-import { CustomerInfoStrip } from "@/utils/balanceDisplay";
+import { CustomerInfoStrip, netBalanceOf } from "@/utils/balanceDisplay";
 import FreePositionToolbar from "@/components/toolbar/FreePositionToolbar";
 import SummaryChip from "@/components/toolbar/SummaryChip";
 import { ToolbarCustomizationProvider } from "@/components/toolbar/ToolbarCustomizationContext";
