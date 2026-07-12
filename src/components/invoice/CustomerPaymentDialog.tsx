@@ -72,6 +72,7 @@ export default function CustomerPaymentDialog({
   const [accountId, setAccountId] = useState<string>("");
   const [referenceNo, setReferenceNo] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [custBalance, setCustBalance] = useState<{ debt: number; credit: number } | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -82,8 +83,21 @@ export default function CustomerPaymentDialog({
       setAccountId("");
       setReferenceNo("");
       setNotes("");
+      setCustBalance(null);
+      // اجلب رصيد العميل الحالي (له/عليه) عند فتح الحوار
+      if (customerId && !isPos) {
+        (async () => {
+          const { data } = await supabase.from("customers").select("balance, credit_balance").eq("id", customerId).maybeSingle();
+          if (data) {
+            setCustBalance({
+              debt: Number((data as any).balance || 0),
+              credit: Number((data as any).credit_balance || 0),
+            });
+          }
+        })();
+      }
     }
-  }, [open, remaining]);
+  }, [open, remaining, customerId, isPos]);
 
   const accountOptions = useMemo(() => {
     const list = (accounts || []) as any[];
