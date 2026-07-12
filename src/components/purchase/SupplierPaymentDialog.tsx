@@ -151,6 +151,12 @@ export default function SupplierPaymentDialog({
         if (upErr) throw upErr;
       }
 
+      if (method === "bank" && accountId) {
+        try { localStorage.setItem("lov:last-bank-account", accountId); } catch {}
+      }
+
+
+
       toast.success(
         purchaseOrderNumber
           ? `تم تسجيل دفعة ${n.toLocaleString()} على أمر الشراء ${purchaseOrderNumber}`
