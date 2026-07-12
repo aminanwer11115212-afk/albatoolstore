@@ -75,7 +75,7 @@ export default function IncomeReportPage() {
         containerSelector=".printable-statement"
         sections={sections}
         shareTitle="بيان الدخل والمصروفات"
-        shareSummary={`الإيرادات: ${totalIncome.toLocaleString()} | المصروفات: ${totalExpenses.toLocaleString()} | الصافي: ${net.toLocaleString()}`}
+        shareSummary={`الإيرادات: ${totalIncome.toLocaleString()} ${baseSymbol} | المصروفات: ${totalExpenses.toLocaleString()} ${baseSymbol} | الصافي: ${net.toLocaleString()} ${baseSymbol}`}
         pdfFilename="بيان-الدخل"
       />
       <div className="printable-statement space-y-6">
@@ -106,7 +106,7 @@ export default function IncomeReportPage() {
             <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><TrendingUp size={20} className="text-green-600" /></div>
             <span className="text-sm text-muted-foreground">إجمالي الإيرادات</span>
           </div>
-          <div className="text-2xl font-bold text-green-600">{totalIncome.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-green-600">{totalIncome.toLocaleString()} {baseSymbol}</div>
           <div className="text-xs text-muted-foreground mt-1">{income.length} معاملة</div>
         </div>
         <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
@@ -114,7 +114,7 @@ export default function IncomeReportPage() {
             <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center"><TrendingDown size={20} className="text-red-600" /></div>
             <span className="text-sm text-muted-foreground">إجمالي المصروفات</span>
           </div>
-          <div className="text-2xl font-bold text-red-600">{totalExpenses.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-red-600">{totalExpenses.toLocaleString()} {baseSymbol}</div>
           <div className="text-xs text-muted-foreground mt-1">{expenses.length} معاملة</div>
         </div>
         <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
@@ -122,7 +122,8 @@ export default function IncomeReportPage() {
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center"><DollarSign size={20} className="text-primary" /></div>
             <span className="text-sm text-muted-foreground">صافي الربح</span>
           </div>
-          <div className={`text-2xl font-bold ${net >= 0 ? "text-green-600" : "text-red-600"}`}>{net.toLocaleString()}</div>
+          <div className={`text-2xl font-bold ${net >= 0 ? "text-green-600" : "text-red-600"}`}>{net.toLocaleString()} {baseSymbol}</div>
+          <div className="text-xs text-muted-foreground mt-1">أساس نقدي — بعملة الأساس</div>
         </div>
       </div>
 
@@ -186,7 +187,7 @@ export default function IncomeReportPage() {
                   <td className="px-4 py-3 text-foreground">{(t.accounts as any)?.name || "-"}</td>
                   <td className="px-4 py-3 text-foreground">{t.description || "-"}</td>
                   <td className={`px-4 py-3 font-bold ${t.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                    {Number(t.amount || 0).toLocaleString()}
+                    {toBase(t).toLocaleString(undefined, { maximumFractionDigits: 2 })} {baseSymbol}
                   </td>
                 </tr>
               ))}
