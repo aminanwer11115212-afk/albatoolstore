@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTransactionsWithAccounts } from "@/hooks/useData";
 import { TrendingUp, TrendingDown, DollarSign, Calendar } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { getBaseCurrency, getLatestRate } from "@/utils/currency";
 
 export default function IncomeReportPage() {
   const [dateFrom, setDateFrom] = useState(() => {
@@ -12,23 +13,51 @@ export default function IncomeReportPage() {
   const [dateTo, setDateTo] = useState(new Date().toISOString().split("T")[0]);
   const { data: transactions, isLoading } = useTransactionsWithAccounts();
 
+  const [baseSymbol, setBaseSymbol] = useState("");
+  const [rateCache, setRateCache] = useState<Record<string, number>>({});
+
   const filtered = (transactions || []).filter((t: any) => t.date >= dateFrom && t.date <= dateTo);
+
+  // Fetch base currency + rates for currency codes lacking a stored rate
+  useEffect(() => {
+    (async () => {
+      const base = await getBaseCurrency();
+      setBaseSymbol(base?.symbol || base?.code || "");
+      const needed = Array.from(new Set(
+        filtered
+          .filter((t: any) => t.currency_code && !t.exchange_rate_to_base && !rateCache[t.currency_code])
+          .map((t: any) => t.currency_code as string)
+      ));
+      if (needed.length === 0) return;
+      const next: Record<string, number> = { ...rateCache };
+      await Promise.all(needed.map(async (code) => { next[code] = await getLatestRate(code); }));
+      setRateCache(next);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, dateFrom, dateTo]);
+
+  // Convert each transaction amount to base currency
+  const toBase = (t: any) => {
+    const rate = Number(t.exchange_rate_to_base || rateCache[t.currency_code] || 1);
+    return Number(t.amount || 0) * rate;
+  };
+
   const income = filtered.filter((t: any) => t.type === "income");
   const expenses = filtered.filter((t: any) => t.type === "expense");
-  const totalIncome = income.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-  const totalExpenses = expenses.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+  const totalIncome = income.reduce((s: number, t: any) => s + toBase(t), 0);
+  const totalExpenses = expenses.reduce((s: number, t: any) => s + toBase(t), 0);
   const net = totalIncome - totalExpenses;
 
-  // Group by category
+  // Group by category (in base currency)
   const incomeByCategory: Record<string, number> = {};
   income.forEach((t: any) => {
     const cat = t.category || "غير مصنف";
-    incomeByCategory[cat] = (incomeByCategory[cat] || 0) + Number(t.amount || 0);
+    incomeByCategory[cat] = (incomeByCategory[cat] || 0) + toBase(t);
   });
   const expensesByCategory: Record<string, number> = {};
   expenses.forEach((t: any) => {
     const cat = t.category || "غير مصنف";
-    expensesByCategory[cat] = (expensesByCategory[cat] || 0) + Number(t.amount || 0);
+    expensesByCategory[cat] = (expensesByCategory[cat] || 0) + toBase(t);
   });
 
   const sections = [
@@ -46,7 +75,7 @@ export default function IncomeReportPage() {
         containerSelector=".printable-statement"
         sections={sections}
         shareTitle="بيان الدخل والمصروفات"
-        shareSummary={`الإيرادات: ${totalIncome.toLocaleString()} | المصروفات: ${totalExpenses.toLocaleString()} | الصافي: ${net.toLocaleString()}`}
+        shareSummary={`الإيرادات: ${totalIncome.toLocaleString()} ${baseSymbol} | المصروفات: ${totalExpenses.toLocaleString()} ${baseSymbol} | الصافي: ${net.toLocaleString()} ${baseSymbol}`}
         pdfFilename="بيان-الدخل"
       />
       <div className="printable-statement space-y-6">
@@ -77,7 +106,7 @@ export default function IncomeReportPage() {
             <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><TrendingUp size={20} className="text-green-600" /></div>
             <span className="text-sm text-muted-foreground">إجمالي الإيرادات</span>
           </div>
-          <div className="text-2xl font-bold text-green-600">{totalIncome.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-green-600">{totalIncome.toLocaleString()} {baseSymbol}</div>
           <div className="text-xs text-muted-foreground mt-1">{income.length} معاملة</div>
         </div>
         <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
@@ -85,7 +114,7 @@ export default function IncomeReportPage() {
             <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center"><TrendingDown size={20} className="text-red-600" /></div>
             <span className="text-sm text-muted-foreground">إجمالي المصروفات</span>
           </div>
-          <div className="text-2xl font-bold text-red-600">{totalExpenses.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-red-600">{totalExpenses.toLocaleString()} {baseSymbol}</div>
           <div className="text-xs text-muted-foreground mt-1">{expenses.length} معاملة</div>
         </div>
         <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
@@ -93,7 +122,8 @@ export default function IncomeReportPage() {
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center"><DollarSign size={20} className="text-primary" /></div>
             <span className="text-sm text-muted-foreground">صافي الربح</span>
           </div>
-          <div className={`text-2xl font-bold ${net >= 0 ? "text-green-600" : "text-red-600"}`}>{net.toLocaleString()}</div>
+          <div className={`text-2xl font-bold ${net >= 0 ? "text-green-600" : "text-red-600"}`}>{net.toLocaleString()} {baseSymbol}</div>
+          <div className="text-xs text-muted-foreground mt-1">أساس نقدي — بعملة الأساس</div>
         </div>
       </div>
 
@@ -157,7 +187,7 @@ export default function IncomeReportPage() {
                   <td className="px-4 py-3 text-foreground">{(t.accounts as any)?.name || "-"}</td>
                   <td className="px-4 py-3 text-foreground">{t.description || "-"}</td>
                   <td className={`px-4 py-3 font-bold ${t.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                    {Number(t.amount || 0).toLocaleString()}
+                    {toBase(t).toLocaleString(undefined, { maximumFractionDigits: 2 })} {baseSymbol}
                   </td>
                 </tr>
               ))}

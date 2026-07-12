@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, X, Maximize2, Minimize2 } from "lucide-react";
+import { netBalanceOf } from "@/utils/balanceDisplay";
 import { useCustomers } from "@/hooks/useData";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
@@ -273,8 +274,9 @@ export default function CustomersPage() {
       if (filterActivity === "active_90" && days > 90) return false;
       if (filterActivity === "inactive_90" && (days <= 90 || days === Infinity)) return false;
       if (filterActivity === "no_activity" && last) return false;
-      if (filterActivity === "with_balance" && !(Number(c.balance || 0) > 0)) return false;
-      if (filterActivity === "with_credit" && !(Number(c.credit_balance || 0) > 0)) return false;
+      // "with_balance" = صافي مدين، "with_credit" = صافي دائن
+      if (filterActivity === "with_balance" && !(netBalanceOf(c) > 0)) return false;
+      if (filterActivity === "with_credit" && !(netBalanceOf(c) < 0)) return false;
     }
     return true;
   }), [customers, search, filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterWaValid, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity, customerTransporter, customerDestination, lastActivity]);
@@ -282,8 +284,8 @@ export default function CustomersPage() {
   const sortedFiltered = useMemo(() => {
     const arr = [...filtered];
     if (sortBy === "recent") arr.sort((a, b) => (lastActivity[b.id] || "").localeCompare(lastActivity[a.id] || ""));
-    else if (sortBy === "balance_desc") arr.sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0));
-    else if (sortBy === "balance_asc")  arr.sort((a, b) => Number(a.balance || 0) - Number(b.balance || 0));
+    else if (sortBy === "balance_desc") arr.sort((a, b) => netBalanceOf(b) - netBalanceOf(a));
+    else if (sortBy === "balance_asc")  arr.sort((a, b) => netBalanceOf(a) - netBalanceOf(b));
     else if (sortBy === "credit_desc")  arr.sort((a, b) => Number(b.credit_balance || 0) - Number(a.credit_balance || 0));
     else if (sortBy === "credit_asc")   arr.sort((a, b) => Number(a.credit_balance || 0) - Number(b.credit_balance || 0));
     else arr.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -1525,7 +1527,7 @@ export default function CustomersPage() {
                 </colgroup>
                 <thead style={{ position: "sticky", top: 0, zIndex: 5, background: "hsl(var(--card))" }}>
                   <tr>
-                    <th style={{ position: "relative" }}>{filterActivity === "with_balance" ? "المديونية" : filterActivity === "with_credit" ? "الدائن" : "#"}<ColumnResizeHandle onMouseDown={(e) => startColDrag(0, e)} hidden={colsLocked} /></th>
+                    <th style={{ position: "relative" }}>{filterActivity === "with_balance" ? "صافي مدين" : filterActivity === "with_credit" ? "صافي دائن" : "#"}<ColumnResizeHandle onMouseDown={(e) => startColDrag(0, e)} hidden={colsLocked} /></th>
                     {(() => {
                       const headers: { i: number; key: string; label: string; filter?: { kind: "text" | "select"; value: string; setValue: (v: string) => void; options?: { value: string; label: string }[]; placeholder?: string } }[] = [
                         { i: 1, key: "name", label: "اسم العميل", filter: { kind: "text", value: filterName, setValue: setFilterName, placeholder: "ابحث بالاسم..." } },
@@ -1807,12 +1809,12 @@ export default function CustomersPage() {
                       >
                         <td className="tabular-nums" style={{ textAlign: "center" }}>
                           {filterActivity === "with_balance" ? (
-                            <span className="font-bold text-destructive" title="المبلغ المستحق (مدين)">
-                              {Number(c.balance || 0).toLocaleString()}
+                            <span className="font-bold text-destructive" title="صافي مدين على العميل">
+                              {netBalanceOf(c).toLocaleString()}
                             </span>
                           ) : filterActivity === "with_credit" ? (
-                            <span className="font-bold text-emerald-600" title="رصيد دائن (سلفة)">
-                              {Number(c.credit_balance || 0).toLocaleString()}
+                            <span className="font-bold text-emerald-600" title="صافي دائن للعميل">
+                              {Math.abs(netBalanceOf(c)).toLocaleString()}
                             </span>
                           ) : (
                             (page - 1) * perPage + i + 1

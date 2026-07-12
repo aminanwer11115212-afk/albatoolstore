@@ -6,6 +6,7 @@ import { useCustomers, useCompanySettings } from "@/hooks/useData";
 import { Search, X, Printer } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import { netBalanceOf } from "@/utils/balanceDisplay";
 
 export default function CustomerStatementPage() {
   const { data: customers } = useCustomers();
@@ -127,6 +128,9 @@ export default function CustomerStatementPage() {
   const handleOpenPrint = () => {
     if (!selectedCustomer) return;
     const remaining = totalInvoices - totalPaid;
+    const netBal = netBalanceOf(selectedCustomer);
+    const netLabel = netBal > 0 ? "عليه (مدين لنا)" : netBal < 0 ? "له (دائن علينا)" : "مسوّى";
+    const netColor: "red" | "green" = netBal > 0 ? "red" : "green";
     const payload: FinancialReportData = {
       title: "كشف حساب عميل",
       subtitle: selectedCustomer.name,
@@ -137,8 +141,7 @@ export default function CustomerStatementPage() {
         { label: "إجمالي الفواتير", value: totalInvoices, color: "blue" },
         { label: "المدفوع", value: totalPaid, color: "green" },
         { label: "المتبقي", value: remaining, color: remaining > 0 ? "red" : "green" },
-        { label: "الرصيد الحالي", value: Number(selectedCustomer.balance || 0), color: Number(selectedCustomer.balance || 0) > 0 ? "red" : "green" },
-        { label: Number(selectedCustomer.balance || 0) > 0 ? "عليه (مدين لنا)" : Number(selectedCustomer.balance || 0) < 0 ? "له (دائن علينا)" : "مسوّى", value: Math.abs(Number(selectedCustomer.balance || 0)), color: Number(selectedCustomer.balance || 0) > 0 ? "red" : "green" },
+        { label: `الرصيد الصافي (${netLabel})`, value: Math.abs(netBal), color: netColor },
       ],
       sections: [
         {
@@ -282,7 +285,7 @@ export default function CustomerStatementPage() {
       </div>
 
       {selectedCustomer && (() => {
-        const netBalance = Number(selectedCustomer.balance || 0) - Number(selectedCustomer.credit_balance || 0);
+        const netBalance = netBalanceOf(selectedCustomer);
         const isDebtor = netBalance > 0;   // عليه — أحمر
         const isCreditor = netBalance < 0; // له — أخضر
         const balanceLabel = isDebtor ? "عليه" : isCreditor ? "له" : "مسوّى";

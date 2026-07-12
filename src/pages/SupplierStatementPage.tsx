@@ -20,6 +20,7 @@ export default function SupplierStatementPage() {
         .from("purchase_orders")
         .select("*")
         .eq("supplier_id", selectedSupplierId)
+        .neq("status", "cancelled")
         .order("date", { ascending: false });
       if (error) throw error;
       return data;

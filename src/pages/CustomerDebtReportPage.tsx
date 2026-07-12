@@ -10,8 +10,10 @@ type DebtorRow = {
   id: string;
   name: string;
   phone: string | null;
-  balance: number;
-  computed_due: number;
+  balance: number;          // raw invoice debt
+  credit_balance: number;   // customer credit
+  net_balance: number;      // net (balance - credit_balance)
+  computed_due: number;     // recomputed from invoices (non-cancelled, non-POS)
   invoice_count: number;
 };
 
@@ -22,28 +24,31 @@ export default function CustomerDebtReportPage() {
   const { data: debtors, isLoading } = useQuery<DebtorRow[]>({
     queryKey: ["customer-debt-report"],
     queryFn: async () => {
-      // Fetch customers + their invoice aggregates in one go
+      // Fetch only customers with a positive NET balance (truly owe us after credit).
       const { data: custs, error: cErr } = await supabase
         .from("customers")
-        .select("id, name, phone, balance")
-        .gt("balance", 0)
-        .order("balance", { ascending: false });
+        .select("id, name, phone, balance, credit_balance, net_balance")
+        .gt("net_balance", 0)
+        .order("net_balance", { ascending: false });
       if (cErr) throw cErr;
 
       const ids = (custs || []).map((c: any) => c.id);
       if (ids.length === 0) return [];
 
+      // Compute due from invoices with the SAME rules as the DB trigger:
+      // exclude cancelled, exclude POS, clip at zero per invoice.
       const { data: invs, error: iErr } = await supabase
         .from("invoices")
-        .select("customer_id, total, paid_amount")
+        .select("customer_id, total, paid_amount, status, source")
         .in("customer_id", ids)
-        .neq("source", "pos");
+        .neq("source", "pos")
+        .neq("status", "cancelled");
       if (iErr) throw iErr;
 
       const map = new Map<string, { due: number; count: number }>();
       for (const inv of invs || []) {
         const cur = map.get(inv.customer_id) || { due: 0, count: 0 };
-        cur.due += Number(inv.total || 0) - Number(inv.paid_amount || 0);
+        cur.due += Math.max(0, Number(inv.total || 0) - Number(inv.paid_amount || 0));
         cur.count += 1;
         map.set(inv.customer_id, cur);
       }
@@ -53,13 +58,15 @@ export default function CustomerDebtReportPage() {
         name: c.name,
         phone: c.phone,
         balance: Number(c.balance || 0),
+        credit_balance: Number(c.credit_balance || 0),
+        net_balance: Number(c.net_balance || 0),
         computed_due: map.get(c.id)?.due || 0,
         invoice_count: map.get(c.id)?.count || 0,
       }));
     },
   });
 
-  const totalDebt = (debtors || []).reduce((s, d) => s + d.balance, 0);
+  const totalNet = (debtors || []).reduce((s, d) => s + d.net_balance, 0);
   const mismatchCount = (debtors || []).filter(
     (d) => Math.abs(d.balance - d.computed_due) > 0.01
   ).length;
@@ -93,7 +100,7 @@ export default function CustomerDebtReportPage() {
         containerSelector=".printable-statement"
         sections={sections}
         shareTitle="تقرير المبالغ المستحقة على العملاء"
-        shareSummary={`عدد المَدينين: ${(debtors || []).length} | الإجمالي: ${totalDebt.toLocaleString()}`}
+        shareSummary={`عدد المَدينين: ${(debtors || []).length} | الصافي: ${totalNet.toLocaleString()}`}
         pdfFilename="تقرير-ديون-العملاء"
       />
       <div className="printable-statement space-y-4">
@@ -117,8 +124,11 @@ export default function CustomerDebtReportPage() {
           عدد المَدينين: <span className="font-bold text-foreground">{(debtors || []).length}</span>
         </p>
         <p className="text-sm text-muted-foreground">
-          إجمالي المبالغ المستحقة:{" "}
-          <span className="font-bold text-destructive">{totalDebt.toLocaleString()}</span>
+          إجمالي الصافي المستحق:{" "}
+          <span className="font-bold text-destructive">{totalNet.toLocaleString()}</span>
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          الصافي = المديونية من الفواتير − الرصيد الدائن للعميل.
         </p>
         {mismatchCount > 0 && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -134,29 +144,17 @@ export default function CustomerDebtReportPage() {
               <tr className="bg-muted">
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">#</th>
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الاسم</th>
-                
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">عدد الفواتير</th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">
-                  المستحق من الفواتير
-                </th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">
-                  الرصيد المسجل
-                </th>
+                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">المستحق من الفواتير</th>
+                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">رصيد دائن</th>
+                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الصافي</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                    جاري التحميل...
-                  </td>
-                </tr>
+                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               ) : (debtors || []).length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                    لا توجد مبالغ مستحقة
-                  </td>
-                </tr>
+                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا توجد مبالغ مستحقة</td></tr>
               ) : (
                 (debtors || []).map((c, i) => {
                   const mismatch = Math.abs(c.balance - c.computed_due) > 0.01;
@@ -164,19 +162,19 @@ export default function CustomerDebtReportPage() {
                     <tr key={c.id} className="border-b border-border hover:bg-muted/50">
                       <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                       <td className="px-4 py-3 font-medium text-foreground">{c.name}</td>
-                      
                       <td className="px-4 py-3 text-muted-foreground">{c.invoice_count}</td>
-                      <td className="px-4 py-3 text-foreground">
-                        {c.computed_due.toLocaleString()}
-                      </td>
                       <td
-                        className={`px-4 py-3 font-bold ${
-                          mismatch ? "text-amber-600 dark:text-amber-400" : "text-destructive"
-                        }`}
-                        title={mismatch ? "الرصيد لا يطابق المستحق المحسوب" : ""}
+                        className={`px-4 py-3 text-foreground ${mismatch ? "text-amber-600 dark:text-amber-400" : ""}`}
+                        title={mismatch ? "المستحق من الفواتير لا يطابق الرصيد المسجّل — أعد الحساب" : ""}
                       >
-                        {c.balance.toLocaleString()}
+                        {c.computed_due.toLocaleString()}
                         {mismatch && <span className="mr-1">⚠️</span>}
+                      </td>
+                      <td className="px-4 py-3 text-emerald-600">
+                        {c.credit_balance > 0 ? c.credit_balance.toLocaleString() : "—"}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-destructive">
+                        {c.net_balance.toLocaleString()}
                       </td>
                     </tr>
                   );

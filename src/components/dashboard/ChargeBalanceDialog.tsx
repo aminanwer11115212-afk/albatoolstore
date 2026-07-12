@@ -11,10 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useDialogSize } from "@/hooks/useDialogSize";
 import { startsWithAny } from "@/utils/searchMatch";
 import { openWhatsApp } from "@/utils/whatsapp";
+import { netBalanceOf } from "@/utils/balanceDisplay";
 
-type Customer = { id: string; name: string; phone: string | null; balance: number | null };
+type Customer = {
+  id: string;
+  name: string;
+  phone: string | null;
+  balance: number | null;
+  credit_balance?: number | null;
+  net_balance?: number | null;
+};
 type Account = { id: string; name: string; bank_name: string | null; account_type: string | null };
-type DueInvoice = { id: string; invoice_number: string; date: string; total: number | null; paid_amount: number | null; due_amount: number | null };
 
 type Method = "cash" | "card" | "bank_transfer";
 
@@ -24,12 +31,17 @@ interface Props {
   onSaved?: () => void;
 }
 
+/**
+ * شحن رصيد العميل — على مستوى العميل كامل، لا على فواتير محددة.
+ *
+ * ينشئ حركة واحدة (`customer_credit`) على العميل. تريغر `recompute_customer_balance`
+ * يُحدّث `credit_balance` و`net_balance` تلقائياً، فيصبح صافي دين العميل الإجمالي
+ * أقل بمقدار المبلغ — بغضّ النظر عن أي فاتورة بعينها.
+ */
 export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Props) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
   const [customerId, setCustomerId] = useState<string>("");
-  const [dueInvoices, setDueInvoices] = useState<DueInvoice[]>([]);
-  const [loadingDues, setLoadingDues] = useState(false);
 
   const [amount, setAmount] = useState<string>("");
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -43,12 +55,11 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
   const [showCustomerSugg, setShowCustomerSugg] = useState(false);
   const { dlgRef, dlgStyle } = useDialogSize("charge_balance_dialog", open, { w: "min(680px, 96vw)", h: "auto" });
 
-  // Load customers + cash/bank accounts when opened
   useEffect(() => {
     if (!open) return;
     (async () => {
       const [{ data: cs }, { data: accs }] = await Promise.all([
-        supabase.from("customers").select("id,name,phone,balance").order("name"),
+        supabase.from("customers").select("id,name,phone,balance,credit_balance,net_balance").order("name"),
         supabase.from("accounts").select("id,name,bank_name,account_type").order("name"),
       ]);
       setCustomers((cs || []) as Customer[]);
@@ -58,64 +69,35 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     })();
   }, [open]);
 
-  // Load unpaid invoices when customer changes
-  useEffect(() => {
-    if (!customerId) { setDueInvoices([]); return; }
-    (async () => {
-      setLoadingDues(true);
-      const { data } = await supabase
-        .from("invoices")
-        .select("id,invoice_number,date,total,paid_amount,due_amount")
-        .eq("customer_id", customerId)
-        .order("date", { ascending: true });
-      const dues = (data || [])
-        .map((i: any) => ({
-          ...i,
-          due_amount: Number(i.due_amount ?? (Number(i.total || 0) - Number(i.paid_amount || 0))),
-        }))
-        .filter((i: any) => Number(i.due_amount) > 0.001);
-      setDueInvoices(dues as DueInvoice[]);
-      setLoadingDues(false);
-    })();
-  }, [customerId]);
-
-  const totalDue = useMemo(
-    () => dueInvoices.reduce((s, i) => s + Number(i.due_amount || 0), 0),
-    [dueInvoices],
-  );
-
-  // Show how the entered amount will be allocated (FIFO preview)
-  const allocationPreview = useMemo(() => {
-    let remaining = Number(amount) || 0;
-    const out: { invoice_number: string; applied: number }[] = [];
-    for (const inv of dueInvoices) {
-      if (remaining <= 0) break;
-      const applied = Math.min(remaining, Number(inv.due_amount || 0));
-      out.push({ invoice_number: inv.invoice_number, applied });
-      remaining -= applied;
-    }
-    return { items: out, leftover: remaining };
-  }, [amount, dueInvoices]);
-
   const bankOnly = bankAccounts.filter((a) => (a.account_type || "").toLowerCase() === "bank" && isAllowedBank(a));
-  const cashOnly = bankAccounts.filter((a) => (a.account_type || "").toLowerCase() !== "bank");
 
-  const selectedCustomerPreview = customers.find((c) => c.id === customerId);
+  const selectedCustomer = customers.find((c) => c.id === customerId);
+  const netBefore = netBalanceOf(selectedCustomer);
+  const amt = Number(amount) || 0;
+  const netAfter = netBefore - amt;
+
   const whatsappPreview = useMemo(() => {
-    if (!selectedCustomerPreview) return "";
-    const amt = Number(amount) || 0;
-    const balanceBefore = Number(selectedCustomerPreview.balance || totalDue || 0);
-    const net = Math.max(0, balanceBefore - amt);
+    if (!selectedCustomer) return "";
     const [yy, mm, dd] = (date || "").split("-");
     const dateFmt = yy && mm && dd ? `${dd}/${mm}/${yy}` : date;
+    const beforeLine = netBefore > 0
+      ? `الحساب السابق: عليه ${netBefore.toLocaleString()}`
+      : netBefore < 0
+        ? `الحساب السابق: له ${Math.abs(netBefore).toLocaleString()}`
+        : `الحساب السابق: مسوّى`;
+    const afterLine = netAfter > 0
+      ? `المتبقي: عليه ${netAfter.toLocaleString()}`
+      : netAfter < 0
+        ? `رصيد دائن: له ${Math.abs(netAfter).toLocaleString()}`
+        : `الحساب: مسوّى بالكامل`;
     return [
-      `مرحبا ${selectedCustomerPreview.name}`,
-      `الحساب القديم ${balanceBefore.toLocaleString()}`,
-      `تم خصم مبلغ ${amt.toLocaleString()}`,
-      `المتبقى ${net.toLocaleString()}`,
-      `تاريخ ${dateFmt}`,
+      `مرحبا ${selectedCustomer.name}`,
+      beforeLine,
+      `تم شحن مبلغ ${amt.toLocaleString()}`,
+      afterLine,
+      `التاريخ ${dateFmt}`,
     ].join("\n");
-  }, [selectedCustomerPreview, amount, date, totalDue]);
+  }, [selectedCustomer, amt, date, netBefore, netAfter]);
 
   function reset() {
     setCustomerId(""); setCustomerSearch(""); setAmount(""); setMethod("cash");
@@ -123,12 +105,8 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     setDate(new Date().toISOString().slice(0, 10));
   }
 
-  // (تمت إزالة إنشاء رابط المشاركة من رسالة شحن الرصيد — يبقى رابط العميل في كشف الحساب فقط.)
-
-
   async function handleSave(sendWhatsApp: boolean = false) {
     if (!customerId) return toast.error("اختر العميل");
-    const amt = Number(amount);
     if (!amt || amt <= 0) return toast.error("أدخل مبلغاً صحيحاً");
     if (method === "bank_transfer") {
       const selectedAcc = bankAccounts.find((a) => a.id === bankAccountId);
@@ -139,99 +117,46 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     setSaving(true);
     try {
       const targetAccountId = method === "bank_transfer" ? bankAccountId : (accountId || null);
-
-      // ── حساب توزيع FIFO قبل التنفيذ ──
-      const allocItems: { invoice_id: string; invoice_number: string; applied: number }[] = [];
-      let remaining = amt;
-      for (const inv of dueInvoices) {
-        if (remaining <= 0) break;
-        const applied = Math.min(remaining, Number(inv.due_amount || 0));
-        allocItems.push({ invoice_id: inv.id, invoice_number: inv.invoice_number, applied });
-        remaining -= applied;
-      }
-      const leftover = Math.max(0, remaining);
-      const balanceBefore = Number(selectedCustomer?.balance || totalDue || 0);
-      const balanceAfter = Math.max(0, balanceBefore - (amt - leftover));
-
       const description =
         method === "bank_transfer"
           ? `شحن رصيد - تحويل بنكي - إشعار: ${referenceNo}${notes ? ` - ${notes}` : ""}`
           : `شحن رصيد - ${method === "cash" ? "نقدي" : "بطاقة"}${notes ? ` - ${notes}` : ""}`;
 
-      // 1) Insert payment transaction (with allocation snapshot)
-      const { data: txRow, error: txErr } = await supabase
-        .from("transactions")
-        .insert({
-          type: "income",
-          category: "payment",
-          amount: amt,
-          credit: amt,
-          method,
-          date,
-          customer_id: customerId,
-          account_id: targetAccountId,
-          description,
-          allocation: {
-            items: allocItems.map((x) => ({ invoice_number: x.invoice_number, applied: x.applied })),
-            leftover,
-            balance_before: balanceBefore,
-            balance_after: balanceAfter,
-            method,
-          },
-        } as any)
-        .select("id")
-        .single();
+      // حركة واحدة على مستوى العميل — التريغر يُحدّث credit_balance و net_balance تلقائياً
+      const { error: txErr } = await supabase.from("transactions").insert({
+        type: "income",
+        category: "customer_credit",
+        amount: amt,
+        credit: amt,
+        method,
+        date,
+        customer_id: customerId,
+        account_id: targetAccountId,
+        description,
+      } as any);
       if (txErr) throw txErr;
-      const txId = (txRow as any)?.id as string | undefined;
 
-      // 2) FIFO allocate to oldest unpaid invoices
-      for (const a of allocItems) {
-        const inv = dueInvoices.find((d) => d.id === a.invoice_id)!;
-        const newPaid = Number(inv.paid_amount || 0) + a.applied;
-        const newDue = Math.max(0, Number(inv.total || 0) - newPaid);
-        const newStatus = newDue <= 0.001 ? "paid" : "partial";
-        await supabase.from("invoices")
-          .update({ paid_amount: newPaid, due_amount: newDue, status: newStatus })
-          .eq("id", inv.id);
-      }
-
-      // 3) رصيد العميل يُعاد حسابه تلقائياً عبر trigger trg_invoices_recompute_cust_balance.
-
-      // اقرأ الرصيد الفعلي بعد التريغر لمعرفة صافي المتبقي (لكلا الزرين)
+      // اقرأ الرصيد الصافي الفعلي بعد التريغر
       const { data: freshCust } = await supabase
         .from("customers")
-        .select("balance, credit_balance")
+        .select("balance, credit_balance, net_balance")
         .eq("id", customerId)
         .maybeSingle();
-      const fBal = Number((freshCust as any)?.balance || 0);
-      const fCred = Number((freshCust as any)?.credit_balance || 0);
-      const net = fBal - fCred;
+      const net = netBalanceOf(freshCust as any);
       const netLine =
         net > 0.001
-          ? `صافي المتبقي: ${net.toLocaleString()}`
+          ? `صافي المتبقي على العميل: ${net.toLocaleString()}`
           : net < -0.001
-            ? `رصيد دائن: ${Math.abs(net).toLocaleString()}`
+            ? `رصيد دائن للعميل: ${Math.abs(net).toLocaleString()}`
             : `الحساب مسدّد بالكامل`;
 
-      toast.success(`تم شحن ${amt.toLocaleString()} بنجاح`, {
-        description: netLine,
-      });
+      toast.success(`تم شحن ${amt.toLocaleString()} بنجاح`, { description: netLine });
 
-      // 4) (اختياري) رسالة واتساب نصية مختصرة — بدون أي روابط للعميل
-      if (sendWhatsApp && txId) {
+      if (sendWhatsApp) {
         if (!selectedCustomer?.phone) {
           toast.info("لا يوجد رقم واتساب للعميل — لم تُرسل الرسالة.");
         } else {
-          const [yy, mm, dd] = date.split("-");
-          const dateFmt = `${dd}/${mm}/${yy}`;
-          const msg = [
-            `مرحبا ${selectedCustomer.name}`,
-            `الحساب القديم ${balanceBefore.toLocaleString()}`,
-            `تم خصم مبلغ ${amt.toLocaleString()}`,
-            `المتبقى ${Math.max(0, net).toLocaleString()}`,
-            `تاريخ ${dateFmt}`,
-          ].join("\n");
-          openWhatsApp(selectedCustomer.phone, msg);
+          openWhatsApp(selectedCustomer.phone, whatsappPreview);
         }
       }
 
@@ -245,8 +170,6 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     }
   }
 
-  const selectedCustomer = customers.find((c) => c.id === customerId);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent ref={dlgRef} style={{ ...dlgStyle, overflowY: "auto" }} dir="rtl">
@@ -255,7 +178,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Customer (search input + dropdown suggestions) */}
+          {/* Customer */}
           <div>
             <Label>العميل</Label>
             <div className="relative">
@@ -282,35 +205,47 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
                     if (matches.length === 0) {
                       return <div className="px-3 py-2 text-sm text-muted-foreground">لا توجد نتائج</div>;
                     }
-                    return matches.map((c) => (
-                      <div
-                        key={c.id}
-                        onMouseDown={() => {
-                          setCustomerId(c.id);
-                          setCustomerSearch(c.name);
-                          setShowCustomerSugg(false);
-                        }}
-                        className="cursor-pointer px-3 py-2 text-sm hover:bg-accent flex items-center justify-between gap-2"
-                      >
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-medium truncate">{c.name}</span>
-                          {c.phone && <span className="text-xs text-muted-foreground truncate">{c.phone}</span>}
+                    return matches.map((c) => {
+                      const net = netBalanceOf(c);
+                      return (
+                        <div
+                          key={c.id}
+                          onMouseDown={() => {
+                            setCustomerId(c.id);
+                            setCustomerSearch(c.name);
+                            setShowCustomerSugg(false);
+                          }}
+                          className="cursor-pointer px-3 py-2 text-sm hover:bg-accent flex items-center justify-between gap-2"
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-medium truncate">{c.name}</span>
+                            {c.phone && <span className="text-xs text-muted-foreground truncate">{c.phone}</span>}
+                          </div>
+                          {net !== 0 && (
+                            <span className={`text-xs font-mono shrink-0 ${net > 0 ? "text-destructive" : "text-emerald-600"}`}>
+                              {net > 0 ? "عليه " : "له "}{Math.abs(net).toLocaleString()}
+                            </span>
+                          )}
                         </div>
-                        {typeof c.balance === "number" && c.balance !== 0 && (
-                          <span className={`text-xs font-mono shrink-0 ${c.balance > 0 ? "text-destructive" : "text-green-600"}`}>
-                            {Number(c.balance).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    ));
+                      );
+                    });
                   })()}
                 </div>
               )}
             </div>
             {selectedCustomer && (
-              <div className="text-xs mt-1 text-muted-foreground">
-                إجمالي المستحقات: <span className="font-bold text-destructive">{totalDue.toLocaleString()}</span>
-                {" "}({dueInvoices.length} فاتورة)
+              <div className="text-xs mt-1">
+                {netBefore > 0 && (
+                  <span className="text-muted-foreground">
+                    صافي الحساب: <span className="font-bold text-destructive">عليه {netBefore.toLocaleString()}</span>
+                  </span>
+                )}
+                {netBefore < 0 && (
+                  <span className="text-muted-foreground">
+                    صافي الحساب: <span className="font-bold text-emerald-600">له {Math.abs(netBefore).toLocaleString()}</span>
+                  </span>
+                )}
+                {netBefore === 0 && <span className="text-muted-foreground">الحساب مسوّى</span>}
               </div>
             )}
           </div>
@@ -386,28 +321,31 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
             <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
-          {/* FIFO preview */}
-          {amount && Number(amount) > 0 && dueInvoices.length > 0 && (
-            <div className="md:col-span-2 border border-border rounded-md p-3 bg-muted/40">
-              <div className="font-semibold mb-1 text-sm">توزيع تلقائي على الفواتير (الأقدم أولاً):</div>
-              <ul className="text-xs space-y-0.5">
-                {allocationPreview.items.map((a) => (
-                  <li key={a.invoice_number} className="flex justify-between">
-                    <span>#{a.invoice_number}</span>
-                    <span className="font-mono">{a.applied.toLocaleString()}</span>
-                  </li>
-                ))}
-              </ul>
-              {allocationPreview.leftover > 0 && (
-                <div className="text-xs mt-1 text-amber-600">
-                  متبقٍ كرصيد دائن للعميل: {allocationPreview.leftover.toLocaleString()}
+          {/* Net balance preview */}
+          {selectedCustomer && amt > 0 && (
+            <div className="md:col-span-2 border border-border rounded-md p-3 bg-muted/40 text-sm">
+              <div className="font-semibold mb-1">أثر الشحن على صافي حساب العميل:</div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="text-center">
+                  <div className="text-muted-foreground">قبل</div>
+                  <div className={`font-bold tabular-nums ${netBefore > 0 ? "text-destructive" : netBefore < 0 ? "text-emerald-600" : ""}`}>
+                    {netBefore > 0 ? `عليه ${netBefore.toLocaleString()}` : netBefore < 0 ? `له ${Math.abs(netBefore).toLocaleString()}` : "مسوّى"}
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
-          {customerId && !loadingDues && dueInvoices.length === 0 && (
-            <div className="md:col-span-2 text-xs text-muted-foreground">
-              لا توجد فواتير غير مسددة — سيُضاف المبلغ كرصيد دائن للعميل.
+                <div className="text-center">
+                  <div className="text-muted-foreground">الشحن</div>
+                  <div className="font-bold text-primary tabular-nums">{amt.toLocaleString()}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-muted-foreground">بعد</div>
+                  <div className={`font-bold tabular-nums ${netAfter > 0 ? "text-destructive" : netAfter < 0 ? "text-emerald-600" : ""}`}>
+                    {netAfter > 0 ? `عليه ${netAfter.toLocaleString()}` : netAfter < 0 ? `له ${Math.abs(netAfter).toLocaleString()}` : "مسوّى"}
+                  </div>
+                </div>
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-2">
+                يُطبَّق الشحن على مجموع حساب العميل — لا يُوزَّع على فواتير بعينها.
+              </div>
             </div>
           )}
 
@@ -418,8 +356,8 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
                 <div className="font-semibold text-sm text-emerald-800 dark:text-emerald-200">
                   معاينة رسالة الواتساب
                 </div>
-                {selectedCustomerPreview?.phone ? (
-                  <span className="text-xs text-muted-foreground font-mono">{selectedCustomerPreview.phone}</span>
+                {selectedCustomer?.phone ? (
+                  <span className="text-xs text-muted-foreground font-mono">{selectedCustomer.phone}</span>
                 ) : (
                   <span className="text-xs text-amber-600">لا يوجد رقم واتساب للعميل</span>
                 )}
@@ -431,7 +369,6 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
           )}
         </div>
 
-
         <DialogFooter className="gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>إلغاء</Button>
           <Button
@@ -439,15 +376,15 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
             disabled={saving}
             variant="outline"
             className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
-            title="حفظ الشحن وإرسال رسالة واتساب نصية مختصرة بدون روابط"
+            title="حفظ الشحن وإرسال رسالة واتساب"
           >
-            {saving ? "..." : "شحن + واتساب نصي"}
+            {saving ? "..." : "شحن + واتساب"}
           </Button>
           <Button
             onClick={() => handleSave(false)}
             disabled={saving}
             className="bg-green-600 hover:bg-green-700 text-white"
-            title="حفظ الشحن فقط بدون إرسال أي رسالة"
+            title="حفظ الشحن فقط"
           >
             {saving ? "جاري الحفظ..." : "شحن الرصيد"}
           </Button>

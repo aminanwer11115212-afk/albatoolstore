@@ -11,6 +11,28 @@
  */
 import React from "react";
 
+/**
+ * Single source of truth for a customer's net balance.
+ *
+ *   net > 0  →  العميل مدين لنا  ("عليه")
+ *   net < 0  →  نحن مدينون له   ("له")
+ *   net = 0  →  مسوّى
+ *
+ * Prefers the DB-computed `net_balance` column (generated column).
+ * Falls back to `balance - credit_balance` for older cached rows.
+ */
+export function netBalanceOf(
+  customer:
+    | { net_balance?: number | null; balance?: number | null; credit_balance?: number | null }
+    | null
+    | undefined,
+): number {
+  if (!customer) return 0;
+  const nb = (customer as any).net_balance;
+  if (nb !== null && nb !== undefined && !Number.isNaN(Number(nb))) return Number(nb);
+  return Number(customer.balance || 0) - Number(customer.credit_balance || 0);
+}
+
 /** Returns an Arabic label + color for a balance value. */
 export function balanceLabel(balance: number): {
   label: string;      // e.g. "عليه" | "له" | ""
