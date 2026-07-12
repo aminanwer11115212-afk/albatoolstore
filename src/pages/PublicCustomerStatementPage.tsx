@@ -269,7 +269,7 @@ export default function PublicCustomerStatementPage() {
             { key: "ps-final", label: "الرصيد النهائي" },
           ]}
           shareTitle={`كشف حساب — ${customer.name}`}
-          shareSummary={`الرصيد المستحق: ${fmt(totals.due)} ${company?.currency || ""}`}
+          shareSummary={`الصافي: ${fmt(Math.abs(totals.net))} ${company?.currency || ""}${totals.net > 0 ? " عليه" : totals.net < 0 ? " له" : ""}`}
           pdfFilename={`كشف-حساب-${customer.name}`}
           showWhatsApp={false}
         />
@@ -502,7 +502,7 @@ export default function PublicCustomerStatementPage() {
           <div className="t">
             {totals.net > 0 ? "الصافي المستحق على العميل" : totals.net < 0 ? "رصيد دائن للعميل" : "الحساب مسوّى"}
           </div>
-          <div className="v">{fmt(Math.abs(totals.net))} {data.company?.currency || ""}</div>
+          <div className="v">{fmt(Math.abs(totals.net))} {company?.currency || ""}</div>
         </div>
 
         <div className="ps-thanks">شكراً لتعاملكم معنا</div>
