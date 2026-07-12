@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccounts, useSuppliers } from "@/hooks/useData";
 import { validateBankTransferPayment, isBankPaymentMethod, filterAccountsForPayment } from "@/lib/bankTransferValidation";
+import { refetchAndToastSupplierBalance } from "@/utils/balanceRefreshToast";
 import { toast } from "sonner";
 import {
   Dialog,
