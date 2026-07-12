@@ -398,18 +398,25 @@ ${showItems ? (variant === "stocktake" ? `
         <td style="font-weight:700;">${it.total.toLocaleString()}</td>
       </tr>
     `).join("")}
-    <tr class="total-row" data-section="grand-total" data-section-label="الإجمالي">
+    <tr class="total-row" data-section="grand-total" data-section-label="الجملة">
       <td colspan="2" style="text-align:right; padding-right:15px;">جملة ${type === "invoice" ? "الفاتورة" : type === "quote" ? "عرض السعر" : "المشتريات"}</td>
       <td></td>
       <td></td>
-      <td>${grandTotal.toLocaleString()}</td>
+      <td>${(Number(subtotal) || (grandTotal + (Number(discountTotal) || 0))).toLocaleString()}</td>
     </tr>
   </tbody>
 </table>
 `) : ""}
 
-${showAccount ? `
-<!-- Financial Summary Rows -->
+${showAccount ? (() => {
+  const prevNet = (Number(previousDebt) || 0) - (Number(previousCredit) || 0);
+  const hasPrev = Math.abs(prevNet) > 0.01;
+  const subtotalRow = Number(subtotal) || (grandTotal + (Number(discountTotal) || 0));
+  const majmoo = grandTotal + prevNet; // جملة − خصم + حساب قديم (signed)
+  const hasPaid = !hidePaidBox && paidAmount > 0.01;
+  const finalNet = majmoo - paidAmount;
+  return `
+<!-- Financial Summary Rows (ordered: جملة → خصم → حساب قديم → المجموع → المدفوع → الإجمالي) -->
 <table data-section="account-summary" data-section-label="ملخص الحساب" style="width:100%;margin-top:8px;border-collapse:collapse;font-size:13px;">
   <tbody>
     ${balSum.hasDiscount ? `
@@ -417,51 +424,35 @@ ${showAccount ? `
       <td style="padding:6px 12px;text-align:right;color:#666;">الخصم</td>
       <td style="padding:6px 12px;text-align:left;font-weight:700;color:#dc2626;">− ${fmt(balSum.discount)}</td>
     </tr>` : ""}
-    ${balSum.hasPreviousDebt ? `
-    <tr data-section="prev-debt-row" data-section-label="حساب سابق">
-      <td style="padding:6px 12px;text-align:right;color:#666;">الحساب السابق (عليه)</td>
-      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#dc2626;">− ${fmt(balSum.previousDebt)}</td>
+    ${hasPrev ? `
+    <tr data-section="prev-account-row" data-section-label="الحساب القديم">
+      <td style="padding:6px 12px;text-align:right;color:#666;">الحساب القديم ${prevNet > 0 ? "(عليه)" : "(له)"}</td>
+      <td style="padding:6px 12px;text-align:left;font-weight:700;color:${prevNet > 0 ? "#dc2626" : "#16a34a"};">${prevNet > 0 ? "+ " : "− "}${fmt(Math.abs(prevNet))}</td>
     </tr>` : ""}
-    ${balSum.hasPreviousCredit ? `
-    <tr data-section="prev-credit-row" data-section-label="رصيد سابق دائن">
-      <td style="padding:6px 12px;text-align:right;color:#666;">رصيد سابق له</td>
-      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#16a34a;">+ ${fmt(balSum.previousCredit)}</td>
-    </tr>` : ""}
-    ${!hidePaidBox && paidAmount > 0 ? `
+    <tr data-section="majmoo-row" data-section-label="المجموع" style="border-top:1px solid #e5e7eb;">
+      <td style="padding:8px 12px;text-align:right;font-weight:700;">المجموع</td>
+      <td style="padding:8px 12px;text-align:left;font-weight:800;">${fmt(majmoo)}</td>
+    </tr>
+    ${hasPaid ? `
     <tr data-section="paid-row" data-section-label="المدفوع">
       <td style="padding:6px 12px;text-align:right;color:#666;">المدفوع</td>
-      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#16a34a;">${fmt(paidAmount)}</td>
+      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#16a34a;">− ${fmt(paidAmount)}</td>
     </tr>` : ""}
-    <tr data-section="final-status" data-section-label="الحالة النهائية" style="border-top:2px solid #1f2937;">
-      ${balSum.remaining > 0 ? `
-        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">المتبقي على العميل</td>
-        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#dc2626;">− ${fmt(balSum.remaining)}</td>
-      ` : balSum.overpaid > 0 ? `
-        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">أُضيفت إلى حسابه</td>
-        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#16a34a;">+ ${fmt(balSum.overpaid)}</td>
-      ` : balSum.isPaid ? `
-        <td colspan="2" style="padding:10px 12px;text-align:center;font-weight:900;font-size:15px;color:#16a34a;">✓ مسددة بالكامل</td>
+    <tr data-section="final-status" data-section-label="الإجمالي النهائي" style="border-top:2px solid #1f2937;">
+      ${finalNet > 0.01 ? `
+        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">الإجمالي (عليه)</td>
+        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#dc2626;">${fmt(finalNet)}</td>
+      ` : finalNet < -0.01 ? `
+        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">الإجمالي (له)</td>
+        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#16a34a;">${fmt(Math.abs(finalNet))}</td>
       ` : `
-        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">المطلوب</td>
-        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#2980b9;">${fmt(grandTotal)}</td>
+        <td colspan="2" style="padding:10px 12px;text-align:center;font-weight:900;font-size:15px;color:#16a34a;">✓ مسددة بالكامل</td>
       `}
     </tr>
   </tbody>
 </table>
-${!hidePaidBox ? `
-<!-- Legacy summary boxes (kept for share-link parity; suppressed in in-app preview via hidePaidBox) -->
-<div class="summary-row" style="display:none;" aria-hidden="true">
-  <div class="summary-box" data-section="paid-amount" data-section-label="المبلغ المدفوع">
-    <div class="summary-box-title">المبلغ المدفوع</div>
-    <div class="summary-box-value" style="color:#16a34a;">${fmt(paidAmount)}</div>
-  </div>
-  <div class="summary-box" data-section="final-total" data-section-label="المطلوب النهائي" style="border-color:#2980b9;">
-    <div class="summary-box-title">المطلوب النهائي</div>
-    <div class="summary-box-value blue">${fmt(Math.max(0, grandTotal - paidAmount))}</div>
-  </div>
-</div>
-` : ""}
-` : ""}
+`;
+})() : ""}
 
 ${showExtras ? `
 <!-- Packaging & Transport -->
