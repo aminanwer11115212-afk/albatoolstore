@@ -163,6 +163,12 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       }
 
       reset();
+      // أبطل الكاش وأبلغ باقي الشاشات (InvoiceCreate/QuoteCreate/StockReturn) فوراً
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["transactionsWithAccounts"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
       onOpenChange(false);
       onSaved?.();
     } catch (e: any) {
