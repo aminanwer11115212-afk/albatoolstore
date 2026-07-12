@@ -2078,6 +2078,16 @@ export default function ProductsPage() {
                 >
                   <FileDown size={16} /> {isExportingPdf ? "جارٍ الإنشاء..." : "معاينة / طباعة PDF"}
                 </button>
+                <button
+                  type="button"
+                  disabled={isExportingPdf}
+                  onClick={() => exportFilteredPdf("share", filtered as any[])}
+                  className="flex items-center justify-center gap-2 bg-sky-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60"
+                  title="توليد نفس محتوى المعاينة كملف PDF ومشاركته مباشرة"
+                  data-testid="products-share-pdf-main"
+                >
+                  <FileDown size={16} /> مشاركة PDF
+                </button>
               </div>
             )}
           </div>
