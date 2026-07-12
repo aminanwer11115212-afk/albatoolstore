@@ -204,6 +204,7 @@ export default function CustomerPaymentDialog({
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoices-full"] });
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
 
       onSaved?.();
       onOpenChange(false);

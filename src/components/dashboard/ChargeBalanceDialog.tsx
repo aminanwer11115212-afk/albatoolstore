@@ -12,6 +12,7 @@ import { useDialogSize } from "@/hooks/useDialogSize";
 import { startsWithAny } from "@/utils/searchMatch";
 import { openWhatsApp } from "@/utils/whatsapp";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Customer = {
   id: string;
@@ -39,6 +40,7 @@ interface Props {
  * أقل بمقدار المبلغ — بغضّ النظر عن أي فاتورة بعينها.
  */
 export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Props) {
+  const qc = useQueryClient();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
   const [customerId, setCustomerId] = useState<string>("");
@@ -161,6 +163,12 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       }
 
       reset();
+      // أبطل الكاش وأبلغ باقي الشاشات (InvoiceCreate/QuoteCreate/StockReturn) فوراً
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["transactionsWithAccounts"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
       onOpenChange(false);
       onSaved?.();
     } catch (e: any) {
