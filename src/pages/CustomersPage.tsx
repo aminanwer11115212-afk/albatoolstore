@@ -481,7 +481,7 @@ export default function CustomersPage() {
 
   const recentDebtors = useMemo(() => {
     const all = (customers || [])
-      .filter((c: any) => Number(c.balance || 0) > 0)
+      .filter((c: any) => netBalanceOf(c) > 0)
       .map((c: any) => ({ ...c, _last: lastActivity[c.id] || "" }))
       .sort((a: any, b: any) => (b._last || "").localeCompare(a._last || ""));
     const q = recentDebtorsSearch.trim().toLowerCase();

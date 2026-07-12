@@ -1002,22 +1002,29 @@ export default function StockReturnCreatePage() {
                         📞 {customer.phone}
                       </span>
                     )}
-                    {Number(customer.balance || 0) !== 0 && customer.phone && (
-                      <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 9, flexShrink: 0 }}>·</span>
-                    )}
-                    {Number(customer.balance || 0) > 0 && (
-                      <span style={{ color: "hsl(var(--destructive))", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(var(--destructive)/0.08)", borderRadius: 3, padding: "0 3px" }}>
-                        عليه {Number(customer.balance).toLocaleString()}
-                      </span>
-                    )}
-                    {Number(customer.balance || 0) < 0 && (
-                      <span style={{ color: "hsl(142 70% 35%)", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(142 70% 35% / 0.08)", borderRadius: 3, padding: "0 3px" }}>
-                        له {Math.abs(Number(customer.balance)).toLocaleString()}
-                      </span>
-                    )}
-                    {Number(customer.balance || 0) === 0 && !customer.phone && (
-                      <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>مسوّى</span>
-                    )}
+                    {(() => {
+                      const _net = netBalanceOf(customer as any);
+                      return (
+                        <>
+                          {_net !== 0 && customer.phone && (
+                            <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 9, flexShrink: 0 }}>·</span>
+                          )}
+                          {_net > 0 && (
+                            <span style={{ color: "hsl(var(--destructive))", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(var(--destructive)/0.08)", borderRadius: 3, padding: "0 3px" }}>
+                              عليه {_net.toLocaleString()}
+                            </span>
+                          )}
+                          {_net < 0 && (
+                            <span style={{ color: "hsl(142 70% 35%)", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(142 70% 35% / 0.08)", borderRadius: 3, padding: "0 3px" }}>
+                              له {Math.abs(_net).toLocaleString()}
+                            </span>
+                          )}
+                          {_net === 0 && !customer.phone && (
+                            <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>مسوّى</span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </>
                 )}
               </div>

@@ -118,7 +118,7 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
                     phone: customer.phone,
                     address: customer.address || customer.city,
                     email: customer.email,
-                    balance: Number(customer.balance || 0),
+                    balance: netBalanceOf(customer as any),
                   },
                   company: (companyRow as any) || undefined,
                   invoices: invoices.map((inv: any) => ({
