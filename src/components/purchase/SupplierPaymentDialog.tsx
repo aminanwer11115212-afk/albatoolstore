@@ -157,6 +157,7 @@ export default function SupplierPaymentDialog({
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       qc.invalidateQueries({ queryKey: ["purchase-orders-full"] });
       qc.invalidateQueries({ queryKey: ["purchase-orders"] });
+      try { window.dispatchEvent(new Event("suppliers:changed")); } catch {}
 
       onOpenChange(false);
     } catch (e: any) {
