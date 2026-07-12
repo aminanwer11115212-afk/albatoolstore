@@ -450,6 +450,7 @@ const App = () => {
             <Route path="/finance/currencies" element={lazyEl(<CurrenciesPage />, "العملات")} />
             <Route path="/reports/income-statement" element={lazyEl(<IncomeStatementPage />, "قائمة الدخل")} />
             <Route path="/reports/trial-balance" element={lazyEl(<TrialBalancePage />, "ميزان المراجعة")} />
+            <Route path="/reports/discount-audit" element={lazyEl(<DiscountAuditPage />, "سجل تدقيق الخصومات")} />
             <Route path="/reports/expense-statement" element={lazyEl(<ExpenseStatementPage />, "كشف المصروفات")} />
             <Route path="/reports/financial-preview" element={lazyEl(<FinancialReportPreviewPage />, "معاينة التقرير المالي")} />
             <Route path="/settings/cloud-usage" element={lazyEl(<CloudUsagePage />, "استهلاك Cloud")} />
