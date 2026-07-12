@@ -8,6 +8,7 @@ import {
   filterAccountsForPayment,
 } from "@/lib/bankTransferValidation";
 import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
+import { splitPayment } from "@/utils/overpayment";
 import { toast } from "sonner";
 import {
   Dialog,
