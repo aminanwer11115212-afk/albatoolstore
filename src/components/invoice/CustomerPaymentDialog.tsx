@@ -197,6 +197,10 @@ export default function CustomerPaymentDialog({
         .eq("id", invoiceId);
       if (upErr) throw upErr;
 
+      if (method === "bank" && accountId) {
+        try { localStorage.setItem("lov:last-bank-account", accountId); } catch {}
+      }
+
       const parts: string[] = [];
       if (split.applied > 0) parts.push(`دفعة ${split.applied.toLocaleString()}`);
       if (split.overpay > 0) parts.push(`رصيد دائن ${split.overpay.toLocaleString()}`);
