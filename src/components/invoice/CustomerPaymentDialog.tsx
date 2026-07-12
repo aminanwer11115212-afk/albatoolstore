@@ -121,26 +121,7 @@ export default function CustomerPaymentDialog({
     savingRef.current = true;
     setSaving(true);
     try {
-      // 1) تسجيل transaction (إن كان هناك مبلغ فعلي) — نتجاوزها لفواتير POS بلا عميل
-      if (n > 0) {
-        const baseNote = notes || (invoiceNumber ? `دفعة على الفاتورة ${invoiceNumber}` : "دفعة من العميل");
-        const description = referenceNo ? `${baseNote} — مرجع: ${referenceNo}` : baseNote;
-        const txPayload: any = {
-          type: "income",
-          category: "customer_payment",
-          customer_id: isPos ? null : customerId || null,
-          account_id: accountId,
-          amount: n,
-          date,
-          method,
-          reference_id: invoiceId,
-          description,
-        };
-        const { error: txErr } = await (supabase as any).from("transactions").insert(txPayload);
-        if (txErr) throw txErr;
-      }
-
-      // 2) قراءة الفاتورة وحساب paid_amount + الخصم الجديد + status
+      // 1) قراءة الفاتورة الحالية قبل تسجيل أي شيء
       const { data: inv, error: rErr } = await (supabase as any)
         .from("invoices")
         .select("total, paid_amount, discount, subtotal")
@@ -148,17 +129,53 @@ export default function CustomerPaymentDialog({
         .maybeSingle();
       if (rErr) throw rErr;
 
+      // الخصم الإضافي يُخفّض إجمالي الفاتورة قبل حساب التقسيم
       const nextDiscount = Math.max(0, Number(inv?.discount || 0) + disc);
-      // إذا أضفنا خصمًا نُخفّض الإجمالي (subtotal ثابت — الإجمالي = subtotal - discount + tax/shipping)
-      // نستخدم فرق الخصم فقط لتفادي إعادة حساب الضريبة هنا
       const nextTotal = Math.max(0, Number(inv?.total || 0) - disc);
-      const nextPaid = Math.min(nextTotal + 1e6, Number(inv?.paid_amount || 0) + n);
-      const nextDue = Math.max(0, nextTotal - nextPaid);
-      const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: nextPaid });
+      const alreadyPaid = Number(inv?.paid_amount || 0);
 
+      // 2) تقسيم الدفعة: applied يقفل الفاتورة، overpay يُسجَّل كرصيد دائن للعميل
+      const split = splitPayment({ amount: n, total: nextTotal, alreadyPaid });
+      const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: split.newPaid });
+
+      // 3) تسجيل transaction الدفعة (الجزء المطبَّق على الفاتورة)
+      if (split.applied > 0) {
+        const baseNote = notes || (invoiceNumber ? `دفعة على الفاتورة ${invoiceNumber}` : "دفعة من العميل");
+        const description = referenceNo ? `${baseNote} — مرجع: ${referenceNo}` : baseNote;
+        const { error: txErr } = await (supabase as any).from("transactions").insert({
+          type: "income",
+          category: "customer_payment",
+          customer_id: isPos ? null : customerId || null,
+          account_id: accountId,
+          amount: split.applied,
+          date,
+          method,
+          reference_id: invoiceId,
+          description,
+        });
+        if (txErr) throw txErr;
+      }
+
+      // 4) تسجيل الفائض كـ customer_credit (رصيد دائن على مستوى العميل — لا يُربط بفاتورة)
+      //    يلتقطه recompute_customer_balance تلقائياً ويُحدّث customers.credit_balance و net_balance.
+      if (split.overpay > 0 && !isPos && customerId) {
+        const { error: cErr } = await (supabase as any).from("transactions").insert({
+          type: "income",
+          category: "customer_credit",
+          customer_id: customerId,
+          account_id: accountId,
+          amount: split.overpay,
+          date,
+          method,
+          description: `فائض دفعة${invoiceNumber ? ` من الفاتورة ${invoiceNumber}` : ""} — رصيد دائن`,
+        });
+        if (cErr) throw cErr;
+      }
+
+      // 5) تحديث الفاتورة
       const updatePayload: any = {
-        paid_amount: nextPaid,
-        due_amount: nextDue,
+        paid_amount: split.newPaid,
+        due_amount: split.newDue,
         status: nextStatus,
       };
       if (disc > 0) {
@@ -172,10 +189,13 @@ export default function CustomerPaymentDialog({
         .eq("id", invoiceId);
       if (upErr) throw upErr;
 
+      const parts: string[] = [];
+      if (split.applied > 0) parts.push(`دفعة ${split.applied.toLocaleString()}`);
+      if (split.overpay > 0) parts.push(`رصيد دائن ${split.overpay.toLocaleString()}`);
+      if (disc > 0) parts.push(`خصم ${disc.toLocaleString()}`);
       toast.success(
-        n > 0
-          ? `تم تسجيل دفعة ${n.toLocaleString()}${disc > 0 ? ` + خصم ${disc.toLocaleString()}` : ""} — الحالة: ${labelStatus(nextStatus)}`
-          : `تم تسجيل خصم ${disc.toLocaleString()}`,
+        (parts.length ? `تم تسجيل ${parts.join(" + ")}` : "تم التسجيل") +
+          ` — الحالة: ${labelStatus(nextStatus)}`,
       );
 
       qc.invalidateQueries({ queryKey: ["transactions"] });
