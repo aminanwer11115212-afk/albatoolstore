@@ -113,6 +113,7 @@ const DeletedItemsPage = lazy(() => import("./pages/DeletedItemsPage"));
 const CurrenciesPage = lazy(() => import("./pages/CurrenciesPage"));
 const IncomeStatementPage = lazy(() => import("./pages/IncomeStatementPage"));
 const TrialBalancePage = lazy(() => import("./pages/TrialBalancePage"));
+const DiscountAuditPage = lazy(() => import("./pages/DiscountAuditPage"));
 const ExpenseStatementPage = lazy(() => import("./pages/ExpenseStatementPage"));
 const FinancialReportPreviewPage = lazy(() => import("./pages/FinancialReportPreviewPage"));
 const CloudUsagePage = lazy(() => import("./pages/CloudUsagePage"));
