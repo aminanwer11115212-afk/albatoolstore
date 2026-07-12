@@ -3266,8 +3266,8 @@ export default function ProductsPage() {
                 <thead className="bg-muted sticky top-0">
                   <tr>
                     <th className="border border-border p-1 w-8">#</th>
-                    {pv.cols.image && <th className="border border-border p-1 w-12">صورة</th>}
                     <th className="border border-border p-1 text-right">الاسم</th>
+                    {pv.cols.image && <th className="border border-border p-1 w-16">صورة</th>}
                     {pv.cols.category && <th className="border border-border p-1 text-right w-24">الفئة</th>}
                     {pv.cols.brand && <th className="border border-border p-1 text-right w-24">الماركة</th>}
                     {pv.cols.warehouse && <th className="border border-border p-1 text-right w-24">المستودع</th>}
@@ -3278,19 +3278,22 @@ export default function ProductsPage() {
                 <tbody>
                   {pdfList.slice(0, 60).map((p: any, i: number) => {
                     const whName = p.warehouse_id ? ((warehouses || []).find((w: any) => w.id === p.warehouse_id)?.name || "") : "";
+                    // حجم الصورة داخل المعاينة يعكس الطباعة: كبير إذا لا فلاتر إضافية، صغير مع الفلاتر
+                    const extra = (pv.cols.category?1:0)+(pv.cols.brand?1:0)+(pv.cols.warehouse?1:0)+(pv.cols.sku?1:0)+(pv.cols.price?1:0);
+                    const imgBox = extra === 0 ? "w-14 h-14" : extra === 1 ? "w-12 h-12" : extra === 2 ? "w-10 h-10" : "w-8 h-8";
                     return (
                     <tr key={p.id} className="odd:bg-background even:bg-muted/30">
                       <td className="border border-border p-1 text-center text-muted-foreground">{i + 1}</td>
+                      <td className="border border-border p-1 font-bold">{p.name}</td>
                       {pv.cols.image && (
                         <td className="border border-border p-1">
-                          <div className="w-8 h-8 mx-auto rounded bg-muted overflow-hidden flex items-center justify-center">
+                          <div className={`${imgBox} mx-auto rounded bg-muted overflow-hidden flex items-center justify-center`}>
                             {p.image_url
                               ? <img src={p.image_url} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-                              : <PackageIcon size={12} className="text-muted-foreground" />}
+                              : <PackageIcon size={extra === 0 ? 22 : 14} className="text-muted-foreground" />}
                           </div>
                         </td>
                       )}
-                      <td className="border border-border p-1 font-medium">{p.name}</td>
                       {pv.cols.category && <td className="border border-border p-1 text-muted-foreground">{p.categories?.[0]?.name || p.product_categories?.name || ""}</td>}
                       {pv.cols.brand && <td className="border border-border p-1 text-muted-foreground">{p.brands?.[0]?.name || p.product_companies?.name || ""}</td>}
                       {pv.cols.warehouse && <td className="border border-border p-1 text-muted-foreground">{whName}</td>}
@@ -3316,6 +3319,15 @@ export default function ProductsPage() {
                 onClick={() => setPdfPreviewOpen(false)}
                 className="px-4 py-2 rounded-lg text-sm bg-muted border border-border hover:bg-muted/70"
               >إلغاء</button>
+              <button
+                type="button"
+                disabled={isExportingPdf || pdfList.length === 0}
+                onClick={() => exportFilteredPdf("share", pdfList)}
+                className="px-4 py-2 rounded-lg text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2"
+                title="إنشاء ملف PDF ومشاركته مباشرة (واتساب / بريد / تطبيقات)"
+              >
+                <FileDown size={16} /> مشاركة PDF
+              </button>
               <button
                 type="button"
                 disabled={isExportingPdf || pdfList.length === 0}
