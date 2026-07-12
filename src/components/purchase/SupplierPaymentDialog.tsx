@@ -80,8 +80,14 @@ export default function SupplierPaymentDialog({
   }, [accounts, method]);
 
   useEffect(() => {
-    // auto-pick default account when list changes
     if (!accountId && accountOptions.length > 0) {
+      if (method === "bank") {
+        try {
+          const last = localStorage.getItem("lov:last-bank-account");
+          const match = accountOptions.find((a: any) => a.id === last);
+          if (match) { setAccountId(match.id); return; }
+        } catch {}
+      }
       const def = accountOptions.find((a: any) => a.is_default) || accountOptions[0];
       setAccountId(def.id);
     }
@@ -144,6 +150,12 @@ export default function SupplierPaymentDialog({
           .eq("id", purchaseOrderId);
         if (upErr) throw upErr;
       }
+
+      if (method === "bank" && accountId) {
+        try { localStorage.setItem("lov:last-bank-account", accountId); } catch {}
+      }
+
+
 
       toast.success(
         purchaseOrderNumber

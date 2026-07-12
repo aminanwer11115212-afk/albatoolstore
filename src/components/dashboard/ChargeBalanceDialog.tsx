@@ -68,6 +68,13 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       setBankAccounts((accs || []) as Account[]);
       const defaultAcc = (accs || []).find((a: any) => a.is_default) || (accs || [])[0];
       if (defaultAcc) setAccountId((defaultAcc as any).id);
+      // استرجاع آخر حساب بنكي مستخدَم
+      try {
+        const lastBank = localStorage.getItem("lov:last-bank-account");
+        if (lastBank && (accs || []).some((a: any) => a.id === lastBank && a.account_type === "bank")) {
+          setBankAccountId(lastBank);
+        }
+      } catch {}
     })();
   }, [open]);
 
@@ -82,24 +89,13 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     if (!selectedCustomer) return "";
     const [yy, mm, dd] = (date || "").split("-");
     const dateFmt = yy && mm && dd ? `${dd}/${mm}/${yy}` : date;
-    const beforeLine = netBefore > 0
-      ? `الحساب السابق: عليه ${netBefore.toLocaleString()}`
-      : netBefore < 0
-        ? `الحساب السابق: له ${Math.abs(netBefore).toLocaleString()}`
-        : `الحساب السابق: مسوّى`;
-    const afterLine = netAfter > 0
-      ? `المتبقي: عليه ${netAfter.toLocaleString()}`
-      : netAfter < 0
-        ? `رصيد دائن: له ${Math.abs(netAfter).toLocaleString()}`
-        : `الحساب: مسوّى بالكامل`;
+    // ملاحظة: لا نعرض سطر "المتبقي" في رسالة شحن الرصيد بناءً على طلب المستخدم.
     return [
       `مرحبا ${selectedCustomer.name}`,
-      beforeLine,
       `تم شحن مبلغ ${amt.toLocaleString()}`,
-      afterLine,
       `التاريخ ${dateFmt}`,
     ].join("\n");
-  }, [selectedCustomer, amt, date, netBefore, netAfter]);
+  }, [selectedCustomer, amt, date]);
 
   function reset() {
     setCustomerId(""); setCustomerSearch(""); setAmount(""); setMethod("cash");
@@ -138,21 +134,13 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       } as any);
       if (txErr) throw txErr;
 
-      // اقرأ الرصيد الصافي الفعلي بعد التريغر
-      const { data: freshCust } = await supabase
-        .from("customers")
-        .select("balance, credit_balance, net_balance")
-        .eq("id", customerId)
-        .maybeSingle();
-      const net = netBalanceOf(freshCust as any);
-      const netLine =
-        net > 0.001
-          ? `صافي المتبقي على العميل: ${net.toLocaleString()}`
-          : net < -0.001
-            ? `رصيد دائن للعميل: ${Math.abs(net).toLocaleString()}`
-            : `الحساب مسدّد بالكامل`;
+      // احفظ آخر حساب بنكي مستخدَم للاسترجاع لاحقًا
+      if (method === "bank_transfer" && bankAccountId) {
+        try { localStorage.setItem("lov:last-bank-account", bankAccountId); } catch {}
+      }
 
-      toast.success(`تم شحن ${amt.toLocaleString()} بنجاح`, { description: netLine });
+      // ملاحظة: لا نعرض "المتبقي" في رسالة شحن الرصيد بناءً على طلب المستخدم
+      toast.success(`تم شحن ${amt.toLocaleString()} بنجاح`);
 
       if (sendWhatsApp) {
         if (!selectedCustomer?.phone) {
