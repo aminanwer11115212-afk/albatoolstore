@@ -318,12 +318,19 @@ export default function PurchaseCreatePage() {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
     };
+    const onSuppliersChanged = async () => {
+      const tid = toast.loading("جارٍ تحديث الرصيد…", { id: "balance-refresh" });
+      try {
+        await queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+        toast.success("تم تحديث الرصيد", { id: tid, duration: 1200 });
+      } catch { toast.dismiss(tid); }
+    };
     window.addEventListener("products:changed", handleSync);
-    window.addEventListener("suppliers:changed", handleSync);
+    window.addEventListener("suppliers:changed", onSuppliersChanged);
     window.addEventListener("focus", handleSync);
     return () => {
       window.removeEventListener("products:changed", handleSync);
-      window.removeEventListener("suppliers:changed", handleSync);
+      window.removeEventListener("suppliers:changed", onSuppliersChanged);
       window.removeEventListener("focus", handleSync);
     };
   }, [queryClient]);

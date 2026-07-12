@@ -487,12 +487,19 @@ export default function QuoteCreatePage() {
       refetchProducts();
       refetchCustomers();
     };
+    const onCustomersChanged = async () => {
+      const tid = toast.loading("جارٍ تحديث الرصيد…", { id: "balance-refresh" });
+      try {
+        await refetchCustomers();
+        toast.success("تم تحديث الرصيد", { id: tid, duration: 1200 });
+      } catch { toast.dismiss(tid); }
+    };
     window.addEventListener("products:changed", refetchProducts);
-    window.addEventListener("customers:changed", refetchCustomers);
+    window.addEventListener("customers:changed", onCustomersChanged);
     window.addEventListener("focus", handleFocus);
     return () => {
       window.removeEventListener("products:changed", refetchProducts);
-      window.removeEventListener("customers:changed", refetchCustomers);
+      window.removeEventListener("customers:changed", onCustomersChanged);
       window.removeEventListener("focus", handleFocus);
     };
   }, [editId]);
