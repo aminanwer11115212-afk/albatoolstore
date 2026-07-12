@@ -10,8 +10,10 @@ type DebtorRow = {
   id: string;
   name: string;
   phone: string | null;
-  balance: number;
-  computed_due: number;
+  balance: number;          // raw invoice debt
+  credit_balance: number;   // customer credit
+  net_balance: number;      // net (balance - credit_balance)
+  computed_due: number;     // recomputed from invoices (non-cancelled, non-POS)
   invoice_count: number;
 };
 
@@ -22,28 +24,31 @@ export default function CustomerDebtReportPage() {
   const { data: debtors, isLoading } = useQuery<DebtorRow[]>({
     queryKey: ["customer-debt-report"],
     queryFn: async () => {
-      // Fetch customers + their invoice aggregates in one go
+      // Fetch only customers with a positive NET balance (truly owe us after credit).
       const { data: custs, error: cErr } = await supabase
         .from("customers")
-        .select("id, name, phone, balance")
-        .gt("balance", 0)
-        .order("balance", { ascending: false });
+        .select("id, name, phone, balance, credit_balance, net_balance")
+        .gt("net_balance", 0)
+        .order("net_balance", { ascending: false });
       if (cErr) throw cErr;
 
       const ids = (custs || []).map((c: any) => c.id);
       if (ids.length === 0) return [];
 
+      // Compute due from invoices with the SAME rules as the DB trigger:
+      // exclude cancelled, exclude POS, clip at zero per invoice.
       const { data: invs, error: iErr } = await supabase
         .from("invoices")
-        .select("customer_id, total, paid_amount")
+        .select("customer_id, total, paid_amount, status, source")
         .in("customer_id", ids)
-        .neq("source", "pos");
+        .neq("source", "pos")
+        .neq("status", "cancelled");
       if (iErr) throw iErr;
 
       const map = new Map<string, { due: number; count: number }>();
       for (const inv of invs || []) {
         const cur = map.get(inv.customer_id) || { due: 0, count: 0 };
-        cur.due += Number(inv.total || 0) - Number(inv.paid_amount || 0);
+        cur.due += Math.max(0, Number(inv.total || 0) - Number(inv.paid_amount || 0));
         cur.count += 1;
         map.set(inv.customer_id, cur);
       }
@@ -53,13 +58,15 @@ export default function CustomerDebtReportPage() {
         name: c.name,
         phone: c.phone,
         balance: Number(c.balance || 0),
+        credit_balance: Number(c.credit_balance || 0),
+        net_balance: Number(c.net_balance || 0),
         computed_due: map.get(c.id)?.due || 0,
         invoice_count: map.get(c.id)?.count || 0,
       }));
     },
   });
 
-  const totalDebt = (debtors || []).reduce((s, d) => s + d.balance, 0);
+  const totalNet = (debtors || []).reduce((s, d) => s + d.net_balance, 0);
   const mismatchCount = (debtors || []).filter(
     (d) => Math.abs(d.balance - d.computed_due) > 0.01
   ).length;
