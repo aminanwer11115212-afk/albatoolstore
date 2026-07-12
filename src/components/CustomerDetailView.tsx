@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
 import type { StatementData } from "@/utils/statementPrintTemplate";
+import { netBalanceOf } from "@/utils/balanceDisplay";
 import { toast } from "sonner";
 import {
   FileText, RotateCcw, Receipt, Wallet, AlertTriangle, CheckCircle2,
