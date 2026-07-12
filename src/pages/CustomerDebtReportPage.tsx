@@ -100,7 +100,7 @@ export default function CustomerDebtReportPage() {
         containerSelector=".printable-statement"
         sections={sections}
         shareTitle="تقرير المبالغ المستحقة على العملاء"
-        shareSummary={`عدد المَدينين: ${(debtors || []).length} | الإجمالي: ${totalDebt.toLocaleString()}`}
+        shareSummary={`عدد المَدينين: ${(debtors || []).length} | الصافي: ${totalNet.toLocaleString()}`}
         pdfFilename="تقرير-ديون-العملاء"
       />
       <div className="printable-statement space-y-4">
@@ -124,8 +124,11 @@ export default function CustomerDebtReportPage() {
           عدد المَدينين: <span className="font-bold text-foreground">{(debtors || []).length}</span>
         </p>
         <p className="text-sm text-muted-foreground">
-          إجمالي المبالغ المستحقة:{" "}
-          <span className="font-bold text-destructive">{totalDebt.toLocaleString()}</span>
+          إجمالي الصافي المستحق:{" "}
+          <span className="font-bold text-destructive">{totalNet.toLocaleString()}</span>
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          الصافي = المديونية من الفواتير − الرصيد الدائن للعميل.
         </p>
         {mismatchCount > 0 && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -141,29 +144,17 @@ export default function CustomerDebtReportPage() {
               <tr className="bg-muted">
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">#</th>
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الاسم</th>
-                
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">عدد الفواتير</th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">
-                  المستحق من الفواتير
-                </th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">
-                  الرصيد المسجل
-                </th>
+                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">المستحق من الفواتير</th>
+                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">رصيد دائن</th>
+                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الصافي</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                    جاري التحميل...
-                  </td>
-                </tr>
+                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               ) : (debtors || []).length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                    لا توجد مبالغ مستحقة
-                  </td>
-                </tr>
+                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا توجد مبالغ مستحقة</td></tr>
               ) : (
                 (debtors || []).map((c, i) => {
                   const mismatch = Math.abs(c.balance - c.computed_due) > 0.01;
@@ -171,19 +162,19 @@ export default function CustomerDebtReportPage() {
                     <tr key={c.id} className="border-b border-border hover:bg-muted/50">
                       <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                       <td className="px-4 py-3 font-medium text-foreground">{c.name}</td>
-                      
                       <td className="px-4 py-3 text-muted-foreground">{c.invoice_count}</td>
-                      <td className="px-4 py-3 text-foreground">
-                        {c.computed_due.toLocaleString()}
-                      </td>
                       <td
-                        className={`px-4 py-3 font-bold ${
-                          mismatch ? "text-amber-600 dark:text-amber-400" : "text-destructive"
-                        }`}
-                        title={mismatch ? "الرصيد لا يطابق المستحق المحسوب" : ""}
+                        className={`px-4 py-3 text-foreground ${mismatch ? "text-amber-600 dark:text-amber-400" : ""}`}
+                        title={mismatch ? "المستحق من الفواتير لا يطابق الرصيد المسجّل — أعد الحساب" : ""}
                       >
-                        {c.balance.toLocaleString()}
+                        {c.computed_due.toLocaleString()}
                         {mismatch && <span className="mr-1">⚠️</span>}
+                      </td>
+                      <td className="px-4 py-3 text-emerald-600">
+                        {c.credit_balance > 0 ? c.credit_balance.toLocaleString() : "—"}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-destructive">
+                        {c.net_balance.toLocaleString()}
                       </td>
                     </tr>
                   );
