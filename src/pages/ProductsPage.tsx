@@ -2589,6 +2589,90 @@ export default function ProductsPage() {
                       </div>
                     )}
                   </td>
+                  {isAllProducts && !isPriceReport && !isInStockPage && !isOutOfStockPage && !isReportPage && (
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        {p.image_url ? (
+                          <img
+                            src={p.image_url}
+                            className="w-10 h-10 rounded object-cover border border-border cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isMobileUI) setImgActionProduct(p);
+                              else setImgLightbox({ url: p.image_url, name: p.name || "" });
+                            }}
+                            title="عرض الصورة"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded bg-muted flex items-center justify-center"><PackageIcon size={14} className="text-muted-foreground" /></div>
+                        )}
+                        <label
+                          className="text-xs text-primary cursor-pointer hover:underline"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              (e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement | null)?.click();
+                            }
+                          }}
+                          tabIndex={0}
+                        >
+                          {p.image_url ? "تغيير" : "ارفع"}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = "";
+                              if (!file) return;
+                              openCropForFile(file, async (cropped) => {
+                                const localUrl = URL.createObjectURL(cropped);
+                                const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                                try {
+                                  const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                  const url = await uploadProductImage(cropped);
+                                  patchProductCaches(p.id, { image_url: url });
+                                  await update.mutateAsync({ id: p.id, image_url: url });
+                                  window.dispatchEvent(new Event("products:changed"));
+                                  setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                                } catch (err: any) {
+                                  rollback();
+                                  URL.revokeObjectURL(localUrl);
+                                  toast.error(err.message || "فشل الرفع");
+                                }
+                              });
+                            }}
+                          />
+                        </label>
+                        {p.image_url && (
+                          <button
+                            type="button"
+                            className="p-1 rounded hover:bg-muted text-primary"
+                            title="إعادة قص"
+                            aria-label="إعادة قص الصورة"
+                            onClick={() => startRecrop(p.image_url, async (cropped) => {
+                              const localUrl = URL.createObjectURL(cropped);
+                              const rollback = patchProductCaches(p.id, { image_url: localUrl });
+                              try {
+                                const { uploadProductImage } = await import("@/utils/productImageUpload");
+                                const url = await uploadProductImage(cropped);
+                                patchProductCaches(p.id, { image_url: url });
+                                await update.mutateAsync({ id: p.id, image_url: url });
+                                window.dispatchEvent(new Event("products:changed"));
+                                setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+                              } catch (err: any) {
+                                rollback();
+                                URL.revokeObjectURL(localUrl);
+                                toast.error(err.message || "فشل حفظ الصورة الجديدة");
+                              }
+                            })}
+                          >
+                            <Scissors size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                   {isPriceReport ? (
                     <td className="px-5 py-3 font-semibold text-foreground">{Number(p.sale_price || 0).toLocaleString()}</td>
                   ) : (isInStockPage || isOutOfStockPage) ? (
