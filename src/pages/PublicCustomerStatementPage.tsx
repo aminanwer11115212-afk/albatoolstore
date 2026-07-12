@@ -14,6 +14,8 @@ interface Customer {
   city?: string | null;
   company?: string | null;
   balance?: number | null;
+  credit_balance?: number | null;
+  net_balance?: number | null;
 }
 
 interface Company {
@@ -113,16 +115,21 @@ export default function PublicCustomerStatementPage() {
   }, [token]);
 
   const totals = useMemo(() => {
-    if (!data) return { sales: 0, paid: 0, due: 0, unpaid: 0, returns: 0, payments: 0 };
+    if (!data) return { sales: 0, paid: 0, due: 0, unpaid: 0, returns: 0, payments: 0, net: 0 };
     const sales = data.invoices.reduce((s, i) => s + Number(i.total || 0), 0);
     const paid = data.invoices.reduce((s, i) => s + Number(i.paid_amount || 0), 0);
-    const due = data.invoices.reduce((s, i) => s + Number(i.due_amount || 0), 0);
+    const due = data.invoices.reduce((s, i) => s + Math.max(0, Number(i.due_amount || 0)), 0);
     const unpaid = data.invoices.filter((i) => Number(i.due_amount || 0) > 0).length;
     const returns = data.returns.reduce((s, r) => s + Number(r.total || 0), 0);
     const payments = data.transactions
       .filter((t) => t.type === "income")
       .reduce((s, t) => s + Number(t.amount || 0), 0);
-    return { sales, paid, due, unpaid, returns, payments };
+    // الصافي الحقيقي على العميل = المديونية من الفواتير − رصيده الدائن.
+    // نستخدم net_balance من الخادم إن توفّر، وإلا نحسبه محلياً.
+    const custNet = data.customer.net_balance !== null && data.customer.net_balance !== undefined
+      ? Number(data.customer.net_balance)
+      : Number(data.customer.balance || 0) - Number(data.customer.credit_balance || 0);
+    return { sales, paid, due, unpaid, returns, payments, net: custNet };
   }, [data]);
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
@@ -350,9 +357,11 @@ export default function PublicCustomerStatementPage() {
             <div className="ps-summary-box-title">المدفوع</div>
             <div className="ps-summary-box-value">{fmt(totals.paid + totals.payments)}</div>
           </div>
-          <div className="ps-summary-box red">
-            <div className="ps-summary-box-title">المتبقي</div>
-            <div className="ps-summary-box-value">{fmt(totals.due)}</div>
+          <div className={`ps-summary-box ${totals.net > 0 ? "red" : totals.net < 0 ? "green" : ""}`}>
+            <div className="ps-summary-box-title">
+              {totals.net > 0 ? "الصافي المستحق (عليه)" : totals.net < 0 ? "رصيد دائن (له)" : "الحساب مسوّى"}
+            </div>
+            <div className="ps-summary-box-value">{fmt(Math.abs(totals.net))}</div>
           </div>
           <div className="ps-summary-box">
             <div className="ps-summary-box-title">فواتير غير مسددة</div>
@@ -490,8 +499,10 @@ export default function PublicCustomerStatementPage() {
 
         {/* Final balance */}
         <div data-section="ps-final" data-section-label="الرصيد النهائي" className="ps-final">
-          <div className="t">الرصيد المستحق على العميل</div>
-          <div className="v">{fmt(totals.due)} {company?.currency || ""}</div>
+          <div className="t">
+            {totals.net > 0 ? "الصافي المستحق على العميل" : totals.net < 0 ? "رصيد دائن للعميل" : "الحساب مسوّى"}
+          </div>
+          <div className="v">{fmt(Math.abs(totals.net))} {data.company?.currency || ""}</div>
         </div>
 
         <div className="ps-thanks">شكراً لتعاملكم معنا</div>
