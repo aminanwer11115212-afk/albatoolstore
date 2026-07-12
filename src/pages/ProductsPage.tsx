@@ -1236,76 +1236,63 @@ export default function ProductsPage() {
 
   .page { padding: 6px 8px; }
 
-  /* ترويسة الشركة — مضغوطة للطباعة لتوفير مساحة المنتجات */
-  .letterhead {
-    display: flex; align-items: center; gap: 10px;
-    padding: 6px 10px; margin-bottom: 6px;
-    background: linear-gradient(135deg, #5b2c8e, #7e3eb5);
-    color: #fff; border-radius: 8px;
+  /* ترويسة نمط الفاتورة: شعار | (اسم الشركة + العنوان + الهواتف) | شعار */
+  .header {
+    text-align: center; padding-bottom: 6px;
+    border-bottom: 3px solid #4a7c59;
+    margin-bottom: 8px;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .letterhead .logo {
-    width: 40px; height: 40px; background: #fff; border-radius: 6px; padding: 3px;
-    display: flex; align-items: center; justify-content: center;
-    color: #5b2c8e; font-weight: 800; font-size: 16px;
+  .header-logos {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; margin-bottom: 4px;
   }
-  .letterhead .logo img { width: 100%; height: 100%; object-fit: contain; }
-  .letterhead .co { flex: 1; min-width: 0; }
-  .letterhead .co h2 { margin: 0 0 2px; font-size: 13px; font-weight: 800; }
-  .letterhead .co .meta { font-size: 9.5px; opacity: 0.95; line-height: 1.4; }
-  .letterhead .side {
-    text-align: center; padding: 4px 8px; min-width: 140px;
-    background: rgba(255,255,255,0.16); border-radius: 6px;
-    border: 1px solid rgba(255,255,255,0.28);
+  .header-logo { flex: 0 0 auto; }
+  .header-logo img { height: 60px; object-fit: contain; }
+  .header-logo .fallback {
+    height: 60px; width: 60px; display: flex; align-items: center; justify-content: center;
+    background: #f1f5f9; color: #4a7c59; font-weight: 900; font-size: 22px; border-radius: 6px;
   }
-  .letterhead .side .t { font-size: 11px; font-weight: 800; }
-  .letterhead .side .st { font-size: 9.5px; opacity: 0.92; margin-top: 1px; }
+  .header-mid { flex: 1; min-width: 0; }
+  .header-title { font-size: 20px; font-weight: 900; color: #c0392b; margin-bottom: 3px; }
+  .header-address { font-size: 12px; color: #333; line-height: 1.4; }
+  .header-phones { font-size: 13px; font-weight: 700; color: #1a1a1a; margin-top: 1px; }
 
-  .filters-note {
-    background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 5px;
-    padding: 3px 8px; margin-bottom: 5px; font-size: 9.5px; color: #475569;
-    display: flex; flex-wrap: wrap; gap: 6px;
+  .doc-title { text-align: center; margin: 4px 0 8px; }
+  .doc-title h1 {
+    font-size: 16px; color: #2c3e50; font-weight: 800;
+    display: inline-block; border-bottom: 2px solid #5b2c8e;
+    padding-bottom: 2px; margin: 0;
   }
-  .filters-note b { color: #0f172a; }
 
   table.products { width: 100%; border-collapse: collapse; }
-  table.products thead { display: table-header-group; } /* تكرار الترويسة كل صفحة */
-  table.products tfoot { display: table-footer-group; }
+  table.products thead { display: table-header-group; }
   table.products th, table.products td {
-    border: 1px solid #e5e7eb; padding: 2px 4px; vertical-align: middle;
-    font-size: 9.5px; line-height: 1.15;
+    border: 1px solid #d1d5db; padding: 4px 6px; vertical-align: middle;
+    font-size: ${rowFontPx}px; line-height: 1.2;
   }
   table.products thead th {
-    background: #f1f5f9; color: #0f172a; font-weight: 800; font-size: 10px;
-    padding: 3px 4px;
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
-  }
-  .repeat-brand td {
-    background: #ede9fe; color: #4c1d95; font-weight: 800; text-align: center;
-    padding: 2px; font-size: 9.5px;
+    background: #5b4cad; color: #fff; font-weight: 800; font-size: 12px;
+    padding: 6px 6px;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   table.products tr { page-break-inside: avoid; break-inside: avoid; }
+  table.products tbody tr:nth-child(even) { background: #f8f8f8; }
 
-  .c-num  { width: 24px; text-align: center; color: #64748b; }
-  .c-img  { width: 34px; }
-  .c-name { font-weight: 700; color: #0f172a; }
-  .c-meta { width: 90px; color: #334155; }
-  .c-sku  { width: 75px; font-family: ui-monospace, monospace; color: #0369a1; font-size: 9px; }
-  .c-price{ width: 70px; text-align: center; font-weight: 700; color: #059669; }
+  .c-num  { width: 28px; text-align: center; color: #64748b; }
+  .c-img  { width: ${thumbPx + 8}px; }
+  .c-name { font-weight: 800; color: #0f172a; text-align: right; font-size: ${nameFontPx}px; padding-inline-start: 10px !important; }
+  .c-meta { width: ${extraCols <= 2 ? 110 : 80}px; color: #334155; text-align: center; }
+  .c-sku  { width: ${extraCols <= 2 ? 90 : 70}px; font-family: ui-monospace, monospace; color: #0369a1; text-align: center; }
+  .c-price{ width: ${extraCols <= 2 ? 90 : 70}px; text-align: center; font-weight: 700; color: #059669; }
 
-  /* الصورة مربعة مضغوطة للطباعة (28×28) لتوفير أكبر عدد من الصفوف */
   .thumb {
-    width: 26px; height: 26px; background: #f8fafc; border: 1px solid #e5e7eb;
-    border-radius: 3px; overflow: hidden; margin: auto;
+    width: ${thumbPx}px; height: ${thumbPx}px;
+    background: #f8fafc; border: 1px solid #e5e7eb;
+    border-radius: 6px; overflow: hidden; margin: auto;
     display: flex; align-items: center; justify-content: center;
   }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-  .footer {
-    margin-top: 6px; padding-top: 4px; border-top: 1px dashed #cbd5e1;
-    color: #64748b; font-size: 9px; text-align: center;
-  }
 
   @media print {
     .toolbar { display: none !important; }
@@ -1322,31 +1309,25 @@ export default function ProductsPage() {
     </div>
   </div>
   <div class="page">
-    <div class="letterhead">
-      <div class="logo">${logoUrl ? `<img src="${escHtml(logoUrl)}" alt="logo"/>` : escHtml(companyName.charAt(0))}</div>
-      <div class="co">
-        <h2>${escHtml(companyName)}</h2>
-        <div class="meta">
-          ${company.phone ? `📞 ${escHtml(company.phone)} &nbsp;` : ""}
-          ${company.email ? `✉️ ${escHtml(company.email)} &nbsp;` : ""}
-          ${company.address ? `📍 ${escHtml(company.address)}` : ""}
+    <div class="header">
+      <div class="header-logos">
+        <div class="header-logo">${logoUrl ? `<img src="${escHtml(logoUrl)}" alt="logo"/>` : `<div class="fallback">${escHtml(companyName.charAt(0))}</div>`}</div>
+        <div class="header-mid">
+          <div class="header-title">${escHtml(companyName)}</div>
+          ${company.address ? `<div class="header-address">${escHtml(company.address)}</div>` : ""}
+          ${company.phone ? `<div class="header-phones">📞 ${escHtml(company.phone)}</div>` : ""}
         </div>
+        <div class="header-logo">${logoUrl ? `<img src="${escHtml(logoUrl)}" alt="logo"/>` : `<div class="fallback">${escHtml(companyName.charAt(0))}</div>`}</div>
       </div>
-      <div class="side">
-        <div class="t">كتالوج المنتجات</div>
-        <div class="st">${escHtml(today)} • ${list.length} صنف</div>
-      </div>
+      <div class="doc-title"><h1>كتالوج المنتجات — ${escHtml(today)} • ${list.length} صنف</h1></div>
     </div>
-
-    ${activeFilters.length ? `<div class="filters-note"><b>الفلاتر المطبَّقة:</b> ${activeFilters.map(f => escHtml(f)).join(" • ")}</div>` : ""}
 
     <table class="products">
       <thead>
-        <tr class="repeat-brand"><td colspan="${totalCols}">${escHtml(companyName)} — كتالوج المنتجات</td></tr>
         <tr>
           <th class="c-num">#</th>
-          ${cols.image ? `<th class="c-img">الصورة</th>` : ""}
           <th class="c-name">اسم المنتج</th>
+          ${cols.image ? `<th class="c-img">الصورة</th>` : ""}
           ${cols.category ? `<th class="c-meta">الفئة</th>` : ""}
           ${cols.brand ? `<th class="c-meta">الماركة</th>` : ""}
           ${cols.warehouse ? `<th class="c-meta">المستودع</th>` : ""}
@@ -1356,10 +1337,42 @@ export default function ProductsPage() {
       </thead>
       <tbody>${rows}</tbody>
     </table>
-
-    <div class="footer">${cols.price ? "الكتالوج مع الأسعار — قابلة للتغيير." : "تم إنشاء الكتالوج تلقائياً — لا يحتوي على أسعار."}</div>
   </div>
-  ${autoPrint ? `<script>
+  ${mode === "share" ? `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+  <script>
+    (function() {
+      function waitImgs() {
+        const imgs = Array.from(document.images);
+        return Promise.all(imgs.map(img => img.complete ? Promise.resolve() :
+          new Promise(res => { img.onload = img.onerror = () => res(null); })));
+      }
+      window.addEventListener('load', async () => {
+        try {
+          await waitImgs();
+          const el = document.querySelector('.page');
+          const opt = {
+            margin: [6, 4, 8, 4],
+            filename: 'كتالوج-المنتجات.pdf',
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['css', 'legacy'] }
+          };
+          const blob = await window.html2pdf().set(opt).from(el).outputPdf('blob');
+          const file = new File([blob], 'كتالوج-المنتجات.pdf', { type: 'application/pdf' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'كتالوج المنتجات' });
+            setTimeout(() => window.close(), 400);
+          } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'كتالوج-المنتجات.pdf'; a.click();
+            setTimeout(() => { URL.revokeObjectURL(url); window.close(); }, 800);
+          }
+        } catch (e) { console.error(e); alert('تعذّرت مشاركة الملف — يمكنك الطباعة/الحفظ يدوياً.'); }
+      });
+    })();
+  <\/script>` : mode === "print" ? `<script>
     window.addEventListener('load', () => {
       const imgs = Array.from(document.images);
       Promise.all(imgs.map(img => img.complete ? Promise.resolve() :
