@@ -2118,15 +2118,27 @@ export default function ProductsPage() {
                 {nameSortDir === "asc" ? "أ↓ ي" : nameSortDir === "desc" ? "ي↓ أ" : "ترتيب أبجدي"}
               </button>
             </div>
-            <button
-              type="button"
-              disabled={isExportingPdf}
-              onClick={openPdfPreview}
-              className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60"
-              title="فتح معاينة PDF مع فلاتر وترتيب قبل الطباعة"
-            >
-              <FileDown size={16} /> {isExportingPdf ? "جارٍ الإنشاء..." : "معاينة / طباعة PDF"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={isExportingPdf}
+                onClick={openPdfPreview}
+                className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60"
+                title="فتح معاينة PDF مع فلاتر وترتيب قبل الطباعة"
+              >
+                <FileDown size={16} /> {isExportingPdf ? "جارٍ الإنشاء..." : "معاينة / طباعة PDF"}
+              </button>
+              <button
+                type="button"
+                disabled={isExportingPdf}
+                onClick={() => exportFilteredPdf("share", filtered as any[])}
+                className="flex items-center justify-center gap-2 bg-sky-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60"
+                title="توليد نفس محتوى المعاينة كملف PDF ومشاركته مباشرة"
+                data-testid="products-share-pdf-toolbar"
+              >
+                <FileDown size={16} /> مشاركة PDF
+              </button>
+            </div>
           </div>
         )}
 
