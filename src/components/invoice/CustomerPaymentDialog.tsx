@@ -253,11 +253,41 @@ export default function CustomerPaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-3 py-2">
+          {custBalance && (custBalance.debt > 0.01 || custBalance.credit > 0.01) && (() => {
+            const net = custBalance.debt - custBalance.credit;
+            const label = net > 0.01 ? "عليه" : net < -0.01 ? "له" : "مسوّى";
+            const color = net > 0.01 ? "text-destructive" : net < -0.01 ? "text-emerald-600" : "";
+            return (
+              <div className="rounded-md border border-dashed border-border p-2 text-xs flex items-center justify-between bg-muted/30">
+                <span>حساب العميل: <b className={color}>{label} {Math.abs(net).toLocaleString()}</b></span>
+                {custBalance.credit > 0.01 && (
+                  <button
+                    type="button"
+                    className="text-primary underline text-[11px]"
+                    onClick={() => setAmount(String(Math.min(remaining, Number(amount) || 0) + custBalance.credit))}
+                    title="أضف كامل الرصيد الدائن إلى المبلغ"
+                  >
+                    + استخدام الرصيد الدائن ({custBalance.credit.toLocaleString()})
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           <div className="rounded-md bg-muted/50 p-2 text-xs flex justify-between">
             <span>الإجمالي: <b>{Number(total).toLocaleString()}</b></span>
             <span>المدفوع سابقاً: <b>{Number(paidBefore).toLocaleString()}</b></span>
             <span className="text-destructive">المتبقي: <b>{remaining.toLocaleString()}</b></span>
           </div>
+          {(() => {
+            const n = Number(amount) || 0;
+            const excess = Math.max(0, n - remaining);
+            if (excess <= 0) return null;
+            return (
+              <div className="rounded-md border border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 p-2 text-xs text-emerald-800 dark:text-emerald-200">
+                فائض <b>{excess.toLocaleString()}</b> سيُودَع كرصيد دائن للعميل
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
