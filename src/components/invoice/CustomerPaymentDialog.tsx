@@ -9,6 +9,9 @@ import {
 } from "@/lib/bankTransferValidation";
 import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
 import { splitPayment } from "@/utils/overpayment";
+import { logDiscountEvent } from "@/utils/discountAuditLogger";
+import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
+import { netBalanceOf } from "@/utils/balanceDisplay";
 import { toast } from "sonner";
 import {
   Dialog,
