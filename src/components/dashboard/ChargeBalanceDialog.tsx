@@ -40,6 +40,7 @@ interface Props {
  * أقل بمقدار المبلغ — بغضّ النظر عن أي فاتورة بعينها.
  */
 export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Props) {
+  const qc = useQueryClient();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
   const [customerId, setCustomerId] = useState<string>("");
