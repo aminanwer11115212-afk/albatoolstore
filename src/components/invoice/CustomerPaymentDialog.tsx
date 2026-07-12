@@ -59,7 +59,7 @@ export default function CustomerPaymentDialog({
   onSaved,
 }: Props) {
   const qc = useQueryClient();
-  const { data: accounts } = useAccounts();
+  const { data: accounts, isLoading: accountsLoading, isError: accountsError, refetch: refetchAccounts } = useAccounts();
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
 
@@ -106,23 +106,31 @@ export default function CustomerPaymentDialog({
     return list;
   }, [accounts, method]);
 
+  // ثبّت الحساب البنكي المختار عبر إغلاق/فتح الحوار وتبديل الطريقة
   useEffect(() => {
-    if (!accountId && accountOptions.length > 0) {
-      // عند التحويل البنكي: حاول استرجاع آخر حساب بنكي مستخدَم
-      if (method === "bank") {
-        try {
-          const last = localStorage.getItem("lov:last-bank-account");
-          const match = accountOptions.find((a: any) => a.id === last);
-          if (match) { setAccountId(match.id); return; }
-        } catch {}
-      }
+    if (accountOptions.length === 0) return;
+    const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
+    if (!accountId) {
+      try {
+        const last = localStorage.getItem(storageKey);
+        const match = accountOptions.find((a: any) => a.id === last);
+        if (match) { setAccountId(match.id); return; }
+      } catch {}
       const def = accountOptions.find((a: any) => a.is_default) || accountOptions[0];
       setAccountId(def.id);
+      return;
     }
-    if (accountId && !accountOptions.find((a: any) => a.id === accountId)) {
+    if (!accountOptions.find((a: any) => a.id === accountId)) {
       setAccountId(accountOptions[0]?.id || "");
     }
-  }, [accountOptions]); // eslint-disable-line
+  }, [accountOptions, method]); // eslint-disable-line
+
+  // احفظ الحساب المختار فور تغييره — لا ننتظر الحفظ لتثبيت الاختيار
+  useEffect(() => {
+    if (!accountId) return;
+    const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
+    try { localStorage.setItem(storageKey, accountId); } catch {}
+  }, [accountId, method]);
 
   const selectedAccount = (accountOptions as any[]).find((a) => a.id === accountId) || null;
 
@@ -331,9 +339,23 @@ export default function CustomerPaymentDialog({
           </div>
 
           <div>
-            <Label>الحساب</Label>
+            <div className="flex items-center justify-between mb-1">
+              <Label>الحساب</Label>
+              {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
+                <button
+                  type="button"
+                  data-testid="retry-load-accounts"
+                  className="text-[11px] text-primary underline"
+                  onClick={() => { refetchAccounts(); }}
+                >
+                  إعادة المحاولة
+                </button>
+              )}
+            </div>
             <Select value={accountId} onValueChange={setAccountId}>
-              <SelectTrigger><SelectValue placeholder="اختر" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder={accountsLoading ? "جارٍ التحميل…" : accountOptions.length === 0 ? "تعذّر تحميل الحسابات" : "اختر"} />
+              </SelectTrigger>
               <SelectContent>
                 {(accountOptions as any[]).map((a) => (
                   <SelectItem key={a.id} value={a.id}>
