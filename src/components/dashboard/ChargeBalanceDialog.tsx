@@ -12,6 +12,7 @@ import { useDialogSize } from "@/hooks/useDialogSize";
 import { startsWithAny } from "@/utils/searchMatch";
 import { openWhatsApp } from "@/utils/whatsapp";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Customer = {
   id: string;
