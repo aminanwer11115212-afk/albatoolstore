@@ -2312,24 +2312,24 @@ export default function ProductsPage() {
                   </>
                 ) : (
                   <>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>الصورة<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(2, e); }} hidden={colsLocked} /></th>
                     <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative", cursor: "pointer", background: filterCategory ? "hsl(var(--primary) / 0.15)" : undefined, userSelect: "none" }} onClick={headerClickFor("category", "select")} title="ضغطة للفلترة">
                       الفئة{filterIndicator(!!filterCategory)}
                       {renderFilterPopover({ key: "category", kind: "select", value: filterCategory, setValue: setFilterCategory, options: (categories || []).map((c: any) => ({ value: c.id, label: c.name })) })}
-                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(2, e); }} hidden={colsLocked} />
+                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(3, e); }} hidden={colsLocked} />
                     </th>
                     <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative", cursor: "pointer", background: filterCompany ? "hsl(var(--primary) / 0.15)" : undefined, userSelect: "none" }} onClick={headerClickFor("company", "select")} title="ضغطة للفلترة">
                       الماركة{filterIndicator(!!filterCompany)}
                       {renderFilterPopover({ key: "company", kind: "select", value: filterCompany, setValue: setFilterCompany, options: (companies || []).map((c: any) => ({ value: c.id, label: c.name })) })}
-                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(3, e); }} hidden={colsLocked} />
+                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(4, e); }} hidden={colsLocked} />
                     </th>
                     <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative", cursor: "pointer", background: filterWarehouse ? "hsl(var(--primary) / 0.15)" : undefined, userSelect: "none" }} onClick={headerClickFor("warehouse", "select")} title="ضغطة للفلترة">
                       المستودع{filterIndicator(!!filterWarehouse)}
                       {renderFilterPopover({ key: "warehouse", kind: "select", value: filterWarehouse, setValue: setFilterWarehouse, options: (warehouses || []).map((w: any) => ({ value: w.id, label: w.name })) })}
-                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(4, e); }} hidden={colsLocked} />
+                      <ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(5, e); }} hidden={colsLocked} />
                     </th>
-                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>السعر<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(5, e); }} hidden={colsLocked} /></th>
-                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>السعر الأجنبي<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(6, e); }} hidden={colsLocked} /></th>
-                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>الصورة<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(7, e); }} hidden={colsLocked} /></th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>السعر<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(6, e); }} hidden={colsLocked} /></th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative" }}>السعر الأجنبي<ColumnResizeHandle onMouseDown={(e) => { e.stopPropagation(); startColDrag(7, e); }} hidden={colsLocked} /></th>
                     <th className="text-right px-3 py-3 font-semibold text-muted-foreground" style={{ position: "relative", cursor: "pointer", background: filterSupplier ? "hsl(var(--primary) / 0.15)" : undefined, userSelect: "none" }} onClick={headerClickFor("supplier", "select")} title="ضغطة للفلترة">
                       المورد{filterIndicator(!!filterSupplier)}
                       {renderFilterPopover({ key: "supplier", kind: "select", value: filterSupplier, setValue: setFilterSupplier, options: (suppliers || []).map((s: any) => ({ value: s.id, label: s.name })) })}
