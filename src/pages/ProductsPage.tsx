@@ -214,11 +214,11 @@ export default function ProductsPage() {
   // Dashboard removed — table-only view
 
   // أعمدة قابلة للسحب لجدول إدارة جميع المنتجات
-  // [#, الاسم, الفئة, الشركة, المستودع, السعر, السعر الأجنبي, الصورة, المورد, تجميد, إعدادات]
-  // 11 columns for isAllProducts: #, اسم, الفئة, الشركة, المستودع, السعر, السعر الأجنبي, الصورة, المورد, تجميد, إعدادات
-  const PRODUCTS_COLS_KEY = userScopedLegacyKey("products-page:colWidths:v1");
+  // [#, الاسم, الصورة, الفئة, الشركة, المستودع, السعر, السعر الأجنبي, المورد, تجميد, إعدادات]
+  // 11 columns for isAllProducts: الصورة تظهر مباشرة بعد اسم المنتج.
+  const PRODUCTS_COLS_KEY = userScopedLegacyKey("products-page:colWidths:v2");
   const PRODUCTS_LOCK_KEY = userScopedLegacyKey("products-page:colsLocked:v1");
-  const PRODUCTS_DEFAULTS: (number | null)[] = [60, null, 140, 140, 140, 110, 110, 130, 140, 80, 110];
+  const PRODUCTS_DEFAULTS: (number | null)[] = [60, null, 130, 140, 140, 140, 110, 110, 140, 80, 110];
   const [colsLocked, setColsLocked] = useSharedColsLocked(() => localStorage.getItem(PRODUCTS_LOCK_KEY) === "true");
   const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, reset: resetColWidths, saveAsUserDefault: saveColDefault, tableProps } = useColumnWidths(
     PRODUCTS_COLS_KEY,
