@@ -99,6 +99,70 @@ export function BalanceChip({
 }
 
 /**
+ * Shared 3-cell summary card: [مدين | دائن | صافي]
+ *
+ * Use this in CustomerDetailView / CustomersPage / statement pages so every
+ * surface shows the SAME numbers (raw balance, raw credit, and the unified net).
+ * Never render bespoke balance chips — always route through this component to
+ * avoid the "different pages, different numbers" regression class.
+ */
+export function CustomerAccountSummary({
+  customer,
+  size = "md",
+  showNetLabel = true,
+}: {
+  customer:
+    | { balance?: number | null; credit_balance?: number | null; net_balance?: number | null }
+    | null
+    | undefined;
+  size?: "sm" | "md";
+  showNetLabel?: boolean;
+}) {
+  const debt = Number(customer?.balance || 0);
+  const credit = Number(customer?.credit_balance || 0);
+  const net = netBalanceOf(customer);
+  const pad = size === "sm" ? "px-2 py-1" : "px-3 py-2";
+  const num = size === "sm" ? "text-sm" : "text-base";
+  const lbl = size === "sm" ? "text-[10px]" : "text-[11px]";
+  return (
+    <div className="grid grid-cols-3 gap-2 w-full" dir="rtl" data-testid="customer-account-summary">
+      <div className={`bg-destructive/10 rounded-lg text-center ${pad}`}>
+        <div className={`text-muted-foreground ${lbl}`}>المديونية</div>
+        <div className={`font-bold tabular-nums text-destructive ${num}`} data-testid="cas-debt">
+          {debt.toLocaleString()}
+        </div>
+      </div>
+      <div className={`bg-emerald-500/10 rounded-lg text-center ${pad}`}>
+        <div className={`text-muted-foreground ${lbl}`}>الرصيد الدائن</div>
+        <div className={`font-bold tabular-nums text-emerald-600 ${num}`} data-testid="cas-credit">
+          {credit.toLocaleString()}
+        </div>
+      </div>
+      <div
+        className={`rounded-lg text-center ${pad} ${
+          net > 0 ? "bg-destructive/15" : net < 0 ? "bg-emerald-500/15" : "bg-muted"
+        }`}
+      >
+        <div className={`text-muted-foreground ${lbl}`}>الصافي</div>
+        <div
+          className={`font-bold tabular-nums ${num} ${
+            net > 0 ? "text-destructive" : net < 0 ? "text-emerald-600" : "text-foreground"
+          }`}
+          data-testid="cas-net"
+        >
+          {Math.abs(net).toLocaleString()}
+          {showNetLabel && (
+            <span className="text-[9px] font-normal mr-1">
+              {net > 0 ? "عليه" : net < 0 ? "له" : "مسوّى"}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Customer info strip for header labels.
  * Shows: 📞 phone  |  [عليه X,XXX] or [له X,XXX]
  */

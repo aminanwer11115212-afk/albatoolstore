@@ -8,6 +8,7 @@ import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 import DiscountInput from "@/components/shared/DiscountInput";
 import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
 import { toast } from "sonner";
+import { netBalanceOf } from "@/utils/balanceDisplay";
 
 /**
  * صفحة معاينة داخلية للمستندات (عرض سعر / فاتورة).
@@ -111,7 +112,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
             company: company as any,
             variant,
             noHeader,
-            oldBalance: Number(qCust?.balance || 0),
+            oldBalance: netBalanceOf(qCust),
             previousDebt: Number(qCust?.balance || 0),
             previousCredit: Number(qCust?.credit_balance || 0),
             hidePaidBox: false,
@@ -169,7 +170,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
             paymentMethod: invoice.payment_method,
             variant,
             noHeader,
-            oldBalance: Number(iCust?.balance || 0),
+            oldBalance: netBalanceOf(iCust),
             previousDebt: prevDebt,
             previousCredit: Number(iCust?.credit_balance || 0),
             hidePaidBox: false,
@@ -264,7 +265,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
             status: (ret as any).status,
             variant,
             noHeader,
-            oldBalance: Number(cust?.balance || 0),
+            oldBalance: netBalanceOf(cust),
           });
         }
 
