@@ -94,6 +94,14 @@ export default function CustomerPaymentDialog({
 
   useEffect(() => {
     if (!accountId && accountOptions.length > 0) {
+      // عند التحويل البنكي: حاول استرجاع آخر حساب بنكي مستخدَم
+      if (method === "bank") {
+        try {
+          const last = localStorage.getItem("lov:last-bank-account");
+          const match = accountOptions.find((a: any) => a.id === last);
+          if (match) { setAccountId(match.id); return; }
+        } catch {}
+      }
       const def = accountOptions.find((a: any) => a.is_default) || accountOptions[0];
       setAccountId(def.id);
     }
