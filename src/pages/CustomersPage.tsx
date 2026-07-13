@@ -23,6 +23,8 @@ import InlineSearchSelect from "@/components/InlineSearchSelect";
 import GeoStructurePanel from "@/components/customers/GeoStructurePanel";
 import CustomerLogisticsTable from "@/components/customers/CustomerLogisticsTable";
 import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDialog";
+import ContactPickerButton from "@/components/shared/ContactPickerButton";
+import { normalizePhoneInput } from "@/utils/phoneNormalize";
 const emptyForm = { name: "", phone: "", address: "", notes: "", city: "", region_id: "" as string | null | "", state_id: "" as string | null | "", locality_id: "" as string | null | "", city_id: "" as string | null | "" };
 
 type ActivityFilter = "all" | "active_30" | "active_90" | "inactive_90" | "no_activity" | "with_balance" | "with_credit";
@@ -1244,7 +1246,20 @@ export default function CustomersPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <input placeholder="الاسم *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inputCls} />
             <div>
-              <input placeholder="الهاتف" value={form.phone} onChange={e => { setForm({ ...form, phone: e.target.value }); setDuplicates([]); }} className={inputCls} />
+              <div className="flex items-center gap-1">
+                <input
+                  placeholder="الهاتف"
+                  value={form.phone}
+                  dir="ltr"
+                  inputMode="tel"
+                  onChange={e => { setForm({ ...form, phone: normalizePhoneInput(e.target.value) }); setDuplicates([]); }}
+                  className={inputCls}
+                />
+                <ContactPickerButton onPicked={(c) => {
+                  setForm(f => ({ ...f, phone: c.tel || f.phone, name: f.name || c.name || "" }));
+                  setDuplicates([]);
+                }} />
+              </div>
               {form.phone && findDuplicatesByPhone(form.phone, editId).length > 0 && (
                 <p className="text-xs text-destructive mt-1">⚠ هذا الرقم مستخدم بالفعل ({findDuplicatesByPhone(form.phone, editId).length})</p>
               )}
@@ -1296,7 +1311,10 @@ export default function CustomersPage() {
             />
             <div className="grid grid-cols-1 gap-3">
               <input placeholder="الاسم *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inputCls} />
-              <input placeholder="الهاتف" value={form.phone} onChange={e => { setForm({ ...form, phone: e.target.value }); setDuplicates([]); }} className={inputCls} />
+              <input placeholder="الهاتف" value={form.phone} dir="ltr" inputMode="tel" onChange={e => { setForm({ ...form, phone: normalizePhoneInput(e.target.value) }); setDuplicates([]); }} className={inputCls} />
+              <div className="-mt-2 flex justify-end">
+                <ContactPickerButton onPicked={(c) => { setForm(f => ({ ...f, phone: c.tel || f.phone, name: f.name || c.name || "" })); setDuplicates([]); }} />
+              </div>
               <input placeholder="المدينة" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className={inputCls} />
               <input placeholder="العنوان" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className={inputCls} />
               <textarea placeholder="ملاحظات" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className={inputCls} rows={3} />
