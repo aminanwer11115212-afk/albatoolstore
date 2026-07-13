@@ -1987,30 +1987,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
               zoom={{ value: itemsZoom, inc: itemsZoomInc, dec: itemsZoomDec }}
               items={[
                 // === Group 0: Summary chips (قابلة للنقل والتسمية والإخفاء) ===
-                {
-                  id: "general-discount",
-                  group: "0-summary",
-                  useHandle: true,
-                  defaultLabel: "خصم",
-                  node: (
-                    <SummaryChip
-                      screenKey={isEdit ? "invoice-edit-toolbar" : "invoice-create-toolbar"}
-                      id="general-discount"
-                      defaultLabel="خصم"
-                      value={
-                        <div style={{ width: 200 }}>
-                          <DiscountInput
-                            label=""
-                            value={generalDiscount || 0}
-                            grandBeforeDiscount={(totals?.subtotal || 0) - (totals?.itemDiscounts || 0)}
-                            onChange={(v) => setGeneralDiscount(v)}
-                            compact
-                          />
-                        </div>
-                      }
-                    />
-                  ),
-                },
+                // ملاحظة: تم نقل إدخال الخصم (نسبة/مبلغ) إلى شاشة «تسجيل الدفعة»
+                // ليظهر تلقائياً عند استلام دفعة العميل، ويُحسب على الرصيد المتبقي.
                 {
                   id: "sum-total",
                   group: "0-summary",
