@@ -1864,13 +1864,13 @@ export default function CustomersPage() {
                               <EditableCell
                                 value={c.whatsapp || ""}
                                 disabled={savingRow === c.id}
-                                onSave={(v) => updateRowField(c.id, { whatsapp: v.trim() || null })}
+                                onSave={(v) => updateRowField(c.id, { whatsapp: normalizePhoneInput(v) || null })}
                                 inputClassName="text-[11px] tabular-nums"
                                 placeholder="واتساب"
                                 inputMode="tel"
                                 dir="ltr"
                                 validate={(v) => {
-                                  const t = (v || "").trim();
+                                  const t = normalizePhoneInput(v);
                                   if (!t) return null;
                                   if (!isValidWhatsAppPhone(t)) return "رقم غير صالح للإرسال (8-15 خانة)";
                                   const dups = findDuplicatesByPhone(t, c.id);
