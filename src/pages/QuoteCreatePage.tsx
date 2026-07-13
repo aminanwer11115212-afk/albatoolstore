@@ -52,7 +52,7 @@ import type { ParsedLine } from "@/hooks/useMessageImport";
 import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { CustomerInfoStrip, netBalanceOf } from "@/utils/balanceDisplay";
-import DiscountInput from "@/components/shared/DiscountInput";
+
 
 /**
  * تنقّل بالـ Arrow keys / Enter / Tab بين الحقول.
@@ -1827,31 +1827,8 @@ export default function QuoteCreatePage() {
               withCustomizeButtons
               zoom={{ value: itemsZoom, inc: itemsZoomInc, dec: itemsZoomDec }}
               items={[
-                // === خصم على المجموع ===
-                {
-                  id: "general-discount",
-                  group: "0-summary",
-                  useHandle: true,
-                  defaultLabel: "خصم",
-                  node: (
-                    <SummaryChip
-                      screenKey="quote-create-toolbar"
-                      id="general-discount"
-                      defaultLabel="خصم"
-                      value={
-                        <div style={{ width: 200 }}>
-                          <DiscountInput
-                            label=""
-                            value={generalDiscount || 0}
-                            grandBeforeDiscount={(totals?.subtotal || 0) - (totals?.itemDiscounts || 0)}
-                            onChange={(v) => setGeneralDiscount(v)}
-                            compact
-                          />
-                        </div>
-                      }
-                    />
-                  ),
-                },
+                // ملاحظة: تم نقل إدخال الخصم (نسبة/مبلغ) إلى شاشة «تسجيل الدفعة»
+                // ليظهر تلقائياً عند استلام دفعة العميل، بدلاً من الشريط السفلي هنا.
                 // === المجموع ===
                 {
                   id: "sum-total",
