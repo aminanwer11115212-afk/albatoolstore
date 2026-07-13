@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -21,17 +21,21 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated?: (row: any) => void;
+  initialName?: string;
 };
 
-export default function QuickAddTransporterDialog({ open, onOpenChange, onCreated }: Props) {
+export default function QuickAddTransporterDialog({ open, onOpenChange, onCreated, initialName }: Props) {
   const qc = useQueryClient();
   const { data: destinations } = useDestinations();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName || "");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [destIds, setDestIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // زامن الاسم كلما فُتح الحوار باسم مبدئي جديد
+  useEffect(() => { if (open) setName(initialName || ""); }, [open, initialName]);
 
   const reset = () => {
     setName(""); setPhone(""); setAddress(""); setDestIds([]); setNotes("");
