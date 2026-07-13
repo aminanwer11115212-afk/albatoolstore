@@ -33,7 +33,7 @@ describe("normalizePhoneInput", () => {
   it("removes letters and unicode punctuation", () => {
     expect(normalizePhoneInput("Tel: 0912345678 ext.")).toBe("0912345678");
     expect(normalizePhoneInput("٠٩١-٢٣٤-٥٦٧٨ *")).toBe("0912345678");
-    expect(normalizePhoneInput("‎+249\u200e912345678")).toBe("+249912345678");
+    expect(normalizePhoneInput("\u200e+249\u200e912345678")).toBe("+249912345678");
   });
 
   it("idempotent — running twice yields same result", () => {
