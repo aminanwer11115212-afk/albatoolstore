@@ -663,6 +663,22 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
           } : undefined}
         />
       )}
+
+      <QuickAddTransporterDialog
+        open={quickAddTrOpen}
+        onOpenChange={setQuickAddTrOpen}
+        initialName={pendingTransporterName}
+        onCreated={(row) => {
+          if (!row?.id) return;
+          setTransporters(prev => {
+            if (prev.some(t => t.id === row.id)) return prev;
+            return [...prev, { id: row.id, name: row.name }]
+              .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+          });
+          setForm(f => ({ ...f, preferred_transporter_id: row.id }));
+          setPendingTransporterName("");
+        }}
+      />
     </Dialog>
   );
 }
