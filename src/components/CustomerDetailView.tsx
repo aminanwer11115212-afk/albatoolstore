@@ -8,8 +8,9 @@ import { toast } from "sonner";
 import {
   FileText, RotateCcw, Receipt, Wallet, AlertTriangle, CheckCircle2,
   ArrowLeft, Pencil, Trash2, Phone, MapPin, Home, StickyNote,
-  ExternalLink, ClipboardList, User
+  ExternalLink, ClipboardList, User, Share2
 } from "lucide-react";
+import { exportContactToDevice } from "@/utils/exportContact";
 
 
 interface Props {
@@ -141,6 +142,28 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
               className="bg-card border border-border text-foreground px-3 py-2 rounded-lg text-sm flex items-center gap-1 hover:bg-muted"
             >
               <ClipboardList size={16} /> كشف حساب
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await exportContactToDevice({
+                    name: customer.name,
+                    phone: customer.phone,
+                    whatsapp: customer.whatsapp,
+                    email: customer.email,
+                    address: customer.address,
+                    city: customer.city,
+                    notes: customer.notes,
+                  });
+                  toast.success(res === "shared" ? "تمت مشاركة بطاقة العميل" : "تم تنزيل بطاقة العميل (.vcf)");
+                } catch (e: any) {
+                  toast.error(e?.message || "تعذّر تصدير جهة الاتصال");
+                }
+              }}
+              className="bg-card border border-border text-foreground px-3 py-2 rounded-lg text-sm flex items-center gap-1 hover:bg-muted"
+              title="تصدير كبطاقة جهة اتصال (.vcf) — تُفتح مباشرة على الهاتف"
+            >
+              <Share2 size={16} /> تصدير للجهات
             </button>
             <button onClick={() => onEdit(customer)} className="bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm flex items-center gap-1 hover:opacity-90">
               <Pencil size={16} /> تعديل
