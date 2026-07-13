@@ -7,17 +7,11 @@ import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/Inlin
 import { useDialogSize } from "@/hooks/useDialogSize";
 import DeleteGeoDialog from "@/components/shared/DeleteGeoDialog";
 import { getGeoImpact, deleteGeoOnly, deleteGeoCascade, EntityKind, kindLabel } from "@/utils/geoMutations";
+import QuickAddTransporterDialog from "@/components/dispatch/QuickAddTransporterDialog";
+import ContactPickerButton from "@/components/shared/ContactPickerButton";
+import { normalizePhoneInput } from "@/utils/phoneNormalize";
 
-const sanitizePhone = (val: string) => {
-  if (!val) return "";
-  const arabicMap: Record<string, string> = {
-    '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-    '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
-  };
-  let cleaned = val.replace(/[٠-٩۰-۹]/g, d => arabicMap[d] || d);
-  cleaned = cleaned.replace(/[\s\-\(\)]/g, ''); // strip spaces, dashes, parens
-  return cleaned;
-};
+const sanitizePhone = normalizePhoneInput;
 
 type Focusable = { focus: () => void } | null;
 
