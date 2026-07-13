@@ -56,6 +56,8 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   const [transporters, setTransporters] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
+  const [quickAddTrOpen, setQuickAddTrOpen] = useState(false);
+  const [pendingTransporterName, setPendingTransporterName] = useState<string>("");
   const [delReq, setDelReq] = useState<null | {
     kind: EntityKind; id: string; name: string;
     customers: number; children: number; childrenLabel: string;
@@ -234,15 +236,13 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     notifyGeoChanged();
     return data.id;
   };
+  // إضافة ناقل جديد — نوجّه المستخدم لحوار QuickAddTransporterDialog الموحّد
+  // (نفس واجهة "إضافة سريعة" في صفحة إدارة الترحيلات: اسم + هاتف + عنوان + وجهات).
+  // نعيد null لأن الإضافة الفعلية تحدث في الحوار، ثم onCreated يحدّث القائمة.
   const addTransporter = async (name: string): Promise<string | null> => {
-    const { data, error } = await (supabase as any).from("transporters")
-      .insert({ name: name.trim() }).select("id,name").single();
-    if (error) { toast.error(error.message); return null; }
-    setTransporters(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    setForm(f => ({ ...f, preferred_transporter_id: data.id }));
-    toast.success(`تمت إضافة الترحيل: ${data.name}`);
-    notifyLogisticsChanged();
-    return data.id;
+    setPendingTransporterName(name || "");
+    setQuickAddTrOpen(true);
+    return null;
   };
   const addGroup = async (name: string): Promise<string | null> => {
     const { data, error } = await supabase.from("customer_groups")
@@ -400,10 +400,18 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
           {(() => { const k = idx(); return (
             <div>
               <label className={lbl}>هاتف</label>
-              <input ref={el => refs.current[k] = el} value={form.phone} dir="ltr"
-                onChange={e => setForm({ ...form, phone: e.target.value })}
-                onBlur={e => setForm({ ...form, phone: sanitizePhone(e.target.value) })}
-                onKeyDown={handleEnter(k)} className={inp} placeholder="09xxxxxxxx" />
+              <div className="flex items-center gap-1">
+                <input ref={el => refs.current[k] = el} value={form.phone} dir="ltr"
+                  inputMode="tel"
+                  onChange={e => setForm({ ...form, phone: normalizePhoneInput(e.target.value) })}
+                  onKeyDown={handleEnter(k)} className={inp} placeholder="09xxxxxxxx" />
+                <ContactPickerButton onPicked={(c) => setForm(f => ({
+                  ...f,
+                  phone: c.tel || f.phone,
+                  whatsapp: f.whatsapp || c.tel || "",
+                  name: f.name || c.name || "",
+                }))} />
+              </div>
               {duplicatePhone && (
                 <p className="text-[10px] text-yellow-500 mt-1">
                   ⚠️ الهاتف مسجل لـ: {duplicatePhone.name}
@@ -417,20 +425,23 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
               <div className="flex justify-between items-center mb-1">
                 <label className={lbl}>هاتف الواتساب</label>
                 {form.phone && (
-                  <button 
-                    type="button" 
-                    onClick={() => setForm({ ...form, whatsapp: form.phone })}
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, whatsapp: normalizePhoneInput(form.phone) })}
                     className="text-[10px] text-primary hover:underline"
                   >
                     مماثل للهاتف
                   </button>
                 )}
               </div>
-              <input ref={el => refs.current[k] = el} value={form.whatsapp} dir="ltr"
-                onChange={e => setForm({ ...form, whatsapp: e.target.value })}
-                onBlur={e => setForm({ ...form, whatsapp: sanitizePhone(e.target.value) })}
-                onKeyDown={handleEnter(k)} className={inp}
-                placeholder="رقم WhatsApp" />
+              <div className="flex items-center gap-1">
+                <input ref={el => refs.current[k] = el} value={form.whatsapp} dir="ltr"
+                  inputMode="tel"
+                  onChange={e => setForm({ ...form, whatsapp: normalizePhoneInput(e.target.value) })}
+                  onKeyDown={handleEnter(k)} className={inp}
+                  placeholder="رقم WhatsApp" />
+                <ContactPickerButton onPicked={(c) => setForm(f => ({ ...f, whatsapp: c.tel || f.whatsapp }))} />
+              </div>
             </div>
           ); })()}
 
