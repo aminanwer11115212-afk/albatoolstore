@@ -7,17 +7,11 @@ import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/Inlin
 import { useDialogSize } from "@/hooks/useDialogSize";
 import DeleteGeoDialog from "@/components/shared/DeleteGeoDialog";
 import { getGeoImpact, deleteGeoOnly, deleteGeoCascade, EntityKind, kindLabel } from "@/utils/geoMutations";
+import QuickAddTransporterDialog from "@/components/dispatch/QuickAddTransporterDialog";
+import ContactPickerButton from "@/components/shared/ContactPickerButton";
+import { normalizePhoneInput } from "@/utils/phoneNormalize";
 
-const sanitizePhone = (val: string) => {
-  if (!val) return "";
-  const arabicMap: Record<string, string> = {
-    '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-    '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
-  };
-  let cleaned = val.replace(/[٠-٩۰-۹]/g, d => arabicMap[d] || d);
-  cleaned = cleaned.replace(/[\s\-\(\)]/g, ''); // strip spaces, dashes, parens
-  return cleaned;
-};
+const sanitizePhone = normalizePhoneInput;
 
 type Focusable = { focus: () => void } | null;
 
@@ -62,6 +56,8 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   const [transporters, setTransporters] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
+  const [quickAddTrOpen, setQuickAddTrOpen] = useState(false);
+  const [pendingTransporterName, setPendingTransporterName] = useState<string>("");
   const [delReq, setDelReq] = useState<null | {
     kind: EntityKind; id: string; name: string;
     customers: number; children: number; childrenLabel: string;
@@ -240,15 +236,13 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     notifyGeoChanged();
     return data.id;
   };
+  // إضافة ناقل جديد — نوجّه المستخدم لحوار QuickAddTransporterDialog الموحّد
+  // (نفس واجهة "إضافة سريعة" في صفحة إدارة الترحيلات: اسم + هاتف + عنوان + وجهات).
+  // نعيد null لأن الإضافة الفعلية تحدث في الحوار، ثم onCreated يحدّث القائمة.
   const addTransporter = async (name: string): Promise<string | null> => {
-    const { data, error } = await (supabase as any).from("transporters")
-      .insert({ name: name.trim() }).select("id,name").single();
-    if (error) { toast.error(error.message); return null; }
-    setTransporters(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    setForm(f => ({ ...f, preferred_transporter_id: data.id }));
-    toast.success(`تمت إضافة الترحيل: ${data.name}`);
-    notifyLogisticsChanged();
-    return data.id;
+    setPendingTransporterName(name || "");
+    setQuickAddTrOpen(true);
+    return null;
   };
   const addGroup = async (name: string): Promise<string | null> => {
     const { data, error } = await supabase.from("customer_groups")
@@ -406,10 +400,18 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
           {(() => { const k = idx(); return (
             <div>
               <label className={lbl}>هاتف</label>
-              <input ref={el => refs.current[k] = el} value={form.phone} dir="ltr"
-                onChange={e => setForm({ ...form, phone: e.target.value })}
-                onBlur={e => setForm({ ...form, phone: sanitizePhone(e.target.value) })}
-                onKeyDown={handleEnter(k)} className={inp} placeholder="09xxxxxxxx" />
+              <div className="flex items-center gap-1">
+                <input ref={el => refs.current[k] = el} value={form.phone} dir="ltr"
+                  inputMode="tel"
+                  onChange={e => setForm({ ...form, phone: normalizePhoneInput(e.target.value) })}
+                  onKeyDown={handleEnter(k)} className={inp} placeholder="09xxxxxxxx" />
+                <ContactPickerButton onPicked={(c) => setForm(f => ({
+                  ...f,
+                  phone: c.tel || f.phone,
+                  whatsapp: f.whatsapp || c.tel || "",
+                  name: f.name || c.name || "",
+                }))} />
+              </div>
               {duplicatePhone && (
                 <p className="text-[10px] text-yellow-500 mt-1">
                   ⚠️ الهاتف مسجل لـ: {duplicatePhone.name}
@@ -423,20 +425,23 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
               <div className="flex justify-between items-center mb-1">
                 <label className={lbl}>هاتف الواتساب</label>
                 {form.phone && (
-                  <button 
-                    type="button" 
-                    onClick={() => setForm({ ...form, whatsapp: form.phone })}
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, whatsapp: normalizePhoneInput(form.phone) })}
                     className="text-[10px] text-primary hover:underline"
                   >
                     مماثل للهاتف
                   </button>
                 )}
               </div>
-              <input ref={el => refs.current[k] = el} value={form.whatsapp} dir="ltr"
-                onChange={e => setForm({ ...form, whatsapp: e.target.value })}
-                onBlur={e => setForm({ ...form, whatsapp: sanitizePhone(e.target.value) })}
-                onKeyDown={handleEnter(k)} className={inp}
-                placeholder="رقم WhatsApp" />
+              <div className="flex items-center gap-1">
+                <input ref={el => refs.current[k] = el} value={form.whatsapp} dir="ltr"
+                  inputMode="tel"
+                  onChange={e => setForm({ ...form, whatsapp: normalizePhoneInput(e.target.value) })}
+                  onKeyDown={handleEnter(k)} className={inp}
+                  placeholder="رقم WhatsApp" />
+                <ContactPickerButton onPicked={(c) => setForm(f => ({ ...f, whatsapp: c.tel || f.whatsapp }))} />
+              </div>
             </div>
           ); })()}
 
@@ -658,6 +663,22 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
           } : undefined}
         />
       )}
+
+      <QuickAddTransporterDialog
+        open={quickAddTrOpen}
+        onOpenChange={setQuickAddTrOpen}
+        initialName={pendingTransporterName}
+        onCreated={(row) => {
+          if (!row?.id) return;
+          setTransporters(prev => {
+            if (prev.some(t => t.id === row.id)) return prev;
+            return [...prev, { id: row.id, name: row.name }]
+              .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+          });
+          setForm(f => ({ ...f, preferred_transporter_id: row.id }));
+          setPendingTransporterName("");
+        }}
+      />
     </Dialog>
   );
 }
