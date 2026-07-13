@@ -16,7 +16,9 @@ export function normalizePhoneInput(val: string | null | undefined): string {
     "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
     "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
   };
-  let s = String(val).replace(/[٠-٩۰-۹]/g, (d) => arabicMap[d] || d);
+  let s = String(val)
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\u200b-\u200d\ufeff]/g, "") // strip bidi/zero-width marks
+    .replace(/[٠-٩۰-۹]/g, (d) => arabicMap[d] || d);
   const hasPlus = s.trimStart().startsWith("+");
   s = s.replace(/\D+/g, "");
   return hasPlus ? "+" + s : s;
