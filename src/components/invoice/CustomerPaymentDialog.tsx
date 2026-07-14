@@ -303,6 +303,7 @@ export default function CustomerPaymentDialog({
       }
 
       onSaved?.();
+      setConfirmOpen(false);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message || "تعذّر حفظ الدفعة");
