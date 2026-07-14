@@ -219,6 +219,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const [showMessageImport, setShowMessageImport] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  // بعد حذف الفاتورة نمنع أي حفظ تلقائي لاحق (unsaved-guard) قد يعيد إنشائها.
+  const deletedRef = useRef(false);
   const { isAdmin } = useUserRole();
   const customerInputRef = useRef<HTMLInputElement>(null);
   const quickProductRef = useRef<HTMLInputElement>(null);
