@@ -161,9 +161,15 @@ export async function runCleanup(qc: QueryClient, aggressive = false): Promise<{
   return { queries, blobs };
 }
 
-/** يُهيّئ الإدارة: cleanup أولي + جدولة دورية + مراقبة الحصّة. */
+/** يُهيّئ الإدارة: cleanup أولي + جدولة دورية + مراقبة الحصّة + حماية التخصيصات. */
 export function initStorageManager(qc: QueryClient): void {
   if (typeof window === "undefined") return;
+  // خطوة الأمان الأولى: استعادة أي تخصيص محميّ مُسح من localStorage عبر IDB.
+  restoreProtectedLocalStorageFromIDB().catch(() => { /* noop */ });
+  // نسخ احتياطي فوري ثم دوري كل ساعة لكل التخصيصات.
+  mirrorProtectedLocalStorageToIDB().catch(() => { /* noop */ });
+  setInterval(() => { mirrorProtectedLocalStorageToIDB().catch(() => { /* noop */ }); }, 60 * 60 * 1000);
+
   const check = async () => {
     try {
       const last = (await get<number>(LAST_PURGE_KEY)) || 0;
