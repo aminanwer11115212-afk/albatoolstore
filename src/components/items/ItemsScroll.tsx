@@ -20,18 +20,21 @@ const BASE_STYLE: CSSProperties = {
   flex: "1 1 auto",
   minHeight: 0,
   overflowX: "auto",
+  overflowY: "hidden",
   boxSizing: "border-box",
   isolation: "isolate",
   position: "relative",
 };
 
-// ملاحظة: لا نضع overflowY في BASE_STYLE حتى لا يطغى الـ inline على class toggle.
-// نضبط overflowY عبر JS مباشرةً (style prop)، فيعمل الـ toggle فعليًا.
+// ملاحظة: نضبط overflowY أيضاً عبر JS/CSS كي يعمل الـ toggle عند الفيض.
 const STICKY_CSS = `
 .items-scroll { overflow-y: hidden; }
 /* الخلفية على thead/tr لا تُطبع بثقة مع border-collapse — نضعها على th نفسه */
-.items-scroll thead { position: sticky; top: 0; z-index: 40; }
-.items-scroll thead tr { background: transparent; }
+.items-scroll thead {
+  position: sticky; top: 0; z-index: 40;
+  background: hsl(var(--primary));
+}
+.items-scroll thead tr { background: hsl(var(--primary)); }
 .items-scroll thead th {
   position: sticky; top: 0; z-index: 40;
   background: hsl(var(--primary));

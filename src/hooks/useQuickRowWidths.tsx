@@ -153,17 +153,17 @@ export function useQuickRowWidths(storageKey: string, length: number) {
           if (pxMatch) {
             const n = parseFloat(pxMatch[1]);
             // يكبر للحدّ الأقصى المخصَّص لكنه يصغر للقاعدة عند ضيق الشاشة.
-            parts.push(`minmax(${n}px, ${n + extra}px)`);
+            parts.push(`minmax(${n}px,${n + extra}px)`);
           } else if (frMatch) {
             const n = parseFloat(frMatch[1]);
             const addedFr = extra / STEP;
-            parts.push(`minmax(0, ${n + addedFr}fr)`);
+            parts.push(`minmax(0,${n + addedFr}fr)`);
           } else {
-            parts.push(`minmax(0, ${b})`);
+            parts.push(`minmax(0,${b})`);
           }
         } else {
           if (frMatch) {
-            parts.push(`minmax(0, ${b})`);
+            parts.push(`minmax(0,${b})`);
           } else {
             parts.push(b);
           }
