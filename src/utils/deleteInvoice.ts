@@ -5,6 +5,7 @@ export type DeleteInvoiceResult = {
   restoredStock: boolean;
   invoiceNumber: string | null;
   convertedToCredit: number;
+  restoredItems: Array<{ product_id: string | null; quantity: number }>;
 };
 
 /**
@@ -12,6 +13,7 @@ export type DeleteInvoiceResult = {
  * إن كانت خُصمت سابقاً. إن كانت الفاتورة قد سُدّدت جزئياً/كلياً، يتم
  * تحويل الدفعات المرتبطة بها إلى **رصيد دائن للعميل** تلقائياً عبر RPC
  * ذرّي `delete_invoice_with_reconciliation` — حتى لا يُفقد المبلغ.
+ * يسجّل العملية في `activity_log` (من قام بالحذف ومتى وماذا استُرجع).
  */
 export async function deleteInvoiceWithStockRestore(
   invoiceId: string,
@@ -28,10 +30,10 @@ export async function deleteInvoiceWithStockRestore(
   const convertedToCredit = Number(reconc?.paid_amount || 0);
 
 
-  // 1) قراءة بيانات الحارس + رقم الفاتورة + حالة سير العمل
+  // 1) قراءة بيانات الحارس + رقم الفاتورة + معلومات لقطة الـ Audit
   const { data: inv, error: invErr } = await supabase
     .from("invoices")
-    .select("id, invoice_number, stock_deduction_id, stock_deducted_at, workflow_status")
+    .select("id, invoice_number, date, customer_id, total, paid_amount, status, stock_deduction_id, stock_deducted_at, workflow_status")
     .eq("id", invoiceId)
     .maybeSingle();
   if (invErr) throw new Error(`تعذّر قراءة الفاتورة: ${invErr.message}`);
