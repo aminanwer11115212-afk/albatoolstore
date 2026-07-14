@@ -312,13 +312,21 @@ export default function InvoiceViewPage() {
     setDeleting(true);
     try {
       const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
-      const { restoredStock, convertedToCredit } = await deleteInvoiceWithStockRestore(invoice.id);
-      const parts = [restoredStock ? "تم حذف الفاتورة وإرجاع الكميات إلى المخزون" : "تم حذف الفاتورة"];
+      const { restoredStock, convertedToCredit, invoiceNumber } = await deleteInvoiceWithStockRestore(invoice.id);
+      const invLabel = invoiceNumber ? `«${invoiceNumber}»` : "";
+      const parts = [
+        restoredStock
+          ? `تم حذف الفاتورة ${invLabel} وإرجاع الكميات إلى المخزون`
+          : `تم حذف الفاتورة ${invLabel}`,
+      ];
       if (convertedToCredit > 0.01) parts.push(`— تم تحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
-      toast.success(parts.join(" "));
+      toast.success(parts.join(" "), { duration: 6000 });
       navigate("/invoices", { replace: true });
     } catch (e: any) {
-      toast.error(e?.message || "تعذّر حذف الفاتورة");
+      // إعادة تحميل الفاتورة لضمان أن أي تعديل جزئي (لو حصل) يظهر على الفور.
+      try { queryClient.invalidateQueries({ queryKey: ["invoice", invoice.id] }); } catch {}
+      try { queryClient.invalidateQueries({ queryKey: ["invoices"] }); } catch {}
+      toast.error(`تعذّر حذف الفاتورة: ${e?.message || "خطأ غير معروف"} — لم يُحذف شيء، حالة الفاتورة كما هي.`, { duration: 8000 });
       setDeleting(false);
     }
   };
