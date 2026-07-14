@@ -176,7 +176,7 @@ export default function SyncStatusIndicator() {
                     </div>
                     <div className="text-[10px] text-muted-foreground">
                       {new Date(it.createdAt).toLocaleString("ar-EG")}
-                      {it.retries > 0 && ` · محاولات: ${it.retries}`}
+                      {it.attempts > 0 && ` · محاولات: ${it.attempts}`}
                     </div>
                     {it.lastError && (
                       <div className="text-[10px] text-destructive truncate mt-0.5" title={it.lastError}>
@@ -197,7 +197,10 @@ export default function SyncStatusIndicator() {
           </div>
 
           {pending.length > 0 && (
-            <div className="px-4 py-2 border-t border-border">
+            <div className="px-4 py-2 border-t border-border flex items-center justify-between">
+              <a href="/offline-queue" className="text-[11px] text-primary hover:underline">
+                فتح سجل المزامنة الكامل ←
+              </a>
               <button
                 onClick={() => {
                   if (confirm("حذف كل العمليات المؤجلة؟ لن يمكن استرجاعها.")) clearQueue();
@@ -206,6 +209,13 @@ export default function SyncStatusIndicator() {
               >
                 حذف كل الطابور
               </button>
+            </div>
+          )}
+          {pending.length === 0 && (
+            <div className="px-4 py-2 border-t border-border">
+              <a href="/offline-queue" className="text-[11px] text-primary hover:underline">
+                فتح سجل المزامنة الكامل ←
+              </a>
             </div>
           )}
         </div>

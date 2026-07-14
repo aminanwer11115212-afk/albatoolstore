@@ -3,7 +3,12 @@ import { lazyEl } from "@/components/PageLoader";
 import { QueryClient, QueryCache, MutationCache } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createIDBPersister } from "@/lib/queryPersister";
-import { initOfflineFlush } from "@/lib/offlineQueue";
+import { initOfflineFlush, setConflictHandler } from "@/lib/offlineQueue";
+import { initAttachmentFlush } from "@/lib/attachmentQueue";
+import { initSagaFlush } from "@/lib/documentSaga";
+import { initStorageManager } from "@/lib/storageManager";
+import { recordConflict } from "@/lib/conflictResolver";
+import ConflictResolutionDialog from "@/components/ConflictResolutionDialog";
 import OfflineBanner from "@/components/layout/OfflineBanner";
 import { toast } from "sonner";
 import { BrowserRouter, Route, Routes, useParams, Navigate } from "react-router-dom";
@@ -130,6 +135,7 @@ const StaffListPage = lazy(() => import("./pages/staff/StaffListPage"));
 const StaffCustomersPage = lazy(() => import("./pages/staff/StaffCustomersPage"));
 const StaffProfilePage = lazy(() => import("./pages/staff/StaffProfilePage"));
 const StaffMyRecordsPage = lazy(() => import("./pages/staff/StaffMyRecordsPage"));
+const OfflineQueuePage = lazy(() => import("./pages/OfflineQueuePage"));
 
 const isAuthOrNetworkError = (err: any) => {
   const msg = String(err?.message || err || "").toLowerCase();
@@ -267,12 +273,27 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    setConflictHandler(async (item, remote) => { await recordConflict(item, remote); });
     initOfflineFlush((r) => {
       if (r.ok > 0) {
         queryClient.invalidateQueries();
         toast.success(`تمت مزامنة ${r.ok} عملية`);
       }
+      if (r.conflicts > 0) {
+        toast.warning(`${r.conflicts} تعارض يحتاج قرارك — راجع سجل المزامنة`);
+      }
     });
+    initAttachmentFlush();
+    initSagaFlush();
+    initStorageManager(queryClient);
+    const onStorageWarn = (e: any) => {
+      const ratio = e.detail?.ratio;
+      if (ratio && ratio >= 0.9) {
+        toast.warning("تخزين المتصفح شارف على الامتلاء — يُنصح بالتنظيف من سجل المزامنة");
+      }
+    };
+    window.addEventListener("albatool:storage-warn", onStorageWarn);
+    return () => window.removeEventListener("albatool:storage-warn", onStorageWarn);
   }, []);
 
   return (
@@ -292,6 +313,7 @@ const App = () => {
     <RealtimeSync />
     <TooltipProvider>
       <OfflineBanner />
+      <ConflictResolutionDialog />
       <Toaster />
       <Sonner />
       <CriticalErrorDialog />
@@ -321,6 +343,7 @@ const App = () => {
             <Route path="/staff/customers" element={lazyEl(<StaffLayout><PermGuard anyOf={["view_customers", "add_customer"]}><StaffCustomersPage /></PermGuard></StaffLayout>, "العملاء")} />
             <Route path="/staff/profile" element={lazyEl(<StaffLayout><StaffProfilePage /></StaffLayout>, "الملف الشخصي")} />
             <Route path="/" element={lazyEl(<Dashboard />, "الرئيسية")} />
+            <Route path="/offline-queue" element={lazyEl(<OfflineQueuePage />, "سجل المزامنة")} />
             {/* Sales */}
             <Route path="/invoices" element={lazyEl(<InvoicesPage />, "إدارة الفواتير")} />
             <Route path="/invoices/create" element={lazyEl(<InvoiceCreatePage />, "فاتورة جديدة")} />
