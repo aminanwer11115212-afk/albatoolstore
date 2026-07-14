@@ -167,14 +167,10 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
                       <td className={`px-3 py-2 tabular-nums font-semibold ${it.remaining_after > 0.01 ? "text-destructive" : "text-emerald-700"}`}>
                         {fmt(it.remaining_after)}
                       </td>
-                      <td className="px-3 py-2">
-                        {it.new_status === "paid" ? (
-                          <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">مسددة</span>
-                        ) : it.new_status === "partial" ? (
-                          <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">جزئية</span>
-                        ) : (
-                          <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{it.new_status || "—"}</span>
-                        )}
+                      <td className="px-3 py-2" data-testid="invoice-state">
+                        {(() => { const s = invoiceStateLabel(it.remaining_after, it.new_status); return (
+                          <span className={`text-xs px-2 py-0.5 rounded ${s.cls}`}>{s.label}</span>
+                        ); })()}
                       </td>
                       <td className="px-3 py-2">
                         {it.invoice_id && (
