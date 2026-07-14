@@ -372,15 +372,15 @@ export default function CustomerPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !saving && onOpenChange(v)}>
-      <DialogContent className="max-w-3xl w-[95vw]" dir="rtl">
+      <DialogContent className="max-w-3xl w-[96vw] sm:w-[95vw] max-h-[92vh] overflow-y-auto p-3 sm:p-6" dir="rtl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-base sm:text-lg leading-tight">
             تسجيل دفعة على {invoiceNumber || "الفاتورة"}
             {customerName ? ` — ${customerName}` : ""}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-3 py-2 md:grid-cols-2">
+        <div className="grid gap-3 py-2 grid-cols-1 md:grid-cols-2">
 
           {(() => {
             const debt = custBalance?.debt || 0;
@@ -560,35 +560,56 @@ export default function CustomerPaymentDialog({
           <div>
             <div className="flex items-center justify-between mb-1 gap-2">
               <Label>الحساب المستلم</Label>
-              <div className="flex items-center gap-2">
-                {method === "bank" && accountId && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {method === "bank" && accountId && pinnedAccountId !== accountId && (
                   <button
                     type="button"
                     onClick={() => {
-                      const next = pinnedAccountId === accountId ? "" : accountId;
-                      setPinnedAccountId(next);
-                      try {
-                        if (next) localStorage.setItem("lov:pinned-bank-account", next);
-                        else localStorage.removeItem("lov:pinned-bank-account");
-                      } catch {}
-                      toast.success(next ? "تم تثبيت الحساب المحوَّل له" : "تم إلغاء التثبيت");
+                      const currentName = selectedAccount?.name || "هذا الحساب";
+                      const prevName = pinnedAccountId
+                        ? (accountOptions as any[]).find((a) => a.id === pinnedAccountId)?.name
+                        : null;
+                      const msg = prevName
+                        ? `سيتم تبديل الحساب المثبَّت من «${prevName}» إلى «${currentName}» واستخدامه افتراضياً في كل مرة. متابعة؟`
+                        : `سيتم تثبيت «${currentName}» كحساب افتراضي دائم لتسجيل الدفعات. متابعة؟`;
+                      if (!window.confirm(msg)) return;
+                      setPinnedAccountId(accountId);
+                      try { localStorage.setItem("lov:pinned-bank-account", accountId); } catch {}
+                      toast.success("تم تثبيت الحساب المحوَّل له");
                     }}
-                    className={`inline-flex items-center gap-1 text-[11px] rounded-md border px-2 py-1 ${
-                      pinnedAccountId === accountId
-                        ? "border-amber-500/60 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-                        : "border-border text-muted-foreground hover:bg-muted"
-                    }`}
-                    title={pinnedAccountId === accountId ? "إلغاء تثبيت الحساب" : "تثبيت الحساب المحوَّل له كافتراضي دائم"}
+                    className="inline-flex items-center gap-1 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted px-2 py-1 min-h-[32px]"
+                    title="تثبيت الحساب المحوَّل له كافتراضي دائم"
                   >
-                    {pinnedAccountId === accountId ? <Pin size={12} className="fill-current" /> : <Pin size={12} />}
-                    {pinnedAccountId === accountId ? "مثبَّت" : "تثبيت"}
+                    <Pin size={12} />
+                    تثبيت
                   </button>
+                )}
+                {method === "bank" && accountId && pinnedAccountId === accountId && (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-xs rounded-md border border-amber-500/60 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 px-2 py-1 min-h-[32px]">
+                      <Pin size={12} className="fill-current" />
+                      مثبَّت
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!window.confirm("سيتم إلغاء تثبيت الحساب الافتراضي. متابعة؟")) return;
+                        setPinnedAccountId("");
+                        try { localStorage.removeItem("lov:pinned-bank-account"); } catch {}
+                        toast.success("تم إلغاء التثبيت");
+                      }}
+                      className="inline-flex items-center gap-1 text-xs rounded-md border border-destructive/50 text-destructive hover:bg-destructive/10 px-2 py-1 min-h-[32px]"
+                      title="فك تثبيت الحساب وإزالة الإعداد المحفوظ"
+                    >
+                      فك التثبيت
+                    </button>
+                  </>
                 )}
                 {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
                   <button
                     type="button"
                     data-testid="retry-load-accounts"
-                    className="text-[11px] text-primary underline"
+                    className="text-xs text-primary underline min-h-[32px]"
                     onClick={() => { refetchAccounts(); }}
                   >
                     إعادة المحاولة
@@ -652,9 +673,9 @@ export default function CustomerPaymentDialog({
         </div>
 
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>إلغاء</Button>
-          <Button onClick={requestSave} disabled={saving} data-testid="open-confirm-payment">
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving} className="min-h-[44px] w-full sm:w-auto">إلغاء</Button>
+          <Button onClick={requestSave} disabled={saving} data-testid="open-confirm-payment" className="min-h-[44px] w-full sm:w-auto">
             {saving ? "جارٍ الحفظ..." : "حفظ الدفعة"}
           </Button>
         </DialogFooter>
@@ -698,9 +719,9 @@ export default function CustomerPaymentDialog({
               </div>
             );
           })()}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>رجوع</Button>
-            <Button onClick={handleSave} disabled={saving} data-testid="confirm-payment">
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving} className="min-h-[44px] w-full sm:w-auto">رجوع</Button>
+            <Button onClick={handleSave} disabled={saving} data-testid="confirm-payment" className="min-h-[44px] w-full sm:w-auto">
               {saving ? "جارٍ الحفظ..." : "تأكيد الحفظ"}
             </Button>
           </DialogFooter>
