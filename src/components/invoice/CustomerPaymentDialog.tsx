@@ -372,15 +372,15 @@ export default function CustomerPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !saving && onOpenChange(v)}>
-      <DialogContent className="max-w-3xl w-[95vw]" dir="rtl">
+      <DialogContent className="max-w-3xl w-[96vw] sm:w-[95vw] max-h-[92vh] overflow-y-auto p-3 sm:p-6" dir="rtl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-base sm:text-lg leading-tight">
             تسجيل دفعة على {invoiceNumber || "الفاتورة"}
             {customerName ? ` — ${customerName}` : ""}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-3 py-2 md:grid-cols-2">
+        <div className="grid gap-3 py-2 grid-cols-1 md:grid-cols-2">
 
           {(() => {
             const debt = custBalance?.debt || 0;
