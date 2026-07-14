@@ -462,8 +462,21 @@ export default function CustomerPaymentDialog({
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoices-full"] });
       qc.invalidateQueries({ queryKey: ["invoice-revisions", invoiceId] });
+      // تحديث كشف حساب العميل + المعاينة + إدارة العملاء
+      qc.invalidateQueries({ queryKey: ["customer-statement"] });
+      qc.invalidateQueries({ queryKey: ["customer-transactions"] });
+      qc.invalidateQueries({ queryKey: ["customer_balance_stats"] });
+      qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       try { window.dispatchEvent(new Event("invoice-payments:changed")); } catch {}
+      // انتظر اكتمال إعادة الجلب للمفاتيح الحرجة قبل تحرير أزرار الحفظ
+      await Promise.allSettled([
+        qc.refetchQueries({ queryKey: ["customer-statement"] }),
+        qc.refetchQueries({ queryKey: ["customer-transactions"] }),
+        qc.refetchQueries({ queryKey: ["customers"] }),
+        qc.refetchQueries({ queryKey: ["invoices-with-customers"] }),
+      ]);
 
       if (customerId && !isPos) {
         const prevNet = custBalance
