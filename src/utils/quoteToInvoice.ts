@@ -2,16 +2,22 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Unified quote → invoice conversion.
- * Used everywhere a quote is converted (QuotesPage, QuoteCreatePage,
- * QuoteViewPage, SideQuotesPage, Staff portal).
  *
- * Behavior:
- * - Creates an invoice with workflow_status = 'new'.
- * - Copies quote items to invoice_items.
- * - Deducts stock immediately (idempotent via `stock_deduction_id` guard),
- *   matching the behaviour of a direct invoice save.
- * - Deletes the original quote and its items (user preference — the invoice
- *   becomes the single source of truth; the quote no longer appears in the list).
+ * Copies EVERYTHING from the quote to the new invoice so no field/attachment
+ * is lost after conversion:
+ *   - header fields (customer, currency, exchange, dates, notes, warehouse,
+ *     tax_amount, user/internal notes, created_by)
+ *   - items (quote_items → invoice_items)
+ *   - transports (quote_transports → invoice_transports)
+ *   - packaging + packaging items (quotes_packaging(+_items) → invoice_packaging(+ items))
+ *   - attachments (quote_attachments → invoice_attachments, same storage URL)
+ *
+ * Also:
+ *   - stocks are deducted once via `deductStockForInvoiceOnce` (idempotent),
+ *   - the original quote (and its child rows) is deleted so the invoice is
+ *     the single source of truth,
+ *   - idempotent: re-running for an already-converted quote returns the
+ *     existing invoice instead of creating a duplicate.
  */
 export async function convertQuoteToInvoice(
   quoteId: string,
@@ -21,6 +27,13 @@ export async function convertQuoteToInvoice(
   alreadyConverted: boolean;
   stockDeducted: boolean;
   deductedLineCount: number;
+  copied: {
+    items: number;
+    transports: number;
+    packaging: number;
+    packagingItems: number;
+    attachments: number;
+  };
 }> {
   // 1. Load quote
   const { data: quote, error: qErr } = await supabase
@@ -44,20 +57,27 @@ export async function convertQuoteToInvoice(
         alreadyConverted: true,
         stockDeducted: false,
         deductedLineCount: 0,
+        copied: { items: 0, transports: 0, packaging: 0, packagingItems: 0, attachments: 0 },
       };
     }
   }
 
-  // 2. Load items
-  const { data: items, error: iErr } = await supabase
-    .from("quote_items")
-    .select("*")
-    .eq("quote_id", quoteId);
-  if (iErr) throw iErr;
+  // 2. Load items + related children in parallel
+  const [itemsRes, transportsRes, pkgRes, pkgItemsRes, attachmentsRes] = await Promise.all([
+    supabase.from("quote_items").select("*").eq("quote_id", quoteId),
+    supabase.from("quote_transports").select("*").eq("quote_id", quoteId),
+    supabase.from("quotes_packaging").select("*").eq("quote_id", quoteId),
+    supabase.from("quotes_packaging_items").select("*").eq("quote_id", quoteId),
+    supabase.from("quote_attachments").select("*").eq("quote_id", quoteId).is("deleted_at", null),
+  ]);
+  if (itemsRes.error) throw itemsRes.error;
+  const items = itemsRes.data || [];
+  const transports = transportsRes.data || [];
+  const packaging = pkgRes.data || [];
+  const packagingItems = pkgItemsRes.data || [];
+  const attachments = attachmentsRes.data || [];
 
   // 3. Generate invoice number using ONLY invoice_prefix.
-  // Defensive: نقرأ أيضاً quote_prefix و side_quote_prefix لنتأكد ألا يتسرّب أيٌّ منهما
-  // إلى رقم الفاتورة، حتى لو تغيّرت بنية الجدول مستقبلاً.
   const { data: company } = await supabase
     .from("company_settings")
     .select("invoice_prefix, quote_prefix, side_quote_prefix")
@@ -72,10 +92,8 @@ export async function convertQuoteToInvoice(
     );
   }
   const prefix = invoicePrefix;
-  // رقم عشوائي فريد عبر helper موحّد بدل Date.now() لتفادي التكرار وضمان عدم التسلسل
   const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
   const invNum = await generateRandomDocNumber("invoices", "invoice_number", prefix);
-  // حماية نهائية: تأكد أن الرقم الناتج لا يبدأ بأي بادئة عرض سعر
   if (
     (quotePrefix && invNum.startsWith(quotePrefix)) ||
     (sideQuotePrefix && invNum.startsWith(sideQuotePrefix))
@@ -83,33 +101,36 @@ export async function convertQuoteToInvoice(
     throw new Error(`[convertQuoteToInvoice] رقم الفاتورة الناتج يبدأ ببادئة عرض سعر: ${invNum}`);
   }
 
-  // 4. Create invoice with workflow_status = 'new'
+  // 4. Create invoice with full field parity
+  const q = quote as any;
   const { data: inv, error: insErr } = await supabase
     .from("invoices")
     .insert({
       invoice_number: invNum,
-      customer_id: quote.customer_id,
-      subtotal: quote.subtotal,
-      discount: quote.discount,
-      total: quote.total,
-      due_amount: quote.total,
+      customer_id: q.customer_id,
+      subtotal: q.subtotal,
+      tax_amount: q.tax_amount ?? 0,
+      discount: q.discount,
+      total: q.total,
+      due_amount: q.total,
       status: "pending",
       workflow_status: "new",
-      currency_code: quote.currency_code,
-      exchange_rate_to_base: quote.exchange_rate_to_base,
+      currency_code: q.currency_code,
+      exchange_rate_to_base: q.exchange_rate_to_base,
+      warehouse_id: q.warehouse_id ?? null,
+      user_note: q.user_note ?? null,
+      internal_note: q.internal_note ?? null,
+      created_by: q.created_by ?? null,
       date: new Date().toISOString().split("T")[0],
-      notes: quote.notes
-        ? `محول من عرض السعر ${quote.quote_number}\n${quote.notes}`
-        : `محول من عرض السعر ${quote.quote_number}`,
+      notes: q.notes
+        ? `محول من عرض السعر ${q.quote_number}\n${q.notes}`
+        : `محول من عرض السعر ${q.quote_number}`,
     })
     .select()
     .single();
   if (insErr || !inv) throw insErr || new Error("Failed to create invoice");
 
-  // 4b. IDEMPOTENCY: mark the quote as converted BEFORE inserting items or
-  // deducting stock. If any later step fails and the user retries, the
-  // early-exit guard at the top of this function short-circuits and returns
-  // the already-created invoice instead of creating a duplicate.
+  // 4b. IDEMPOTENCY: mark the quote as converted BEFORE inserting children.
   {
     const { error: markErr } = await supabase
       .from("quotes")
@@ -122,8 +143,16 @@ export async function convertQuoteToInvoice(
     }
   }
 
-  // 5. Copy items first
-  if (items && items.length > 0) {
+  const copied = {
+    items: 0,
+    transports: 0,
+    packaging: 0,
+    packagingItems: 0,
+    attachments: 0,
+  };
+
+  // 5. Copy items
+  if (items.length > 0) {
     const payload = items.map((it: any) => ({
       invoice_id: inv.id,
       product_id: it.product_id,
@@ -140,18 +169,103 @@ export async function convertQuoteToInvoice(
     }));
     const { error: itErr } = await supabase.from("invoice_items").insert(payload);
     if (itErr) {
-      // Rollback the orphan invoice (and log if rollback itself fails).
       const { error: rbErr } = await supabase.from("invoices").delete().eq("id", inv.id);
       if (rbErr) console.error("[convertQuoteToInvoice] items-insert rollback failed", rbErr);
       throw itErr;
     }
+    copied.items = payload.length;
   }
 
-  // 6. Deduct stock for the newly-created invoice (matches direct-invoice save).
-  //    Idempotent via `invoices.stock_deduction_id` — safe if this ever re-runs.
+  // 5b. Copy transports
+  if (transports.length > 0) {
+    const payload = transports.map((t: any) => ({
+      invoice_id: inv.id,
+      transporter_id: t.transporter_id,
+      destination_id: t.destination_id,
+      driver_name: t.driver_name,
+      vehicle_number: t.vehicle_number,
+      cost: t.cost,
+      status: t.status,
+      notes: t.notes,
+      transport_date: t.transport_date,
+    }));
+    const { error } = await supabase.from("invoice_transports").insert(payload);
+    if (error) console.error("[convertQuoteToInvoice] transports copy failed", error);
+    else copied.transports = payload.length;
+  }
+
+  // 5c. Copy packaging headers + build old→new id map, then items
+  const pkgIdMap = new Map<string, string>();
+  if (packaging.length > 0) {
+    const payload = packaging.map((p: any) => ({
+      invoice_id: inv.id,
+      packaging_type_id: p.packaging_type_id,
+      notes: p.notes,
+      total: p.total,
+      quantity: p.quantity,
+      packs_count: p.packs_count,
+      pieces_per_pack: p.pieces_per_pack,
+      weight: p.weight,
+      dimensions: p.dimensions,
+      cost: p.cost,
+    }));
+    const { data: inserted, error } = await supabase
+      .from("invoice_packaging")
+      .insert(payload)
+      .select("id");
+    if (error) {
+      console.error("[convertQuoteToInvoice] packaging copy failed", error);
+    } else if (inserted) {
+      packaging.forEach((p: any, i: number) => {
+        if (inserted[i]) pkgIdMap.set(p.id, inserted[i].id);
+      });
+      copied.packaging = inserted.length;
+    }
+  }
+  if (packagingItems.length > 0) {
+    const payload = packagingItems
+      .map((pi: any) => ({
+        invoice_id: inv.id,
+        invoice_packaging_id: pi.quote_packaging_id
+          ? pkgIdMap.get(pi.quote_packaging_id) ?? null
+          : null,
+        packaging_id: pi.packaging_id,
+        packaging_type_id: pi.packaging_type_id,
+        description: pi.description,
+        quantity: pi.quantity,
+        unit_price: pi.unit_price,
+        total: pi.total,
+        product_id: pi.product_id,
+        product_name: pi.product_name,
+        packs_count: pi.packs_count,
+        pieces_per_pack: pi.pieces_per_pack,
+        price: pi.price,
+      }));
+    const { error } = await supabase.from("invoices_packaging_items").insert(payload);
+    if (error) console.error("[convertQuoteToInvoice] packaging items copy failed", error);
+    else copied.packagingItems = payload.length;
+  }
+
+  // 5d. Copy attachments (same storage URL — no file duplication)
+  if (attachments.length > 0) {
+    const payload = attachments.map((a: any) => ({
+      invoice_id: inv.id,
+      file_url: a.file_url,
+      file_name: a.file_name,
+      file_type: a.file_type,
+      file_size: a.file_size,
+      category: a.category,
+      expires_at: a.expires_at,
+    }));
+    const { error } = await supabase.from("invoice_attachments").insert(payload);
+    if (error) console.error("[convertQuoteToInvoice] attachments copy failed", error);
+    else copied.attachments = payload.length;
+  }
+
+  // 6. Deduct stock for the newly-created invoice (idempotent).
   let stockDeducted = false;
   let deductedLineCount = 0;
-  if (items && items.length > 0) {
+  if (items.length > 0) {
     try {
       const { deductStockForInvoiceOnce } = await import("@/utils/stockDeduction");
       const linesForStock = items
@@ -162,16 +276,17 @@ export async function convertQuoteToInvoice(
       deductedLineCount = res.deducted ? linesForStock.length : 0;
     } catch (e) {
       console.error("[convertQuoteToInvoice] stock deduction failed", e);
-      // لا نُلغي الفاتورة — البنود محفوظة وسيتمكّن المستخدم من إعادة الخصم لاحقاً.
     }
   }
 
-  // 7. Delete the original quote (items first, then the quote itself).
-  // User preference: after a successful conversion the quote is removed from
-  // the quotes list — the resulting invoice is the single source of truth.
-  const { error: delItemsErr } = await supabase
-    .from("quote_items").delete().eq("quote_id", quoteId);
-  if (delItemsErr) console.error("[convertQuoteToInvoice] delete quote_items failed", delItemsErr);
+  // 7. Delete the original quote and all its children.
+  await Promise.all([
+    supabase.from("quote_items").delete().eq("quote_id", quoteId),
+    supabase.from("quote_transports").delete().eq("quote_id", quoteId),
+    supabase.from("quotes_packaging_items").delete().eq("quote_id", quoteId),
+    supabase.from("quotes_packaging").delete().eq("quote_id", quoteId),
+    supabase.from("quote_attachments").delete().eq("quote_id", quoteId),
+  ]);
   const { error: delQuoteErr } = await supabase
     .from("quotes").delete().eq("id", quoteId);
   if (delQuoteErr) console.error("[convertQuoteToInvoice] delete quote failed", delQuoteErr);
@@ -182,5 +297,6 @@ export async function convertQuoteToInvoice(
     alreadyConverted: false,
     stockDeducted,
     deductedLineCount,
+    copied,
   };
 }
