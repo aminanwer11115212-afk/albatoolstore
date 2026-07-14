@@ -104,10 +104,22 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
       await qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       await qc.invalidateQueries({ queryKey: ["invoices"] });
       await qc.invalidateQueries({ queryKey: ["transactions"] });
-      toast.success("تم إلغاء الشحنة وإعادة أرصدة الفواتير");
+      await qc.invalidateQueries({ queryKey: ["customer-audit-log", customerId] });
+
+      const invLine = g.items.length
+        ? ` — تأثّرت ${g.items.length} فاتورة (${g.items.map((i) => i.invoice_number || "?").slice(0, 3).join("، ")}${g.items.length > 3 ? "…" : ""})`
+        : "";
+      const surLine = g.surplus > 0.01 ? ` وحُذف ${fmt(g.surplus)} من الرصيد الدائن` : "";
+      toast.success(`تم إلغاء شحنة ${fmt(g.total)}${invLine}${surLine}`, { duration: 6000 });
       setPendingReverse(null);
     } catch (e: any) {
-      toast.error(e?.message || "تعذّر إلغاء الشحنة");
+      // فشل عام → أعِد تحميل كل مصادر البيانات لضمان عدم بقاء تغييرات جزئية في الواجهة.
+      await qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
+      await qc.invalidateQueries({ queryKey: ["customers"] });
+      await qc.invalidateQueries({ queryKey: ["invoices"] });
+      await qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      await qc.invalidateQueries({ queryKey: ["transactions"] });
+      toast.error(`تعذّر إلغاء الشحنة: ${e?.message || "خطأ غير معروف"} — تم إعادة تحميل البيانات، حالة الفواتير لم تتغيّر.`, { duration: 8000 });
     } finally {
       setReversingGroupId(null);
     }

@@ -108,26 +108,39 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
       confirmLabel: "حذف الفاتورة",
       errorMessage: "تعذّر حذف الفاتورة",
       onConfirm: async () => {
-        const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
-        const { restoredStock, convertedToCredit } = await deleteInvoiceWithStockRestore(id);
-        qc.setQueriesData<any>(
-          { predicate: (q) => {
-            const key = q.queryKey[0];
-            return key === "invoices-with-customers" || key === "invoices" || key === "invoices-full";
-          }},
-          (old: any) => Array.isArray(old) ? old.filter((row: any) => row.id !== id) : old,
-        );
-        qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
-        qc.invalidateQueries({ queryKey: ["invoices-full"] });
-        qc.invalidateQueries({ queryKey: ["invoices"] });
-        qc.invalidateQueries({ queryKey: ["customers"] });
-        qc.invalidateQueries({ queryKey: ["transactions"] });
-        qc.invalidateQueries({ queryKey: ["products"] });
-        try { refetch(); } catch {}
-        const parts = ["تم حذف الفاتورة"];
-        if (restoredStock) parts.push("وإرجاع الكميات إلى المخزون");
-        if (convertedToCredit > 0.01) parts.push(`وتحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
-        toast.success(parts.join(" "));
+        try {
+          const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
+          const { restoredStock, convertedToCredit, invoiceNumber } = await deleteInvoiceWithStockRestore(id);
+          qc.setQueriesData<any>(
+            { predicate: (q) => {
+              const key = q.queryKey[0];
+              return key === "invoices-with-customers" || key === "invoices" || key === "invoices-full";
+            }},
+            (old: any) => Array.isArray(old) ? old.filter((row: any) => row.id !== id) : old,
+          );
+          qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+          qc.invalidateQueries({ queryKey: ["invoices-full"] });
+          qc.invalidateQueries({ queryKey: ["invoices"] });
+          qc.invalidateQueries({ queryKey: ["customers"] });
+          qc.invalidateQueries({ queryKey: ["transactions"] });
+          qc.invalidateQueries({ queryKey: ["products"] });
+          try { refetch(); } catch {}
+          const invLabel = invoiceNumber ? `«${invoiceNumber}»` : "";
+          const parts = [`تم حذف الفاتورة ${invLabel}`.trim()];
+          if (restoredStock) parts.push("وإرجاع الكميات إلى المخزون");
+          if (convertedToCredit > 0.01) parts.push(`وتحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
+          toast.success(parts.join(" "), { duration: 6000 });
+        } catch (err: any) {
+          // إعادة تحميل شاملة لضمان عدم بقاء أي حالة جزئية على الواجهة.
+          qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+          qc.invalidateQueries({ queryKey: ["invoices-full"] });
+          qc.invalidateQueries({ queryKey: ["invoices"] });
+          qc.invalidateQueries({ queryKey: ["customers"] });
+          qc.invalidateQueries({ queryKey: ["transactions"] });
+          qc.invalidateQueries({ queryKey: ["products"] });
+          try { refetch(); } catch {}
+          throw new Error(`تعذّر حذف الفاتورة: ${err?.message || "خطأ غير معروف"} — تم إعادة تحميل الفواتير، لم يُحذف شيء.`);
+        }
       },
     });
   };

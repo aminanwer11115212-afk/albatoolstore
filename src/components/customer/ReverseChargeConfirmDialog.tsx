@@ -9,7 +9,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, Loader2, Undo2 } from "lucide-react";
+import { AlertTriangle, Download, Loader2, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export interface ReverseChargeItem {
   invoice_id?: string;
@@ -44,6 +45,35 @@ interface Props {
 
 const fmt = (n: number) =>
   Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+function exportPreviewCsv(group: ReverseChargeGroup) {
+  const headers = [
+    "invoice_number", "invoice_date", "invoice_total",
+    "applied", "paid_before", "paid_after",
+    "remaining_before", "remaining_after_reverse",
+  ];
+  const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [headers.join(",")];
+  for (const it of group.items) {
+    const remainingAfterReverse = Math.max(
+      Number(it.invoice_total || 0) - Math.max(Number(it.paid_after || 0) - Number(it.applied || 0), 0),
+      0,
+    );
+    lines.push([
+      it.invoice_number || "", it.invoice_date || "", it.invoice_total,
+      it.applied, it.paid_before, it.paid_after,
+      it.remaining_before, remainingAfterReverse,
+    ].map(esc).join(","));
+  }
+  const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `reverse-charge-preview-${group.groupId.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
 
 /**
  * Detailed confirmation dialog for reversing a customer charge (شحنة رصيد).
@@ -98,6 +128,17 @@ export function ReverseChargeConfirmDialog({
               )}
               {group.surplus > 0.01 && (
                 <div>الفائض (رصيد دائن): <span className="font-bold text-primary tabular-nums">{fmt(group.surplus)}</span></div>
+              )}
+              {group.items.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ms-auto h-7"
+                  onClick={() => exportPreviewCsv(group)}
+                  data-testid="reverse-preview-csv"
+                >
+                  <Download size={12} className="ml-1" /> تصدير CSV للمعاينة
+                </Button>
               )}
             </div>
 
