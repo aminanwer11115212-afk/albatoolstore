@@ -46,6 +46,8 @@ import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 import { useUserRole } from "@/hooks/useUserRole";
 
 import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
+import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
+import InvoicePaymentHistory from "@/components/invoice/InvoicePaymentHistory";
 import PackagingDialog from "@/components/packaging/PackagingDialog";
 import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDialog";
 import TransportDialog from "@/components/transport/TransportDialog";
@@ -2329,111 +2331,36 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       </Dialog>
 
       {/* ============ Record Payment Dialog ============ */}
-      <Dialog open={paymentDialogOpen} onOpenChange={(o) => !savingPayment && setPaymentDialogOpen(o)}>
-        <DialogContent dir="rtl" className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>تسجيل دفعة</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded border border-border p-2 bg-muted/30">
-                <div className="text-[11px] text-muted-foreground">الإجمالي</div>
-                <div className="font-semibold">{Number(savedTotal || 0).toLocaleString()}</div>
-              </div>
-              <div className="rounded border border-border p-2 bg-muted/30">
-                <div className="text-[11px] text-muted-foreground">المدفوع</div>
-                <div className="font-semibold">{Number(savedPaid || 0).toLocaleString()}</div>
-              </div>
-              <div className="rounded border border-border p-2 bg-muted/30">
-                <div className="text-[11px] text-muted-foreground">المتبقي</div>
-                <div className="font-semibold">{Number(savedDue || 0).toLocaleString()}</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-medium mb-1">مبلغ الدفعة</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control w-full"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1" title="يُخصم من المتبقي ويُسجَّل ضمن ملاحظة الدفعة">
-                  خصم على الدفعة
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="form-control w-full"
-                  value={payDiscount}
-                  onChange={(e) => setPayDiscount(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-medium mb-1">طريقة الدفع</label>
-                <select className="form-control w-full" value={payMethod} onChange={(e) => { setPayMethod(e.target.value); setPayAccount(""); setPayRef(""); }}>
-                  <option value="cash">نقدي</option>
-                  <option value="bank_transfer">تحويل بنكي</option>
-                  <option value="card">بطاقة</option>
-                  <option value="cheque">شيك</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">
-                  {isBankMethod(payMethod) ? "الحساب البنكي المستلِم *" : "الحساب المستلِم"}
-                </label>
-                <select className="form-control w-full" value={payAccount} onChange={(e) => setPayAccount(e.target.value)}>
-                  <option value="">— بدون —</option>
-                  {filterAccountsForPayment(accounts as any[], payMethod).map((a: any) => {
-                    const flagged = isBankMethod(payMethod) && !isAllowedBank(a);
-                    return (
-                      <option key={a.id} value={a.id} disabled={flagged}>
-                        {a.name}{a.bank_name ? ` (${a.bank_name})` : ""}{flagged ? " — بنك غير معتمد" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            </div>
-            {isBankMethod(payMethod) && (
-              <div>
-                <label className="block text-xs font-medium mb-1">رقم العملية / الإشعار البنكي (اختياري)</label>
-                <input
-                  type="text"
-                  className="form-control w-full"
-                  value={payRef}
-                  onChange={(e) => setPayRef(e.target.value)}
-                  placeholder="مثال: 12345678"
-                />
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-medium mb-1">التاريخ</label>
-              <input type="date" className="form-control w-full" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">ملاحظة</label>
-              <Textarea rows={2} value={payNote} onChange={(e) => setPayNote(e.target.value)} className="resize-none" />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)} disabled={savingPayment}>
-              إلغاء
-            </Button>
-            <Button onClick={handleRecordPayment} disabled={savingPayment} className="bg-cyan-600 hover:bg-cyan-700 text-white">
-              {savingPayment ? "جاري الحفظ..." : "حفظ الدفعة"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ============ Record Payment Dialog (shared) ============ */}
+      {editId && (
+        <CustomerPaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          invoiceId={editId}
+          invoiceNumber={invoiceNumber}
+          customerId={customer?.id || savedCustomerId || null}
+          customerName={customer?.name || null}
+          total={Number(savedTotal || 0)}
+          paidBefore={Number(savedPaid || 0)}
+          isPos={pos}
+          onSaved={async () => {
+            try {
+              const { data } = await supabase
+                .from("invoices")
+                .select("total, paid_amount, due_amount")
+                .eq("id", editId)
+                .maybeSingle();
+              if (data) {
+                setSavedTotal(Number((data as any).total || 0));
+                setSavedPaid(Number((data as any).paid_amount || 0));
+                setSavedDue(Number((data as any).due_amount || 0));
+              }
+              queryClient.invalidateQueries({ queryKey: ["invoices"] });
+            } catch { /* noop */ }
+          }}
+        />
+      )}
+
 
       {/* ============ Clear/Delete Confirmation ============ */}
       <AlertDialog open={clearConfirmOpen} onOpenChange={(o) => !clearing && setClearConfirmOpen(o)}>

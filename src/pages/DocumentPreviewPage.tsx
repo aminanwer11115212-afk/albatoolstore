@@ -5,6 +5,7 @@ import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 import { loadInvoiceExtras, loadQuoteExtras } from "@/utils/printExtras";
 import { ArrowRight, Loader2, Wallet } from "lucide-react";
 import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
+import InvoicePaymentHistory from "@/components/invoice/InvoicePaymentHistory";
 import DiscountInput from "@/components/shared/DiscountInput";
 import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
 import { toast } from "sonner";
@@ -423,6 +424,12 @@ export default function DocumentPreviewPage({ docType }: Props) {
           </select>
         </div>
       </div>
+
+      {docType === "invoice" && invMeta && (
+        <div className="px-3 py-2 border-b border-border bg-muted/20">
+          <InvoicePaymentHistory invoiceId={invMeta.id} refreshKey={reloadTick} />
+        </div>
+      )}
 
       {invMeta && (
         <CustomerPaymentDialog

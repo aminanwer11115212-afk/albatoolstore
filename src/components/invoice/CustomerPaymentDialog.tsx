@@ -13,6 +13,7 @@ import { logDiscountEvent } from "@/utils/discountAuditLogger";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { useUserRole } from "@/hooks/useUserRole";
+import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -187,6 +188,8 @@ export default function CustomerPaymentDialog({
 
     savingRef.current = true;
     setSaving(true);
+    const toastId = "cust-pay-flow";
+    toast.loading("جارٍ تسجيل الدفعة…", { id: toastId });
     try {
       // 1) قراءة الفاتورة الحالية قبل تسجيل أي شيء
       const { data: inv, error: rErr } = await (supabase as any)
@@ -267,7 +270,49 @@ export default function CustomerPaymentDialog({
       toast.success(
         (parts.length ? `تم تسجيل ${parts.join(" + ")}` : "تم التسجيل") +
           ` — الحالة: ${labelStatus(nextStatus)}`,
+        { id: toastId },
       );
+
+      // سجل تدقيق داخل الفاتورة (يظهر في سجل الدفعات)
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const changedBy = authData?.user?.email || authData?.user?.id || "system";
+        await recordInvoiceRevision({
+          invoiceId,
+          action: "payment",
+          changedBy,
+          changes: {
+            paid_amount: { before: Number(inv?.paid_amount || 0), after: split.newPaid },
+            ...(disc > 0
+              ? {
+                  discount: { before: Number(inv?.discount || 0), after: nextDiscount },
+                  total: { before: Number(inv?.total || 0), after: nextTotal },
+                }
+              : {}),
+          },
+          snapshot: {
+            amount: n,
+            applied: split.applied,
+            overpay: split.overpay,
+            discount: disc,
+            method,
+            account_id: accountId,
+            account_name: selectedAccount?.name || null,
+            bank_name: selectedAccount?.bank_name || null,
+            reference_no: referenceNo || null,
+            date,
+            status: nextStatus,
+          },
+          note:
+            (notes ? `${notes} — ` : "") +
+            `دفعة ${n.toLocaleString()} (${methodLabel(method)})` +
+            (referenceNo ? ` — مرجع ${referenceNo}` : "") +
+            (disc > 0 ? ` — خصم ${disc.toLocaleString()}` : ""),
+        });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("failed to record payment revision", e);
+      }
 
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["transactionsWithAccounts"] });
@@ -275,7 +320,9 @@ export default function CustomerPaymentDialog({
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoices-full"] });
+      qc.invalidateQueries({ queryKey: ["invoice-revisions", invoiceId] });
       try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+      try { window.dispatchEvent(new Event("invoice-payments:changed")); } catch {}
 
       // audit + balance-refresh toast (fire-and-forget so UX stays snappy)
       if (customerId && !isPos) {
@@ -306,12 +353,13 @@ export default function CustomerPaymentDialog({
       setConfirmOpen(false);
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(e?.message || "تعذّر حفظ الدفعة");
+      toast.error(e?.message || "تعذّر حفظ الدفعة", { id: toastId });
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
   }
+
 
   return (
     <Dialog open={open} onOpenChange={(v) => !saving && onOpenChange(v)}>
@@ -618,5 +666,17 @@ function labelStatus(s: string): string {
     case "overdue": return "متأخرة";
     case "cancelled": return "ملغاة";
     default: return "معلّقة";
+  }
+}
+
+export function methodLabel(m: string): string {
+  switch (m) {
+    case "cash": return "نقدي";
+    case "bank":
+    case "bank_transfer": return "تحويل بنكي";
+    case "card": return "بطاقة";
+    case "mobile": return "محفظة";
+    case "cheque": return "شيك";
+    default: return m || "—";
   }
 }
