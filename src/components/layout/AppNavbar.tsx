@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import AccountsOpeningBalanceDialog from "@/components/dashboard/AccountsOpeningBalanceDialog";
 import OnlineUsersIndicator from "@/components/layout/OnlineUsersIndicator";
 import SyncStatusIndicator from "@/components/layout/SyncStatusIndicator";
+import SimpleSyncStatusIndicator from "@/components/SyncStatusIndicator";
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useUserScopedLegacyKey } from "@/lib/userScopedKey";
 
@@ -650,6 +651,7 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
 
           {/* مؤشر المزامنة والاتصال — يظهر دائماً (حتى على الموبايل) */}
           <SyncStatusIndicator />
+          <SimpleSyncStatusIndicator />
 
 
 
