@@ -312,6 +312,7 @@ const App = () => {
     <RealtimeSync />
     <TooltipProvider>
       <OfflineBanner />
+      <ConflictResolutionDialog />
       <Toaster />
       <Sonner />
       <CriticalErrorDialog />
