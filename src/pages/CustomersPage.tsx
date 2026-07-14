@@ -588,12 +588,12 @@ export default function CustomersPage() {
     toast.success(`تمت إضافة المجموعة: ${name}`);
     return data.id;
   };
+  // إضافة ناقل جديد — نفتح حوار «إضافة ناقل» الموحّد (نفس صفحة إدارة الترحيلات)
+  // ليجمع كل تفاصيل الناقل (اسم/هاتف/عنوان/وجهات) في مكان واحد بدل إدراج اسم فقط.
   const createTransporter = async (name: string): Promise<string | null> => {
-    const { data, error } = await (supabase as any).from("transporters").insert({ name }).select("id,name").single();
-    if (error) { toast.error(error.message); return null; }
-    setTransporters(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    toast.success(`تمت إضافة ترحيلات: ${name}`);
-    return data.id;
+    setPendingTransporterName(name || "");
+    setQuickAddTrOpen(true);
+    return null;
   };
   const createDestination = async (name: string): Promise<string | null> => {
     const { data, error } = await (supabase as any).from("destinations").insert({ name }).select("id,name").single();
