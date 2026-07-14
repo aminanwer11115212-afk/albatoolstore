@@ -139,8 +139,12 @@ export default function CompanySettingsPage() {
             bank_name: billingForm.bank_name,
             bank_account: billingForm.bank_account,
             iban: billingForm.iban,
-        } as any).eq("id", id);
+          },
+          match: { id },
+          label: "حفظ إعدادات الفوترة",
+        });
         if (error) throw error;
+        if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
       }
       toast.success("تم حفظ إعدادات الفوترة");
     } catch (e: any) { toast.error(e.message); }

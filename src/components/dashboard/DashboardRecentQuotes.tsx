@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { runOrQueue } from "@/lib/offlineQueue";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";
 
 interface Props {
@@ -22,7 +23,7 @@ export default function DashboardRecentQuotes({ quotes, isLoading }: Props) {
   const handleStatusChange = async (quoteId: string, newStatus: string) => {
     const prev = localQuotes;
     setLocalQuotes((qs) => qs.map((q) => (q.id === quoteId ? { ...q, status: newStatus } : q)));
-    const { error } = await supabase.from("quotes").update({ status: newStatus }).eq("id", quoteId);
+    const { error } = await runOrQueue({ table: "quotes", op: "update", payload: { status: newStatus }, match: { id: quoteId }, label: "تحديث حالة عرض سعر" }).then(r => ({ error: r.error }));
     if (error) {
       setLocalQuotes(prev);
       toast.error(error.message || "تعذر تحديث الحالة");
