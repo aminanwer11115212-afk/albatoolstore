@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 
 /**
  * Listens to the global `products:changed` event and invalidates only

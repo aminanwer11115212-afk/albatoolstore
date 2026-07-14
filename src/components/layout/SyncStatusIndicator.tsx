@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Cloud, CloudOff, Loader2, RefreshCw, Trash2, CheckCircle2, Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { flushQueue, removeItem, clearQueue } from "@/lib/offlineQueue";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import { toast } from "sonner";
 import { subscribeSyncState, type SyncState } from "@/lib/realtimeSync";
 

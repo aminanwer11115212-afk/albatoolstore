@@ -7,7 +7,7 @@ import { WORKFLOW_STATUSES, getWorkflowStatus, invalidateWorkflowAutoCache, type
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInvoicesWithCustomers, useQuotesWithCustomers } from "@/hooks/useData";
 import { useQuery } from "@tanstack/react-query";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {

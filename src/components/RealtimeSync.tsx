@@ -5,7 +5,7 @@
  * انظر src/lib/realtimeSync.ts للتفاصيل.
  */
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import { startRealtimeSync } from "@/lib/realtimeSync";
 
 export default function RealtimeSync() {

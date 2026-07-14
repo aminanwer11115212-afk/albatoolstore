@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccounts, useSuppliers } from "@/hooks/useData";
 import { validateBankTransferPayment, isBankPaymentMethod, filterAccountsForPayment } from "@/lib/bankTransferValidation";
