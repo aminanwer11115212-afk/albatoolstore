@@ -68,7 +68,7 @@ describe("offlineQueue: runOrQueue + flushQueue", () => {
     expect(await getQueueCount()).toBe(1);
   });
 
-  it("يزامن العنصر المؤجل بنجاح بعد عودة الاتصال، ويُبقي الفاشل مع retries و lastError عند فشل أول محاولة", async () => {
+  it("يزامن العنصر المؤجل بنجاح بعد عودة الاتصال، ويُبقي الفاشل مع attempts و lastError عند فشل أول محاولة", async () => {
     setOnline(false);
     const { runOrQueue, flushQueue, getQueue } = await import("@/lib/offlineQueue");
 
@@ -87,7 +87,7 @@ describe("offlineQueue: runOrQueue + flushQueue", () => {
 
     const queueAfterFail = await getQueue();
     expect(queueAfterFail.length).toBe(1);
-    expect(queueAfterFail[0].retries).toBe(1);
+    expect(queueAfterFail[0].attempts).toBe(1);
     expect(queueAfterFail[0].lastError).toBeTruthy();
 
     // ثاني محاولة — supabase mock سينجح الآن

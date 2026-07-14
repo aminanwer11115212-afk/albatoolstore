@@ -176,7 +176,7 @@ export default function SyncStatusIndicator() {
                     </div>
                     <div className="text-[10px] text-muted-foreground">
                       {new Date(it.createdAt).toLocaleString("ar-EG")}
-                      {it.retries > 0 && ` · محاولات: ${it.retries}`}
+                      {it.attempts > 0 && ` · محاولات: ${it.attempts}`}
                     </div>
                     {it.lastError && (
                       <div className="text-[10px] text-destructive truncate mt-0.5" title={it.lastError}>
