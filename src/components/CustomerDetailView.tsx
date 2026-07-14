@@ -22,7 +22,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-type TabKey = "invoices" | "quotes" | "returns";
+type TabKey = "invoices" | "quotes" | "returns" | "charges";
 
 export default function CustomerDetailView({ customer, onBack, onEdit, onDelete }: Props) {
   const [tab, setTab] = useState<TabKey>("invoices");
