@@ -57,9 +57,10 @@ export function useColumnWidths(
   const minFor = useCallback(
     (index: number) => {
       const d = defaults[index];
-      // Allow columns to shrink down to 16px (icon-only columns can be very narrow).
-      if (typeof d === "number" && d < 16) return Math.max(8, Math.min(d, 16));
-      return 16;
+      if (typeof d !== "number") return 16;
+      // الحد الأدنى لعمود مقاس هو defaults[i] نفسه (لا نسمح بالانكماش تحت التصميم)،
+      // ولكن نُقيّده بسقف 60px حتى لا يُقفل عمود عريض من الانكماش عند ضيق الشاشة.
+      return Math.min(d, 60);
     },
     [defaults]
   );
