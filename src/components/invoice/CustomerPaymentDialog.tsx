@@ -12,6 +12,7 @@ import { splitPayment } from "@/utils/overpayment";
 import { logDiscountEvent } from "@/utils/discountAuditLogger";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import {
   Dialog,
