@@ -12,6 +12,7 @@ import { splitPayment } from "@/utils/overpayment";
 import { logDiscountEvent } from "@/utils/discountAuditLogger";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -63,8 +64,12 @@ export default function CustomerPaymentDialog({
 }: Props) {
   const qc = useQueryClient();
   const { data: accounts, isLoading: accountsLoading, isError: accountsError, refetch: refetchAccounts } = useAccounts();
+  const { isAdmin, permissions } = useUserRole();
+  const canRecordPayment = isAdmin || permissions.record_payment !== false;
+  const canApplyDiscount = isAdmin || permissions.apply_discount !== false;
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const remaining = Math.max(0, Number(total || 0) - Number(paidBefore || 0));
 
@@ -143,6 +148,35 @@ export default function CustomerPaymentDialog({
 
   const selectedAccount = (accountOptions as any[]).find((a) => a.id === accountId) || null;
 
+  const jaberAccount = useMemo(() => {
+    return (accountOptions as any[]).find((a) => {
+      const s = `${a.name || ""} ${a.bank_name || ""}`;
+      return /اولاد\s*جابر|أولاد\s*جابر/.test(s);
+    }) || null;
+  }, [accountOptions]);
+
+  function requestSave() {
+    const n = Number(amount) || 0;
+    const disc = Math.max(0, Number(discount) || 0);
+    if (n < 0 || (Number(discount) || 0) < 0) return toast.error("لا يُسمح بقيم سالبة");
+    if (n <= 0 && disc <= 0) return toast.error("أدخل مبلغ أو خصم أكبر من صفر");
+    // صلاحيات: منع تسجيل مبلغ عام أو خصم لغير المخولين
+    const rem = Math.max(0, remaining - disc);
+    const generalAmount = Math.max(0, n - rem); // أي فائض عن المتبقي = مبلغ عام (رصيد دائن)
+    if (generalAmount > 0.01 && !canRecordPayment) {
+      return toast.error("ليست لديك صلاحية تسجيل مبلغ عام (فائض/رصيد دائن) — تواصل مع المسؤول");
+    }
+    if (disc > 0 && !canApplyDiscount) {
+      return toast.error("ليست لديك صلاحية تطبيق خصم إضافي — تواصل مع المسؤول");
+    }
+    if (n > 0 && !accountId) return toast.error("اختر الحساب");
+    if (n > 0 && isBankPaymentMethod(method)) {
+      const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo });
+      if (err) return toast.error(err);
+    }
+    setConfirmOpen(true);
+  }
+
   async function handleSave() {
     if (savingRef.current) {
       toast.info("يتم حفظ الدفعة بالفعل — انتظر لحظة", { id: "cust-pay-inflight" });
@@ -150,12 +184,6 @@ export default function CustomerPaymentDialog({
     }
     const n = Number(amount) || 0;
     const disc = Math.max(0, Number(discount) || 0);
-    if (n <= 0 && disc <= 0) return toast.error("أدخل مبلغ أو خصم أكبر من صفر");
-    if (n > 0 && !accountId) return toast.error("اختر الحساب");
-    if (n > 0 && isBankPaymentMethod(method)) {
-      const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo });
-      if (err) return toast.error(err);
-    }
 
     savingRef.current = true;
     setSaving(true);
@@ -275,6 +303,7 @@ export default function CustomerPaymentDialog({
       }
 
       onSaved?.();
+      setConfirmOpen(false);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message || "تعذّر حفظ الدفعة");
@@ -365,19 +394,39 @@ export default function CustomerPaymentDialog({
               <Input
                 type="number"
                 inputMode="decimal"
+                min={0}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || Number(v) >= 0) setAmount(v);
+                }}
                 placeholder="0.00"
+                disabled={!canRecordPayment && Number(amount || 0) > remaining}
               />
+              {!canRecordPayment && (
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  لا يمكنك تسجيل مبلغ يتجاوز المتبقي (صلاحية «تسجيل مبلغ عام» مطلوبة)
+                </div>
+              )}
             </div>
             <div>
-              <DiscountInput
-                label="خصم على الدفعة (اختياري)"
-                value={Number(discount) || 0}
-                grandBeforeDiscount={remaining}
-                onChange={(v) => setDiscount(v ? String(v) : "")}
-                compact
-              />
+              {canApplyDiscount ? (
+                <DiscountInput
+                  label="خصم على الدفعة (اختياري)"
+                  value={Number(discount) || 0}
+                  grandBeforeDiscount={remaining}
+                  onChange={(v) => setDiscount(v && Number(v) >= 0 ? String(v) : "")}
+                  compact
+                />
+              ) : (
+                <>
+                  <Label>خصم على الدفعة</Label>
+                  <Input value="—" readOnly disabled title="لا تملك صلاحية تطبيق خصم" />
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    صلاحية «تطبيق خصم» غير مفعّلة لحسابك
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -394,7 +443,7 @@ export default function CustomerPaymentDialog({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label>الحساب</Label>
+              <Label>الحساب المستلم</Label>
               {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
                 <button
                   type="button"
@@ -406,18 +455,43 @@ export default function CustomerPaymentDialog({
                 </button>
               )}
             </div>
-            <Select value={accountId} onValueChange={setAccountId}>
-              <SelectTrigger>
-                <SelectValue placeholder={accountsLoading ? "جارٍ التحميل…" : accountOptions.length === 0 ? "تعذّر تحميل الحسابات" : "اختر"} />
-              </SelectTrigger>
-              <SelectContent>
-                {(accountOptions as any[]).map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}{a.bank_name ? ` — ${a.bank_name}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {jaberAccount && accountId === jaberAccount.id ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 rounded-md border border-primary/40 bg-primary/5 p-2 text-sm font-bold">
+                  {jaberAccount.name}{jaberAccount.bank_name ? ` — ${jaberAccount.bank_name}` : ""}
+                </div>
+                {accountOptions.length > 1 && (
+                  <button
+                    type="button"
+                    className="text-[11px] text-primary underline"
+                    onClick={() => setAccountId("")}
+                  >
+                    تغيير
+                  </button>
+                )}
+              </div>
+            ) : (
+              <Select value={accountId} onValueChange={setAccountId}>
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      accountsLoading
+                        ? "جارٍ التحميل…"
+                        : accountOptions.length === 0
+                          ? "لا يوجد حساب — أضف حسابًا بنكيًا"
+                          : "اختر الحساب المستلم"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {(accountOptions as any[]).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}{a.bank_name ? ` — ${a.bank_name}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {method === "bank" && (
@@ -435,12 +509,68 @@ export default function CustomerPaymentDialog({
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>إلغاء</Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={requestSave} disabled={saving} data-testid="open-confirm-payment">
             {saving ? "جارٍ الحفظ..." : "حفظ الدفعة"}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* نافذة تأكيد قبل الحفظ */}
+      <Dialog open={confirmOpen} onOpenChange={(v) => !saving && setConfirmOpen(v)}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تأكيد تسجيل الدفعة</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const n = Number(amount) || 0;
+            const disc = Math.max(0, Number(discount) || 0);
+            const rem = Math.max(0, remaining - disc);
+            const excess = Math.max(0, n - rem);
+            const debt = custBalance?.debt || 0;
+            const credit = custBalance?.credit || 0;
+            const net = debt - credit;
+            const state = Math.abs(net) < 0.01 ? "خالص" : net < 0 ? `له ${Math.abs(net).toLocaleString()}` : `عليه ${net.toLocaleString()}`;
+            return (
+              <div className="space-y-2 text-sm">
+                <div className="rounded-md border bg-muted/40 p-2 flex justify-between">
+                  <span className="text-muted-foreground">حالة العميل الحالية</span>
+                  <b>{state}</b>
+                </div>
+                <Row k="الفاتورة" v={invoiceNumber || "—"} />
+                <Row k="الإجمالي" v={Number(total).toLocaleString()} />
+                <Row k="المدفوع سابقًا" v={Number(paidBefore).toLocaleString()} />
+                {disc > 0 && <Row k="خصم إضافي" v={disc.toLocaleString()} />}
+                <Row k="مبلغ الدفعة" v={n.toLocaleString()} />
+                <Row k="المتبقي بعد الحفظ" v={Math.max(0, rem - Math.min(n, rem)).toLocaleString()} highlight />
+                {excess > 0 && (
+                  <div className="rounded-md border border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 p-2 text-xs text-emerald-800 dark:text-emerald-200">
+                    فائض <b>{excess.toLocaleString()}</b> سيُودَع كرصيد دائن للعميل
+                  </div>
+                )}
+                <div className="text-[11px] text-muted-foreground pt-1">
+                  الحساب المستلم: <b>{selectedAccount?.name || "—"}</b>{selectedAccount?.bank_name ? ` — ${selectedAccount.bank_name}` : ""}
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving}>رجوع</Button>
+            <Button onClick={handleSave} disabled={saving} data-testid="confirm-payment">
+              {saving ? "جارٍ الحفظ..." : "تأكيد الحفظ"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
+  );
+}
+
+function Row({ k, v, highlight }: { k: string; v: string; highlight?: boolean }) {
+  return (
+    <div className={`flex justify-between px-1 ${highlight ? "font-bold text-destructive" : ""}`}>
+      <span className="text-muted-foreground">{k}</span>
+      <span className="tabular-nums">{v}</span>
+    </div>
   );
 }
 
