@@ -1,16 +1,17 @@
 import { useMemo, useState, forwardRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
 import type { StatementData } from "@/utils/statementPrintTemplate";
-import { netBalanceOf } from "@/utils/balanceDisplay";
+import { netBalanceOf, CustomerAccountSummary } from "@/utils/balanceDisplay";
 import { toast } from "sonner";
 import {
   FileText, RotateCcw, Receipt, Wallet, AlertTriangle, CheckCircle2,
   ArrowLeft, Pencil, Trash2, Phone, MapPin, Home, StickyNote,
-  ExternalLink, ClipboardList, User, Share2
+  ExternalLink, ClipboardList, User, Share2, PlusCircle
 } from "lucide-react";
 import { exportContactToDevice } from "@/utils/exportContact";
+import ChargeBalanceDialog from "@/components/dashboard/ChargeBalanceDialog";
 
 
 interface Props {
