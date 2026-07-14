@@ -3,7 +3,7 @@
  * صف لكل عميل مع: ناقلين العميل (إضافة/حذف) + وجهات العميل (إضافة/حذف + تحديد الافتراضي).
  */
 import { useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import {
   useTransporters, useDestinations,
   useCustomerTransporters, useCustomerDestinations,

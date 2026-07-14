@@ -40,16 +40,21 @@ export function useUnsavedChangesGuard({ isDirty, onSave }: Options) {
   }, [isDirty]);
 
   const autoSaveAndProceed = useCallback((proceed: () => void) => {
-    // Fire-and-forget save; never block navigation.
-    isDirtyRef.current = false;
-    if (!savingRef.current) {
-      savingRef.current = true;
-      Promise.resolve()
-        .then(() => onSaveRef.current())
-        .catch(() => { /* swallow — don't block navigation */ })
-        .finally(() => { savingRef.current = false; });
-    }
-    proceed();
+    // Try to save; only proceed if save succeeds. Aborts navigation on failure.
+    if (savingRef.current) return;
+    savingRef.current = true;
+    Promise.resolve()
+      .then(() => onSaveRef.current())
+      .then((ok) => {
+        savingRef.current = false;
+        if (ok === false) return; // abort
+        isDirtyRef.current = false;
+        proceed();
+      })
+      .catch(() => {
+        savingRef.current = false;
+        // treat throw as failure — do not navigate
+      });
   }, []);
 
   // Intercept SPA navigations: link clicks + history API + back/forward.

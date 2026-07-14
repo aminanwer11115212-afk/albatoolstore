@@ -266,7 +266,8 @@ export async function flushQueue(): Promise<{ ok: number; failed: number; confli
         item.status = "failed_permanent";
       } else {
         item.status = "failed_retryable";
-        item.nextRetryAt = Date.now() + backoffDelay(item.attempts);
+        // أول محاولة إعادة تكون فورية؛ المحاولات اللاحقة تستخدم backoff تصاعدي.
+        item.nextRetryAt = item.attempts <= 1 ? 0 : Date.now() + backoffDelay(item.attempts - 1);
       }
       failed++;
     }

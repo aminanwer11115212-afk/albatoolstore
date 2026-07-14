@@ -4,10 +4,6 @@
 //   - لا تُحفظ له تسمية مخصّصة في useToolbarLabels.
 //   - يُحذف تلقائياً من قوائم localStorage عند أول قراءة.
 export const RETIRED_TOOLBAR_ITEM_IDS: ReadonlySet<string> = new Set([
-  "sum-count",
-  "sum-subtotal",
-  "sum-discount",
-  "sum-tax",
   // أزرار التخصيص/إعادة الافتراضي القديمة دُمجت في زر إعدادات واحد:
   "__customize_reset__",
   "__customize_toggle__",

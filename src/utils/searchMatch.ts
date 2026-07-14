@@ -23,7 +23,8 @@ export function normalizeAr(s: unknown): string {
 }
 
 /**
- * يُرجِع true إذا haystack يبدأ بـ query (بعد التطبيع) من أول النص فقط.
+ * يُرجِع true إذا haystack يبدأ بـ query (بعد التطبيع) — على مستوى النص
+ * كاملاً أو على بداية أي كلمة داخله (token startsWith).
  * بحث فارغ ⇒ true دائماً.
  */
 export function startsWithMatch(haystack: unknown, query: unknown): boolean {
@@ -31,7 +32,12 @@ export function startsWithMatch(haystack: unknown, query: unknown): boolean {
   if (!q) return true;
   const h = normalizeAr(haystack);
   if (!h) return false;
-  return h.startsWith(q);
+  if (h.startsWith(q)) return true;
+  const tokens = h.split(" ");
+  for (const t of tokens) {
+    if (t && t.startsWith(q)) return true;
+  }
+  return false;
 }
 
 

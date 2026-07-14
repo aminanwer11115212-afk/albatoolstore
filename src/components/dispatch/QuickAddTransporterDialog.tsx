@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,15 @@ type Props = {
 };
 
 export default function QuickAddTransporterDialog({ open, onOpenChange, onCreated, initialName }: Props) {
+  // تجنّب تشغيل الـ hooks الداخلية (useQuery داخل useDestinations) عند إغلاق الحوار
+  // كي لا نطالب المستهلكين باستدعاء الحوار داخل QueryClientProvider دائماً.
+  if (!open) {
+    return null as any;
+  }
+  return <QuickAddTransporterDialogInner open={open} onOpenChange={onOpenChange} onCreated={onCreated} initialName={initialName} />;
+}
+
+function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initialName }: Props) {
   const qc = useQueryClient();
   const { data: destinations } = useDestinations();
   const [name, setName] = useState(initialName || "");

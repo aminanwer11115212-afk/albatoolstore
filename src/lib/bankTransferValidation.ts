@@ -85,12 +85,18 @@ export function validateBankTransferPayment(opts: {
   method: string | null | undefined;
   account: BankAccountLike | null | undefined;
   referenceNo: string | null | undefined;
+  /** إذا كانت false، لا يفرض إدخال رقم العملية (يستخدمه CustomerPaymentDialog). */
+  requireReferenceNo?: boolean;
 }): string | null {
   if (!isBankPaymentMethod(opts.method)) return null;
   if (!opts.account) return "اختر الحساب البنكي المستلِم";
   if (!isAllowedBank(opts.account)) {
     return "البنك المختار غير مسموح به. يجب أن يكون: بنك فيصل أو بنك أم درمان أو بنك الخرطوم";
   }
-  // رقم العملية اختياري — يُسمح بالحفظ بدونه
+  const requireRef = opts.requireReferenceNo !== false;
+  if (requireRef) {
+    const ref = typeof opts.referenceNo === "string" ? opts.referenceNo.trim() : "";
+    if (!ref) return "أدخل رقم العملية (مرجع التحويل)";
+  }
   return null;
 }

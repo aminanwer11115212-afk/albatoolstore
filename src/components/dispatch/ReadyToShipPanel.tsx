@@ -5,7 +5,8 @@
  * بعد الطباعة → تحويل الحالة إلى in_transit.
  */
 import { useMemo, useState, useCallback, Fragment, useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { filterSelectColumns } from "@/lib/tableColumns";

@@ -80,9 +80,18 @@ export default function ToolbarSettingsMenu({ screenKey, zoom }: Props) {
   /** ينفّذ فعل القفل/فك القفل (مع حالة التخصيص) ويظهر Toast. */
   const performLockToggle = () => {
     const wasLocked = isLocked;
-    if (customizing && !wasLocked) {
-      toggleCustomizing();
-      // اضمن التزام التغييرات قبل التقاط لقطة القفل.
+    let isCustomizing = customizing;
+    try {
+      if (typeof window !== "undefined") {
+        isCustomizing = localStorage.getItem("neobilling:toolbar-customizing:global:v1") === "1";
+      }
+    } catch { /* noop */ }
+    if (isCustomizing && !wasLocked) {
+      // اكتب "0" مباشرة ودعّم بحدث حتى يزامن الـ Provider الحالة.
+      try {
+        localStorage.setItem("neobilling:toolbar-customizing:global:v1", "0");
+        window.dispatchEvent(new CustomEvent("neobilling:toolbar-customizing-changed", { detail: false }));
+      } catch { /* noop */ }
       window.setTimeout(() => {
         toggleLock();
       }, 0);
@@ -206,7 +215,7 @@ export default function ToolbarSettingsMenu({ screenKey, zoom }: Props) {
         <button
           type="button"
           onClick={handleSaveCustomization}
-          aria-label="حفظ ترتيب الأزرار وإنهاء التخصيص"
+          aria-label="حفظ ترتيب الأزرار"
           title="حفظ التخصيص — التغييرات تُحفظ تلقائياً، اضغط هنا لإنهاء وضع التخصيص"
           style={{
             display: "inline-flex",

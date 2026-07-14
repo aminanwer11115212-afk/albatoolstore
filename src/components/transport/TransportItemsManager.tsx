@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import { Plus, Trash2, ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useProducts } from "@/hooks/useData";

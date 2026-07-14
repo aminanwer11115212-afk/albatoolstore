@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, KeyboardEvent } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import DeleteGeoDialog from "@/components/shared/DeleteGeoDialog";
@@ -66,7 +66,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   }>(null);
 
   const queryClient = useQueryClient();
-  const localCustomers = queryClient.getQueryData<any[]>(["customers"]) || [];
+  const localCustomers: any[] = queryClient.getQueryData(["customers"]) || [];
 
   const duplicateName = form.name.trim() 
     ? localCustomers.find(c => c.id !== form.id && c.name?.trim() === form.name.trim())

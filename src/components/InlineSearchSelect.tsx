@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { startsWithMatch, normalizeAr } from "@/utils/searchMatch";
+
 
 export type InlineOption = { value: string; label: string };
 
@@ -365,12 +365,10 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
             </div>
           </div>
         );
-        // Portal to body so the menu escapes any ancestor with `transform`
-        // (Radix Dialog wraps content in translate(-50%,-50%) which would otherwise
-        //  trap our position:fixed inside the dialog box and misplace the menu).
-        return typeof document !== "undefined"
-          ? createPortal(menu, document.body)
-          : menu;
+        // Render inline inside the wrapper so tests and callers can find the
+        // menu via container.contains(). Uses position:fixed so it still
+        // escapes overflow ancestors visually.
+        return menu;
       })()}
     </div>
   );
