@@ -544,6 +544,7 @@ export type Database = {
           started_at: string
           status: string
           triggered_by: string
+          triggered_by_uid: string | null
         }
         Insert: {
           anomalies_found?: number | null
@@ -557,6 +558,7 @@ export type Database = {
           started_at?: string
           status?: string
           triggered_by?: string
+          triggered_by_uid?: string | null
         }
         Update: {
           anomalies_found?: number | null
@@ -570,6 +572,7 @@ export type Database = {
           started_at?: string
           status?: string
           triggered_by?: string
+          triggered_by_uid?: string | null
         }
         Relationships: []
       }
