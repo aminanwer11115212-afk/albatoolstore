@@ -114,6 +114,12 @@ export default function CustomerPaymentDialog({
     if (accountOptions.length === 0) return;
     const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
     if (!accountId) {
+      // فضّل حساب "أولاد جابر" افتراضياً للتحويلات البنكية
+      const jaber = (accountOptions as any[]).find((a) => {
+        const s = `${a.name || ""} ${a.bank_name || ""}`;
+        return /اولاد\s*جابر|أولاد\s*جابر/.test(s);
+      });
+      if (method === "bank" && jaber) { setAccountId(jaber.id); return; }
       try {
         const last = localStorage.getItem(storageKey);
         const match = accountOptions.find((a: any) => a.id === last);
