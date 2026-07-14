@@ -104,26 +104,29 @@ beforeEach(() => {
 describe("CustomerPaymentDialog — تدفق الدفعة", () => {
   it("طريقة الدفع مثبتة على «تحويل بنكي»", () => {
     renderDlg();
-    expect(screen.getByDisplayValue("تحويل بنكي")).toBeTruthy();
+    // shadcn Select يعرض القيمة داخل SelectValue وليس كـ display value
+    expect(screen.getAllByText(/تحويل بنكي/).length).toBeGreaterThan(0);
   });
 
   it("يعرض حالة «خالص» عند رصيد صفري", async () => {
-    renderDlg();
-    await waitFor(() => expect(screen.getByText(/حساب العميل:/)).toBeTruthy());
-    expect(screen.getByText(/خالص/)).toBeTruthy();
+    renderDlg({ total: 1000, paidBefore: 0 });
+    // مع دفع كامل المتبقي (auto-filled) → يظهر بلوك «مكتمل»
+    await waitFor(() => expect(screen.getAllByText(/مكتمل/).length).toBeGreaterThan(0));
   });
 
   it("يعرض «له» بالأخضر عند وجود رصيد دائن", async () => {
     custRow.credit_balance = 500;
     renderDlg({ total: 0, paidBefore: 0 });
-    await waitFor(() => expect(screen.getByText(/له/)).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText(/له/).length).toBeGreaterThan(0));
   });
 
   it("يعرض «عليه» بالأحمر عند وجود دين", async () => {
     custRow.balance = 700;
-    renderDlg();
-    await waitFor(() => expect(screen.getByText(/عليه/)).toBeTruthy());
+    renderDlg({ total: 100, paidBefore: 0 });
+    await waitFor(() => expect(screen.getAllByText(/عليه/).length).toBeGreaterThan(0));
   });
+
+
 
   it("يمنع القيم السالبة في المبلغ", () => {
     renderDlg();

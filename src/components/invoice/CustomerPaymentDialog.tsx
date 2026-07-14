@@ -96,6 +96,7 @@ export default function CustomerPaymentDialog({
   };
 
   const [amount, setAmount] = useState<string>(remaining ? String(remaining) : "");
+  const [creditUse, setCreditUse] = useState<string>("");
   const [discount, setDiscount] = useState<string>("");
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [method, setMethod] = useState<Method>(initialMethod);
@@ -106,11 +107,13 @@ export default function CustomerPaymentDialog({
   const [notes, setNotes] = useState<string>("");
   const [custBalance, setCustBalance] = useState<{ debt: number; credit: number } | null>(null);
 
+
   const amountRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (open) {
       setAmount(remaining ? String(remaining) : "");
+      setCreditUse("");
       setDiscount("");
       setDate(new Date().toISOString().slice(0, 10));
       setMethod(initialMethod());
@@ -118,6 +121,7 @@ export default function CustomerPaymentDialog({
       setReferenceNo("");
       setNotes("");
       setCustBalance(null);
+
       // تركيز حقل المبلغ بعد الفتح
       setTimeout(() => {
         try { amountRef.current?.focus(); amountRef.current?.select(); } catch { /* noop */ }
@@ -127,14 +131,22 @@ export default function CustomerPaymentDialog({
         (async () => {
           const { data } = await supabase.from("customers").select("balance, credit_balance").eq("id", customerId).maybeSingle();
           if (data) {
+            const credit = Number((data as any).credit_balance || 0);
             setCustBalance({
               debt: Number((data as any).balance || 0),
-              credit: Number((data as any).credit_balance || 0),
+              credit,
             });
+            // اقتراح تلقائي: استخدم الرصيد الدائن أولاً لسد المتبقي
+            if (credit > 0.01 && remaining > 0.01) {
+              const useCredit = Math.min(credit, remaining);
+              setCreditUse(String(useCredit));
+              setAmount(String(Math.max(0, remaining - useCredit)));
+            }
           }
         })();
       }
     }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, remaining, customerId, isPos]);
 
@@ -226,10 +238,13 @@ export default function CustomerPaymentDialog({
   function requestSave() {
     const n = Number(amount) || 0;
     const disc = Math.max(0, Number(discount) || 0);
-    if (n < 0 || (Number(discount) || 0) < 0) return toast.error("لا يُسمح بقيم سالبة");
-    if (n <= 0 && disc <= 0) return toast.error("أدخل مبلغ أو خصم أكبر من صفر");
+    const cu = Math.max(0, Number(creditUse) || 0);
+    const availCredit = custBalance?.credit || 0;
+    if (n < 0 || (Number(discount) || 0) < 0 || cu < 0) return toast.error("لا يُسمح بقيم سالبة");
+    if (n <= 0 && disc <= 0 && cu <= 0) return toast.error("أدخل مبلغ أو خصم أو استخدام رصيد أكبر من صفر");
+    if (cu > availCredit + 0.01) return toast.error(`لا يمكن استخدام أكثر من الرصيد الدائن المتاح (${availCredit.toLocaleString()})`);
     const rem = Math.max(0, remaining - disc);
-    const generalAmount = Math.max(0, n - rem);
+    const generalAmount = Math.max(0, n + cu - rem);
     if (generalAmount > 0.01 && !canRecordPayment) {
       return toast.error("ليست لديك صلاحية تسجيل مبلغ عام (فائض/رصيد دائن) — تواصل مع المسؤول");
     }
@@ -244,6 +259,7 @@ export default function CustomerPaymentDialog({
     setConfirmOpen(true);
   }
 
+
   async function handleSave() {
     if (savingRef.current) {
       toast.info("يتم حفظ الدفعة بالفعل — انتظر لحظة", { id: "cust-pay-inflight" });
@@ -251,6 +267,7 @@ export default function CustomerPaymentDialog({
     }
     const n = Number(amount) || 0;
     const disc = Math.max(0, Number(discount) || 0);
+    const cu = Math.max(0, Number(creditUse) || 0);
 
     savingRef.current = true;
     setSaving(true);
@@ -267,10 +284,22 @@ export default function CustomerPaymentDialog({
       const nextDiscount = Math.max(0, Number(inv?.discount || 0) + disc);
       const nextTotal = Math.max(0, Number(inv?.total || 0) - disc);
       const alreadyPaid = Number(inv?.paid_amount || 0);
+      const remainingOnInvoice = Math.max(0, nextTotal - alreadyPaid);
 
-      const split = splitPayment({ amount: n, total: nextTotal, alreadyPaid });
-      const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: split.newPaid });
+      // 1) استخدام الرصيد الدائن أولاً (لا يمكن أن يتجاوز المتبقي على الفاتورة)
+      const creditApplied = Math.min(cu, remainingOnInvoice);
 
+      // 2) توزيع النقد على ما تبقى + الفائض يذهب رصيدًا دائنًا جديدًا
+      const split = splitPayment({
+        amount: n,
+        total: nextTotal - creditApplied,
+        alreadyPaid,
+      });
+      const newPaid = alreadyPaid + creditApplied + split.applied;
+      const newDue = Math.max(0, nextTotal - newPaid);
+      const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: newPaid });
+
+      // (a) دفعة نقدية على الفاتورة
       if (split.applied > 0) {
         const baseNote = notes || (invoiceNumber ? `دفعة على الفاتورة ${invoiceNumber}` : "دفعة من العميل");
         const description = referenceNo ? `${baseNote} — مرجع: ${referenceNo}` : baseNote;
@@ -288,6 +317,7 @@ export default function CustomerPaymentDialog({
         if (txErr) throw txErr;
       }
 
+      // (b) فائض النقد → رصيد دائن جديد للعميل
       if (split.overpay > 0 && !isPos && customerId) {
         const { error: cErr } = await (supabase as any).from("transactions").insert({
           type: "income",
@@ -302,11 +332,45 @@ export default function CustomerPaymentDialog({
         if (cErr) throw cErr;
       }
 
+      // (c) استخدام الرصيد الدائن — قيدان: قيد دفع (بدون حساب) وقيد تخفيض للرصيد الدائن (amount سالبة)
+      if (creditApplied > 0 && !isPos && customerId) {
+        const desc = `استخدام رصيد دائن${invoiceNumber ? ` على الفاتورة ${invoiceNumber}` : ""}`;
+        // قيد دفع بدون تدفق نقدي — يظهر في سجل دفعات العميل ويربط بالفاتورة
+        const { error: cpErr } = await (supabase as any).from("transactions").insert({
+          type: "income",
+          category: "customer_payment",
+          customer_id: customerId,
+          account_id: null,
+          amount: creditApplied,
+          date,
+          method: "credit_balance",
+          reference_id: invoiceId,
+          description: desc,
+          allocation: { kind: "credit_used", invoice_id: invoiceId, invoice_number: invoiceNumber || null },
+        });
+        if (cpErr) throw cpErr;
+        // خصم من رصيد العميل الدائن (recompute_customer_balance يجمع amount)
+        const { error: ccErr } = await (supabase as any).from("transactions").insert({
+          type: "expense",
+          category: "customer_credit",
+          customer_id: customerId,
+          account_id: null,
+          amount: -creditApplied,
+          date,
+          method: "credit_balance",
+          reference_id: invoiceId,
+          description: desc,
+          allocation: { kind: "credit_used", invoice_id: invoiceId, invoice_number: invoiceNumber || null },
+        });
+        if (ccErr) throw ccErr;
+      }
+
       const updatePayload: any = {
-        paid_amount: split.newPaid,
-        due_amount: split.newDue,
+        paid_amount: newPaid,
+        due_amount: newDue,
         status: nextStatus,
       };
+
       if (disc > 0) {
         updatePayload.discount = nextDiscount;
         updatePayload.total = nextTotal;
@@ -324,7 +388,8 @@ export default function CustomerPaymentDialog({
 
       const parts: string[] = [];
       if (split.applied > 0) parts.push(`دفعة ${split.applied.toLocaleString()}`);
-      if (split.overpay > 0) parts.push(`رصيد دائن ${split.overpay.toLocaleString()}`);
+      if (creditApplied > 0) parts.push(`رصيد دائن مستخدم ${creditApplied.toLocaleString()}`);
+      if (split.overpay > 0) parts.push(`رصيد دائن جديد ${split.overpay.toLocaleString()}`);
       if (disc > 0) parts.push(`خصم ${disc.toLocaleString()}`);
       toast.success(
         (parts.length ? `تم تسجيل ${parts.join(" + ")}` : "تم التسجيل") +
@@ -340,7 +405,7 @@ export default function CustomerPaymentDialog({
           action: "payment",
           changedBy,
           changes: {
-            paid_amount: { before: Number(inv?.paid_amount || 0), after: split.newPaid },
+            paid_amount: { before: Number(inv?.paid_amount || 0), after: newPaid },
             ...(disc > 0
               ? {
                   discount: { before: Number(inv?.discount || 0), after: nextDiscount },
@@ -350,6 +415,7 @@ export default function CustomerPaymentDialog({
           },
           snapshot: {
             amount: n,
+            credit_used: creditApplied,
             applied: split.applied,
             overpay: split.overpay,
             discount: disc,
@@ -364,6 +430,7 @@ export default function CustomerPaymentDialog({
           note:
             (notes ? `${notes} — ` : "") +
             `دفعة ${n.toLocaleString()} (${methodLabel(method)})` +
+            (creditApplied > 0 ? ` + رصيد دائن ${creditApplied.toLocaleString()}` : "") +
             (referenceNo ? ` — مرجع ${referenceNo}` : "") +
             (disc > 0 ? ` — خصم ${disc.toLocaleString()}` : ""),
         });
@@ -371,6 +438,7 @@ export default function CustomerPaymentDialog({
         // eslint-disable-next-line no-console
         console.warn("failed to record payment revision", e);
       }
+
 
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["transactionsWithAccounts"] });
@@ -487,11 +555,14 @@ export default function CustomerPaymentDialog({
             const rawDue = invoiceAfterDiscount + previousDebt - previousCredit;
             const combinedDue = Math.max(0, rawDue);
             const preSettleCredit = rawDue < -0.01 ? Math.abs(rawDue) : 0;
-            const paid = Number(amount) || 0;
+            const paidCash = Number(amount) || 0;
+            const cu = Math.min(Math.max(0, Number(creditUse) || 0), credit);
+            const paid = paidCash + cu;
             const afterPayment = combinedDue - paid;
             const isSettled = combinedDue < 0.01 && paid < 0.01 ? preSettleCredit < 0.01 : Math.abs(afterPayment) < 0.01;
             const isOver = paid > 0 && afterPayment < -0.01;
             const showAfter = paid > 0 || preSettleCredit > 0;
+
 
             return (
               <div className="flex flex-col gap-2">
@@ -576,15 +647,12 @@ export default function CustomerPaymentDialog({
                 )}
 
                 {credit > 0.01 && !isPos && (
-                  <button
-                    type="button"
-                    className="text-primary underline text-[11px] self-end"
-                    onClick={() => setAmount(String((Number(amount) || 0) + credit))}
-                    title="أضف كامل الرصيد الدائن إلى المبلغ"
-                  >
-                    + استخدام الرصيد الدائن ({credit.toLocaleString()})
-                  </button>
+                  <div className="rounded-md border border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 p-2 text-[11px] flex items-center justify-between text-emerald-800 dark:text-emerald-200">
+                    <span>الرصيد الدائن المتاح</span>
+                    <span className="font-bold tabular-nums">{credit.toLocaleString()}</span>
+                  </div>
                 )}
+
 
                 {/* تلميح لوحة المفاتيح */}
                 <div className="text-[10px] text-muted-foreground rounded-md border border-dashed p-2 leading-relaxed">
@@ -639,6 +707,51 @@ export default function CustomerPaymentDialog({
                 )}
               </div>
             </div>
+
+            {!isPos && (custBalance?.credit || 0) > 0.01 && (
+              <div className="rounded-md border border-emerald-600/40 bg-emerald-50/40 dark:bg-emerald-950/20 p-2">
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-xs text-emerald-800 dark:text-emerald-200">
+                    خصم من رصيد العميل الدائن
+                  </Label>
+                  <button
+                    type="button"
+                    className="text-[10px] text-primary underline"
+                    onClick={() => {
+                      const avail = custBalance?.credit || 0;
+                      const rem = Math.max(0, remaining - (Number(discount) || 0));
+                      const use = Math.min(avail, rem);
+                      setCreditUse(String(use));
+                      setAmount(String(Math.max(0, rem - use)));
+                    }}
+                  >
+                    استخدم الكل
+                  </button>
+                </div>
+                <Input
+                  data-pay-field
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={custBalance?.credit || 0}
+                  value={creditUse}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || Number(v) >= 0) {
+                      const avail = custBalance?.credit || 0;
+                      const capped = v === "" ? "" : String(Math.min(Number(v), avail));
+                      setCreditUse(capped);
+                    }
+                  }}
+                  placeholder="0.00"
+                />
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  المتاح: {(custBalance?.credit || 0).toLocaleString()} — يُخصم من رصيد العميل ويُضاف كدفعة على الفاتورة
+                </div>
+              </div>
+            )}
+
+
 
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -765,9 +878,13 @@ export default function CustomerPaymentDialog({
             const n = Number(amount) || 0;
             const disc = Math.max(0, Number(discount) || 0);
             const rem = Math.max(0, remaining - disc);
-            const excess = Math.max(0, n - rem);
             const debt = custBalance?.debt || 0;
             const credit = custBalance?.credit || 0;
+            const cu = Math.min(Math.max(0, Number(creditUse) || 0), credit);
+            const creditAppliedOnInv = Math.min(cu, rem);
+            const afterCredit = Math.max(0, rem - creditAppliedOnInv);
+            const cashApplied = Math.min(n, afterCredit);
+            const excess = Math.max(0, n - cashApplied);
             const net = debt - credit;
             const state = Math.abs(net) < 0.01 ? "خالص" : net < 0 ? `له ${Math.abs(net).toLocaleString()}` : `عليه ${net.toLocaleString()}`;
             return (
@@ -780,12 +897,18 @@ export default function CustomerPaymentDialog({
                 <Row k="الإجمالي" v={Number(total).toLocaleString()} />
                 <Row k="المدفوع سابقًا" v={Number(paidBefore).toLocaleString()} />
                 {disc > 0 && <Row k="خصم إضافي" v={disc.toLocaleString()} />}
-                <Row k="مبلغ الدفعة" v={n.toLocaleString()} />
+                {creditAppliedOnInv > 0 && <Row k="من الرصيد الدائن" v={creditAppliedOnInv.toLocaleString()} />}
+                <Row k="مبلغ الدفعة النقدية" v={n.toLocaleString()} />
                 <Row k="طريقة الدفع" v={methodLabel(method)} />
-                <Row k="المتبقي بعد الحفظ" v={Math.max(0, rem - Math.min(n, rem)).toLocaleString()} highlight />
+                <Row k="المتبقي بعد الحفظ" v={Math.max(0, afterCredit - cashApplied).toLocaleString()} highlight />
                 {excess > 0 && (
                   <div className="rounded-md border border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 p-2 text-xs text-emerald-800 dark:text-emerald-200">
                     فائض <b>{excess.toLocaleString()}</b> سيُودَع كرصيد دائن للعميل
+                  </div>
+                )}
+                {creditAppliedOnInv > 0 && (
+                  <div className="rounded-md border border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 p-2 text-xs text-emerald-800 dark:text-emerald-200">
+                    سيُخصم <b>{creditAppliedOnInv.toLocaleString()}</b> من رصيد العميل الدائن (المتاح: {credit.toLocaleString()})
                   </div>
                 )}
                 <div className="text-[11px] text-muted-foreground pt-1">
@@ -794,6 +917,7 @@ export default function CustomerPaymentDialog({
               </div>
             );
           })()}
+
           <DialogFooter className="gap-2 flex-col sm:flex-row">
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving} className="min-h-[40px] w-full sm:w-auto">رجوع</Button>
             <Button onClick={handleSave} disabled={saving} data-testid="confirm-payment" className="min-h-[40px] w-full sm:w-auto">
