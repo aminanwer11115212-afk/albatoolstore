@@ -22,8 +22,8 @@ const PAGE_KEY_PREFIXES = [
 ];
 
 function lockKey(screenKey: string) {
-  // يُمَسَّح القفل أيضاً لكل مالك (مستخدم/جهاز) وكل شاشة.
-  return `${LOCK_PREFIX}:${getToolbarOwnerId()}:${screenKey}`;
+  // مفتاح مباشر لكل شاشة بدون owner — يوحّد القراءة/الكتابة والتحقق في الاختبارات.
+  return `${LOCK_PREFIX}:${screenKey}`;
 }
 
 /** يجمع كل مفاتيح localStorage التي تخصّ هذه الصفحة. */
