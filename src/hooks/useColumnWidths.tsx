@@ -157,14 +157,15 @@ export function useColumnWidths(
     const startX = (e as PointerEvent).clientX;
     const pointerId = (e as PointerEvent).pointerId;
     const handleEl = (e as PointerEvent).target as HTMLElement | null;
-    // Capture pointer so we keep getting events even if finger drifts off the handle.
     try {
       if (handleEl && typeof pointerId === "number" && (handleEl as any).setPointerCapture) {
         (handleEl as any).setPointerCapture(pointerId);
       }
     } catch { /* noop */ }
 
-    // Excel/Access-style: ONLY the dragged column changes.
+    // ضع علامة userResized فوراً عند بداية السحب — لا ننتظر onUp.
+    try { localStorage.setItem(storageKey + ":userResized", "1"); } catch { /* noop */ }
+
     const tableEl = (handleEl?.closest?.("table") as HTMLTableElement | null) ?? null;
     const headerCells = tableEl
       ? (Array.from(tableEl.querySelectorAll("thead th")) as HTMLTableCellElement[])
@@ -186,7 +187,6 @@ export function useColumnWidths(
 
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
-    // Block touch scroll/zoom while dragging on touch devices.
     const prevTouchAction = document.body.style.touchAction;
     document.body.style.touchAction = "none";
     document.body.setAttribute("data-resizing-col", String(index + 1));
@@ -208,14 +208,11 @@ export function useColumnWidths(
 
     const floor = minFor(index);
 
-    const beforeSnapshot: (number | null)[] = widthsRef.current.map((v, i) => {
-      if (typeof v === "number") return v;
-      const m = measured[i];
-      return typeof m === "number" ? m : null;
-    });
-
+    // اضبط قيمة العمود المسحوب فوراً على startW حتى وإن لم يتحرك المؤشر
+    // (يضمن أن العمود لن يبقى null بعد سحبة سريعة قبل أول move).
     setWidths((prev) => {
       const arr = prev.slice();
+      arr[index] = Math.max(floor, startW);
       for (let i = 0; i < arr.length; i++) {
         if (i === index) continue;
         if (typeof arr[i] !== "number" && typeof measured[i] === "number") {
@@ -225,45 +222,14 @@ export function useColumnWidths(
       return arr;
     });
 
-    const snapshotTablePin = () => {
-      if (!tableEl) return { pinned: false, width: "", inlineWidth: "" };
-      return {
-        pinned: tableEl.dataset.colwidthsPinned === "1",
-        width: tableEl.style.width || "",
-        inlineWidth: tableEl.getAttribute("style") || "",
-      };
-    };
-    const initialPin = snapshotTablePin();
-
-    try {
-      window.dispatchEvent(new CustomEvent("colwidths-debug-start", {
-        detail: { storageKey, index, startW, before: beforeSnapshot, initialPin },
-      }));
-    } catch { /* noop */ }
-
-    const onMove = (ev: PointerEvent) => {
-      const dx = ev.clientX - startX;
+    const onMove = (ev: PointerEvent | MouseEvent) => {
+      const dx = (ev as any).clientX - startX;
       const isRtl = document.documentElement.dir === "rtl" || document.body.dir === "rtl";
-      // On coarse pointers, apply a small dead-zone to prevent jitter, and a
-      // sub-pixel snap so dragging feels smoother on touch.
-      const isCoarse = (ev as any).pointerType === "touch" || (ev as any).pointerType === "pen";
       const raw = startW + (isRtl ? -dx : dx);
-      const next = Math.max(floor, Math.round(isCoarse ? raw : raw));
+      const next = Math.max(floor, Math.round(raw));
       setWidths((prev) => {
         const arr = prev.slice();
         arr[index] = next;
-        try {
-          const pin = snapshotTablePin();
-          window.dispatchEvent(new CustomEvent("colwidths-debug-move", {
-            detail: {
-              storageKey, index, dx, widths: arr.slice(),
-              tablePinned: pin.pinned,
-              tableWidth: pin.width,
-              pinChangedDuringDrag:
-                pin.pinned !== initialPin.pinned || pin.width !== initialPin.width,
-            },
-          }));
-        } catch { /* noop */ }
         return arr;
       });
     };
@@ -272,42 +238,26 @@ export function useColumnWidths(
       document.body.style.userSelect = "";
       document.body.style.touchAction = prevTouchAction;
       document.body.removeAttribute("data-resizing-col");
-      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointermove", onMove as EventListener);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("mousemove", onMove as EventListener);
+      window.removeEventListener("mouseup", onUp);
       try {
         if (handleEl && typeof pointerId === "number" && (handleEl as any).releasePointerCapture) {
           (handleEl as any).releasePointerCapture(pointerId);
         }
       } catch { /* noop */ }
 
-      const beforePinUp = snapshotTablePin();
-      try {
-        localStorage.setItem(storageKey + ":userResized", "1");
-      } catch { /* noop */ }
+      try { localStorage.setItem(storageKey + ":userResized", "1"); } catch { /* noop */ }
       pinTableWidth(widthsRef.current);
-      const afterPinUp = snapshotTablePin();
-      let expectedSum = 0;
-      for (let i = 0; i < widthsRef.current.length; i++) {
-        const v = widthsRef.current[i];
-        const m = measured[i];
-        expectedSum += typeof v === "number" ? v : (typeof m === "number" ? m : (defaults[i] as number) || 100);
-      }
-      try {
-        window.dispatchEvent(new CustomEvent("colwidths-debug-end", {
-          detail: {
-            storageKey, index, final: widthsRef.current.slice(),
-            initialPin,
-            beforePinUp,
-            afterPinUp,
-            expectedSum,
-          },
-        }));
-      } catch { /* noop */ }
     };
-    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointermove", onMove as EventListener);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
+    // دعم أحداث الماوس الكلاسيكية بجانب أحداث المؤشر (بيئات الاختبار).
+    window.addEventListener("mousemove", onMove as EventListener);
+    window.addEventListener("mouseup", onUp);
   }, [defaults, minFor, storageKey]);
 
   const reset = useCallback(() => {
