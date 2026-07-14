@@ -91,6 +91,7 @@ export function validateBankTransferPayment(opts: {
   if (!isAllowedBank(opts.account)) {
     return "البنك المختار غير مسموح به. يجب أن يكون: بنك فيصل أو بنك أم درمان أو بنك الخرطوم";
   }
-  // رقم العملية اختياري — يُسمح بالحفظ بدونه
+  const ref = typeof opts.referenceNo === "string" ? opts.referenceNo.trim() : "";
+  if (!ref) return "أدخل رقم العملية (مرجع التحويل)";
   return null;
 }
