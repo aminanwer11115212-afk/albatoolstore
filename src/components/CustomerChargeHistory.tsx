@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
-import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle } from "lucide-react";
+import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 /**
  * سجلّ شحن رصيد العميل — يُجمّع الحركات حسب `allocation->>group_id`.
