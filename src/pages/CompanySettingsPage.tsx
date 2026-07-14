@@ -685,7 +685,7 @@ function ThemeTab() {
 }
 
 function DangerZoneTab() {
-  const qc = (require("@tanstack/react-query") as typeof import("@tanstack/react-query")).useQueryClient();
+  const qc = useQueryClient();
   const [scope, setScope] = useState({
     invoices: false,
     quotes: false,
