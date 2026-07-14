@@ -4,7 +4,8 @@ import { useAppearance, type ThemeColor, type FontSize } from "@/hooks/useAppear
 import { toast } from "sonner";
 import { runOrQueue } from "@/lib/offlineQueue";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, Building, Receipt, Globe, Clock, Palette, Mail, Upload, Image, Phone, MapPin, FileText, Hash, Percent, DollarSign, Check, RotateCcw, Lock, Unlock, Columns3, Scissors } from "lucide-react";
+import { Settings, Building, Receipt, Globe, Clock, Palette, Mail, Upload, Image, Phone, MapPin, FileText, Hash, Percent, DollarSign, Check, RotateCcw, Lock, Unlock, Columns3, Scissors, AlertTriangle, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { lockAllPagesColumnWidths, unlockAllPagesColumnWidths, resetAllPagesColumnWidths } from "@/hooks/useColumnWidths";
 import { useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ const tabs = [
   { key: "theme", label: "المظهر", icon: <Palette size={16} />, path: "/settings/theme" },
   { key: "smtp", label: "SMTP", icon: <Mail size={16} />, path: "/settings/smtp" },
   { key: "columns", label: "أعمدة الجداول", icon: <Columns3 size={16} />, path: "/settings/columns" },
+  { key: "danger", label: "منطقة الخطر", icon: <AlertTriangle size={16} />, path: "/settings/danger" },
 ];
 
 export default function CompanySettingsPage() {
@@ -559,6 +561,9 @@ export default function CompanySettingsPage() {
         </Card>
       )}
 
+      {activeTab === "danger" && <DangerZoneTab />}
+
+
       <ImageCropDialog
         open={logoCropOpen}
         file={logoCropFile}
@@ -673,6 +678,119 @@ function ThemeTab() {
             <RotateCcw size={16} className="ml-1" /> إعادة التعيين
           </Button>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DangerZoneTab() {
+  const [scope, setScope] = useState({
+    invoices: false,
+    quotes: false,
+    purchases: false,
+    bank: false,
+    customers: false,
+  });
+  const [confirmText, setConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [lastResult, setLastResult] = useState<any>(null);
+
+  const anySelected = Object.values(scope).some(Boolean);
+  const canRun = anySelected && confirmText.trim() === "تصفير" && !busy;
+
+  const toggle = (k: keyof typeof scope) => setScope(s => ({ ...s, [k]: !s[k] }));
+
+  const items: { key: keyof typeof scope; label: string; hint: string }[] = [
+    { key: "invoices",  label: "الفواتير وبنودها ومرفقاتها ومراجعاتها", hint: "يحذف كل الفواتير والحركات المرتبطة بها" },
+    { key: "quotes",    label: "عروض الأسعار وبنودها ومرفقاتها",         hint: "يحذف كل عروض السعر" },
+    { key: "purchases", label: "أوامر الشراء ومدفوعات الموردين",         hint: "يحذف كل المشتريات ومدفوعات الموردين" },
+    { key: "bank",      label: "حركات البنك وتصفير أرصدة الحسابات",     hint: "يحذف كل transactions ويصفّر أرصدة الحسابات البنكية" },
+    { key: "customers", label: "تصفير أرصدة العملاء والموردين",           hint: "يعيد أرصدة العملاء والموردين إلى صفر" },
+  ];
+
+  const run = async () => {
+    if (!canRun) return;
+    if (!confirm("هل أنت متأكد تماماً؟ لا يمكن التراجع عن هذه العملية.")) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("admin_reset_transactional_data" as any, { _scope: scope });
+      if (error) throw error;
+      setLastResult(data);
+      toast.success("تم التصفير بنجاح — أُعيد حساب كل الأرصدة");
+      setConfirmText("");
+      setScope({ invoices: false, quotes: false, purchases: false, bank: false, customers: false });
+    } catch (e: any) {
+      toast.error(e?.message || "تعذّر التنفيذ — تأكد أن لديك صلاحية admin");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="border-destructive/40">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2 text-destructive">
+          <AlertTriangle size={18} /> منطقة الخطر — تصفير البيانات
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive leading-relaxed">
+          هذه العملية <b>لا يمكن التراجع عنها</b>. يُنصح بشدة بأخذ نسخة احتياطية (تصدير البيانات) قبل التنفيذ. متاحة فقط لمستخدمي admin.
+        </div>
+
+        <div className="space-y-2">
+          {items.map(it => (
+            <label
+              key={it.key}
+              className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-destructive/40 cursor-pointer transition-colors"
+            >
+              <Checkbox
+                checked={scope[it.key]}
+                onCheckedChange={() => toggle(it.key)}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-foreground">{it.label}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{it.hint}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm">للتأكيد اكتب كلمة <b className="text-destructive">تصفير</b> في الحقل:</Label>
+          <Input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="تصفير"
+            className="max-w-xs"
+            dir="rtl"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="destructive"
+            onClick={run}
+            disabled={!canRun}
+          >
+            <Trash2 size={16} className="ml-1" />
+            {busy ? "جارِ التنفيذ..." : "تنفيذ التصفير الآن"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => { setScope({ invoices: false, quotes: false, purchases: false, bank: false, customers: false }); setConfirmText(""); }}
+            disabled={busy}
+          >
+            إلغاء الاختيار
+          </Button>
+        </div>
+
+        {lastResult && (
+          <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto max-h-48" dir="ltr">
+{JSON.stringify(lastResult, null, 2)}
+          </pre>
+        )}
       </CardContent>
     </Card>
   );
