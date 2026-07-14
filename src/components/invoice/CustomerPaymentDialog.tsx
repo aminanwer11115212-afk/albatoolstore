@@ -253,7 +253,7 @@ export default function CustomerPaymentDialog({
     }
     if (n > 0 && !accountId) return toast.error("اختر الحساب");
     if (n > 0 && isBankPaymentMethod(method)) {
-      const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo });
+      const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo, requireReferenceNo: false });
       if (err) return toast.error(err);
     }
     setConfirmOpen(true);
