@@ -33,6 +33,21 @@ export default function CustomerStatementPage() {
 
   useEffect(() => { setActiveIdx(0); }, [search]);
 
+  // تحديث فوري عند حفظ فاتورة/تغيّر بيانات عميل في أي مكان بالتطبيق
+  const qc = useQueryClient();
+  useEffect(() => {
+    const refresh = () => {
+      qc.invalidateQueries({ queryKey: ["customer-statement"] });
+      qc.invalidateQueries({ queryKey: ["customer-transactions"] });
+    };
+    window.addEventListener("invoices:changed", refresh);
+    window.addEventListener("customers:changed", refresh);
+    return () => {
+      window.removeEventListener("invoices:changed", refresh);
+      window.removeEventListener("customers:changed", refresh);
+    };
+  }, [qc]);
+
   const pickCustomer = (c: any) => {
     setSelectedCustomerId(c.id);
     setSearch(c.name);
