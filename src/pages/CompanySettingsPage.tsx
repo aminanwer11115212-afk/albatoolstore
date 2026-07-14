@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
 import { Separator } from "@/components/ui/separator";
+import { useQueryClient } from "@tanstack/react-query";
 
 const tabs = [
   { key: "company", label: "الشركة", icon: <Building size={16} />, path: "/settings/company" },
