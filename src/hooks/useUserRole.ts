@@ -10,6 +10,10 @@ export interface StaffPermissions {
   add_customer?: boolean;
   view_customers?: boolean;
   view_products?: boolean;
+  /** تسجيل مبلغ عام في نافذة الدفعة (خارج المتبقي) */
+  record_payment?: boolean;
+  /** تطبيق خصم إضافي أثناء تسجيل الدفعة */
+  apply_discount?: boolean;
 }
 
 /**
