@@ -105,7 +105,13 @@ export async function deleteInvoiceWithStockRestore(
   if (typeof window !== "undefined") {
     try { window.dispatchEvent(new Event("products:changed")); } catch {}
     try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+    try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+    try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
   }
 
-  return { restoredStock, invoiceNumber: (inv as any).invoice_number ?? null };
+  return {
+    restoredStock,
+    invoiceNumber: (inv as any).invoice_number ?? null,
+    convertedToCredit,
+  };
 }
