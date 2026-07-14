@@ -66,7 +66,7 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   }>(null);
 
   const queryClient = useQueryClient();
-  const localCustomers = queryClient.getQueryData<any[]>(["customers"]) || [];
+  const localCustomers: any[] = queryClient.getQueryData(["customers"]) || [];
 
   const duplicateName = form.name.trim() 
     ? localCustomers.find(c => c.id !== form.id && c.name?.trim() === form.name.trim())
