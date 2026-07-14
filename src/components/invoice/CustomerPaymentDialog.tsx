@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import DiscountInput from "@/components/shared/DiscountInput";
+import { Pin } from "lucide-react";
 
 type Method = "cash" | "bank" | "card" | "mobile";
 
@@ -79,6 +80,9 @@ export default function CustomerPaymentDialog({
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [method, setMethod] = useState<Method>("bank");
   const [accountId, setAccountId] = useState<string>("");
+  const [pinnedAccountId, setPinnedAccountId] = useState<string>(() => {
+    try { return localStorage.getItem("lov:pinned-bank-account") || ""; } catch { return ""; }
+  });
   const [referenceNo, setReferenceNo] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [custBalance, setCustBalance] = useState<{ debt: number; credit: number } | null>(null);
@@ -120,7 +124,12 @@ export default function CustomerPaymentDialog({
     if (accountOptions.length === 0) return;
     const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
     if (!accountId) {
-      // فضّل حساب "أولاد جابر" افتراضياً للتحويلات البنكية
+      // 1) حساب مثبَّت من المستخدم يفوز دائماً
+      if (method === "bank" && pinnedAccountId) {
+        const pinned = accountOptions.find((a: any) => a.id === pinnedAccountId);
+        if (pinned) { setAccountId(pinned.id); return; }
+      }
+      // 2) حساب "أولاد جابر" افتراضياً للتحويلات البنكية
       const jaber = (accountOptions as any[]).find((a) => {
         const s = `${a.name || ""} ${a.bank_name || ""}`;
         return /اولاد\s*جابر|أولاد\s*جابر/.test(s);
@@ -138,7 +147,7 @@ export default function CustomerPaymentDialog({
     if (!accountOptions.find((a: any) => a.id === accountId)) {
       setAccountId(accountOptions[0]?.id || "");
     }
-  }, [accountOptions, method]); // eslint-disable-line
+  }, [accountOptions, method, pinnedAccountId]); // eslint-disable-line
 
   // احفظ الحساب المختار فور تغييره — لا ننتظر الحفظ لتثبيت الاختيار
   useEffect(() => {
@@ -363,7 +372,7 @@ export default function CustomerPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !saving && onOpenChange(v)}>
-      <DialogContent className="max-w-md" dir="rtl">
+      <DialogContent className="max-w-3xl w-[95vw]" dir="rtl">
         <DialogHeader>
           <DialogTitle>
             تسجيل دفعة على {invoiceNumber || "الفاتورة"}
@@ -371,26 +380,29 @@ export default function CustomerPaymentDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-2 py-2">
+        <div className="grid gap-3 py-2 md:grid-cols-2">
+
           {(() => {
             const debt = custBalance?.debt || 0;
             const credit = custBalance?.credit || 0;
             const net = debt - credit; // >0 عليه، <0 له
             const invoiceRemaining = remaining;
-            // الدين القديم = صافي حساب العميل - متبقي هذه الفاتورة (لا يقل عن 0)
             const previousDebt = !isPos ? Math.max(0, net - invoiceRemaining) : 0;
             const previousCredit = !isPos && net < -0.01 ? Math.abs(net) : 0;
             const disc = Math.max(0, Number(discount) || 0);
             const invoiceAfterDiscount = Math.max(0, invoiceRemaining - disc);
-            // المجموع المطلوب تسويته = متبقي الفاتورة + الدين القديم - الرصيد الدائن السابق
-            const combinedDue = Math.max(0, invoiceAfterDiscount + previousDebt - previousCredit);
+            const rawDue = invoiceAfterDiscount + previousDebt - previousCredit;
+            const combinedDue = Math.max(0, rawDue);
+            // إذا كان الرصيد الدائن السابق يفوق مجموع الفاتورة والدَّين القديم → العميل «له» بعد التسوية
+            const preSettleCredit = rawDue < -0.01 ? Math.abs(rawDue) : 0;
             const paid = Number(amount) || 0;
-            const afterPayment = combinedDue - paid; // >0 ناقص عليه، <0 زائد له، 0 مكتمل
-            const isSettled = Math.abs(afterPayment) < 0.01;
-            const isOver = afterPayment < -0.01;
+            const afterPayment = combinedDue - paid; // >0 ناقص، <0 زائد، 0 مكتمل
+            const isSettled = combinedDue < 0.01 && paid < 0.01 ? preSettleCredit < 0.01 : Math.abs(afterPayment) < 0.01;
+            const isOver = paid > 0 && afterPayment < -0.01;
+            const showAfter = paid > 0 || preSettleCredit > 0;
 
             return (
-              <>
+              <div className="flex flex-col gap-2">
                 {/* مربّع الحسابات المضغوط */}
                 <div className="rounded-md border bg-muted/30 p-2 text-[11px] space-y-1">
                   <div className="flex justify-between">
@@ -409,7 +421,9 @@ export default function CustomerPaymentDialog({
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">متبقي الفاتورة</span>
-                    <span className="font-bold tabular-nums text-destructive">{invoiceAfterDiscount.toLocaleString()}</span>
+                    <span className={`font-bold tabular-nums ${invoiceAfterDiscount > 0.01 ? "text-destructive" : ""}`}>
+                      {invoiceAfterDiscount.toLocaleString()}
+                    </span>
                   </div>
                   {previousDebt > 0.01 && (
                     <div className="flex justify-between border-t pt-1">
@@ -426,27 +440,40 @@ export default function CustomerPaymentDialog({
                   {(previousDebt > 0.01 || previousCredit > 0.01) && (
                     <div className="flex justify-between border-t pt-1">
                       <span className="text-muted-foreground">المطلوب سداده</span>
-                      <span className="font-bold tabular-nums text-destructive">{combinedDue.toLocaleString()}</span>
+                      {preSettleCredit > 0.01 ? (
+                        <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                          له {preSettleCredit.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className={`font-bold tabular-nums ${combinedDue > 0.01 ? "text-destructive" : "text-primary"}`}>
+                          {combinedDue.toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
 
                 {/* شريط الحساب بعد الدفع */}
-                {paid > 0 && (
+                {showAfter && (
                   <div
                     className={`rounded-md border p-2 text-center ${
                       isSettled
                         ? "border-primary/40 bg-primary/5 text-primary"
-                        : isOver
+                        : isOver || preSettleCredit > 0
                           ? "border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200"
                           : "border-destructive/40 bg-destructive/5 text-destructive"
                     }`}
                   >
                     {isSettled ? (
                       <div className="text-sm font-bold">مكتمل ✓</div>
+                    ) : preSettleCredit > 0 && paid < 0.01 ? (
+                      <>
+                        <div className="text-sm font-bold">+ له {preSettleCredit.toLocaleString()}</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">رصيد العميل الحالي — لا حاجة للدفع</div>
+                      </>
                     ) : isOver ? (
                       <>
-                        <div className="text-sm font-bold">+ له {Math.abs(afterPayment).toLocaleString()}</div>
+                        <div className="text-sm font-bold">+ له {(Math.abs(afterPayment) + preSettleCredit).toLocaleString()}</div>
                         <div className="text-[10px] opacity-80 mt-0.5">حساب العميل بعد الدفع</div>
                       </>
                     ) : (
@@ -468,9 +495,13 @@ export default function CustomerPaymentDialog({
                     + استخدام الرصيد الدائن ({credit.toLocaleString()})
                   </button>
                 )}
-              </>
+              </div>
             );
           })()}
+
+          {/* العمود الأيسر: نموذج الدفعة */}
+          <div className="grid gap-3 content-start">
+
 
 
           <div className="grid grid-cols-2 gap-3">
@@ -527,18 +558,43 @@ export default function CustomerPaymentDialog({
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1 gap-2">
               <Label>الحساب المستلم</Label>
-              {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
-                <button
-                  type="button"
-                  data-testid="retry-load-accounts"
-                  className="text-[11px] text-primary underline"
-                  onClick={() => { refetchAccounts(); }}
-                >
-                  إعادة المحاولة
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {method === "bank" && accountId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = pinnedAccountId === accountId ? "" : accountId;
+                      setPinnedAccountId(next);
+                      try {
+                        if (next) localStorage.setItem("lov:pinned-bank-account", next);
+                        else localStorage.removeItem("lov:pinned-bank-account");
+                      } catch {}
+                      toast.success(next ? "تم تثبيت الحساب المحوَّل له" : "تم إلغاء التثبيت");
+                    }}
+                    className={`inline-flex items-center gap-1 text-[11px] rounded-md border px-2 py-1 ${
+                      pinnedAccountId === accountId
+                        ? "border-amber-500/60 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                    title={pinnedAccountId === accountId ? "إلغاء تثبيت الحساب" : "تثبيت الحساب المحوَّل له كافتراضي دائم"}
+                  >
+                    {pinnedAccountId === accountId ? <Pin size={12} className="fill-current" /> : <Pin size={12} />}
+                    {pinnedAccountId === accountId ? "مثبَّت" : "تثبيت"}
+                  </button>
+                )}
+                {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
+                  <button
+                    type="button"
+                    data-testid="retry-load-accounts"
+                    className="text-[11px] text-primary underline"
+                    onClick={() => { refetchAccounts(); }}
+                  >
+                    إعادة المحاولة
+                  </button>
+                )}
+              </div>
             </div>
             {jaberAccount && accountId === jaberAccount.id ? (
               <div className="flex items-center gap-2">
@@ -572,12 +628,14 @@ export default function CustomerPaymentDialog({
                   {(accountOptions as any[]).map((a) => (
                     <SelectItem key={a.id} value={a.id}>
                       {a.name}{a.bank_name ? ` — ${a.bank_name}` : ""}
+                      {pinnedAccountId === a.id ? " 📌" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
           </div>
+
 
           {method === "bank" && (
             <div>
@@ -590,7 +648,9 @@ export default function CustomerPaymentDialog({
             <Label>ملاحظة</Label>
             <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+          </div>
         </div>
+
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>إلغاء</Button>
