@@ -323,70 +323,107 @@ export default function CustomerPaymentDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-3 py-2">
-          {!isPos && (() => {
+        <div className="grid gap-2 py-2">
+          {(() => {
             const debt = custBalance?.debt || 0;
             const credit = custBalance?.credit || 0;
-            const net = debt - credit;
-            // Positive net => customer owes us (عليه). Negative => we owe customer (له). Zero => خالص
-            const isSettled = Math.abs(net) < 0.01;
-            const isCredit = net < -0.01; // customer has money with us / we owe him → green
-            const label = isSettled ? "خالص" : isCredit ? "له" : "عليه";
-            const cls = isSettled
-              ? "border-border bg-muted/40 text-muted-foreground"
-              : isCredit
-                ? "border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200"
-                : "border-destructive/40 bg-destructive/5 text-destructive";
+            const net = debt - credit; // >0 عليه، <0 له
+            const invoiceRemaining = remaining;
+            // الدين القديم = صافي حساب العميل - متبقي هذه الفاتورة (لا يقل عن 0)
+            const previousDebt = !isPos ? Math.max(0, net - invoiceRemaining) : 0;
+            const previousCredit = !isPos && net < -0.01 ? Math.abs(net) : 0;
+            const disc = Math.max(0, Number(discount) || 0);
+            const invoiceAfterDiscount = Math.max(0, invoiceRemaining - disc);
+            // المجموع المطلوب تسويته = متبقي الفاتورة + الدين القديم - الرصيد الدائن السابق
+            const combinedDue = Math.max(0, invoiceAfterDiscount + previousDebt - previousCredit);
+            const paid = Number(amount) || 0;
+            const afterPayment = combinedDue - paid; // >0 ناقص عليه، <0 زائد له، 0 مكتمل
+            const isSettled = Math.abs(afterPayment) < 0.01;
+            const isOver = afterPayment < -0.01;
+
             return (
-              <div className={`rounded-md border p-2 text-xs flex items-center justify-between ${cls}`}>
-                <span>حساب العميل: <b>{label}{isSettled ? "" : ` ${Math.abs(net).toLocaleString()}`}</b></span>
-                {credit > 0.01 && !isSettled && isCredit && (
+              <>
+                {/* مربّع الحسابات المضغوط */}
+                <div className="rounded-md border bg-muted/30 p-2 text-[11px] space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">إجمالي الفاتورة</span>
+                    <span className="font-bold tabular-nums">{Number(total).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">المدفوع سابقاً</span>
+                    <span className="font-bold tabular-nums">{Number(paidBefore).toLocaleString()}</span>
+                  </div>
+                  {disc > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">خصم إضافي</span>
+                      <span className="font-bold tabular-nums">{disc.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">متبقي الفاتورة</span>
+                    <span className="font-bold tabular-nums text-destructive">{invoiceAfterDiscount.toLocaleString()}</span>
+                  </div>
+                  {previousDebt > 0.01 && (
+                    <div className="flex justify-between border-t pt-1">
+                      <span className="text-muted-foreground">حساب قديم عليه</span>
+                      <span className="font-bold tabular-nums text-destructive">+ {previousDebt.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {previousCredit > 0.01 && (
+                    <div className="flex justify-between border-t pt-1">
+                      <span className="text-muted-foreground">رصيد سابق له</span>
+                      <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">− {previousCredit.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {(previousDebt > 0.01 || previousCredit > 0.01) && (
+                    <div className="flex justify-between border-t pt-1">
+                      <span className="text-muted-foreground">المطلوب سداده</span>
+                      <span className="font-bold tabular-nums text-destructive">{combinedDue.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* شريط الحساب بعد الدفع */}
+                {paid > 0 && (
+                  <div
+                    className={`rounded-md border p-2 text-center ${
+                      isSettled
+                        ? "border-primary/40 bg-primary/5 text-primary"
+                        : isOver
+                          ? "border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200"
+                          : "border-destructive/40 bg-destructive/5 text-destructive"
+                    }`}
+                  >
+                    {isSettled ? (
+                      <div className="text-sm font-bold">مكتمل ✓</div>
+                    ) : isOver ? (
+                      <>
+                        <div className="text-sm font-bold">+ له {Math.abs(afterPayment).toLocaleString()}</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">حساب العميل بعد الدفع</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-sm font-bold">− عليه {afterPayment.toLocaleString()}</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">حساب العميل بعد الدفع</div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {credit > 0.01 && !isPos && (
                   <button
                     type="button"
-                    className="text-primary underline text-[11px]"
-                    onClick={() => setAmount(String(Math.min(remaining, Number(amount) || 0) + credit))}
+                    className="text-primary underline text-[11px] self-end"
+                    onClick={() => setAmount(String((Number(amount) || 0) + credit))}
                     title="أضف كامل الرصيد الدائن إلى المبلغ"
                   >
                     + استخدام الرصيد الدائن ({credit.toLocaleString()})
                   </button>
                 )}
-              </div>
+              </>
             );
           })()}
 
-          {/* ملخص أرقام الفاتورة + حساب العميل */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-md border bg-muted/40 p-2 text-center">
-              <div className="text-[11px] text-muted-foreground">الإجمالي</div>
-              <div className="font-bold">{Number(total).toLocaleString()}</div>
-            </div>
-            <div className="rounded-md border bg-muted/40 p-2 text-center">
-              <div className="text-[11px] text-muted-foreground">المدفوع</div>
-              <div className="font-bold">{Number(paidBefore).toLocaleString()}</div>
-            </div>
-            <div className="rounded-md border bg-muted/40 p-2 text-center">
-              <div className="text-[11px] text-muted-foreground">خصم إضافي</div>
-              <div className="font-bold">{(Number(discount) || 0).toLocaleString()}</div>
-            </div>
-            <div className="rounded-md border bg-destructive/5 border-destructive/40 p-2 text-center">
-              <div className="text-[11px] text-muted-foreground">المتبقي</div>
-              <div className="font-bold text-destructive">
-                {Math.max(0, remaining - (Number(discount) || 0)).toLocaleString()}
-              </div>
-            </div>
-          </div>
-
-          {(() => {
-            const n = Number(amount) || 0;
-            const rem = Math.max(0, remaining - (Number(discount) || 0));
-            const excess = Math.max(0, n - rem);
-            if (excess <= 0) return null;
-            return (
-              <div className="rounded-md border border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 p-2 text-xs text-emerald-800 dark:text-emerald-200">
-                فائض <b>{excess.toLocaleString()}</b> سيُودَع كرصيد دائن للعميل
-              </div>
-            );
-          })()}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
