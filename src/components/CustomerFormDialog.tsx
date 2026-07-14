@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, KeyboardEvent } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import InlineSearchSelect, { InlineSearchSelectHandle } from "@/components/InlineSearchSelect";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import DeleteGeoDialog from "@/components/shared/DeleteGeoDialog";

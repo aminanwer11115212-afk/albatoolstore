@@ -14,7 +14,7 @@ import { startsWithAny } from "@/utils/searchMatch";
 import { openWhatsApp } from "@/utils/whatsapp";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 
 type Customer = {
   id: string;
