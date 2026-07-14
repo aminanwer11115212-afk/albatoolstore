@@ -2900,7 +2900,9 @@ export type Database = {
       }
       is_workflow_automation_enabled: { Args: never; Returns: boolean }
       mark_overdue_invoices: { Args: never; Returns: number }
+      recalc_all_account_balances: { Args: never; Returns: Json }
       recalc_all_customer_balances: { Args: never; Returns: Json }
+      recalc_all_supplier_balances: { Args: never; Returns: Json }
       receive_purchase_stock_once: { Args: { _po_id: string }; Returns: Json }
       recompute_account_balance: {
         Args: { _account_id: string }

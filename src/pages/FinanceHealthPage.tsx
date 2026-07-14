@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { RefreshCw, CheckCircle2, XCircle, ChevronDown, ChevronUp, Activity } from "lucide-react";
+import { RefreshCw, CheckCircle2, XCircle, ChevronDown, ChevronUp, Activity, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { runAllInvariants, type FinanceHealthReport, type InvariantResult, type InvariantSeverity } from "@/lib/financeInvariants";
 
 const SEV_STYLE: Record<InvariantSeverity, { badge: string; label: string }> = {
@@ -212,9 +213,62 @@ export default function FinanceHealthPage() {
         )}
       </div>
 
+      <RepairTools onDone={run} />
+
       <p className="text-xs text-muted-foreground text-center">
-        الدفعة 3 القادمة: أدوات إصلاح آلية (recompute) واختبارات تكامل.
+        الأدوات أعلاه تُعيد حساب الأرصدة من مصدر الحقيقة (المعاملات/الفواتير) — لا تعدّل أي معاملة.
       </p>
+    </div>
+  );
+}
+
+function RepairTools({ onDone }: { onDone: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const call = async (label: string, fn: string) => {
+    if (!confirm(`تشغيل: ${label}؟\nستُعاد كتابة أعمدة الأرصدة فقط.`)) return;
+    setBusy(fn);
+    try {
+      const { data, error } = await supabase.rpc(fn as any);
+      if (error) throw error;
+      const n = (data as any)?.recalculated ?? "?";
+      toast.success(`${label}: أُعيد حساب ${n} سجل`);
+      onDone();
+    } catch (e: any) {
+      toast.error(`${label}: ${e?.message || "فشل التنفيذ"}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const tools = [
+    { fn: "recalc_all_account_balances",  label: "إعادة حساب أرصدة الحسابات",  desc: "يُعيد رصيد كل حساب من مجموع معاملاته." },
+    { fn: "recalc_all_customer_balances", label: "إعادة حساب أرصدة العملاء",   desc: "يُعيد رصيد كل عميل من فواتيره غير الملغاة (بدون كاش)." },
+    { fn: "recalc_all_supplier_balances", label: "إعادة حساب أرصدة الموردين",  desc: "يُعيد رصيد كل مورد من أوامر الشراء ودفعاته." },
+  ];
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-sm">
+      <div className="p-4 border-b border-border flex items-center gap-2">
+        <Wrench size={16} className="text-primary" />
+        <h3 className="font-semibold text-foreground">أدوات الإصلاح (Admin)</h3>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x md:divide-x-reverse divide-border">
+        {tools.map(t => (
+          <div key={t.fn} className="p-4 space-y-2">
+            <div className="text-sm font-semibold text-foreground">{t.label}</div>
+            <div className="text-xs text-muted-foreground min-h-[32px]">{t.desc}</div>
+            <button
+              onClick={() => call(t.label, t.fn)}
+              disabled={busy !== null}
+              className="w-full inline-flex items-center justify-center gap-2 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-60"
+            >
+              {busy === t.fn ? <RefreshCw size={14} className="animate-spin" /> : <Wrench size={14} />}
+              {busy === t.fn ? "جارٍ التنفيذ..." : "تشغيل"}
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
