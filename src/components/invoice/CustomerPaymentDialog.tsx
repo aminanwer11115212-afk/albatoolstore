@@ -673,9 +673,9 @@ export default function CustomerPaymentDialog({
         </div>
 
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>إلغاء</Button>
-          <Button onClick={requestSave} disabled={saving} data-testid="open-confirm-payment">
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving} className="min-h-[44px] w-full sm:w-auto">إلغاء</Button>
+          <Button onClick={requestSave} disabled={saving} data-testid="open-confirm-payment" className="min-h-[44px] w-full sm:w-auto">
             {saving ? "جارٍ الحفظ..." : "حفظ الدفعة"}
           </Button>
         </DialogFooter>
