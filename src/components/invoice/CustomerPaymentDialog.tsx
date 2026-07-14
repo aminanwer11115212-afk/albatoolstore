@@ -556,19 +556,19 @@ export default function CustomerPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !saving && onOpenChange(v)}>
       <DialogContent
-        className="max-w-xl w-[94vw] sm:w-[560px] max-h-[90vh] overflow-y-auto p-3 sm:p-4"
+        className="max-w-xl w-[calc(100vw-16px)] sm:w-[560px] max-h-[92vh] overflow-y-auto p-2 sm:p-4"
         dir="rtl"
         onKeyDown={onDialogKeyDown}
         data-pay-scope
       >
         <DialogHeader className="pb-1">
-          <DialogTitle className="text-sm sm:text-base leading-tight">
+          <DialogTitle className="text-[13px] sm:text-base leading-tight truncate">
             تسجيل دفعة على {invoiceNumber || "الفاتورة"}
             {customerName ? ` — ${customerName}` : ""}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-2 grid-cols-1 md:grid-cols-2 md:auto-rows-min">
+        <div className="grid gap-2 grid-cols-1 md:grid-cols-2 md:auto-rows-min min-w-0">
 
           {/* العمود الأيمن: ملخّص الحسابات */}
           {(() => {
