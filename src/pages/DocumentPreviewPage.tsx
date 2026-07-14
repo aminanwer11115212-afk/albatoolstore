@@ -425,6 +425,12 @@ export default function DocumentPreviewPage({ docType }: Props) {
         </div>
       </div>
 
+      {docType === "invoice" && invMeta && (
+        <div className="px-3 py-2 border-b border-border bg-muted/20">
+          <InvoicePaymentHistory invoiceId={invMeta.id} refreshKey={reloadTick} />
+        </div>
+      )}
+
       {invMeta && (
         <CustomerPaymentDialog
           open={payOpen}
