@@ -386,20 +386,22 @@ export default function CustomerPaymentDialog({
             const credit = custBalance?.credit || 0;
             const net = debt - credit; // >0 عليه، <0 له
             const invoiceRemaining = remaining;
-            // الدين القديم = صافي حساب العميل - متبقي هذه الفاتورة (لا يقل عن 0)
             const previousDebt = !isPos ? Math.max(0, net - invoiceRemaining) : 0;
             const previousCredit = !isPos && net < -0.01 ? Math.abs(net) : 0;
             const disc = Math.max(0, Number(discount) || 0);
             const invoiceAfterDiscount = Math.max(0, invoiceRemaining - disc);
-            // المجموع المطلوب تسويته = متبقي الفاتورة + الدين القديم - الرصيد الدائن السابق
-            const combinedDue = Math.max(0, invoiceAfterDiscount + previousDebt - previousCredit);
+            const rawDue = invoiceAfterDiscount + previousDebt - previousCredit;
+            const combinedDue = Math.max(0, rawDue);
+            // إذا كان الرصيد الدائن السابق يفوق مجموع الفاتورة والدَّين القديم → العميل «له» بعد التسوية
+            const preSettleCredit = rawDue < -0.01 ? Math.abs(rawDue) : 0;
             const paid = Number(amount) || 0;
-            const afterPayment = combinedDue - paid; // >0 ناقص عليه، <0 زائد له، 0 مكتمل
-            const isSettled = Math.abs(afterPayment) < 0.01;
-            const isOver = afterPayment < -0.01;
+            const afterPayment = combinedDue - paid; // >0 ناقص، <0 زائد، 0 مكتمل
+            const isSettled = combinedDue < 0.01 && paid < 0.01 ? preSettleCredit < 0.01 : Math.abs(afterPayment) < 0.01;
+            const isOver = paid > 0 && afterPayment < -0.01;
+            const showAfter = paid > 0 || preSettleCredit > 0;
 
             return (
-              <>
+              <div className="flex flex-col gap-2">
                 {/* مربّع الحسابات المضغوط */}
                 <div className="rounded-md border bg-muted/30 p-2 text-[11px] space-y-1">
                   <div className="flex justify-between">
@@ -418,7 +420,9 @@ export default function CustomerPaymentDialog({
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">متبقي الفاتورة</span>
-                    <span className="font-bold tabular-nums text-destructive">{invoiceAfterDiscount.toLocaleString()}</span>
+                    <span className={`font-bold tabular-nums ${invoiceAfterDiscount > 0.01 ? "text-destructive" : ""}`}>
+                      {invoiceAfterDiscount.toLocaleString()}
+                    </span>
                   </div>
                   {previousDebt > 0.01 && (
                     <div className="flex justify-between border-t pt-1">
@@ -435,27 +439,40 @@ export default function CustomerPaymentDialog({
                   {(previousDebt > 0.01 || previousCredit > 0.01) && (
                     <div className="flex justify-between border-t pt-1">
                       <span className="text-muted-foreground">المطلوب سداده</span>
-                      <span className="font-bold tabular-nums text-destructive">{combinedDue.toLocaleString()}</span>
+                      {preSettleCredit > 0.01 ? (
+                        <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                          له {preSettleCredit.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className={`font-bold tabular-nums ${combinedDue > 0.01 ? "text-destructive" : "text-primary"}`}>
+                          {combinedDue.toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
 
                 {/* شريط الحساب بعد الدفع */}
-                {paid > 0 && (
+                {showAfter && (
                   <div
                     className={`rounded-md border p-2 text-center ${
                       isSettled
                         ? "border-primary/40 bg-primary/5 text-primary"
-                        : isOver
+                        : isOver || preSettleCredit > 0
                           ? "border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200"
                           : "border-destructive/40 bg-destructive/5 text-destructive"
                     }`}
                   >
                     {isSettled ? (
                       <div className="text-sm font-bold">مكتمل ✓</div>
+                    ) : preSettleCredit > 0 && paid < 0.01 ? (
+                      <>
+                        <div className="text-sm font-bold">+ له {preSettleCredit.toLocaleString()}</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">رصيد العميل الحالي — لا حاجة للدفع</div>
+                      </>
                     ) : isOver ? (
                       <>
-                        <div className="text-sm font-bold">+ له {Math.abs(afterPayment).toLocaleString()}</div>
+                        <div className="text-sm font-bold">+ له {(Math.abs(afterPayment) + preSettleCredit).toLocaleString()}</div>
                         <div className="text-[10px] opacity-80 mt-0.5">حساب العميل بعد الدفع</div>
                       </>
                     ) : (
@@ -477,9 +494,13 @@ export default function CustomerPaymentDialog({
                     + استخدام الرصيد الدائن ({credit.toLocaleString()})
                   </button>
                 )}
-              </>
+              </div>
             );
           })()}
+
+          {/* العمود الأيسر: نموذج الدفعة */}
+          <div className="grid gap-3 content-start">
+
 
 
           <div className="grid grid-cols-2 gap-3">
