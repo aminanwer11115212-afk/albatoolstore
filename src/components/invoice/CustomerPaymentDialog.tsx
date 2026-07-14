@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccounts } from "@/hooks/useData";
@@ -34,7 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import DiscountInput from "@/components/shared/DiscountInput";
-import { Pin } from "lucide-react";
+import { Pin, PinOff } from "lucide-react";
 
 type Method = "cash" | "bank" | "card" | "mobile";
 
@@ -50,6 +50,20 @@ interface Props {
   /** فاتورة POS (كاش) — يمنع إنشاء transaction مرتبطة بالعميل */
   isPos?: boolean;
   onSaved?: () => void;
+}
+
+// مفاتيح التثبيت — عامة لكل الأجهزة (تفضيل مالي)، مع دعم المفتاح القديم
+const PIN_ACCOUNT_KEY = "lov:pinned-bank-account";
+const PIN_METHOD_KEY = "lov:pinned-payment-method";
+
+function readPin(key: string): string {
+  try { return localStorage.getItem(key) || ""; } catch { return ""; }
+}
+function writePin(key: string, val: string) {
+  try {
+    if (val) localStorage.setItem(key, val);
+    else localStorage.removeItem(key);
+  } catch { /* noop */ }
 }
 
 export default function CustomerPaymentDialog({
@@ -75,28 +89,39 @@ export default function CustomerPaymentDialog({
 
   const remaining = Math.max(0, Number(total || 0) - Number(paidBefore || 0));
 
+  // القيمة الابتدائية للطريقة — تُطبَّق تلقائياً إن كانت مثبَّتة
+  const initialMethod = (): Method => {
+    const m = readPin(PIN_METHOD_KEY) as Method;
+    return (m === "cash" || m === "bank" || m === "card" || m === "mobile") ? m : "bank";
+  };
+
   const [amount, setAmount] = useState<string>(remaining ? String(remaining) : "");
   const [discount, setDiscount] = useState<string>("");
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<Method>("bank");
+  const [method, setMethod] = useState<Method>(initialMethod);
   const [accountId, setAccountId] = useState<string>("");
-  const [pinnedAccountId, setPinnedAccountId] = useState<string>(() => {
-    try { return localStorage.getItem("lov:pinned-bank-account") || ""; } catch { return ""; }
-  });
+  const [pinnedAccountId, setPinnedAccountId] = useState<string>(() => readPin(PIN_ACCOUNT_KEY));
+  const [pinnedMethod, setPinnedMethod] = useState<string>(() => readPin(PIN_METHOD_KEY));
   const [referenceNo, setReferenceNo] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [custBalance, setCustBalance] = useState<{ debt: number; credit: number } | null>(null);
+
+  const amountRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (open) {
       setAmount(remaining ? String(remaining) : "");
       setDiscount("");
       setDate(new Date().toISOString().slice(0, 10));
-      setMethod("bank");
+      setMethod(initialMethod());
       setAccountId("");
       setReferenceNo("");
       setNotes("");
       setCustBalance(null);
+      // تركيز حقل المبلغ بعد الفتح
+      setTimeout(() => {
+        try { amountRef.current?.focus(); amountRef.current?.select(); } catch { /* noop */ }
+      }, 80);
       // اجلب رصيد العميل الحالي (له/عليه) عند فتح الحوار
       if (customerId && !isPos) {
         (async () => {
@@ -110,6 +135,7 @@ export default function CustomerPaymentDialog({
         })();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, remaining, customerId, isPos]);
 
   const accountOptions = useMemo(() => {
@@ -119,13 +145,13 @@ export default function CustomerPaymentDialog({
     return list;
   }, [accounts, method]);
 
-  // ثبّت الحساب البنكي المختار عبر إغلاق/فتح الحوار وتبديل الطريقة
+  // ثبّت الحساب المختار عبر إغلاق/فتح الحوار وتبديل الطريقة
   useEffect(() => {
     if (accountOptions.length === 0) return;
     const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
     if (!accountId) {
       // 1) حساب مثبَّت من المستخدم يفوز دائماً
-      if (method === "bank" && pinnedAccountId) {
+      if (pinnedAccountId) {
         const pinned = accountOptions.find((a: any) => a.id === pinnedAccountId);
         if (pinned) { setAccountId(pinned.id); return; }
       }
@@ -165,14 +191,45 @@ export default function CustomerPaymentDialog({
     }) || null;
   }, [accountOptions]);
 
+  // — تحكم كامل بالكيبورد داخل الحوار —
+  const focusNextField = useCallback((current: HTMLElement) => {
+    const scope = current.closest('[data-pay-scope]');
+    if (!scope) return;
+    const nodes = Array.from(
+      scope.querySelectorAll<HTMLElement>('[data-pay-field]:not([disabled]):not([aria-hidden="true"])')
+    ).filter((el) => el.offsetParent !== null);
+    const idx = nodes.indexOf(current);
+    const next = nodes[idx + 1];
+    if (next) { next.focus(); (next as any).select?.(); }
+  }, []);
+
+  const onDialogKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (saving) return;
+    // Ctrl/⌘+Enter → فتح تأكيد الحفظ
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      requestSave();
+      return;
+    }
+    // Enter داخل حقل نصي (ما عدا Textarea) → الحقل التالي
+    if (e.key === "Enter") {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "TEXTAREA") return;
+      if (t.hasAttribute("data-pay-field")) {
+        e.preventDefault();
+        focusNextField(t);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saving, focusNextField]);
+
   function requestSave() {
     const n = Number(amount) || 0;
     const disc = Math.max(0, Number(discount) || 0);
     if (n < 0 || (Number(discount) || 0) < 0) return toast.error("لا يُسمح بقيم سالبة");
     if (n <= 0 && disc <= 0) return toast.error("أدخل مبلغ أو خصم أكبر من صفر");
-    // صلاحيات: منع تسجيل مبلغ عام أو خصم لغير المخولين
     const rem = Math.max(0, remaining - disc);
-    const generalAmount = Math.max(0, n - rem); // أي فائض عن المتبقي = مبلغ عام (رصيد دائن)
+    const generalAmount = Math.max(0, n - rem);
     if (generalAmount > 0.01 && !canRecordPayment) {
       return toast.error("ليست لديك صلاحية تسجيل مبلغ عام (فائض/رصيد دائن) — تواصل مع المسؤول");
     }
@@ -200,7 +257,6 @@ export default function CustomerPaymentDialog({
     const toastId = "cust-pay-flow";
     toast.loading("جارٍ تسجيل الدفعة…", { id: toastId });
     try {
-      // 1) قراءة الفاتورة الحالية قبل تسجيل أي شيء
       const { data: inv, error: rErr } = await (supabase as any)
         .from("invoices")
         .select("total, paid_amount, discount, subtotal")
@@ -208,16 +264,13 @@ export default function CustomerPaymentDialog({
         .maybeSingle();
       if (rErr) throw rErr;
 
-      // الخصم الإضافي يُخفّض إجمالي الفاتورة قبل حساب التقسيم
       const nextDiscount = Math.max(0, Number(inv?.discount || 0) + disc);
       const nextTotal = Math.max(0, Number(inv?.total || 0) - disc);
       const alreadyPaid = Number(inv?.paid_amount || 0);
 
-      // 2) تقسيم الدفعة: applied يقفل الفاتورة، overpay يُسجَّل كرصيد دائن للعميل
       const split = splitPayment({ amount: n, total: nextTotal, alreadyPaid });
       const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: split.newPaid });
 
-      // 3) تسجيل transaction الدفعة (الجزء المطبَّق على الفاتورة)
       if (split.applied > 0) {
         const baseNote = notes || (invoiceNumber ? `دفعة على الفاتورة ${invoiceNumber}` : "دفعة من العميل");
         const description = referenceNo ? `${baseNote} — مرجع: ${referenceNo}` : baseNote;
@@ -235,8 +288,6 @@ export default function CustomerPaymentDialog({
         if (txErr) throw txErr;
       }
 
-      // 4) تسجيل الفائض كـ customer_credit (رصيد دائن على مستوى العميل — لا يُربط بفاتورة)
-      //    يلتقطه recompute_customer_balance تلقائياً ويُحدّث customers.credit_balance و net_balance.
       if (split.overpay > 0 && !isPos && customerId) {
         const { error: cErr } = await (supabase as any).from("transactions").insert({
           type: "income",
@@ -251,7 +302,6 @@ export default function CustomerPaymentDialog({
         if (cErr) throw cErr;
       }
 
-      // 5) تحديث الفاتورة
       const updatePayload: any = {
         paid_amount: split.newPaid,
         due_amount: split.newDue,
@@ -282,7 +332,6 @@ export default function CustomerPaymentDialog({
         { id: toastId },
       );
 
-      // سجل تدقيق داخل الفاتورة (يظهر في سجل الدفعات)
       try {
         const { data: authData } = await supabase.auth.getUser();
         const changedBy = authData?.user?.email || authData?.user?.id || "system";
@@ -333,7 +382,6 @@ export default function CustomerPaymentDialog({
       try { window.dispatchEvent(new Event("customers:changed")); } catch {}
       try { window.dispatchEvent(new Event("invoice-payments:changed")); } catch {}
 
-      // audit + balance-refresh toast (fire-and-forget so UX stays snappy)
       if (customerId && !isPos) {
         const prevNet = custBalance
           ? netBalanceOf({ balance: custBalance.debt, credit_balance: custBalance.credit })
@@ -369,23 +417,68 @@ export default function CustomerPaymentDialog({
     }
   }
 
+  // — أزرار التثبيت —
+  function togglePinAccount() {
+    if (!accountId) return;
+    if (pinnedAccountId === accountId) {
+      if (!window.confirm("سيتم إلغاء تثبيت الحساب الافتراضي. متابعة؟")) return;
+      setPinnedAccountId("");
+      writePin(PIN_ACCOUNT_KEY, "");
+      toast.success("تم إلغاء تثبيت الحساب");
+      return;
+    }
+    const currentName = selectedAccount?.name || "هذا الحساب";
+    const prevName = pinnedAccountId
+      ? (accountOptions as any[]).find((a) => a.id === pinnedAccountId)?.name
+      : null;
+    const msg = prevName
+      ? `سيتم تبديل الحساب المثبَّت من «${prevName}» إلى «${currentName}». متابعة؟`
+      : `سيتم تثبيت «${currentName}» كحساب افتراضي دائم. متابعة؟`;
+    if (!window.confirm(msg)) return;
+    setPinnedAccountId(accountId);
+    writePin(PIN_ACCOUNT_KEY, accountId);
+    toast.success("تم تثبيت الحساب");
+  }
+
+  function togglePinMethod() {
+    if (pinnedMethod === method) {
+      if (!window.confirm("سيتم إلغاء تثبيت طريقة الدفع الافتراضية. متابعة؟")) return;
+      setPinnedMethod("");
+      writePin(PIN_METHOD_KEY, "");
+      toast.success("تم إلغاء تثبيت طريقة الدفع");
+      return;
+    }
+    const msg = pinnedMethod
+      ? `سيتم تبديل الطريقة المثبَّتة إلى «${methodLabel(method)}». متابعة؟`
+      : `سيتم تثبيت «${methodLabel(method)}» كطريقة دفع افتراضية دائمة. متابعة؟`;
+    if (!window.confirm(msg)) return;
+    setPinnedMethod(method);
+    writePin(PIN_METHOD_KEY, method);
+    toast.success("تم تثبيت طريقة الدفع");
+  }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !saving && onOpenChange(v)}>
-      <DialogContent className="max-w-3xl w-[96vw] sm:w-[95vw] max-h-[92vh] overflow-y-auto p-3 sm:p-6" dir="rtl">
-        <DialogHeader>
+      <DialogContent
+        className="max-w-2xl w-[96vw] sm:w-[92vw] max-h-[92vh] overflow-y-auto p-3 sm:p-5"
+        dir="rtl"
+        onKeyDown={onDialogKeyDown}
+        data-pay-scope
+      >
+        <DialogHeader className="pb-1">
           <DialogTitle className="text-base sm:text-lg leading-tight">
             تسجيل دفعة على {invoiceNumber || "الفاتورة"}
             {customerName ? ` — ${customerName}` : ""}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-3 py-2 grid-cols-1 md:grid-cols-2">
+        <div className="grid gap-3 grid-cols-1 md:grid-cols-2 md:auto-rows-min">
 
+          {/* العمود الأيمن: ملخّص الحسابات */}
           {(() => {
             const debt = custBalance?.debt || 0;
             const credit = custBalance?.credit || 0;
-            const net = debt - credit; // >0 عليه، <0 له
+            const net = debt - credit;
             const invoiceRemaining = remaining;
             const previousDebt = !isPos ? Math.max(0, net - invoiceRemaining) : 0;
             const previousCredit = !isPos && net < -0.01 ? Math.abs(net) : 0;
@@ -393,17 +486,15 @@ export default function CustomerPaymentDialog({
             const invoiceAfterDiscount = Math.max(0, invoiceRemaining - disc);
             const rawDue = invoiceAfterDiscount + previousDebt - previousCredit;
             const combinedDue = Math.max(0, rawDue);
-            // إذا كان الرصيد الدائن السابق يفوق مجموع الفاتورة والدَّين القديم → العميل «له» بعد التسوية
             const preSettleCredit = rawDue < -0.01 ? Math.abs(rawDue) : 0;
             const paid = Number(amount) || 0;
-            const afterPayment = combinedDue - paid; // >0 ناقص، <0 زائد، 0 مكتمل
+            const afterPayment = combinedDue - paid;
             const isSettled = combinedDue < 0.01 && paid < 0.01 ? preSettleCredit < 0.01 : Math.abs(afterPayment) < 0.01;
             const isOver = paid > 0 && afterPayment < -0.01;
             const showAfter = paid > 0 || preSettleCredit > 0;
 
             return (
               <div className="flex flex-col gap-2">
-                {/* مربّع الحسابات المضغوط */}
                 <div className="rounded-md border bg-muted/30 p-2 text-[11px] space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">إجمالي الفاتورة</span>
@@ -453,7 +544,6 @@ export default function CustomerPaymentDialog({
                   )}
                 </div>
 
-                {/* شريط الحساب بعد الدفع */}
                 {showAfter && (
                   <div
                     className={`rounded-md border p-2 text-center ${
@@ -495,152 +585,138 @@ export default function CustomerPaymentDialog({
                     + استخدام الرصيد الدائن ({credit.toLocaleString()})
                   </button>
                 )}
+
+                {/* تلميح لوحة المفاتيح */}
+                <div className="text-[10px] text-muted-foreground rounded-md border border-dashed p-2 leading-relaxed">
+                  ⌨︎ <b>Enter</b>: التالي · <b>Ctrl+Enter</b>: حفظ · <b>Esc</b>: إغلاق
+                </div>
               </div>
             );
           })()}
 
           {/* العمود الأيسر: نموذج الدفعة */}
-          <div className="grid gap-3 content-start">
-
-
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>المبلغ المدفوع</Label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                value={amount}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "" || Number(v) >= 0) setAmount(v);
-                }}
-                placeholder="0.00"
-                disabled={!canRecordPayment && Number(amount || 0) > remaining}
-              />
-              {!canRecordPayment && (
-                <div className="text-[10px] text-muted-foreground mt-1">
-                  لا يمكنك تسجيل مبلغ يتجاوز المتبقي (صلاحية «تسجيل مبلغ عام» مطلوبة)
-                </div>
-              )}
-            </div>
-            <div>
-              {canApplyDiscount ? (
-                <DiscountInput
-                  label="خصم على الدفعة (اختياري)"
-                  value={Number(discount) || 0}
-                  grandBeforeDiscount={remaining}
-                  onChange={(v) => setDiscount(v && Number(v) >= 0 ? String(v) : "")}
-                  compact
+          <div className="grid gap-2 content-start">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">المبلغ المدفوع</Label>
+                <Input
+                  ref={amountRef}
+                  data-pay-field
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  value={amount}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || Number(v) >= 0) setAmount(v);
+                  }}
+                  placeholder="0.00"
+                  disabled={!canRecordPayment && Number(amount || 0) > remaining}
                 />
-              ) : (
-                <>
-                  <Label>خصم على الدفعة</Label>
-                  <Input value="—" readOnly disabled title="لا تملك صلاحية تطبيق خصم" />
+                {!canRecordPayment && (
                   <div className="text-[10px] text-muted-foreground mt-1">
-                    صلاحية «تطبيق خصم» غير مفعّلة لحسابك
+                    لا يمكنك تسجيل مبلغ يتجاوز المتبقي (صلاحية «تسجيل مبلغ عام» مطلوبة)
                   </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>التاريخ</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div>
-              <Label>طريقة الدفع</Label>
-              <Input value="تحويل بنكي" readOnly disabled />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1 gap-2">
-              <Label>الحساب المستلم</Label>
-              <div className="flex items-center gap-2 flex-wrap">
-                {method === "bank" && accountId && pinnedAccountId !== accountId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const currentName = selectedAccount?.name || "هذا الحساب";
-                      const prevName = pinnedAccountId
-                        ? (accountOptions as any[]).find((a) => a.id === pinnedAccountId)?.name
-                        : null;
-                      const msg = prevName
-                        ? `سيتم تبديل الحساب المثبَّت من «${prevName}» إلى «${currentName}» واستخدامه افتراضياً في كل مرة. متابعة؟`
-                        : `سيتم تثبيت «${currentName}» كحساب افتراضي دائم لتسجيل الدفعات. متابعة؟`;
-                      if (!window.confirm(msg)) return;
-                      setPinnedAccountId(accountId);
-                      try { localStorage.setItem("lov:pinned-bank-account", accountId); } catch {}
-                      toast.success("تم تثبيت الحساب المحوَّل له");
-                    }}
-                    className="inline-flex items-center gap-1 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted px-2 py-1 min-h-[32px]"
-                    title="تثبيت الحساب المحوَّل له كافتراضي دائم"
-                  >
-                    <Pin size={12} />
-                    تثبيت
-                  </button>
                 )}
-                {method === "bank" && accountId && pinnedAccountId === accountId && (
+              </div>
+              <div>
+                {canApplyDiscount ? (
+                  <DiscountInput
+                    label="خصم على الدفعة"
+                    value={Number(discount) || 0}
+                    grandBeforeDiscount={remaining}
+                    onChange={(v) => setDiscount(v && Number(v) >= 0 ? String(v) : "")}
+                    compact
+                  />
+                ) : (
                   <>
-                    <span className="inline-flex items-center gap-1 text-xs rounded-md border border-amber-500/60 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 px-2 py-1 min-h-[32px]">
-                      <Pin size={12} className="fill-current" />
-                      مثبَّت
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!window.confirm("سيتم إلغاء تثبيت الحساب الافتراضي. متابعة؟")) return;
-                        setPinnedAccountId("");
-                        try { localStorage.removeItem("lov:pinned-bank-account"); } catch {}
-                        toast.success("تم إلغاء التثبيت");
-                      }}
-                      className="inline-flex items-center gap-1 text-xs rounded-md border border-destructive/50 text-destructive hover:bg-destructive/10 px-2 py-1 min-h-[32px]"
-                      title="فك تثبيت الحساب وإزالة الإعداد المحفوظ"
-                    >
-                      فك التثبيت
-                    </button>
+                    <Label className="text-xs">خصم على الدفعة</Label>
+                    <Input value="—" readOnly disabled title="لا تملك صلاحية تطبيق خصم" />
+                    <div className="text-[10px] text-muted-foreground mt-1">
+                      صلاحية «تطبيق خصم» غير مفعّلة
+                    </div>
                   </>
                 )}
-                {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
-                  <button
-                    type="button"
-                    data-testid="retry-load-accounts"
-                    className="text-xs text-primary underline min-h-[32px]"
-                    onClick={() => { refetchAccounts(); }}
-                  >
-                    إعادة المحاولة
-                  </button>
-                )}
               </div>
             </div>
-            {jaberAccount && accountId === jaberAccount.id ? (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 rounded-md border border-primary/40 bg-primary/5 p-2 text-sm font-bold">
-                  {jaberAccount.name}{jaberAccount.bank_name ? ` — ${jaberAccount.bank_name}` : ""}
-                </div>
-                {accountOptions.length > 1 && (
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">التاريخ</Label>
+                <Input data-pay-field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-xs">طريقة الدفع</Label>
                   <button
                     type="button"
-                    className="text-[11px] text-primary underline"
-                    onClick={() => setAccountId("")}
+                    onClick={togglePinMethod}
+                    className={`inline-flex items-center gap-1 text-[10px] rounded border px-1.5 py-0.5 ${
+                      pinnedMethod === method
+                        ? "border-amber-500/60 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                    title={pinnedMethod === method ? "فك تثبيت طريقة الدفع" : "تثبيت طريقة الدفع"}
                   >
-                    تغيير
+                    {pinnedMethod === method ? <><Pin size={10} className="fill-current" />مثبَّتة</> : <><Pin size={10} />تثبيت</>}
                   </button>
-                )}
+                </div>
+                <Select value={method} onValueChange={(v) => setMethod(v as Method)}>
+                  <SelectTrigger data-pay-field>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bank">تحويل بنكي{pinnedMethod === "bank" ? " 📌" : ""}</SelectItem>
+                    <SelectItem value="cash">نقدي{pinnedMethod === "cash" ? " 📌" : ""}</SelectItem>
+                    <SelectItem value="card">بطاقة{pinnedMethod === "card" ? " 📌" : ""}</SelectItem>
+                    <SelectItem value="mobile">محفظة{pinnedMethod === "mobile" ? " 📌" : ""}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1 gap-2">
+                <Label className="text-xs">الحساب المستلم</Label>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {accountId && (
+                    <button
+                      type="button"
+                      onClick={togglePinAccount}
+                      className={`inline-flex items-center gap-1 text-[10px] rounded border px-1.5 py-0.5 ${
+                        pinnedAccountId === accountId
+                          ? "border-amber-500/60 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      }`}
+                      title={pinnedAccountId === accountId ? "فك تثبيت الحساب" : "تثبيت الحساب"}
+                    >
+                      {pinnedAccountId === accountId ? (
+                        <><PinOff size={10} /> فك التثبيت</>
+                      ) : (
+                        <><Pin size={10} /> تثبيت</>
+                      )}
+                    </button>
+                  )}
+                  {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
+                    <button
+                      type="button"
+                      data-testid="retry-load-accounts"
+                      className="text-[10px] text-primary underline"
+                      onClick={() => { refetchAccounts(); }}
+                    >
+                      إعادة المحاولة
+                    </button>
+                  )}
+                </div>
+              </div>
               <Select value={accountId} onValueChange={setAccountId}>
-                <SelectTrigger>
+                <SelectTrigger data-pay-field>
                   <SelectValue
                     placeholder={
                       accountsLoading
                         ? "جارٍ التحميل…"
                         : accountOptions.length === 0
-                          ? "لا يوجد حساب — أضف حسابًا بنكيًا"
+                          ? "لا يوجد حساب — أضف حسابًا"
                           : "اختر الحساب المستلم"
                     }
                   />
@@ -650,33 +726,31 @@ export default function CustomerPaymentDialog({
                     <SelectItem key={a.id} value={a.id}>
                       {a.name}{a.bank_name ? ` — ${a.bank_name}` : ""}
                       {pinnedAccountId === a.id ? " 📌" : ""}
+                      {jaberAccount && a.id === jaberAccount.id ? " ⭐" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
-          </div>
-
-
-          {method === "bank" && (
-            <div>
-              <Label>رقم العملية (اختياري)</Label>
-              <Input value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="مثلاً TRX-1234" />
             </div>
-          )}
 
-          <div>
-            <Label>ملاحظة</Label>
-            <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
+            {isBankPaymentMethod(method) && (
+              <div>
+                <Label className="text-xs">رقم العملية (اختياري)</Label>
+                <Input data-pay-field value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="مثلاً TRX-1234" />
+              </div>
+            )}
+
+            <div>
+              <Label className="text-xs">ملاحظة</Label>
+              <Textarea data-pay-field rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
           </div>
         </div>
 
-
-        <DialogFooter className="gap-2 flex-col sm:flex-row">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving} className="min-h-[44px] w-full sm:w-auto">إلغاء</Button>
-          <Button onClick={requestSave} disabled={saving} data-testid="open-confirm-payment" className="min-h-[44px] w-full sm:w-auto">
-            {saving ? "جارٍ الحفظ..." : "حفظ الدفعة"}
+        <DialogFooter className="gap-2 flex-col sm:flex-row pt-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving} className="min-h-[40px] w-full sm:w-auto">إلغاء</Button>
+          <Button onClick={requestSave} disabled={saving} data-testid="open-confirm-payment" className="min-h-[40px] w-full sm:w-auto">
+            {saving ? "جارٍ الحفظ..." : "حفظ الدفعة (Ctrl+Enter)"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -707,6 +781,7 @@ export default function CustomerPaymentDialog({
                 <Row k="المدفوع سابقًا" v={Number(paidBefore).toLocaleString()} />
                 {disc > 0 && <Row k="خصم إضافي" v={disc.toLocaleString()} />}
                 <Row k="مبلغ الدفعة" v={n.toLocaleString()} />
+                <Row k="طريقة الدفع" v={methodLabel(method)} />
                 <Row k="المتبقي بعد الحفظ" v={Math.max(0, rem - Math.min(n, rem)).toLocaleString()} highlight />
                 {excess > 0 && (
                   <div className="rounded-md border border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 p-2 text-xs text-emerald-800 dark:text-emerald-200">
@@ -720,8 +795,8 @@ export default function CustomerPaymentDialog({
             );
           })()}
           <DialogFooter className="gap-2 flex-col sm:flex-row">
-            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving} className="min-h-[44px] w-full sm:w-auto">رجوع</Button>
-            <Button onClick={handleSave} disabled={saving} data-testid="confirm-payment" className="min-h-[44px] w-full sm:w-auto">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving} className="min-h-[40px] w-full sm:w-auto">رجوع</Button>
+            <Button onClick={handleSave} disabled={saving} data-testid="confirm-payment" className="min-h-[40px] w-full sm:w-auto">
               {saving ? "جارٍ الحفظ..." : "تأكيد الحفظ"}
             </Button>
           </DialogFooter>
