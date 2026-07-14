@@ -188,6 +188,8 @@ export default function CustomerPaymentDialog({
 
     savingRef.current = true;
     setSaving(true);
+    const toastId = "cust-pay-flow";
+    toast.loading("جارٍ تسجيل الدفعة…", { id: toastId });
     try {
       // 1) قراءة الفاتورة الحالية قبل تسجيل أي شيء
       const { data: inv, error: rErr } = await (supabase as any)
