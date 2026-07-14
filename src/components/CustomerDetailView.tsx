@@ -183,6 +183,9 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
             >
               <Share2 size={16} /> تصدير للجهات
             </button>
+            <button onClick={() => setChargeOpen(true)} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1 hover:opacity-90">
+              <PlusCircle size={16} /> شحن رصيد
+            </button>
             <button onClick={() => onEdit(customer)} className="bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm flex items-center gap-1 hover:opacity-90">
               <Pencil size={16} /> تعديل
             </button>
@@ -191,6 +194,36 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
             </button>
           </div>
         </div>
+
+        {/* Balance hero — الصافي فقط وفق القاعدة: "له" لا تظهر إلا إذا اكتملت جميع الفواتير */}
+        <div className="relative px-6 pb-4">
+          <div className={`rounded-xl border p-4 flex items-center justify-between flex-wrap gap-3 ${
+            net > 0 ? "bg-destructive/10 border-destructive/30" :
+            net < 0 ? "bg-emerald-500/10 border-emerald-500/30" :
+            "bg-muted border-border"
+          }`}>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">صافي الحساب</div>
+              <div className={`text-2xl md:text-3xl font-extrabold tabular-nums ${
+                net > 0 ? "text-destructive" : net < 0 ? "text-emerald-600" : "text-foreground"
+              }`}>
+                {net > 0 ? "عليه " : net < 0 ? "له " : "مسوّى"}
+                {Math.abs(net) > 0 && Math.abs(net).toLocaleString()}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                {net > 0
+                  ? "لدى العميل فواتير غير مسدَّدة — أي رصيد يُشحن سيُخفّض هذا المبلغ أولاً"
+                  : net < 0
+                  ? "كل الفواتير مسدَّدة — هذا رصيد فائض للعميل لدينا"
+                  : "لا يوجد مديونية"}
+              </div>
+            </div>
+            <div className="min-w-[280px] md:min-w-[360px]">
+              <CustomerAccountSummary customer={balSource} size="md" />
+            </div>
+          </div>
+        </div>
+
 
         {/* Stats strip */}
         <div className="relative grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 px-6 pb-6">
