@@ -24,6 +24,8 @@ import GeoStructurePanel from "@/components/customers/GeoStructurePanel";
 import CustomerLogisticsTable from "@/components/customers/CustomerLogisticsTable";
 import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDialog";
 import ContactPickerButton from "@/components/shared/ContactPickerButton";
+import PhonePickerDialog from "@/components/customer/PhonePickerDialog";
+import QuickAddTransporterDialog from "@/components/dispatch/QuickAddTransporterDialog";
 import { normalizePhoneInput } from "@/utils/phoneNormalize";
 const emptyForm = { name: "", phone: "", address: "", notes: "", city: "", region_id: "" as string | null | "", state_id: "" as string | null | "", locality_id: "" as string | null | "", city_id: "" as string | null | "" };
 
