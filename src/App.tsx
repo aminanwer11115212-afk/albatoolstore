@@ -135,6 +135,7 @@ const StaffListPage = lazy(() => import("./pages/staff/StaffListPage"));
 const StaffCustomersPage = lazy(() => import("./pages/staff/StaffCustomersPage"));
 const StaffProfilePage = lazy(() => import("./pages/staff/StaffProfilePage"));
 const StaffMyRecordsPage = lazy(() => import("./pages/staff/StaffMyRecordsPage"));
+const OfflineQueuePage = lazy(() => import("./pages/OfflineQueuePage"));
 
 const isAuthOrNetworkError = (err: any) => {
   const msg = String(err?.message || err || "").toLowerCase();
