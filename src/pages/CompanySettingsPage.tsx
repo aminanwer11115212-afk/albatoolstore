@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
 import { Separator } from "@/components/ui/separator";
+import { useQueryClient } from "@tanstack/react-query";
 
 const tabs = [
   { key: "company", label: "الشركة", icon: <Building size={16} />, path: "/settings/company" },
@@ -684,6 +685,7 @@ function ThemeTab() {
 }
 
 function DangerZoneTab() {
+  const qc = useQueryClient();
   const [scope, setScope] = useState({
     invoices: false,
     quotes: false,
@@ -716,6 +718,15 @@ function DangerZoneTab() {
       const { data, error } = await supabase.rpc("admin_reset_transactional_data" as any, { _scope: scope });
       if (error) throw error;
       setLastResult(data);
+      // بعد التصفير: بطّل كل كاش الجداول المتأثرة كي تُظهر الواجهة الحالة الجديدة فوراً.
+      [
+        "invoices","invoices-full","invoices-with-customers",
+        "quotes","quotes-full","quotes-with-customers",
+        "purchase_orders","purchase-orders",
+        "transactions","transactionsWithAccounts",
+        "accounts","customers","suppliers",
+        "customer_balance_stats","account_balance","supplier_balance",
+      ].forEach(k => qc.invalidateQueries({ queryKey: [k] }));
       toast.success("تم التصفير بنجاح — أُعيد حساب كل الأرصدة");
       setConfirmText("");
       setScope({ invoices: false, quotes: false, purchases: false, bank: false, customers: false });
