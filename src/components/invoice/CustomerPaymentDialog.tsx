@@ -71,7 +71,7 @@ export default function CustomerPaymentDialog({
   const [amount, setAmount] = useState<string>(remaining ? String(remaining) : "");
   const [discount, setDiscount] = useState<string>("");
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<Method>("cash");
+  const [method, setMethod] = useState<Method>("bank");
   const [accountId, setAccountId] = useState<string>("");
   const [referenceNo, setReferenceNo] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
@@ -82,7 +82,7 @@ export default function CustomerPaymentDialog({
       setAmount(remaining ? String(remaining) : "");
       setDiscount("");
       setDate(new Date().toISOString().slice(0, 10));
-      setMethod("cash");
+      setMethod("bank");
       setAccountId("");
       setReferenceNo("");
       setNotes("");
@@ -114,6 +114,12 @@ export default function CustomerPaymentDialog({
     if (accountOptions.length === 0) return;
     const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
     if (!accountId) {
+      // فضّل حساب "أولاد جابر" افتراضياً للتحويلات البنكية
+      const jaber = (accountOptions as any[]).find((a) => {
+        const s = `${a.name || ""} ${a.bank_name || ""}`;
+        return /اولاد\s*جابر|أولاد\s*جابر/.test(s);
+      });
+      if (method === "bank" && jaber) { setAccountId(jaber.id); return; }
       try {
         const last = localStorage.getItem(storageKey);
         const match = accountOptions.find((a: any) => a.id === last);
@@ -289,34 +295,62 @@ export default function CustomerPaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-3 py-2">
-          {custBalance && (custBalance.debt > 0.01 || custBalance.credit > 0.01) && (() => {
-            const net = custBalance.debt - custBalance.credit;
-            const label = net > 0.01 ? "عليه" : net < -0.01 ? "له" : "خالص";
-            const color = net > 0.01 ? "text-destructive" : net < -0.01 ? "text-emerald-600" : "";
+          {!isPos && (() => {
+            const debt = custBalance?.debt || 0;
+            const credit = custBalance?.credit || 0;
+            const net = debt - credit;
+            // Positive net => customer owes us (عليه). Negative => we owe customer (له). Zero => خالص
+            const isSettled = Math.abs(net) < 0.01;
+            const isCredit = net < -0.01; // customer has money with us / we owe him → green
+            const label = isSettled ? "خالص" : isCredit ? "له" : "عليه";
+            const cls = isSettled
+              ? "border-border bg-muted/40 text-muted-foreground"
+              : isCredit
+                ? "border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200"
+                : "border-destructive/40 bg-destructive/5 text-destructive";
             return (
-              <div className="rounded-md border border-dashed border-border p-2 text-xs flex items-center justify-between bg-muted/30">
-                <span>حساب العميل: <b className={color}>{label} {Math.abs(net).toLocaleString()}</b></span>
-                {custBalance.credit > 0.01 && (
+              <div className={`rounded-md border p-2 text-xs flex items-center justify-between ${cls}`}>
+                <span>حساب العميل: <b>{label}{isSettled ? "" : ` ${Math.abs(net).toLocaleString()}`}</b></span>
+                {credit > 0.01 && !isSettled && isCredit && (
                   <button
                     type="button"
                     className="text-primary underline text-[11px]"
-                    onClick={() => setAmount(String(Math.min(remaining, Number(amount) || 0) + custBalance.credit))}
+                    onClick={() => setAmount(String(Math.min(remaining, Number(amount) || 0) + credit))}
                     title="أضف كامل الرصيد الدائن إلى المبلغ"
                   >
-                    + استخدام الرصيد الدائن ({custBalance.credit.toLocaleString()})
+                    + استخدام الرصيد الدائن ({credit.toLocaleString()})
                   </button>
                 )}
               </div>
             );
           })()}
-          <div className="rounded-md bg-muted/50 p-2 text-xs flex justify-between">
-            <span>الإجمالي: <b>{Number(total).toLocaleString()}</b></span>
-            <span>المدفوع سابقاً: <b>{Number(paidBefore).toLocaleString()}</b></span>
-            <span className="text-destructive">المتبقي: <b>{remaining.toLocaleString()}</b></span>
+
+          {/* ملخص أرقام الفاتورة + حساب العميل */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-md border bg-muted/40 p-2 text-center">
+              <div className="text-[11px] text-muted-foreground">الإجمالي</div>
+              <div className="font-bold">{Number(total).toLocaleString()}</div>
+            </div>
+            <div className="rounded-md border bg-muted/40 p-2 text-center">
+              <div className="text-[11px] text-muted-foreground">المدفوع</div>
+              <div className="font-bold">{Number(paidBefore).toLocaleString()}</div>
+            </div>
+            <div className="rounded-md border bg-muted/40 p-2 text-center">
+              <div className="text-[11px] text-muted-foreground">خصم إضافي</div>
+              <div className="font-bold">{(Number(discount) || 0).toLocaleString()}</div>
+            </div>
+            <div className="rounded-md border bg-destructive/5 border-destructive/40 p-2 text-center">
+              <div className="text-[11px] text-muted-foreground">المتبقي</div>
+              <div className="font-bold text-destructive">
+                {Math.max(0, remaining - (Number(discount) || 0)).toLocaleString()}
+              </div>
+            </div>
           </div>
+
           {(() => {
             const n = Number(amount) || 0;
-            const excess = Math.max(0, n - remaining);
+            const rem = Math.max(0, remaining - (Number(discount) || 0));
+            const excess = Math.max(0, n - rem);
             if (excess <= 0) return null;
             return (
               <div className="rounded-md border border-emerald-600/40 bg-emerald-50/60 dark:bg-emerald-950/30 p-2 text-xs text-emerald-800 dark:text-emerald-200">
@@ -338,7 +372,7 @@ export default function CustomerPaymentDialog({
             </div>
             <div>
               <DiscountInput
-                label="خصم إضافي (اختياري)"
+                label="خصم على الدفعة (اختياري)"
                 value={Number(discount) || 0}
                 grandBeforeDiscount={remaining}
                 onChange={(v) => setDiscount(v ? String(v) : "")}
@@ -354,15 +388,7 @@ export default function CustomerPaymentDialog({
             </div>
             <div>
               <Label>طريقة الدفع</Label>
-              <Select value={method} onValueChange={(v) => setMethod(v as Method)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">نقدي</SelectItem>
-                  <SelectItem value="bank">تحويل بنكي</SelectItem>
-                  <SelectItem value="mobile">محفظة</SelectItem>
-                  <SelectItem value="card">بطاقة</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input value="تحويل بنكي" readOnly disabled />
             </div>
           </div>
 
