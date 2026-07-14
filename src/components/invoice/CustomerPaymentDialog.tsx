@@ -560,35 +560,56 @@ export default function CustomerPaymentDialog({
           <div>
             <div className="flex items-center justify-between mb-1 gap-2">
               <Label>الحساب المستلم</Label>
-              <div className="flex items-center gap-2">
-                {method === "bank" && accountId && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {method === "bank" && accountId && pinnedAccountId !== accountId && (
                   <button
                     type="button"
                     onClick={() => {
-                      const next = pinnedAccountId === accountId ? "" : accountId;
-                      setPinnedAccountId(next);
-                      try {
-                        if (next) localStorage.setItem("lov:pinned-bank-account", next);
-                        else localStorage.removeItem("lov:pinned-bank-account");
-                      } catch {}
-                      toast.success(next ? "تم تثبيت الحساب المحوَّل له" : "تم إلغاء التثبيت");
+                      const currentName = selectedAccount?.name || "هذا الحساب";
+                      const prevName = pinnedAccountId
+                        ? (accountOptions as any[]).find((a) => a.id === pinnedAccountId)?.name
+                        : null;
+                      const msg = prevName
+                        ? `سيتم تبديل الحساب المثبَّت من «${prevName}» إلى «${currentName}» واستخدامه افتراضياً في كل مرة. متابعة؟`
+                        : `سيتم تثبيت «${currentName}» كحساب افتراضي دائم لتسجيل الدفعات. متابعة؟`;
+                      if (!window.confirm(msg)) return;
+                      setPinnedAccountId(accountId);
+                      try { localStorage.setItem("lov:pinned-bank-account", accountId); } catch {}
+                      toast.success("تم تثبيت الحساب المحوَّل له");
                     }}
-                    className={`inline-flex items-center gap-1 text-[11px] rounded-md border px-2 py-1 ${
-                      pinnedAccountId === accountId
-                        ? "border-amber-500/60 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-                        : "border-border text-muted-foreground hover:bg-muted"
-                    }`}
-                    title={pinnedAccountId === accountId ? "إلغاء تثبيت الحساب" : "تثبيت الحساب المحوَّل له كافتراضي دائم"}
+                    className="inline-flex items-center gap-1 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted px-2 py-1 min-h-[32px]"
+                    title="تثبيت الحساب المحوَّل له كافتراضي دائم"
                   >
-                    {pinnedAccountId === accountId ? <Pin size={12} className="fill-current" /> : <Pin size={12} />}
-                    {pinnedAccountId === accountId ? "مثبَّت" : "تثبيت"}
+                    <Pin size={12} />
+                    تثبيت
                   </button>
+                )}
+                {method === "bank" && accountId && pinnedAccountId === accountId && (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-xs rounded-md border border-amber-500/60 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 px-2 py-1 min-h-[32px]">
+                      <Pin size={12} className="fill-current" />
+                      مثبَّت
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!window.confirm("سيتم إلغاء تثبيت الحساب الافتراضي. متابعة؟")) return;
+                        setPinnedAccountId("");
+                        try { localStorage.removeItem("lov:pinned-bank-account"); } catch {}
+                        toast.success("تم إلغاء التثبيت");
+                      }}
+                      className="inline-flex items-center gap-1 text-xs rounded-md border border-destructive/50 text-destructive hover:bg-destructive/10 px-2 py-1 min-h-[32px]"
+                      title="فك تثبيت الحساب وإزالة الإعداد المحفوظ"
+                    >
+                      فك التثبيت
+                    </button>
+                  </>
                 )}
                 {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
                   <button
                     type="button"
                     data-testid="retry-load-accounts"
-                    className="text-[11px] text-primary underline"
+                    className="text-xs text-primary underline min-h-[32px]"
                     onClick={() => { refetchAccounts(); }}
                   >
                     إعادة المحاولة
