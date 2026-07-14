@@ -86,6 +86,8 @@ export default function CustomerPaymentDialog({
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [ackAdjustments, setAckAdjustments] = useState(false);
+  useEffect(() => { if (confirmOpen) setAckAdjustments(false); }, [confirmOpen]);
 
   const remaining = Math.max(0, Number(total || 0) - Number(paidBefore || 0));
 
@@ -975,12 +977,38 @@ export default function CustomerPaymentDialog({
             );
           })()}
 
-          <DialogFooter className="gap-2 flex-col sm:flex-row">
-            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving} className="min-h-[40px] w-full sm:w-auto">رجوع</Button>
-            <Button onClick={handleSave} disabled={saving} data-testid="confirm-payment" className="min-h-[40px] w-full sm:w-auto">
-              {saving ? "جارٍ الحفظ..." : "تأكيد الحفظ"}
-            </Button>
-          </DialogFooter>
+          {(() => {
+            const disc = Math.max(0, Number(discount) || 0);
+            const credit = custBalance?.credit || 0;
+            const cu = Math.min(Math.max(0, Number(creditUse) || 0), credit);
+            const needsAck = disc > 0 || cu > 0;
+            return (
+              <>
+                {needsAck && (
+                  <label className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-50/60 dark:bg-amber-950/30 p-2 text-[12px] text-amber-900 dark:text-amber-100 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={ackAdjustments}
+                      onChange={(e) => setAckAdjustments(e.target.checked)}
+                      className="mt-0.5 shrink-0"
+                      data-testid="ack-adjustments"
+                    />
+                    <span>
+                      أؤكّد التسويات:
+                      {disc > 0 ? ` خصم إضافي ${disc.toLocaleString()} · ` : " "}
+                      {cu > 0 ? `خصم من الرصيد الدائن ${cu.toLocaleString()}` : ""}
+                    </span>
+                  </label>
+                )}
+                <DialogFooter className="gap-2 flex-col sm:flex-row">
+                  <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving} className="min-h-[40px] w-full sm:w-auto">رجوع</Button>
+                  <Button onClick={handleSave} disabled={saving || (needsAck && !ackAdjustments)} data-testid="confirm-payment" className="min-h-[40px] w-full sm:w-auto">
+                    {saving ? "جارٍ التحديث…" : "تأكيد الحفظ"}
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </Dialog>
