@@ -25,6 +25,15 @@ type Props = {
 };
 
 export default function QuickAddTransporterDialog({ open, onOpenChange, onCreated, initialName }: Props) {
+  // تجنّب تشغيل الـ hooks الداخلية (useQuery داخل useDestinations) عند إغلاق الحوار
+  // كي لا نطالب المستهلكين باستدعاء الحوار داخل QueryClientProvider دائماً.
+  if (!open) {
+    return null as any;
+  }
+  return <QuickAddTransporterDialogInner open={open} onOpenChange={onOpenChange} onCreated={onCreated} initialName={initialName} />;
+}
+
+function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initialName }: Props) {
   const qc = useQueryClient();
   const { data: destinations } = useDestinations();
   const [name, setName] = useState(initialName || "");
