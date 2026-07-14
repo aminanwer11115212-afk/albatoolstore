@@ -46,6 +46,8 @@ import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
 import { useUserRole } from "@/hooks/useUserRole";
 
 import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
+import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
+import InvoicePaymentHistory from "@/components/invoice/InvoicePaymentHistory";
 import PackagingDialog from "@/components/packaging/PackagingDialog";
 import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDialog";
 import TransportDialog from "@/components/transport/TransportDialog";
