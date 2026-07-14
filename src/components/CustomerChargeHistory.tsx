@@ -311,6 +311,18 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
               <div className="tabular-nums">الإجمالي: <span className="font-bold text-foreground">{fmt(g.total)}</span></div>
               {g.allocated > 0.01 && (<div className="tabular-nums text-emerald-600">سُدِّد: <span className="font-bold">{fmt(g.allocated)}</span></div>)}
               {g.surplus > 0.01 && (<div className="tabular-nums text-primary">فائض: <span className="font-bold">{fmt(g.surplus)}</span></div>)}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => handleReverseGroup(g)}
+                disabled={reversingGroupId === g.groupId}
+                data-testid="reverse-charge-btn"
+                title="إلغاء هذه الشحنة وإعادة الأرصدة"
+              >
+                {reversingGroupId === g.groupId ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                إلغاء الشحنة
+              </Button>
             </div>
           </div>
 
