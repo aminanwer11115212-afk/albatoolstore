@@ -162,11 +162,8 @@ export function useQuickRowWidths(storageKey: string, length: number) {
             parts.push(`minmax(0,${b})`);
           }
         } else {
-          if (frMatch) {
-            parts.push(`minmax(0,${b})`);
-          } else {
-            parts.push(b);
-          }
+          // extra == 0 → لا نلفّ في minmax، نبقي التعبير كما هو (test contract).
+          parts.push(b);
         }
       }
       return parts.join(" ");
