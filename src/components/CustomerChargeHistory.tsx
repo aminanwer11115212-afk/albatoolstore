@@ -1,46 +1,54 @@
 import { useMemo, useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Link } from "react-router-dom";
-import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle, Download, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle, Download, AlertTriangle, CheckCircle2, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { computeReconciliation, sortGroups, type SortKey } from "@/lib/chargeReconciliation";
 
 const PAGE_SIZE = 10;
+const LS_KEY = (cid: string) => `albatool.chargeHistory.filters.${cid}`;
 
 interface ChargeItem {
-  invoice_id?: string;
-  invoice_number?: string;
-  invoice_date?: string;
-  invoice_total: number;
-  applied: number;
-  paid_before: number;
-  paid_after: number;
-  remaining_before: number;
-  remaining_after: number;
+  invoice_id?: string; invoice_number?: string; invoice_date?: string;
+  invoice_total: number; applied: number;
+  paid_before: number; paid_after: number;
+  remaining_before: number; remaining_after: number;
   new_status?: string;
 }
-
 interface ChargeGroup {
-  groupId: string;
-  date: string;
-  created_at: string;
-  method: string | null;
-  accountName?: string;
-  bankName?: string;
-  description?: string;
-  items: ChargeItem[];
-  surplus: number;
-  allocated: number;
-  total: number;
+  groupId: string; date: string; created_at: string; method: string | null;
+  accountName?: string; bankName?: string; description?: string;
+  items: ChargeItem[]; surplus: number; allocated: number; total: number;
+}
+
+function readInitial(customerId: string, sp: URLSearchParams) {
+  const fromUrl = {
+    from: sp.get("chFrom") || "",
+    to: sp.get("chTo") || "",
+    method: sp.get("chMethod") || "all",
+    sort: (sp.get("chSort") as SortKey) || "date_desc",
+  };
+  if (fromUrl.from || fromUrl.to || fromUrl.method !== "all" || fromUrl.sort !== "date_desc") return fromUrl;
+  try {
+    const raw = localStorage.getItem(LS_KEY(customerId));
+    if (raw) return { ...fromUrl, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return fromUrl;
 }
 
 export default function CustomerChargeHistory({ customerId }: { customerId: string }) {
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [methodFilter, setMethodFilter] = useState<string>("all");
+  const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initial = useMemo(() => readInitial(customerId, searchParams), [customerId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [fromDate, setFromDate] = useState(initial.from);
+  const [toDate, setToDate] = useState(initial.to);
+  const [methodFilter, setMethodFilter] = useState<string>(initial.method);
+  const [sort, setSort] = useState<SortKey>(initial.sort);
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [reconMsg, setReconMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -59,6 +67,37 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
     },
   });
 
+  // Persist filters (URL + localStorage) so reload keeps the same view.
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    const setOrDel = (k: string, v: string, def: string) => {
+      if (v && v !== def) next.set(k, v); else next.delete(k);
+    };
+    setOrDel("chFrom", fromDate, "");
+    setOrDel("chTo", toDate, "");
+    setOrDel("chMethod", methodFilter, "all");
+    setOrDel("chSort", sort, "date_desc");
+    setSearchParams(next, { replace: true });
+    try {
+      localStorage.setItem(LS_KEY(customerId), JSON.stringify({ from: fromDate, to: toDate, method: methodFilter, sort }));
+    } catch { /* ignore quota */ }
+  }, [fromDate, toDate, methodFilter, sort, customerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime: any new/updated/deleted transaction or invoice for this customer → refetch.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`charge-history:${customerId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter: `customer_id=eq.${customerId}` }, () => {
+        qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
+        qc.invalidateQueries({ queryKey: ["customer", customerId] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "invoices", filter: `customer_id=eq.${customerId}` }, () => {
+        qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [customerId, qc]);
+
   const groups: ChargeGroup[] = useMemo(() => {
     const map = new Map<string, ChargeGroup>();
     let orphanIdx = 0;
@@ -67,17 +106,11 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
       const gid = alloc.group_id || `orphan-${(row as any).id || orphanIdx++}`;
       if (!map.has(gid)) {
         map.set(gid, {
-          groupId: gid,
-          date: (row as any).date,
-          created_at: (row as any).created_at,
+          groupId: gid, date: (row as any).date, created_at: (row as any).created_at,
           method: (row as any).method,
-          accountName: (row as any).accounts?.name,
-          bankName: (row as any).accounts?.bank_name,
+          accountName: (row as any).accounts?.name, bankName: (row as any).accounts?.bank_name,
           description: (row as any).description,
-          items: [],
-          surplus: 0,
-          allocated: 0,
-          total: 0,
+          items: [], surplus: 0, allocated: 0, total: 0,
         });
       }
       const g = map.get(gid)!;
@@ -90,12 +123,9 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
         const paidAfter = Number(alloc.paid_after ?? (paidBefore + applied));
         g.items.push({
           invoice_id: alloc.invoice_id || (row as any).reference_id,
-          invoice_number: alloc.invoice_number,
-          invoice_date: alloc.invoice_date,
-          invoice_total: invoiceTotal,
-          applied,
-          paid_before: paidBefore,
-          paid_after: paidAfter,
+          invoice_number: alloc.invoice_number, invoice_date: alloc.invoice_date,
+          invoice_total: invoiceTotal, applied,
+          paid_before: paidBefore, paid_after: paidAfter,
           remaining_before: Math.max(invoiceTotal - paidBefore, 0),
           remaining_after: Number(alloc.remaining_after ?? Math.max(invoiceTotal - paidAfter, 0)),
           new_status: alloc.new_status,
@@ -104,23 +134,24 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
       }
       g.total = g.allocated + g.surplus;
     }
-    return Array.from(map.values()).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    return Array.from(map.values());
   }, [data]);
 
   const filtered = useMemo(() => {
-    return groups.filter((g) => {
+    const f = groups.filter((g) => {
       if (fromDate && (g.date || "") < fromDate) return false;
       if (toDate && (g.date || "") > toDate) return false;
       if (methodFilter !== "all" && (g.method || "") !== methodFilter) return false;
       return true;
     });
-  }, [groups, fromDate, toDate, methodFilter]);
+    return sortGroups(f, sort);
+  }, [groups, fromDate, toDate, methodFilter, sort]);
 
   const paged = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
 
-  useEffect(() => setVisible(PAGE_SIZE), [fromDate, toDate, methodFilter]);
+  useEffect(() => setVisible(PAGE_SIZE), [fromDate, toDate, methodFilter, sort]);
 
-  // Reconciliation check after data loads — verify DB invariant.
+  // Reconciliation banner — runs whenever the underlying tx list changes or filters change.
   useEffect(() => {
     if (!data) return;
     let cancelled = false;
@@ -129,20 +160,10 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
         supabase.from("customers").select("balance, credit_balance").eq("id", customerId).maybeSingle(),
         supabase.from("invoices").select("total, paid_amount, status, source").eq("customer_id", customerId),
       ]);
-      if (cancelled || !cust) return;
-      const expectedBalance = (invs || [])
-        .filter((i: any) => i.status !== "cancelled" && i.source !== "pos")
-        .reduce((s: number, i: any) => s + Math.max(Number(i.total || 0) - Number(i.paid_amount || 0), 0), 0);
-      const totalSurplus = groups.reduce((s, g) => s + g.surplus, 0);
-      const balDelta = Math.abs(Number(cust.balance || 0) - expectedBalance);
-      const credDelta = Math.abs(Number(cust.credit_balance || 0) - totalSurplus);
-      if (balDelta > 0.02 || credDelta > 0.02) {
-        const msg = `تعارض في الأرصدة: رصيد=${cust.balance} (متوقع ${expectedBalance.toFixed(2)}) — دائن=${cust.credit_balance} (متوقع ${totalSurplus.toFixed(2)})`;
-        setReconMsg({ ok: false, text: msg });
-        toast.error(msg);
-      } else {
-        setReconMsg({ ok: true, text: `الأرصدة متطابقة — المستحق ${expectedBalance.toFixed(2)} / الدائن ${totalSurplus.toFixed(2)}` });
-      }
+      if (cancelled) return;
+      const r = computeReconciliation({ customer: cust, invoices: invs || [], groups });
+      setReconMsg({ ok: r.ok, text: r.text });
+      if (!r.ok) toast.error(r.text);
     })();
     return () => { cancelled = true; };
   }, [data, groups, customerId]);
@@ -181,7 +202,16 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
     URL.revokeObjectURL(url);
   };
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground text-sm">جاري التحميل...</div>;
+  if (isLoading) {
+    return (
+      <div className="p-3 space-y-3" data-testid="charge-history-loading">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
 
   const methodOptions = Array.from(new Set((groups.map((g) => g.method).filter(Boolean)) as string[]));
 
@@ -213,8 +243,20 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
             </SelectContent>
           </Select>
         </div>
-        {(fromDate || toDate || methodFilter !== "all") && (
-          <Button size="sm" variant="ghost" onClick={() => { setFromDate(""); setToDate(""); setMethodFilter("all"); }}>مسح الفلاتر</Button>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground flex items-center gap-1"><ArrowUpDown size={12} /> ترتيب</label>
+          <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+            <SelectTrigger className="h-9 w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date_desc">التاريخ (الأحدث)</SelectItem>
+              <SelectItem value="date_asc">التاريخ (الأقدم)</SelectItem>
+              <SelectItem value="method_asc">طريقة الدفع (أ→ي)</SelectItem>
+              <SelectItem value="method_desc">طريقة الدفع (ي→أ)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(fromDate || toDate || methodFilter !== "all" || sort !== "date_desc") && (
+          <Button size="sm" variant="ghost" onClick={() => { setFromDate(""); setToDate(""); setMethodFilter("all"); setSort("date_desc"); }}>مسح الفلاتر</Button>
         )}
         <div className="mr-auto flex items-center gap-3">
           <div className="text-sm text-muted-foreground">النتائج: <span className="font-bold text-foreground">{filtered.length}</span>{filtered.length !== groups.length && <span className="text-muted-foreground"> / {groups.length}</span>}</div>
@@ -225,17 +267,15 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
       </div>
 
       {!filtered.length && (
-        <div className="p-8 text-center text-muted-foreground text-sm">
-          {groups.length ? "لا نتائج تطابق الفلاتر." : "لا يوجد سجل شحن رصيد لهذا العميل بعد."}
+        <div className="p-8 text-center text-muted-foreground text-sm" data-testid="charge-history-empty">
+          {groups.length ? "لا نتائج تطابق الفلاتر الحالية — جرّب تعديل التاريخ أو طريقة الدفع." : "لا يوجد سجل شحن رصيد لهذا العميل بعد."}
         </div>
       )}
 
       {paged.map((g) => (
         <div key={g.groupId} className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-muted/40 border-b border-border">
-            <div className="flex items-center gap-2 text-primary font-bold">
-              <Wallet size={16} /> شحن رصيد
-            </div>
+            <div className="flex items-center gap-2 text-primary font-bold"><Wallet size={16} /> شحن رصيد</div>
             <div className="text-xs text-muted-foreground">{g.date}</div>
             <div className="text-xs text-muted-foreground">•</div>
             <div className="text-xs text-muted-foreground">{methodLabel(g.method)}</div>
@@ -268,9 +308,7 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
                   {g.items.map((it, i) => (
                     <tr key={`${g.groupId}-${it.invoice_id}-${i}`} className="border-t border-border">
                       <td className="px-3 py-2 font-medium">
-                        {it.invoice_id ? (
-                          <Link to={`/invoices/view/${it.invoice_id}`} className="text-primary hover:underline">{it.invoice_number || "—"}</Link>
-                        ) : (it.invoice_number || "—")}
+                        {it.invoice_id ? (<Link to={`/invoices/view/${it.invoice_id}`} className="text-primary hover:underline">{it.invoice_number || "—"}</Link>) : (it.invoice_number || "—")}
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{it.invoice_date || "—"}</td>
                       <td className="px-3 py-2 tabular-nums">{fmt(it.invoice_total)}</td>
@@ -285,11 +323,7 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
                         ); })()}
                       </td>
                       <td className="px-3 py-2">
-                        {it.invoice_id && (
-                          <Link to={`/invoices/view/${it.invoice_id}`} className="text-muted-foreground hover:text-primary inline-flex">
-                            <ExternalLink size={14} />
-                          </Link>
-                        )}
+                        {it.invoice_id && (<Link to={`/invoices/view/${it.invoice_id}`} className="text-muted-foreground hover:text-primary inline-flex"><ExternalLink size={14} /></Link>)}
                       </td>
                     </tr>
                   ))}
