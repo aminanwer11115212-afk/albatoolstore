@@ -1656,24 +1656,37 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                         📞 {customer.phone}
                       </span>
                     )}
-                    {customer.phone && (customerBalances?.debt || 0) + (customerBalances?.credit || 0) > 0 && (
-                      <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 9, flexShrink: 0 }}>·</span>
-                    )}
-                    {/* عليه = عميل مدين لنا */}
-                    {customerBalances && customerBalances.debt > 0 && (
-                      <span style={{ color: "hsl(var(--destructive))", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(var(--destructive)/0.08)", borderRadius: 3, padding: "0 3px" }}>
-                        عليه {customerBalances.debt.toLocaleString()}
-                      </span>
-                    )}
-                    {/* له = نحن مدينون له */}
-                    {customerBalances && customerBalances.credit > 0 && (
-                      <span style={{ color: "hsl(142 70% 35%)", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(142 70% 35% / 0.08)", borderRadius: 3, padding: "0 3px" }}>
-                        له {customerBalances.credit.toLocaleString()}
-                      </span>
-                    )}
-                    {(!customerBalances || (customerBalances.debt === 0 && customerBalances.credit === 0)) && !customer.phone && (
-                      <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>مسوّى</span>
-                    )}
+                    {(() => {
+                      // القاعدة الموحّدة: صافي الحساب فقط — لا نُظهر "له" إلا إذا كانت كل الفواتير مسدّدة
+                      // ويوجد رصيد فائض للعميل. غير ذلك نُظهر "عليه" بمقدار الصافي (بعد خصم رصيده).
+                      const debt = Number(customerBalances?.debt || 0);
+                      const credit = Number(customerBalances?.credit || 0);
+                      const net = debt - credit;
+                      if (Math.abs(net) < 0.01) {
+                        if (!customer.phone) {
+                          return <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>مسوّى</span>;
+                        }
+                        return null;
+                      }
+                      if (net > 0) {
+                        return (
+                          <>
+                            {customer.phone && <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 9, flexShrink: 0 }}>·</span>}
+                            <span style={{ color: "hsl(var(--destructive))", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(var(--destructive)/0.08)", borderRadius: 3, padding: "0 3px" }}>
+                              عليه {net.toLocaleString()}
+                            </span>
+                          </>
+                        );
+                      }
+                      return (
+                        <>
+                          {customer.phone && <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 9, flexShrink: 0 }}>·</span>}
+                          <span style={{ color: "hsl(142 70% 35%)", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(142 70% 35% / 0.08)", borderRadius: 3, padding: "0 3px" }}>
+                            له {Math.abs(net).toLocaleString()}
+                          </span>
+                        </>
+                      );
+                    })()}
                   </>
                 )}
               </div>

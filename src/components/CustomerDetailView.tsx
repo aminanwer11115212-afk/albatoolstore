@@ -1,16 +1,17 @@
 import { useMemo, useState, forwardRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
 import type { StatementData } from "@/utils/statementPrintTemplate";
-import { netBalanceOf } from "@/utils/balanceDisplay";
+import { netBalanceOf, CustomerAccountSummary } from "@/utils/balanceDisplay";
 import { toast } from "sonner";
 import {
   FileText, RotateCcw, Receipt, Wallet, AlertTriangle, CheckCircle2,
   ArrowLeft, Pencil, Trash2, Phone, MapPin, Home, StickyNote,
-  ExternalLink, ClipboardList, User, Share2
+  ExternalLink, ClipboardList, User, Share2, PlusCircle
 } from "lucide-react";
 import { exportContactToDevice } from "@/utils/exportContact";
+import ChargeBalanceDialog from "@/components/dashboard/ChargeBalanceDialog";
 
 
 interface Props {
@@ -24,7 +25,24 @@ type TabKey = "invoices" | "quotes" | "returns";
 
 export default function CustomerDetailView({ customer, onBack, onEdit, onDelete }: Props) {
   const [tab, setTab] = useState<TabKey>("invoices");
+  const [chargeOpen, setChargeOpen] = useState(false);
   const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  // اجلب أحدث نسخة من العميل (balance, credit_balance, net_balance) بعد أي شحن
+  const { data: fresh } = useQuery({
+    queryKey: ["customer-fresh", customer.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("customers")
+        .select("balance, credit_balance, net_balance")
+        .eq("id", customer.id)
+        .maybeSingle();
+      return data;
+    },
+  });
+  const balSource = { ...(customer as any), ...(fresh || {}) };
+  const net = netBalanceOf(balSource);
 
   const { data: invoices = [], isLoading: loadingInv } = useQuery({
     queryKey: ["customer-invoices", customer.id],
@@ -165,6 +183,9 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
             >
               <Share2 size={16} /> تصدير للجهات
             </button>
+            <button onClick={() => setChargeOpen(true)} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1 hover:opacity-90">
+              <PlusCircle size={16} /> شحن رصيد
+            </button>
             <button onClick={() => onEdit(customer)} className="bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm flex items-center gap-1 hover:opacity-90">
               <Pencil size={16} /> تعديل
             </button>
@@ -173,6 +194,36 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
             </button>
           </div>
         </div>
+
+        {/* Balance hero — الصافي فقط وفق القاعدة: "له" لا تظهر إلا إذا اكتملت جميع الفواتير */}
+        <div className="relative px-6 pb-4">
+          <div className={`rounded-xl border p-4 flex items-center justify-between flex-wrap gap-3 ${
+            net > 0 ? "bg-destructive/10 border-destructive/30" :
+            net < 0 ? "bg-emerald-500/10 border-emerald-500/30" :
+            "bg-muted border-border"
+          }`}>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">صافي الحساب</div>
+              <div className={`text-2xl md:text-3xl font-extrabold tabular-nums ${
+                net > 0 ? "text-destructive" : net < 0 ? "text-emerald-600" : "text-foreground"
+              }`}>
+                {net > 0 ? "عليه " : net < 0 ? "له " : "مسوّى"}
+                {Math.abs(net) > 0 && Math.abs(net).toLocaleString()}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                {net > 0
+                  ? "لدى العميل فواتير غير مسدَّدة — أي رصيد يُشحن سيُخفّض هذا المبلغ أولاً"
+                  : net < 0
+                  ? "كل الفواتير مسدَّدة — هذا رصيد فائض للعميل لدينا"
+                  : "لا يوجد مديونية"}
+              </div>
+            </div>
+            <div className="min-w-[280px] md:min-w-[360px]">
+              <CustomerAccountSummary customer={balSource} size="md" />
+            </div>
+          </div>
+        </div>
+
 
         {/* Stats strip */}
         <div className="relative grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 px-6 pb-6">
@@ -265,6 +316,16 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
           />
         )}
       </div>
+
+      <ChargeBalanceDialog
+        open={chargeOpen}
+        onOpenChange={setChargeOpen}
+        onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["customer-fresh", customer.id] });
+          qc.invalidateQueries({ queryKey: ["customer-invoices", customer.id] });
+          qc.invalidateQueries({ queryKey: ["customers"] });
+        }}
+      />
     </div>
   );
 }

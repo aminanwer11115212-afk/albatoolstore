@@ -813,12 +813,16 @@ export default function CustomersPage() {
 
   if (viewCustomer) {
     return (
-      <CustomerDetailView
-        customer={viewCustomer}
-        onBack={closeView}
-        onEdit={handleEdit}
-        onDelete={(id) => { handleDelete(id); closeView(); }}
-      />
+      <div className="fixed inset-0 z-[90] bg-background overflow-auto">
+        <div className="mx-auto max-w-[1600px] p-4 md:p-6">
+          <CustomerDetailView
+            customer={viewCustomer}
+            onBack={closeView}
+            onEdit={handleEdit}
+            onDelete={(id) => { handleDelete(id); closeView(); }}
+          />
+        </div>
+      </div>
     );
   }
 
