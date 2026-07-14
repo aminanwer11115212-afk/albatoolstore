@@ -272,12 +272,27 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    setConflictHandler(async (item, remote) => { await recordConflict(item, remote); });
     initOfflineFlush((r) => {
       if (r.ok > 0) {
         queryClient.invalidateQueries();
         toast.success(`تمت مزامنة ${r.ok} عملية`);
       }
+      if (r.conflicts > 0) {
+        toast.warning(`${r.conflicts} تعارض يحتاج قرارك — راجع سجل المزامنة`);
+      }
     });
+    initAttachmentFlush();
+    initSagaFlush();
+    initStorageManager(queryClient);
+    const onStorageWarn = (e: any) => {
+      const ratio = e.detail?.ratio;
+      if (ratio && ratio >= 0.9) {
+        toast.warning("تخزين المتصفح شارف على الامتلاء — يُنصح بالتنظيف من سجل المزامنة");
+      }
+    };
+    window.addEventListener("albatool:storage-warn", onStorageWarn);
+    return () => window.removeEventListener("albatool:storage-warn", onStorageWarn);
   }, []);
 
   return (
