@@ -25,7 +25,24 @@ type TabKey = "invoices" | "quotes" | "returns";
 
 export default function CustomerDetailView({ customer, onBack, onEdit, onDelete }: Props) {
   const [tab, setTab] = useState<TabKey>("invoices");
+  const [chargeOpen, setChargeOpen] = useState(false);
   const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  // اجلب أحدث نسخة من العميل (balance, credit_balance, net_balance) بعد أي شحن
+  const { data: fresh } = useQuery({
+    queryKey: ["customer-fresh", customer.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("customers")
+        .select("balance, credit_balance, net_balance")
+        .eq("id", customer.id)
+        .maybeSingle();
+      return data;
+    },
+  });
+  const balSource = { ...(customer as any), ...(fresh || {}) };
+  const net = netBalanceOf(balSource);
 
   const { data: invoices = [], isLoading: loadingInv } = useQuery({
     queryKey: ["customer-invoices", customer.id],
