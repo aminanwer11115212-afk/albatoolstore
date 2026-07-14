@@ -13,6 +13,7 @@ import { logDiscountEvent } from "@/utils/discountAuditLogger";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { useUserRole } from "@/hooks/useUserRole";
+import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { toast } from "sonner";
 import {
   Dialog,
