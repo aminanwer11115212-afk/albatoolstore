@@ -2847,6 +2847,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_reset_transactional_data: { Args: { _scope: Json }; Returns: Json }
       advance_invoice_workflow: {
         Args: { _invoice_id: string; _reason: string; _target: string }
         Returns: undefined
