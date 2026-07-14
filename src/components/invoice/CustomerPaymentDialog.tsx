@@ -557,18 +557,43 @@ export default function CustomerPaymentDialog({
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1 gap-2">
               <Label>الحساب المستلم</Label>
-              {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
-                <button
-                  type="button"
-                  data-testid="retry-load-accounts"
-                  className="text-[11px] text-primary underline"
-                  onClick={() => { refetchAccounts(); }}
-                >
-                  إعادة المحاولة
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {method === "bank" && accountId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = pinnedAccountId === accountId ? "" : accountId;
+                      setPinnedAccountId(next);
+                      try {
+                        if (next) localStorage.setItem("lov:pinned-bank-account", next);
+                        else localStorage.removeItem("lov:pinned-bank-account");
+                      } catch {}
+                      toast.success(next ? "تم تثبيت الحساب المحوَّل له" : "تم إلغاء التثبيت");
+                    }}
+                    className={`inline-flex items-center gap-1 text-[11px] rounded-md border px-2 py-1 ${
+                      pinnedAccountId === accountId
+                        ? "border-amber-500/60 bg-amber-50/70 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                    title={pinnedAccountId === accountId ? "إلغاء تثبيت الحساب" : "تثبيت الحساب المحوَّل له كافتراضي دائم"}
+                  >
+                    {pinnedAccountId === accountId ? <Pin size={12} className="fill-current" /> : <Pin size={12} />}
+                    {pinnedAccountId === accountId ? "مثبَّت" : "تثبيت"}
+                  </button>
+                )}
+                {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
+                  <button
+                    type="button"
+                    data-testid="retry-load-accounts"
+                    className="text-[11px] text-primary underline"
+                    onClick={() => { refetchAccounts(); }}
+                  >
+                    إعادة المحاولة
+                  </button>
+                )}
+              </div>
             </div>
             {jaberAccount && accountId === jaberAccount.id ? (
               <div className="flex items-center gap-2">
@@ -602,12 +627,14 @@ export default function CustomerPaymentDialog({
                   {(accountOptions as any[]).map((a) => (
                     <SelectItem key={a.id} value={a.id}>
                       {a.name}{a.bank_name ? ` — ${a.bank_name}` : ""}
+                      {pinnedAccountId === a.id ? " 📌" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
           </div>
+
 
           {method === "bank" && (
             <div>
