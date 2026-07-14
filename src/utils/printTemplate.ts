@@ -411,44 +411,37 @@ ${showItems ? (variant === "stocktake" ? `
 ${showAccount ? (() => {
   const prevNet = (Number(previousDebt) || 0) - (Number(previousCredit) || 0);
   const hasPrev = Math.abs(prevNet) > 0.01;
-  const subtotalRow = Number(subtotal) || (grandTotal + (Number(discountTotal) || 0));
-  const majmoo = grandTotal + prevNet; // جملة − خصم + حساب قديم (signed)
+  const invoiceValue = Number(grandTotal) || 0; // قيمة الفاتورة (بعد خصم البنود، شامل الشحن)
+  const generalDiscount = balSum.hasDiscount ? balSum.discount : 0;
+  const jomlaHesab = invoiceValue - generalDiscount + prevNet; // جملة الحساب
   const hasPaid = !hidePaidBox && paidAmount > 0.01;
-  const finalNet = majmoo - paidAmount;
+  const finalNet = jomlaHesab - paidAmount; // الحساب الكلي (>0 عليه، <0 له)
+  const cellR = "padding:9px 14px;text-align:right;font-weight:700;color:#111;background:#fafafa;border:1.5px solid #111;";
+  const cellL = "padding:9px 14px;text-align:left;font-weight:800;color:#111;border:1.5px solid #111;";
+  const row = (label: string, value: string, opts: { valColor?: string; strong?: boolean; sideBadge?: string; badgeColor?: string } = {}) => `
+    <tr data-section="sum-${label}" data-section-label="${label}">
+      <td style="${cellR}${opts.strong ? "font-size:14px;" : ""}">${label}</td>
+      <td style="${cellL}${opts.valColor ? `color:${opts.valColor};` : ""}${opts.strong ? "font-size:15px;" : ""}">${value}</td>
+      <td style="border:none;padding:0 8px;text-align:right;font-weight:800;color:${opts.badgeColor || "#111"};white-space:nowrap;">${opts.sideBadge || ""}</td>
+    </tr>`;
   return `
-<!-- Financial Summary Rows (ordered: جملة → خصم → حساب قديم → المجموع → المدفوع → الإجمالي) -->
-<table data-section="account-summary" data-section-label="ملخص الحساب" style="width:100%;margin-top:8px;border-collapse:collapse;font-size:13px;">
+<!-- ملخّص الحساب: قيمة الفاتورة → الخصم → الحساب القديم → جملة الحساب → المدفوع → الحساب الكلي -->
+<table data-section="account-summary" data-section-label="ملخص الحساب" style="width:60%;max-width:420px;margin:14px 0 8px;border-collapse:separate;border-spacing:0 6px;font-size:13px;">
   <tbody>
-    ${balSum.hasDiscount ? `
-    <tr data-section="discount-row" data-section-label="الخصم">
-      <td style="padding:6px 12px;text-align:right;color:#666;">الخصم</td>
-      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#dc2626;">− ${fmt(balSum.discount)}</td>
-    </tr>` : ""}
-    ${hasPrev ? `
-    <tr data-section="prev-account-row" data-section-label="الحساب القديم">
-      <td style="padding:6px 12px;text-align:right;color:#666;">الحساب القديم ${prevNet > 0 ? "(عليه)" : "(له)"}</td>
-      <td style="padding:6px 12px;text-align:left;font-weight:700;color:${prevNet > 0 ? "#dc2626" : "#16a34a"};">${prevNet > 0 ? "+ " : "− "}${fmt(Math.abs(prevNet))}</td>
-    </tr>` : ""}
-    <tr data-section="majmoo-row" data-section-label="المجموع" style="border-top:1px solid #e5e7eb;">
-      <td style="padding:8px 12px;text-align:right;font-weight:700;">المجموع</td>
-      <td style="padding:8px 12px;text-align:left;font-weight:800;">${fmt(majmoo)}</td>
-    </tr>
-    ${hasPaid ? `
-    <tr data-section="paid-row" data-section-label="المدفوع">
-      <td style="padding:6px 12px;text-align:right;color:#666;">المدفوع</td>
-      <td style="padding:6px 12px;text-align:left;font-weight:700;color:#16a34a;">− ${fmt(paidAmount)}</td>
-    </tr>` : ""}
-    <tr data-section="final-status" data-section-label="الإجمالي النهائي" style="border-top:2px solid #1f2937;">
-      ${finalNet > 0.01 ? `
-        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">الإجمالي (عليه)</td>
-        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#dc2626;">${fmt(finalNet)}</td>
-      ` : finalNet < -0.01 ? `
-        <td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;">الإجمالي (له)</td>
-        <td style="padding:10px 12px;text-align:left;font-weight:900;font-size:16px;color:#16a34a;">${fmt(Math.abs(finalNet))}</td>
-      ` : `
-        <td colspan="2" style="padding:10px 12px;text-align:center;font-weight:900;font-size:15px;color:#16a34a;">✓ مسددة بالكامل</td>
-      `}
-    </tr>
+    ${row("قيمة الفاتورة", fmt(invoiceValue))}
+    ${generalDiscount > 0.01 ? row("الخصم على الفاتورة", `− ${fmt(generalDiscount)}`, { valColor: "#c0392b" }) : ""}
+    ${hasPrev ? row("الحساب القديم", `${prevNet > 0 ? "+ " : "− "}${fmt(Math.abs(prevNet))}`, {
+      valColor: prevNet > 0 ? "#c0392b" : "#16a34a",
+      sideBadge: prevNet > 0 ? "عليه" : "له",
+      badgeColor: prevNet > 0 ? "#c0392b" : "#16a34a",
+    }) : ""}
+    ${row("جملة الحساب", fmt(jomlaHesab), { strong: true })}
+    ${hasPaid ? row("المدفوع", `− ${fmt(paidAmount)}`, { valColor: "#16a34a" }) : ""}
+    ${finalNet > 0.01
+      ? row("الحساب الكلي", fmt(finalNet), { strong: true, valColor: "#c0392b", sideBadge: "عليه", badgeColor: "#c0392b" })
+      : finalNet < -0.01
+        ? row("الحساب الكلي", fmt(Math.abs(finalNet)), { strong: true, valColor: "#16a34a", sideBadge: "له", badgeColor: "#16a34a" })
+        : row("الحساب الكلي", "✓ مسددة بالكامل", { strong: true, valColor: "#16a34a" })}
   </tbody>
 </table>
 `;
