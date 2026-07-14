@@ -79,6 +79,9 @@ export default function CustomerPaymentDialog({
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [method, setMethod] = useState<Method>("bank");
   const [accountId, setAccountId] = useState<string>("");
+  const [pinnedAccountId, setPinnedAccountId] = useState<string>(() => {
+    try { return localStorage.getItem("lov:pinned-bank-account") || ""; } catch { return ""; }
+  });
   const [referenceNo, setReferenceNo] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [custBalance, setCustBalance] = useState<{ debt: number; credit: number } | null>(null);
