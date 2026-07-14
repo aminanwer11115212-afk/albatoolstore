@@ -117,38 +117,59 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     setSaving(true);
     try {
       const targetAccountId = method === "bank_transfer" ? bankAccountId : (accountId || null);
-      const description =
-        method === "bank_transfer"
-          ? `شحن رصيد - تحويل بنكي - إشعار: ${referenceNo}${notes ? ` - ${notes}` : ""}`
-          : `شحن رصيد - ${method === "cash" ? "نقدي" : "بطاقة"}${notes ? ` - ${notes}` : ""}`;
+      const online = typeof navigator === "undefined" ? true : navigator.onLine;
 
-      // حركة واحدة على مستوى العميل — التريغر يُحدّث credit_balance و net_balance تلقائياً
-      const { queued: txQueued, error: txErr } = await runOrQueue({
-        table: "transactions",
-        op: "insert",
-        payload: {
-          type: "income",
-          category: "customer_credit",
-          amount: amt,
-          credit: amt,
-          method,
-          date,
-          customer_id: customerId,
-          account_id: targetAccountId,
-          description,
-        },
-        label: "شحن رصيد عميل",
-      });
-      if (txErr) throw txErr;
-      if (txQueued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
+      let allocations: any[] = [];
+      let allocatedSum = 0;
+      let surplus = 0;
 
-      // احفظ آخر حساب بنكي مستخدَم للاسترجاع لاحقًا
+      if (online) {
+        // RPC: يوزّع الشحن على الفواتير غير المسددة FIFO ويُحدّث حالتها ذرّياً
+        const { data, error } = await (supabase as any).rpc("allocate_customer_charge", {
+          _customer_id: customerId,
+          _amount: amt,
+          _date: date,
+          _method: method,
+          _account_id: targetAccountId,
+          _reference_no: method === "bank_transfer" ? referenceNo : null,
+          _notes: notes || null,
+        });
+        if (error) throw error;
+        if (data && data.ok === false) throw new Error(data.reason || "تعذّر توزيع الشحن");
+        allocations = (data?.allocations || []) as any[];
+        allocatedSum = Number(data?.allocated || 0);
+        surplus = Number(data?.surplus || 0);
+      } else {
+        // أوفلاين: احفظ حركة رصيد عامة، سيُعاد توزيعها فور عودة الاتصال (fallback)
+        const { queued, error: txErr } = await runOrQueue({
+          table: "transactions",
+          op: "insert",
+          payload: {
+            type: "income",
+            category: "customer_credit",
+            amount: amt,
+            credit: amt,
+            method,
+            date,
+            customer_id: customerId,
+            account_id: targetAccountId,
+            description: `شحن رصيد (سيُوزَّع عند الاتصال)${notes ? ` - ${notes}` : ""}`,
+          },
+          label: "شحن رصيد عميل (أوفلاين)",
+        });
+        if (txErr) throw txErr;
+        if (queued) toast.info("تم الحفظ محلياً — سيُوزَّع تلقائياً عند عودة الاتصال");
+        surplus = amt;
+      }
+
       if (method === "bank_transfer" && bankAccountId) {
         try { localStorage.setItem("lov:last-bank-account", bankAccountId); } catch {}
       }
 
-      // ملاحظة: لا نعرض "المتبقي" في رسالة شحن الرصيد بناءً على طلب المستخدم
-      toast.success(`تم شحن ${amt.toLocaleString()} بنجاح`);
+      const parts: string[] = [`تم شحن ${amt.toLocaleString()}`];
+      if (allocatedSum > 0) parts.push(`سُدِّد ${allocatedSum.toLocaleString()} على ${allocations.length} فاتورة`);
+      if (surplus > 0.01) parts.push(`فائض ${surplus.toLocaleString()} أُضيف كرصيد للعميل`);
+      toast.success(parts.join(" • "));
 
       if (sendWhatsApp) {
         if (!selectedCustomer?.phone) {
@@ -159,15 +180,16 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       }
 
       reset();
-      // أبطل الكاش وأبلغ باقي الشاشات (InvoiceCreate/QuoteCreate/StockReturn) فوراً
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["transactionsWithAccounts"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["customer-fresh", customerId] });
+      qc.invalidateQueries({ queryKey: ["customer-invoices", customerId] });
+      qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
       try { window.dispatchEvent(new Event("customers:changed")); } catch {}
-      const chargedCustomerId = (selectedCustomer as any)?.id || null;
       const prevNet = selectedCustomer ? netBalanceOf(selectedCustomer as any) : null;
-      if (chargedCustomerId) refetchAndToastCustomerBalance(chargedCustomerId, { previousNet: prevNet });
+      refetchAndToastCustomerBalance(customerId, { previousNet: prevNet });
       onOpenChange(false);
       onSaved?.();
     } catch (e: any) {

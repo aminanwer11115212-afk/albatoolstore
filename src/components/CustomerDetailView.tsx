@@ -13,6 +13,7 @@ import {
 import { exportContactToDevice } from "@/utils/exportContact";
 import ChargeBalanceDialog from "@/components/dashboard/ChargeBalanceDialog";
 import CustomerNetBalanceCard from "@/components/CustomerNetBalanceCard";
+import CustomerChargeHistory from "@/components/CustomerChargeHistory";
 
 
 interface Props {
@@ -22,7 +23,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-type TabKey = "invoices" | "quotes" | "returns";
+type TabKey = "invoices" | "quotes" | "returns" | "charges";
 
 export default function CustomerDetailView({ customer, onBack, onEdit, onDelete }: Props) {
   const [tab, setTab] = useState<TabKey>("invoices");
@@ -232,7 +233,10 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
           <TabBtn active={tab === "invoices"} onClick={() => setTab("invoices")} icon={<FileText size={15} />} label="الفواتير" count={invoices.length} />
           <TabBtn active={tab === "quotes"} onClick={() => setTab("quotes")} icon={<Receipt size={15} />} label="عروض الأسعار" count={quotes.length} />
           <TabBtn active={tab === "returns"} onClick={() => setTab("returns")} icon={<RotateCcw size={15} />} label="المرتجعات" count={returns.length} />
+          <TabBtn active={tab === "charges"} onClick={() => setTab("charges")} icon={<Wallet size={15} />} label="شحن الرصيد" count={0} />
         </div>
+
+        {tab === "charges" && <CustomerChargeHistory customerId={customer.id} />}
 
         {tab === "invoices" && (
           <DataTable
