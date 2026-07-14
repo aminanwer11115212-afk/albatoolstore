@@ -26,6 +26,7 @@ const tabs = [
   { key: "theme", label: "المظهر", icon: <Palette size={16} />, path: "/settings/theme" },
   { key: "smtp", label: "SMTP", icon: <Mail size={16} />, path: "/settings/smtp" },
   { key: "columns", label: "أعمدة الجداول", icon: <Columns3 size={16} />, path: "/settings/columns" },
+  { key: "danger", label: "منطقة الخطر", icon: <AlertTriangle size={16} />, path: "/settings/danger" },
 ];
 
 export default function CompanySettingsPage() {
