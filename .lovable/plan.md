@@ -1,120 +1,99 @@
-# خطة توسيع الأوفلاين — 5 مسارات متوازية
+# خطة التحسينات الشاملة (5 دفعات)
 
-الوضع الحالي: عندنا `queryPersister` (IndexedDB via `idb-keyval`) + `offlineQueue` (طابور كتابات فردية) + `RealtimeSync` + `SyncStatusIndicator`. الفجوات: لا TTL/سقف حجم، لا backoff/سجل عمليات، لا طابور مرفقات، لا حلّ تعارضات، ومستندات الإنشاء (Invoice/Quote/Purchase) ما زالت تكتب مباشرة لأنها متعددة الجداول.
-
-## 1) سياسة تنظيف IndexedDB والكاش
-
-- **TTL للاستعلامات**: `PersistQueryClientProvider.maxAge = 30d` (موجود). نضيف Purge دوري يمسح queries لم تُلمَس منذ 14 يوماً.
-- **سقف حجم**: قياس `navigator.storage.estimate()` عند الإقلاع؛ إذا `usage/quota > 0.75` نُشغّل تنظيفاً ذكياً بترتيب الأولوية:
-  1. Attachments blobs > 24h ومرفوعة
-  2. Realtime cache للجداول الكبيرة (transactions, activity_log)
-  3. Persisted queries الأقدم
-- **Whitelist بيانات ضرورية**: `customers, products, suppliers, accounts, company_settings, currencies` لا تُمسح أبداً — من `prefetchCoreData`.
-- **مؤشر تخزين** في `SyncStatusIndicator`: تلميح بنسبة الاستخدام + زر "تنظيف الكاش" يدوي.
-
-الملفات: `src/lib/storageManager.ts` (جديد)، `src/lib/queryPersister.ts`، `src/components/SyncStatusIndicator.tsx`، `src/App.tsx` (استدعاء `initStorageManager`).
-
-## 2) Backoff + سجل حالة العمليات
-
-توسيع `offlineQueue.ts`:
-
-```text
-Op = { id, table, op, payload, label, attempts, lastError, nextRetryAt, status }
-status: pending | in_flight | failed_retryable | failed_permanent | done
-backoff: 2s → 5s → 15s → 60s → 5m (max 5 محاولات)
-```
-
-- كل عملية فاشلة تُحدَّث بـ `attempts++, nextRetryAt = now + backoff(attempts), lastError`.
-- خطأ 4xx تحققي (409/422/RLS) → `failed_permanent` مباشرة (لا إعادة محاولة عمياء).
-- خطأ شبكة/5xx/timeout → `failed_retryable`.
-- Loop مركزي `processQueue()` كل 30s + عند `online` + عند dispatch جديد.
-- شاشة سجل: `src/pages/OfflineQueuePage.tsx` تعرض جدولاً بكل عملية (label, table, op, attempts, lastError, زر "أعد المحاولة الآن"، "احذف").
-- إشعار Toast مجمَّع: "N عملية تنتظر إعادة الاتصال — عرض السجل".
-
-الملفات: `src/lib/offlineQueue.ts`، `src/pages/OfflineQueuePage.tsx` (جديد)، `src/components/SyncStatusIndicator.tsx` (رابط للسجل)، `src/App.tsx` (route جديد).
-
-## 3) طابور رفع المرفقات أوفلاين
-
-المشكلة: `storage.upload` غير مدعوم في `offlineQueue` الحالي (نصّي فقط).
-
-- IndexedDB store جديد `attachment_queue` (blob + metadata + parent_table + parent_id + bucket + path_template).
-- API جديد `queueAttachment({ file, bucket, pathTemplate, linkTable, linkPayload })`:
-  - أوفلاين → حفظ الـ Blob محلياً + toast "الملف محفوظ، سيُرفع عند الاتصال"
-  - أونلاين → رفع فوري + INSERT في جدول الربط
-- عند العودة: `flushAttachmentQueue()` يرفع كل ملف ثم يُنشئ سجل الربط، مع نفس backoff.
-- تحديث `InvoiceAttachmentsDialog`, `QuoteAttachmentsDialog`, `PurchaseAttachmentsDialog` لاستخدام `queueAttachment` بدل `supabase.storage.upload` المباشر.
-- Preview محلي: نعرض `URL.createObjectURL(blob)` مع شارة "معلَّق".
-
-الملفات: `src/lib/attachmentQueue.ts` (جديد)، `src/components/invoice/InvoiceAttachmentsDialog.tsx`، `src/components/quote/QuoteAttachmentsDialog.tsx`، `src/components/purchase/PurchaseAttachmentsDialog.tsx`.
-
-## 4) حلّ تعارضات المزامنة
-
-المبدأ: **Last-Writer-Wins مع كشف صريح للتعارض** — لأن UI متعدد المستخدمين.
-
-- كل UPDATE في `offlineQueue` يحمل `expected_updated_at` (قيمة `updated_at` وقت التعديل المحلي).
-- عند flush نقرأ الصف الحالي أولاً؛ إذا `remote.updated_at > expected_updated_at` → تعارض.
-- Store `conflict_queue` يحفظ: `{ table, id, local_changes, remote_snapshot, base_snapshot }`.
-- Dialog جديد `ConflictResolutionDialog` يعرض للمستخدم:
-  - عمود "التغييرات المحلية"
-  - عمود "النسخة السحابية"
-  - أزرار: **احتفظ بالمحلي** / **احتفظ بالسحابي** / **دمج حقلاً حقلاً**
-- Realtime يفتح الـ Dialog تلقائياً عند وصول تعارضات جديدة.
-
-للجداول الحساسة (`invoices.paid_amount`, `customers.balance`) — منع الكتابة المباشرة أوفلاين وإجبار إعادة الحساب من triggers بعد التسجيل.
-
-الملفات: `src/lib/conflictResolver.ts` (جديد)، `src/components/ConflictResolutionDialog.tsx` (جديد)، `src/lib/offlineQueue.ts` (hook للـ conflict check)، `src/App.tsx` (mount Dialog عالمياً).
-
-## 5) أوفلاين لمستندات الإنشاء (متعدد الجداول)
-
-الفجوة: `InvoiceCreatePage / QuoteCreatePage / PurchaseCreatePage` تحفظ header ثم items ثم transports ثم packaging — رحلة FKs لا يدعمها `runOrQueue` الحالي.
-
-الحل: **saga أوفلاين** بـ optimistic UUIDs:
-
-```text
-{
-  saga_id, kind: "invoice"|"quote"|"purchase",
-  operations: [
-    { op: insert, table: invoices, tempId: X, payload: {...} },
-    { op: insert, table: invoice_items, payload: {..., invoice_id: $X} },
-    { op: insert, table: invoice_transports, payload: {..., invoice_id: $X} },
-  ]
-}
-```
-
-- `runDocumentSaga(saga)` — أونلاين تنفّذ فوري بترتيب مع FK resolution ($X → uuid حقيقي).
-- أوفلاين تُخزَّن في `document_saga_queue`؛ عند flush تُنفَّذ كوحدة ذرّية:
-  - نجاح كامل → done + invalidate queries + toast + realtime broadcast
-  - فشل جزئي → rollback ما أُدرج + retry مع backoff
-- `duplicateDocGuard` يمتد ليعمل من الكاش المحلي أثناء الأوفلاين (نفس signature check ضد persisted queries).
-- الشاشات الثلاث تستدعي `runDocumentSaga` بدل الـ multi-step insert الحالي.
-- المستند يظهر في القوائم فوراً باستخدام optimistic update في React Query (`setQueryData`) مع علامة "معلَّق".
-
-الملفات: `src/lib/documentSaga.ts` (جديد)، `src/pages/InvoiceCreatePage.tsx`، `src/pages/QuoteCreatePage.tsx`، `src/pages/PurchaseCreatePage.tsx`، `src/utils/duplicateDocGuard.ts`.
+كل دفعة مستقلة، تُنفَّذ بالتتابع، وتُقسَّم داخلياً عبر **subagents** متوازية للفحص والتتبع قبل الكتابة. لا نبدأ الدفعة التالية قبل تحقّق البناء + قراءة نتائج الدفعة السابقة.
 
 ---
 
-## تفاصيل تقنية
+## الدفعة 1 — شاشة تسجيل الدفعة (UX + كيبورد + تثبيت)
 
-**Subagents (بالتوازي):**
-- A: مسارات 1+2 (storage + backoff/queue log page)
-- B: مسار 3 (attachments queue + integration في 3 dialogs)
-- C: مسار 4 (conflict resolver + dialog + hooks)
-- D: مسار 5 (document saga + 3 create pages)
+**الهدف:** إزالة الفراغات، جعل الحوار شبه مربّع، تحكم كامل بالكيبورد، وتوسيع التثبيت ليشمل «طريقة الدفع» + الحساب مع تطبيقهما تلقائياً عند الفتح.
 
-**ترتيب التنفيذ:** A و B و C يمكن أن تسير معاً؛ D يعتمد على تحسينات A (backoff schema) فيبدأ بعد A بقليل.
+**Subagents (قراءة فقط، بالتوازي):**
+- A1: تدقيق `CustomerPaymentDialog.tsx` الحالي — قائمة كل الحقول، ترتيب DOM، أماكن الفراغات، عرض العمود الأيمن مقابل الأيسر.
+- A2: تتبّع كل الاستدعاءات لـ `CustomerPaymentDialog` (InvoiceCreate، DocumentPreview، أي مكان آخر) للتأكد من props وتوحيدها.
+- A3: مسح localStorage keys الحالية للتثبيت + اقتراح مفاتيح `lov:u:{uid}:payment:pinned-method` و`lov:u:{uid}:payment:pinned-account`.
 
-**Migrations:** لا حاجة لتغييرات schema — الاعتماد الوحيد على `updated_at` وهو موجود في كل الجداول عبر triggers.
+**التنفيذ:**
+1. تخطيط جديد: `max-w-2xl aspect-square-ish` — grid عمودين متساويين، بدون scroll داخلي على الديسكتوب.
+2. `useEffect` تركيز أول حقل عند الفتح، `tabIndex` صريح لكل حقل، `Enter` = التقدّم للحقل التالي، `Ctrl+Enter` = فتح تأكيد الحفظ، `Esc` = إغلاق.
+3. زر «تثبيت الطريقة» بجانب select طريقة الدفع (نفس نمط زر تثبيت الحساب) + تأكيد قبل التغيير + زر فك تثبيت.
+4. عند الفتح: قراءة كلا المثبَّتين وتطبيقهما تلقائياً إن وُجدا.
 
-**اختبارات:**
-- `e2e/offline-attachments.spec.ts` — رفع مرفق أوفلاين → يرجع الاتصال → يظهر في السحابة
-- `e2e/offline-invoice-create.spec.ts` — إنشاء فاتورة كاملة أوفلاين + بنود + ترحيل → مزامنة
-- `e2e/conflict-resolution.spec.ts` — تعارض حقيقي محاكى بجهازين
-- `src/test/offlineBackoff.test.ts` — منحنى backoff + حدود المحاولات
-- `src/test/storageManagerPurge.test.ts` — سياسة التنظيف
+**تحقّق:** build + فتح الحوار من صفحتين مختلفتين + اختبار كيبورد.
 
-**قبول:**
-- مرفق يُرفع محلياً أوفلاين ثم يظهر مع رابط سحابي بعد الاتصال ≤ 10 ثوان.
-- فاتورة أوفلاين كاملة (رأس + 5 بنود) تُحفظ ثم تُزامَن دون تكرار.
-- تعارض تحرير عميل من جهازين يفتح Dialog يعرض القيمتين.
-- عند وصول التخزين لـ 80% يظهر تلميح، وعند 90% ينظّف تلقائياً بدون فقد بيانات whitelist.
-- سجل عمليات معلّقة يعرض كل fail مع سبب واضح.
+---
+
+## الدفعة 2 — حفظ تخصيصات الواجهة محلياً لكل جهاز إلى الأبد
+
+**الهدف:** ضمان أن كل تخصيص (أعمدة، عرض، ترتيب، حجم، حالة dialogs، toolbar، zoom، row heights) يُحفظ محلياً لكل جهاز ولا يُمسح أبداً.
+
+**Subagents:**
+- B1: جرد كل مفاتيح `lov:*` المستخدمة (grep على المشروع) + التحقّق من أنها كلها تمر بـ `formFactorKey` + `userScopedKey`.
+- B2: فحص `storageManager.ts` — التأكد أن whitelist يستثني كل مفاتيح `lov:u:*:ff:*` من التنظيف.
+- B3: فحص `useUiPrefsCloudSync` — هل يحفظ محلياً أولاً ثم يحاول المزامنة (offline-first)؟
+
+**التنفيذ:**
+1. توسيع `CORE_STORAGE_PREFIXES` في `storageManager.ts` ليحمي كل ما يبدأ بـ `lov:u:` و`lov:pinned-*`.
+2. إضافة migration محلي: عند البدء، لو وُجد مفتاح قديم بدون `ff:` ننسخه لكلا bucket‑ي mobile/desktop.
+3. توثيق العقد في `mem://features/ui-personalization`.
+
+**تحقّق:** unit test يشغّل `runCleanup(aggressive=true)` ويؤكّد بقاء مفاتيح `lov:u:` كلها.
+
+---
+
+## الدفعة 3 — Reset صفر (فواتير/حسابات/عملاء/عروض/بنوك)
+
+**الهدف:** أداة آمنة تصفّر الحسابات والفواتير وعروض الأسعار وأرصدة العملاء والحسابات البنكية مع الحفاظ على الروابط (customers, products, accounts remain, only balances/documents cleared).
+
+**Subagents:**
+- C1: خريطة الجداول المتأثرة + ترتيب الحذف الصحيح احتراماً للـ FK (items قبل headers، transactions قبل accounts…).
+- C2: تحديد أي RPC/triggers ستطلق أثناء الحذف الجماعي وكيف نعطّلها مؤقتاً (أو نستخدم `*_silent`).
+- C3: تصميم واجهة تأكيد بثلاث مراحل (اكتب "تصفير" + password admin + checkbox لكل مجموعة).
+
+**التنفيذ:**
+1. RPC `admin_reset_transactional_data(_scope jsonb)` — SECURITY DEFINER + `has_role(auth.uid(),'admin')` + يحذف بالترتيب.
+2. صفحة `SettingsPage → Danger Zone → تصفير البيانات` مع 4 checkboxes مستقلة: فواتير، عروض، معاملات/حسابات بنكية، أرصدة عملاء (recompute بعد الحذف تلقائياً).
+3. زر «نسخة احتياطية قبل التصفير» (export JSON) إجباري قبل التنفيذ.
+
+**تحقّق:** اختبار على بيانات وهمية + التأكد أن `recompute_customer_balance` يعود بصفر.
+
+---
+
+## الدفعة 4 — توافق كامل بين عرض السعر والفاتورة المحوَّلة
+
+**الهدف:** أي خاصية تظهر/تُحفظ في الفاتورة يجب أن تُنقل من عرض السعر عند التحويل (customer, currency, exchange_rate, items, notes, discount, packaging refs, transport refs, attachments, custom fields).
+
+**Subagents:**
+- D1: قراءة `quoteToInvoice.ts` + مخطط جدول `invoices` vs `quotes` وإخراج جدول diff بالحقول.
+- D2: فحص `QuoteCreatePage` مقابل `InvoiceCreatePage` لأي حقل UI موجود في الأولى ومفقود في التحويل.
+- D3: فحص المرفقات (`quote_attachments` → `invoice_attachments`) هل تُنسخ فعلاً؟
+
+**التنفيذ:**
+1. سدّ فجوات الحقول المكتشفة في `quoteToInvoice.ts`.
+2. نسخ المرفقات عبر تكرار الروابط (بدون duplication في storage — نستخدم نفس المسار مع row جديدة تشير للـ invoice).
+3. اختبار تحويل شامل + مقارنة الحقول قبل/بعد.
+
+**تحقّق:** e2e موجود `quote-to-invoice-flow.spec.ts` + توسيعه.
+
+---
+
+## الدفعة 5 — تدقيق شامل + إغلاق
+
+**Subagents (متوازية، 6 قطاعات وفق `albatool-ui-audit`):**
+- Sales · Inventory · Parties · Logistics · Finance · System
+
+كل واحد يُرجع JSON بأي regressions من الدفعات 1‑4. نصلح ما يظهر ثم ننشر.
+
+---
+
+## القواعد أثناء التنفيذ
+- بعد كل دفعة: انتظار build + قراءة تقرير subagents قبل الانتقال.
+- لا تعديل ملفات auto-gen (`client.ts`, `types.ts`, `.env`, `config.toml`).
+- كل جدول جديد يحصل على GRANT + RLS في نفس migration.
+- كل حفظ يستخدم `savingRef` guard + `duplicateDocGuard`.
+- لا hardcoded colors — tokens فقط.
+
+## Details تقنية مختصرة
+- مفاتيح التثبيت: `lov:u:{uid}:payment:pinned-method`, `lov:u:{uid}:payment:pinned-account` (بدون form-factor — عام لكل الأجهزة لأنه تفضيل مالي).
+- Reset RPC يعيد `jsonb` تلخيصي (كم صف حُذف لكل جدول).
+- Migration الحفظ المحلي: idempotent — يعمل مرة واحدة عبر flag `lov:migration:ff-split:v1`.
