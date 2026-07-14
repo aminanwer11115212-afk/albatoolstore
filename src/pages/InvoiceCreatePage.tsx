@@ -1668,7 +1668,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                       const net = debt - credit;
                       if (Math.abs(net) < 0.01) {
                         if (!customer.phone) {
-                          return <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>مسوّى</span>;
+                          return <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>خالص</span>;
                         }
                         return null;
                       }

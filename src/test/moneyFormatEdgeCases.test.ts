@@ -9,7 +9,7 @@ import { formatMoney, computeDisplayBalance, netBalanceOf } from "@/utils/balanc
  *   - No "-0" ever renders.
  *   - Whole numbers render without trailing decimals (never "1500.00").
  *   - Very large numbers keep the locale thousand separators.
- *   - Sub-cent residuals collapse to "مسوّى" (never render as "له 0").
+ *   - Sub-cent residuals collapse to "خالص" (never render as "له 0").
  */
 describe("formatMoney — edge cases", () => {
   it("negative zero renders as plain 0 (no leading minus sign)", () => {
@@ -57,7 +57,7 @@ describe("computeDisplayBalance — edge cases", () => {
   it("negative zero net → settled, no 'له' phantom", () => {
     const d = computeDisplayBalance({ balance: 0, credit_balance: 0 });
     expect(d.direction).toBe("settled");
-    expect(d.label).toBe("مسوّى");
+    expect(d.label).toBe("خالص");
     expect(Object.is(d.amount, -0)).toBe(false);
   });
 

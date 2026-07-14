@@ -359,7 +359,7 @@ export default function PublicCustomerStatementPage() {
           </div>
           <div className={`ps-summary-box ${totals.net > 0 ? "red" : totals.net < 0 ? "green" : ""}`}>
             <div className="ps-summary-box-title">
-              {totals.net > 0 ? "الصافي المستحق (عليه)" : totals.net < 0 ? "رصيد دائن (له)" : "الحساب مسوّى"}
+              {totals.net > 0 ? "الصافي المستحق (عليه)" : totals.net < 0 ? "رصيد دائن (له)" : "الحساب خالص"}
             </div>
             <div className="ps-summary-box-value">{fmt(Math.abs(totals.net))}</div>
           </div>
@@ -500,7 +500,7 @@ export default function PublicCustomerStatementPage() {
         {/* Final balance */}
         <div data-section="ps-final" data-section-label="الرصيد النهائي" className="ps-final">
           <div className="t">
-            {totals.net > 0 ? "الصافي المستحق على العميل" : totals.net < 0 ? "رصيد دائن للعميل" : "الحساب مسوّى"}
+            {totals.net > 0 ? "الصافي المستحق على العميل" : totals.net < 0 ? "رصيد دائن للعميل" : "الحساب خالص"}
           </div>
           <div className="v">{fmt(Math.abs(totals.net))} {company?.currency || ""}</div>
         </div>

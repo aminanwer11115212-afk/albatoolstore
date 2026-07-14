@@ -991,7 +991,7 @@ export default function PurchaseCreatePage() {
                       </span>
                     )}
                     {Number(selectedSupplier.balance || 0) === 0 && !selectedSupplier.phone && (
-                      <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>مسوّى</span>
+                      <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>خالص</span>
                     )}
                   </>
                 )}

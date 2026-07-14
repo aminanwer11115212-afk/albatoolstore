@@ -10,7 +10,7 @@ import { netBalanceOf } from "@/utils/balanceDisplay";
 function labelFor(net: number): { label: string; amount: number } {
   if (net > 0.01) return { label: "عليه", amount: net };
   if (net < -0.01) return { label: "له", amount: -net };
-  return { label: "مسوّى", amount: 0 };
+  return { label: "خالص", amount: 0 };
 }
 
 export async function refetchAndToastCustomerBalance(

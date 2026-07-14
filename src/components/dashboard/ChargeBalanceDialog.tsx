@@ -274,7 +274,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
                     صافي الحساب: <span className="font-bold text-emerald-600">له {Math.abs(netBefore).toLocaleString()}</span>
                   </span>
                 )}
-                {netBefore === 0 && <span className="text-muted-foreground">الحساب مسوّى</span>}
+                {netBefore === 0 && <span className="text-muted-foreground">الحساب خالص</span>}
               </div>
             )}
           </div>
@@ -358,7 +358,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
                 <div className="text-center">
                   <div className="text-muted-foreground">قبل</div>
                   <div className={`font-bold tabular-nums ${netBefore > 0 ? "text-destructive" : netBefore < 0 ? "text-emerald-600" : ""}`}>
-                    {netBefore > 0 ? `عليه ${netBefore.toLocaleString()}` : netBefore < 0 ? `له ${Math.abs(netBefore).toLocaleString()}` : "مسوّى"}
+                    {netBefore > 0 ? `عليه ${netBefore.toLocaleString()}` : netBefore < 0 ? `له ${Math.abs(netBefore).toLocaleString()}` : "خالص"}
                   </div>
                 </div>
                 <div className="text-center">
@@ -368,7 +368,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
                 <div className="text-center">
                   <div className="text-muted-foreground">بعد</div>
                   <div className={`font-bold tabular-nums ${netAfter > 0 ? "text-destructive" : netAfter < 0 ? "text-emerald-600" : ""}`}>
-                    {netAfter > 0 ? `عليه ${netAfter.toLocaleString()}` : netAfter < 0 ? `له ${Math.abs(netAfter).toLocaleString()}` : "مسوّى"}
+                    {netAfter > 0 ? `عليه ${netAfter.toLocaleString()}` : netAfter < 0 ? `له ${Math.abs(netAfter).toLocaleString()}` : "خالص"}
                   </div>
                 </div>
               </div>

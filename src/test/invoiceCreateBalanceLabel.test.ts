@@ -15,7 +15,7 @@ function simulateCustomer(invoices: Array<{ total: number; paid: number }>, cred
   return { balance, credit_balance: creditBalance };
 }
 
-describe("invoice-create — 'عليه/له/مسوّى' label parity", () => {
+describe("invoice-create — 'عليه/له/خالص' label parity", () => {
   it("single partial payment → 'عليه' with remainder", () => {
     const c = simulateCustomer([{ total: 1000, paid: 400 }]);
     const d = computeDisplayBalance(c);
@@ -56,10 +56,10 @@ describe("invoice-create — 'عليه/له/مسوّى' label parity", () => {
     expect(d.amount).toBe(300);
   });
 
-  it("rounding threshold: residual < 0.01 renders as 'مسوّى', not 'له'", () => {
+  it("rounding threshold: residual < 0.01 renders as 'خالص', not 'له'", () => {
     const c = simulateCustomer([{ total: 100.005, paid: 100 }]);
     const d = computeDisplayBalance(c);
-    expect(d.label).toBe("مسوّى");
+    expect(d.label).toBe("خالص");
   });
 
   it("rounding threshold: residual >= 0.01 still renders as 'عليه'", () => {
@@ -69,10 +69,10 @@ describe("invoice-create — 'عليه/له/مسوّى' label parity", () => {
     expect(d.amount).toBeCloseTo(0.02, 2);
   });
 
-  it("exactly balanced with credit → 'مسوّى'", () => {
+  it("exactly balanced with credit → 'خالص'", () => {
     const c = simulateCustomer([{ total: 100, paid: 0 }], 100);
     const d = computeDisplayBalance(c);
-    expect(d.label).toBe("مسوّى");
+    expect(d.label).toBe("خالص");
     expect(d.amount).toBe(0);
   });
 

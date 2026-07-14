@@ -129,7 +129,7 @@ export default function CustomerStatementPage() {
     if (!selectedCustomer) return;
     const remaining = totalInvoices - totalPaid;
     const netBal = netBalanceOf(selectedCustomer);
-    const netLabel = netBal > 0 ? "عليه (مدين لنا)" : netBal < 0 ? "له (دائن علينا)" : "مسوّى";
+    const netLabel = netBal > 0 ? "عليه (مدين لنا)" : netBal < 0 ? "له (دائن علينا)" : "خالص";
     const netColor: "red" | "green" = netBal > 0 ? "red" : "green";
     const payload: FinancialReportData = {
       title: "كشف حساب عميل",
@@ -288,7 +288,7 @@ export default function CustomerStatementPage() {
         const netBalance = netBalanceOf(selectedCustomer);
         const isDebtor = netBalance > 0;   // عليه — أحمر
         const isCreditor = netBalance < 0; // له — أخضر
-        const balanceLabel = isDebtor ? "عليه" : isCreditor ? "له" : "مسوّى";
+        const balanceLabel = isDebtor ? "عليه" : isCreditor ? "له" : "خالص";
         const balanceColor = isDebtor
           ? "text-destructive"
           : isCreditor

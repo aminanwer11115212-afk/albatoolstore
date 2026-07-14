@@ -291,7 +291,7 @@ export default function CustomerPaymentDialog({
         <div className="grid gap-3 py-2">
           {custBalance && (custBalance.debt > 0.01 || custBalance.credit > 0.01) && (() => {
             const net = custBalance.debt - custBalance.credit;
-            const label = net > 0.01 ? "عليه" : net < -0.01 ? "له" : "مسوّى";
+            const label = net > 0.01 ? "عليه" : net < -0.01 ? "له" : "خالص";
             const color = net > 0.01 ? "text-destructive" : net < -0.01 ? "text-emerald-600" : "";
             return (
               <div className="rounded-md border border-dashed border-border p-2 text-xs flex items-center justify-between bg-muted/30">

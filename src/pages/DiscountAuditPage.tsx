@@ -32,7 +32,7 @@ function fmt(n: number | null | undefined) {
 function balanceCell(v: number | null | undefined) {
   if (v === null || v === undefined) return <span className="text-muted-foreground">—</span>;
   const n = Number(v);
-  if (Math.abs(n) < 0.01) return <span className="text-muted-foreground">مسوّى</span>;
+  if (Math.abs(n) < 0.01) return <span className="text-muted-foreground">خالص</span>;
   return (
     <span className={n > 0 ? "text-destructive font-bold" : "text-emerald-600 font-bold"}>
       {n > 0 ? "عليه" : "له"} {Math.abs(n).toLocaleString()}

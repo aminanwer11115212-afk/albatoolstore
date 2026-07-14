@@ -32,7 +32,7 @@ describe("charge balance allocation — dues first, surplus as credit", () => {
     expect(row.credit_balance).toBe(300);
   });
 
-  it("charge == total dues → 'مسوّى'", () => {
+  it("charge == total dues → 'خالص'", () => {
     const row = afterCharge({ debt: 1000, charge: 1000 });
     expect(computeDisplayBalance(row).direction).toBe("settled");
     expect(netBalanceOf(row)).toBe(0);
@@ -88,8 +88,8 @@ describe("invoice-create header balance label — display contract", () => {
     expect(labelOf({ balance: 100, credit_balance: 50 })).toBe("عليه");
   });
 
-  it("'مسوّى' when everything nets to zero", () => {
-    expect(labelOf({ balance: 500, credit_balance: 500 })).toBe("مسوّى");
-    expect(labelOf({ balance: 0, credit_balance: 0 })).toBe("مسوّى");
+  it("'خالص' when everything nets to zero", () => {
+    expect(labelOf({ balance: 500, credit_balance: 500 })).toBe("خالص");
+    expect(labelOf({ balance: 0, credit_balance: 0 })).toBe("خالص");
   });
 });
