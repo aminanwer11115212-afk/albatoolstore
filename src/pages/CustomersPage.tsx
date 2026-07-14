@@ -130,6 +130,9 @@ export default function CustomersPage() {
   const [savingRow, setSavingRow] = useState<string | null>(null);
   const [quickAdd, setQuickAdd] = useState<{ name: string; address: string; phone: string; region_id: string; state_id: string; city: string; city_id: string; locality_id: string; group_id: string; transporter_id: string; destination_id: string }>({ name: "", address: "", phone: "", region_id: "", state_id: "", city: "", city_id: "", locality_id: "", group_id: "", transporter_id: "", destination_id: "" });
   const [quickSaving, setQuickSaving] = useState(false);
+  const [phonePicker, setPhonePicker] = useState<{ customerId: string; initialValue: string; customerName: string; field: "whatsapp" | "phone" } | null>(null);
+  const [quickAddTrOpen, setQuickAddTrOpen] = useState(false);
+  const [pendingTransporterName, setPendingTransporterName] = useState<string>("");
 
   // F9 → فتح نافذة إضافة عميل جديد / Esc → خروج من ملء الشاشة
   useEffect(() => {
