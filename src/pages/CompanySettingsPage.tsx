@@ -561,6 +561,9 @@ export default function CompanySettingsPage() {
         </Card>
       )}
 
+      {activeTab === "danger" && <DangerZoneTab />}
+
+
       <ImageCropDialog
         open={logoCropOpen}
         file={logoCropFile}
