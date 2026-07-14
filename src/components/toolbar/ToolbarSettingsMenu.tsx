@@ -80,7 +80,6 @@ export default function ToolbarSettingsMenu({ screenKey, zoom }: Props) {
   /** ينفّذ فعل القفل/فك القفل (مع حالة التخصيص) ويظهر Toast. */
   const performLockToggle = () => {
     const wasLocked = isLocked;
-    // اقرأ حالة التخصيص من localStorage مباشرة لتفادي أي مسار stale-closure.
     let isCustomizing = customizing;
     try {
       if (typeof window !== "undefined") {
@@ -88,9 +87,11 @@ export default function ToolbarSettingsMenu({ screenKey, zoom }: Props) {
       }
     } catch { /* noop */ }
     if (isCustomizing && !wasLocked) {
-      // اكتب "0" في التخزين مباشرة ثم استدعِ toggleCustomizing لتحديث الحالة.
-      try { localStorage.setItem("neobilling:toolbar-customizing:global:v1", "0"); } catch { /* noop */ }
-      if (customizing) toggleCustomizing();
+      // اكتب "0" مباشرة ودعّم بحدث حتى يزامن الـ Provider الحالة.
+      try {
+        localStorage.setItem("neobilling:toolbar-customizing:global:v1", "0");
+        window.dispatchEvent(new CustomEvent("neobilling:toolbar-customizing-changed", { detail: false }));
+      } catch { /* noop */ }
       window.setTimeout(() => {
         toggleLock();
       }, 0);
