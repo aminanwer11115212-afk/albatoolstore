@@ -289,6 +289,18 @@ export default function DocumentPreviewPage({ docType }: Props) {
     return () => { cancelled = true; };
   }, [id, docType, variant, noHeader, stocktakeSort, reloadTick]);
 
+  // إعادة تحميل المعاينة فوراً عند حفظ الفاتورة/تحديث العميل من نافذة أخرى
+  useEffect(() => {
+    const bump = () => setReloadTick((n) => n + 1);
+    window.addEventListener("invoices:changed", bump);
+    window.addEventListener("customers:changed", bump);
+    return () => {
+      window.removeEventListener("invoices:changed", bump);
+      window.removeEventListener("customers:changed", bump);
+    };
+  }, []);
+
+
   // استقبال رسالة "إغلاق" من زر ✕ داخل الـiframe → رجوع
   useEffect(() => {
     const onMsg = async (e: MessageEvent) => {

@@ -1219,12 +1219,18 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       savedRef.current = true;
       lastSavedIdRef.current = invId!;
       setSavedInvoiceId(invId!);
-      // بث حدث لتحديث الشاشات المرتبطة (الترحيلات، قائمة الفواتير)
+      // بث حدث لتحديث الشاشات المرتبطة (الترحيلات، قائمة الفواتير، كشف العميل، المعاينة، إدارة العملاء)
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
       // حدّث الشريط الجانبي (آخر الفواتير) فوراً حتى تظهر الفاتورة المحفوظة
       queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoices-full"] });
+      // تحديث كشف حساب العميل + إدارة العملاء فوراً بعد الحفظ
+      queryClient.invalidateQueries({ queryKey: ["customer-statement"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["customer_balance_stats"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
       // تحديث بيانات الدفع المحفوظة لتعكس القيم الجديدة بعد الحفظ
       setSavedTotal(Number(totals.total) || 0);
       setSavedPaid(computedPaid);
