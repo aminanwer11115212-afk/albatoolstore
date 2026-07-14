@@ -2849,6 +2849,18 @@ export type Database = {
         Returns: undefined
       }
       advance_invoke_safe: { Args: { _id: string }; Returns: undefined }
+      allocate_customer_charge: {
+        Args: {
+          _account_id: string
+          _amount: number
+          _customer_id: string
+          _date: string
+          _method: string
+          _notes: string
+          _reference_no: string
+        }
+        Returns: Json
+      }
       apply_stock_delta: {
         Args: { _delta: number; _product_id: string }
         Returns: undefined
