@@ -780,6 +780,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
 
   // ---------- Save ----------
   async function saveInvoice(opts: { andNew?: boolean; skipNavigate?: boolean; silent?: boolean } = {}): Promise<boolean> {
+    // بعد الحذف: لا نسمح بأي حفظ تلقائي/يدوي حتى لا نُعيد إنشاء الفاتورة المحذوفة.
+    if (deletedRef.current) return false;
     // حارس متزامن لمنع الإدراج المتوازي/المكرر (نقر مزدوج، saveThen + نقر يدوي، StrictMode...)
     if (isSavingRef.current) return false;
     isSavingRef.current = true;
