@@ -33,6 +33,38 @@ export function netBalanceOf(
   return Number(customer.balance || 0) - Number(customer.credit_balance || 0);
 }
 
+/**
+ * Unified display decision for the customer's net balance.
+ *
+ * Rules (must match InvoiceCreatePage, CustomerDetailView, statement pages):
+ *   - "عليه" appears ONLY when there's a positive net dues after subtracting credit_balance
+ *   - "له" appears ONLY when ALL invoices are paid and there's a surplus credit
+ *   - "مسوّى" when |net| < 0.01
+ *
+ * Any client-facing balance surface MUST route through this helper so the DB
+ * math (`recompute_customer_balance` -> `net_balance = balance - credit_balance`)
+ * and the UI never drift, regardless of decimal precision of totals/discounts.
+ */
+export type BalanceDirection = "debtor" | "creditor" | "settled";
+export function computeDisplayBalance(
+  customer: { balance?: number | null; credit_balance?: number | null; net_balance?: number | null } | null | undefined,
+): { direction: BalanceDirection; label: "عليه" | "له" | "مسوّى"; amount: number; net: number } {
+  const net = netBalanceOf(customer);
+  if (Math.abs(net) < 0.01) return { direction: "settled", label: "مسوّى", amount: 0, net: 0 };
+  if (net > 0) return { direction: "debtor", label: "عليه", amount: Math.abs(net), net };
+  return { direction: "creditor", label: "له", amount: Math.abs(net), net };
+}
+
+/**
+ * Formats a monetary amount consistently across DB-derived and UI-derived values.
+ * Rounds to 2 decimals to eliminate float precision drift (e.g. 0.1+0.2=0.3),
+ * then locale-formats without trailing zeros for whole numbers.
+ */
+export function formatMoney(n: number | null | undefined): string {
+  const v = Math.round(Number(n || 0) * 100) / 100;
+  return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 /** Returns an Arabic label + color for a balance value. */
 export function balanceLabel(balance: number): {
   label: string;      // e.g. "عليه" | "له" | ""
