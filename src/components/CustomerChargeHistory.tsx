@@ -349,7 +349,7 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
                 size="sm"
                 variant="outline"
                 className="h-7 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
-                onClick={() => handleReverseGroup(g)}
+                onClick={() => setPendingReverse(g)}
                 disabled={reversingGroupId === g.groupId}
                 data-testid="reverse-charge-btn"
                 title="إلغاء هذه الشحنة وإعادة الأرصدة"
