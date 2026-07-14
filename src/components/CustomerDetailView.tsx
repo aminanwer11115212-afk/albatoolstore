@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { exportContactToDevice } from "@/utils/exportContact";
 import ChargeBalanceDialog from "@/components/dashboard/ChargeBalanceDialog";
+import CustomerNetBalanceCard from "@/components/CustomerNetBalanceCard";
 
 
 interface Props {
