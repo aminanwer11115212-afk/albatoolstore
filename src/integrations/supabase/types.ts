@@ -2874,6 +2874,10 @@ export type Database = {
         Args: { p_invoice_id: string }
         Returns: undefined
       }
+      delete_invoice_with_reconciliation: {
+        Args: { _invoice_id: string }
+        Returns: Json
+      }
       find_duplicate_invoice: {
         Args: {
           _customer_id: string
@@ -2911,6 +2915,7 @@ export type Database = {
         Returns: undefined
       }
       restore_purchase_stock_once: { Args: { _po_id: string }; Returns: Json }
+      reverse_customer_charge: { Args: { _group_id: string }; Returns: Json }
       workflow_rank: { Args: { _s: string }; Returns: number }
     }
     Enums: {
