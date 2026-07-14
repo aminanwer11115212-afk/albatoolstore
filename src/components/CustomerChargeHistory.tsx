@@ -2,13 +2,14 @@ import { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle, Download, AlertTriangle, CheckCircle2, ArrowUpDown } from "lucide-react";
+import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle, Download, AlertTriangle, CheckCircle2, ArrowUpDown, Undo2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { computeReconciliation, sortGroups, type SortKey } from "@/lib/chargeReconciliation";
+import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
 
 const PAGE_SIZE = 10;
 const LS_KEY = (cid: string) => `albatool.chargeHistory.filters.${cid}`;
