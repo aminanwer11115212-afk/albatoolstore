@@ -33,13 +33,13 @@ describe("CustomerNetBalanceCard — color + layout fingerprint", () => {
     expect(screen.getByTestId("net-balance-label").textContent).toBe("له");
   });
 
-  it("settled: neutral muted tone + 'مسوّى' label + no amount rendered", () => {
+  it("settled: neutral muted tone + 'خالص' label + no amount rendered", () => {
     renderCard({ balance: 100, credit_balance: 100 });
     const card = screen.getByTestId("net-balance-card");
     expect(card.getAttribute("data-direction")).toBe("settled");
     expect(card.className).toMatch(/bg-muted/);
     expect(card.className).toMatch(/border-border/);
-    expect(screen.getByTestId("net-balance-label").textContent).toBe("مسوّى");
+    expect(screen.getByTestId("net-balance-label").textContent).toBe("خالص");
     // Settled hides the amount span
     expect(screen.queryByTestId("net-balance-amount")).toBeNull();
   });

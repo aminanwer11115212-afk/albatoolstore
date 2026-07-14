@@ -1027,7 +1027,7 @@ export default function StockReturnCreatePage() {
                             </span>
                           )}
                           {_net === 0 && !customer.phone && (
-                            <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>مسوّى</span>
+                            <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>خالص</span>
                           )}
                         </>
                       );

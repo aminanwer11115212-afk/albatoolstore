@@ -48,7 +48,7 @@ describe("precision parity — DB balance ↔ UI display", () => {
   });
 
   it("net = balance - credit_balance survives float subtraction", () => {
-    // paying 100.10 against 100.10 debt should render as 'مسوّى', not 'له 0.0000001'
+    // paying 100.10 against 100.10 debt should render as 'خالص', not 'له 0.0000001'
     const net = netBalanceOf({ balance: 100.1, credit_balance: 100.1 });
     expect(Math.abs(net)).toBeLessThan(0.01);
     expect(computeDisplayBalance({ balance: 100.1, credit_balance: 100.1 }).direction).toBe("settled");
@@ -57,7 +57,7 @@ describe("precision parity — DB balance ↔ UI display", () => {
   it("tiny residual under 0.01 is treated as settled (no phantom 'له')", () => {
     const d = computeDisplayBalance({ balance: 500, credit_balance: 500.004 });
     expect(d.direction).toBe("settled");
-    expect(d.label).toBe("مسوّى");
+    expect(d.label).toBe("خالص");
   });
 
   it("formatMoney preserves whole numbers without trailing .00", () => {
