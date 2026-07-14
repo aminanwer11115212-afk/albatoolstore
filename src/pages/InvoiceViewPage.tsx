@@ -303,16 +303,23 @@ export default function InvoiceViewPage() {
     }
   };
 
+  const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => {
-    if (!invoice) return;
-    if (!confirm("هل أنت متأكد من حذف هذه الفاتورة؟ سيتم إرجاع الكميات إلى المخزون.")) return;
+    if (!invoice || deleting) return;
+    const label = invoice.invoice_number ? `«${invoice.invoice_number}»` : "";
+    const when = invoice.date ? ` بتاريخ ${invoice.date}` : "";
+    if (!confirm(`هل أنت متأكد من حذف الفاتورة ${label}${when}؟ سيتم إرجاع الكميات إلى المخزون. لا يمكن التراجع.`)) return;
+    setDeleting(true);
     try {
       const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
-      const { restoredStock } = await deleteInvoiceWithStockRestore(invoice.id);
-      toast.success(restoredStock ? "تم حذف الفاتورة وإرجاع الكميات إلى المخزون" : "تم حذف الفاتورة");
+      const { restoredStock, convertedToCredit } = await deleteInvoiceWithStockRestore(invoice.id);
+      const parts = [restoredStock ? "تم حذف الفاتورة وإرجاع الكميات إلى المخزون" : "تم حذف الفاتورة"];
+      if (convertedToCredit > 0.01) parts.push(`— تم تحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
+      toast.success(parts.join(" "));
       navigate("/invoices", { replace: true });
     } catch (e: any) {
       toast.error(e?.message || "تعذّر حذف الفاتورة");
+      setDeleting(false);
     }
   };
 

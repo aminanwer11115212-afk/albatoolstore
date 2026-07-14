@@ -99,10 +99,12 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
   };
 
   const confirmDelete = useConfirmDelete();
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: string, meta?: { invoice_number?: string; date?: string }) => {
+    const label = meta?.invoice_number ? `«${meta.invoice_number}»` : "";
+    const when = meta?.date ? ` بتاريخ ${meta.date}` : "";
     confirmDelete({
       title: "حذف الفاتورة",
-      description: "هل أنت متأكد من حذف هذه الفاتورة؟ سيتم إرجاع الكميات إلى المخزون.",
+      description: `هل أنت متأكد من حذف الفاتورة ${label}${when}؟ سيتم إرجاع الكميات إلى المخزون. لا يمكن التراجع.`,
       confirmLabel: "حذف الفاتورة",
       errorMessage: "تعذّر حذف الفاتورة",
       onConfirm: async () => {
@@ -120,6 +122,8 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
         qc.invalidateQueries({ queryKey: ["invoices"] });
         qc.invalidateQueries({ queryKey: ["customers"] });
         qc.invalidateQueries({ queryKey: ["transactions"] });
+        qc.invalidateQueries({ queryKey: ["products"] });
+        try { refetch(); } catch {}
         const parts = ["تم حذف الفاتورة"];
         if (restoredStock) parts.push("وإرجاع الكميات إلى المخزون");
         if (convertedToCredit > 0.01) parts.push(`وتحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
@@ -543,7 +547,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                         <button
                           type="button"
                           className="btn-xs btn-danger"
-                          onClick={() => handleDelete(inv.id)}
+                          onClick={() => handleDelete(inv.id, { invoice_number: inv.invoice_number, date: fmtDate(inv.date) })}
                           title="حذف"
                         >
                           🗑
@@ -591,7 +595,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                       {pickCustomerWhatsApp(inv.customers) && (
                         <button className="btn-xs btn-primary" onClick={() => handleWhatsApp(inv)}>✉ واتساب</button>
                       )}
-                      <button className="btn-xs btn-danger" onClick={() => handleDelete(inv.id)}>🗑 حذف</button>
+                      <button className="btn-xs btn-danger" onClick={() => handleDelete(inv.id, { invoice_number: inv.invoice_number, date: fmtDate(inv.date) })}>🗑 حذف</button>
                     </>
                   }
                 />

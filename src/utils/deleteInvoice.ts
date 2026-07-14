@@ -5,6 +5,7 @@ export type DeleteInvoiceResult = {
   restoredStock: boolean;
   invoiceNumber: string | null;
   convertedToCredit: number;
+  restoredItems: Array<{ product_id: string | null; quantity: number }>;
 };
 
 /**
@@ -12,6 +13,7 @@ export type DeleteInvoiceResult = {
  * إن كانت خُصمت سابقاً. إن كانت الفاتورة قد سُدّدت جزئياً/كلياً، يتم
  * تحويل الدفعات المرتبطة بها إلى **رصيد دائن للعميل** تلقائياً عبر RPC
  * ذرّي `delete_invoice_with_reconciliation` — حتى لا يُفقد المبلغ.
+ * يسجّل العملية في `activity_log` (من قام بالحذف ومتى وماذا استُرجع).
  */
 export async function deleteInvoiceWithStockRestore(
   invoiceId: string,
@@ -28,10 +30,10 @@ export async function deleteInvoiceWithStockRestore(
   const convertedToCredit = Number(reconc?.paid_amount || 0);
 
 
-  // 1) قراءة بيانات الحارس + رقم الفاتورة + حالة سير العمل
+  // 1) قراءة بيانات الحارس + رقم الفاتورة + معلومات لقطة الـ Audit
   const { data: inv, error: invErr } = await supabase
     .from("invoices")
-    .select("id, invoice_number, stock_deduction_id, stock_deducted_at, workflow_status")
+    .select("id, invoice_number, date, customer_id, total, paid_amount, status, stock_deduction_id, stock_deducted_at, workflow_status")
     .eq("id", invoiceId)
     .maybeSingle();
   if (invErr) throw new Error(`تعذّر قراءة الفاتورة: ${invErr.message}`);
@@ -101,7 +103,44 @@ export async function deleteInvoiceWithStockRestore(
   const { error: delErr } = await supabase.from("invoices").delete().eq("id", invoiceId);
   if (delErr) throw new Error(`فشل حذف الفاتورة: ${delErr.message}`);
 
-  // 6) إخطار باقي الشاشات بتحديث المخزون والقوائم
+  // 6) سجل Audit — من قام بالحذف، متى، وما الذي استُرجع (بدون إيقاف العملية عند الفشل)
+  const restoredItems = restoredStock
+    ? (items || []).map((it: any) => ({ product_id: it.product_id ?? null, quantity: Number(it.quantity || 0) }))
+    : [];
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    const email = userData?.user?.email || null;
+    const uid = userData?.user?.id || null;
+    await (supabase as any).from("activity_log").insert({
+      entity_type: "invoice",
+      entity_id: invoiceId,
+      action: "delete",
+      user_email: email,
+      user_name: email,
+      changed_by: uid,
+      table_name: "invoices",
+      record_id: invoiceId,
+      old_data: {
+        invoice_number: (inv as any).invoice_number,
+        date: (inv as any).date,
+        customer_id: (inv as any).customer_id,
+        total: (inv as any).total,
+        paid_amount: (inv as any).paid_amount,
+        status: (inv as any).status,
+        workflow_status: (inv as any).workflow_status,
+      },
+      details: {
+        restored_stock: restoredStock,
+        restored_items: restoredItems,
+        converted_to_credit: convertedToCredit,
+        items_count: (items || []).length,
+      },
+    });
+  } catch (auditErr) {
+    console.warn("[deleteInvoice] audit log failed (non-fatal)", auditErr);
+  }
+
+  // 7) إخطار باقي الشاشات بتحديث المخزون والقوائم
   if (typeof window !== "undefined") {
     try { window.dispatchEvent(new Event("products:changed")); } catch {}
     try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
@@ -113,5 +152,6 @@ export async function deleteInvoiceWithStockRestore(
     restoredStock,
     invoiceNumber: (inv as any).invoice_number ?? null,
     convertedToCredit,
+    restoredItems,
   };
 }
