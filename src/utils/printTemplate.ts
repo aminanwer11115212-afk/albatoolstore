@@ -420,21 +420,21 @@ ${showAccount ? (() => {
   const finalDisplay = Math.max(finalNet, 0); // نُبقي التعاقد مع share: لا سالب
   const finalBadge = finalNet > 0.01 ? "عليه" : finalNet < -0.01 ? "له" : "مسددة بالكامل";
   const finalColor = finalNet > 0.01 ? "#c0392b" : "#16a34a";
-  const cellR = "padding:9px 14px;text-align:right;font-weight:700;color:#111;background:#fafafa;border:1.5px solid #111;";
-  const cellL = "padding:9px 14px;text-align:left;font-weight:800;color:#111;border:1.5px solid #111;";
+  const cellR = "padding:4px 8px;text-align:right;font-weight:700;color:#111;background:#fafafa;border:1px solid #111;line-height:1.15;";
+  const cellL = "padding:4px 8px;text-align:left;font-weight:800;color:#111;border:1px solid #111;line-height:1.15;";
   const row = (opts: {
     section: string; label: string; value: string;
     valColor?: string; strong?: boolean; sideBadge?: string; badgeColor?: string;
     valueClass?: string;
   }) => `
     <tr data-section="${opts.section}" data-section-label="${opts.label}">
-      <td style="${cellR}${opts.strong ? "font-size:14px;" : ""}">${opts.label}</td>
-      <td class="${opts.valueClass || "summary-box-value"}" style="${cellL}${opts.valColor ? `color:${opts.valColor};` : ""}${opts.strong ? "font-size:15px;" : ""}">${opts.value}</td>
-      <td style="border:none;padding:0 8px;text-align:right;font-weight:800;color:${opts.badgeColor || "#111"};white-space:nowrap;">${opts.sideBadge || ""}</td>
+      <td style="${cellR}${opts.strong ? "font-size:11px;" : ""}">${opts.label}</td>
+      <td class="${opts.valueClass || "summary-box-value"}" style="${cellL}${opts.valColor ? `color:${opts.valColor};` : ""}${opts.strong ? "font-size:12px;" : ""}">${opts.value}</td>
+      <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:10px;color:${opts.badgeColor || "#111"};white-space:nowrap;">${opts.sideBadge || ""}</td>
     </tr>`;
   return `
 <!-- ملخّص الحساب: قيمة الفاتورة → الخصم → الحساب القديم → جملة الحساب → المدفوع → الحساب الكلي -->
-<table data-section="account-summary" data-section-label="ملخص الحساب" style="width:60%;max-width:420px;margin:14px 0 8px;border-collapse:separate;border-spacing:0 6px;font-size:13px;">
+<table data-section="account-summary" data-section-label="ملخص الحساب" style="width:44%;max-width:300px;margin:8px 0 4px;border-collapse:separate;border-spacing:0 2px;font-size:10.5px;">
   <tbody>
     ${row({ section: "invoice-value", label: "قيمة الفاتورة", value: fmt(invoiceValue) })}
     ${generalDiscount > 0.01 ? row({ section: "discount-row", label: "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : ""}
@@ -449,9 +449,9 @@ ${showAccount ? (() => {
     ${row({ section: "majmoo-row", label: "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
     ${row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
     <tr data-section="final-status" data-section-label="الحساب الكلي">
-      <td style="${cellR}font-size:14px;">الحساب الكلي</td>
-      <td data-section="final-total" data-section-label="الحساب الكلي" class="summary-box-value" style="${cellL}font-size:15px;color:${finalColor};">${fmt(finalDisplay)}</td>
-      <td style="border:none;padding:0 8px;text-align:right;font-weight:800;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
+      <td style="${cellR}font-size:11px;">الحساب الكلي</td>
+      <td data-section="final-total" data-section-label="الحساب الكلي" class="summary-box-value" style="${cellL}font-size:12px;color:${finalColor};">${fmt(finalDisplay)}</td>
+      <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:10px;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
     </tr>
   </tbody>
 </table>
