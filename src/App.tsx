@@ -125,6 +125,7 @@ const FinancialReportPreviewPage = lazy(() => import("./pages/FinancialReportPre
 const CloudUsagePage = lazy(() => import("./pages/CloudUsagePage"));
 const PerformanceReportPage = lazy(() => import("./pages/PerformanceReportPage"));
 const DataHealthPage = lazy(() => import("./pages/DataHealthPage"));
+const FinanceHealthPage = lazy(() => import("./pages/FinanceHealthPage"));
 const SystemStatusPage = lazy(() => import("./pages/SystemStatusPage"));
 const DataMigrationPage = lazy(() => import("./pages/DataMigrationPage"));
 const PublicCustomerStatementPage = lazy(() => import("./pages/PublicCustomerStatementPage"));
