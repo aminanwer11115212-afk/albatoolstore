@@ -71,7 +71,7 @@ export default function CustomerPaymentDialog({
   const [amount, setAmount] = useState<string>(remaining ? String(remaining) : "");
   const [discount, setDiscount] = useState<string>("");
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<Method>("cash");
+  const [method, setMethod] = useState<Method>("bank");
   const [accountId, setAccountId] = useState<string>("");
   const [referenceNo, setReferenceNo] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
@@ -82,7 +82,7 @@ export default function CustomerPaymentDialog({
       setAmount(remaining ? String(remaining) : "");
       setDiscount("");
       setDate(new Date().toISOString().slice(0, 10));
-      setMethod("cash");
+      setMethod("bank");
       setAccountId("");
       setReferenceNo("");
       setNotes("");
