@@ -427,6 +427,14 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
           </Button>
         </div>
       )}
+
+      <ReverseChargeConfirmDialog
+        open={!!pendingReverse}
+        group={pendingReverse}
+        pending={reversingGroupId === pendingReverse?.groupId}
+        onConfirm={() => pendingReverse && executeReverse(pendingReverse)}
+        onCancel={() => setPendingReverse(null)}
+      />
     </div>
   );
 }
