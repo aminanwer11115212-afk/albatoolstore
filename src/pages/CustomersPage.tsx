@@ -24,6 +24,8 @@ import GeoStructurePanel from "@/components/customers/GeoStructurePanel";
 import CustomerLogisticsTable from "@/components/customers/CustomerLogisticsTable";
 import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDialog";
 import ContactPickerButton from "@/components/shared/ContactPickerButton";
+import PhonePickerDialog from "@/components/customer/PhonePickerDialog";
+import QuickAddTransporterDialog from "@/components/dispatch/QuickAddTransporterDialog";
 import { normalizePhoneInput } from "@/utils/phoneNormalize";
 const emptyForm = { name: "", phone: "", address: "", notes: "", city: "", region_id: "" as string | null | "", state_id: "" as string | null | "", locality_id: "" as string | null | "", city_id: "" as string | null | "" };
 
@@ -128,6 +130,9 @@ export default function CustomersPage() {
   const [savingRow, setSavingRow] = useState<string | null>(null);
   const [quickAdd, setQuickAdd] = useState<{ name: string; address: string; phone: string; region_id: string; state_id: string; city: string; city_id: string; locality_id: string; group_id: string; transporter_id: string; destination_id: string }>({ name: "", address: "", phone: "", region_id: "", state_id: "", city: "", city_id: "", locality_id: "", group_id: "", transporter_id: "", destination_id: "" });
   const [quickSaving, setQuickSaving] = useState(false);
+  const [phonePicker, setPhonePicker] = useState<{ customerId: string; initialValue: string; customerName: string; field: "whatsapp" | "phone" } | null>(null);
+  const [quickAddTrOpen, setQuickAddTrOpen] = useState(false);
+  const [pendingTransporterName, setPendingTransporterName] = useState<string>("");
 
   // F9 → فتح نافذة إضافة عميل جديد / Esc → خروج من ملء الشاشة
   useEffect(() => {
@@ -583,12 +588,12 @@ export default function CustomersPage() {
     toast.success(`تمت إضافة المجموعة: ${name}`);
     return data.id;
   };
+  // إضافة ناقل جديد — نفتح حوار «إضافة ناقل» الموحّد (نفس صفحة إدارة الترحيلات)
+  // ليجمع كل تفاصيل الناقل (اسم/هاتف/عنوان/وجهات) في مكان واحد بدل إدراج اسم فقط.
   const createTransporter = async (name: string): Promise<string | null> => {
-    const { data, error } = await (supabase as any).from("transporters").insert({ name }).select("id,name").single();
-    if (error) { toast.error(error.message); return null; }
-    setTransporters(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    toast.success(`تمت إضافة ترحيلات: ${name}`);
-    return data.id;
+    setPendingTransporterName(name || "");
+    setQuickAddTrOpen(true);
+    return null;
   };
   const createDestination = async (name: string): Promise<string | null> => {
     const { data, error } = await (supabase as any).from("destinations").insert({ name }).select("id,name").single();
@@ -1863,25 +1868,25 @@ export default function CustomersPage() {
                           />
                         </td>
                         <td className="tabular-nums" style={{ padding: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <EditableCell
-                                value={c.whatsapp || ""}
-                                disabled={savingRow === c.id}
-                                onSave={(v) => updateRowField(c.id, { whatsapp: normalizePhoneInput(v) || null })}
-                                inputClassName="text-[11px] tabular-nums"
-                                placeholder="واتساب"
-                                inputMode="tel"
-                                dir="ltr"
-                                validate={(v) => {
-                                  const t = normalizePhoneInput(v);
-                                  if (!t) return null;
-                                  if (!isValidWhatsAppPhone(t)) return "رقم غير صالح للإرسال (8-15 خانة)";
-                                  const dups = findDuplicatesByPhone(t, c.id);
-                                  return dups.length > 0 ? `رقم مكرر مع: ${dups.map((d: any) => d.name).slice(0, 2).join("، ")}` : null;
-                                }}
-                              />
-                            </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 4px" }}>
+                            <button
+                              type="button"
+                              disabled={savingRow === c.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPhonePicker({
+                                  customerId: c.id,
+                                  initialValue: c.whatsapp || "",
+                                  customerName: c.name || "",
+                                  field: "whatsapp",
+                                });
+                              }}
+                              title="اضغط لتعديل الرقم أو استيراده من جهات الاتصال"
+                              className="text-[11px] tabular-nums text-right w-full truncate hover:text-primary hover:underline disabled:opacity-50 cursor-pointer bg-transparent border-0 outline-none"
+                              style={{ padding: "6px 4px", direction: "ltr" }}
+                            >
+                              {c.whatsapp || <span className="text-muted-foreground opacity-60">— اضغط للإدخال —</span>}
+                            </button>
                             {(() => {
                               const wa = pickCustomerWhatsApp(c);
                               if (!wa) return null;
@@ -2079,6 +2084,48 @@ export default function CustomersPage() {
           onDone={() => setUnlinkDialog(null)}
         />
       )}
+
+
+
+      {phonePicker && (
+        <PhonePickerDialog
+          open={!!phonePicker}
+          onOpenChange={(v) => { if (!v) setPhonePicker(null); }}
+          initialValue={phonePicker.initialValue}
+          customerName={phonePicker.customerName}
+          fieldLabel="واتساب / رقم الهاتف"
+          validate={(v) => {
+            const t = normalizePhoneInput(v);
+            if (!t) return null;
+            if (!isValidWhatsAppPhone(t)) return "رقم غير صالح للإرسال (8-15 خانة)";
+            const dups = findDuplicatesByPhone(t, phonePicker.customerId);
+            return dups.length > 0 ? `رقم مكرر مع: ${dups.map((d: any) => d.name).slice(0, 2).join("، ")}` : null;
+          }}
+          onSave={async (v) => {
+            const norm = normalizePhoneInput(v) || null;
+            const patch = phonePicker.field === "whatsapp" ? { whatsapp: norm } : { phone: norm };
+            await updateRowField(phonePicker.customerId, patch);
+            setPhonePicker(null);
+          }}
+        />
+      )}
+
+      <QuickAddTransporterDialog
+        open={quickAddTrOpen}
+        onOpenChange={setQuickAddTrOpen}
+        initialName={pendingTransporterName}
+        onCreated={(row) => {
+          if (!row?.id) return;
+          setTransporters(prev => {
+            if (prev.some(t => t.id === row.id)) return prev;
+            return [...prev, { id: row.id, name: row.name }]
+              .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+          });
+          setPendingTransporterName("");
+          queryClient.invalidateQueries({ queryKey: ["transporters"] });
+        }}
+      />
     </div>
   );
 }
+
