@@ -324,8 +324,8 @@ export default function InvoiceViewPage() {
       navigate("/invoices", { replace: true });
     } catch (e: any) {
       // إعادة تحميل الفاتورة لضمان أن أي تعديل جزئي (لو حصل) يظهر على الفور.
-      try { queryClient.invalidateQueries({ queryKey: ["invoice", invoice.id] }); } catch {}
-      try { queryClient.invalidateQueries({ queryKey: ["invoices"] }); } catch {}
+      try { qc.invalidateQueries({ queryKey: ["invoice", invoice.id] }); } catch {}
+      try { qc.invalidateQueries({ queryKey: ["invoices"] }); } catch {}
       toast.error(`تعذّر حذف الفاتورة: ${e?.message || "خطأ غير معروف"} — لم يُحذف شيء، حالة الفاتورة كما هي.`, { duration: 8000 });
       setDeleting(false);
     }
