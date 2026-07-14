@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { computeReconciliation, sortGroups, type SortKey } from "@/lib/chargeReconciliation";
-import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
+import { ReverseChargeConfirmDialog } from "@/components/customer/ReverseChargeConfirmDialog";
 
 const PAGE_SIZE = 10;
 const LS_KEY = (cid: string) => `albatool.chargeHistory.filters.${cid}`;
@@ -53,30 +53,64 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [reconMsg, setReconMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [reversingGroupId, setReversingGroupId] = useState<string | null>(null);
-  const confirmDelete = useConfirmDelete();
+  const [pendingReverse, setPendingReverse] = useState<ChargeGroup | null>(null);
 
-  async function handleReverseGroup(g: ChargeGroup) {
-    confirmDelete({
-      title: "إلغاء شحنة رصيد",
-      description: `سيتم عكس شحنة الرصيد بتاريخ ${g.date} (${fmt(g.total)}). ستُعاد المبالغ الموزَّعة على الفواتير كديون مستحقّة، ويُلغى الفائض من الرصيد الدائن. لا يمكن التراجع عن هذا الإجراء.`,
-      confirmLabel: "نعم، ألغِ الشحنة",
-      successMessage: "تم إلغاء الشحنة وإعادة أرصدة الفواتير",
-      onConfirm: async () => {
-        setReversingGroupId(g.groupId);
-        try {
-          const { data, error } = await (supabase as any).rpc("reverse_customer_charge", { _group_id: g.groupId });
-          if (error) throw new Error(error.message);
-          if (!data?.ok) throw new Error(data?.reason || "فشل إلغاء الشحنة");
-          await qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
-          await qc.invalidateQueries({ queryKey: ["customers"] });
-          await qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
-          await qc.invalidateQueries({ queryKey: ["invoices"] });
-          await qc.invalidateQueries({ queryKey: ["transactions"] });
-        } finally {
-          setReversingGroupId(null);
-        }
-      },
-    });
+  async function executeReverse(g: ChargeGroup) {
+    setReversingGroupId(g.groupId);
+    try {
+      const { data, error } = await (supabase as any).rpc("reverse_customer_charge", { _group_id: g.groupId });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.reason || "فشل إلغاء الشحنة");
+
+      // Audit log — record who reversed, invoice numbers, group_id, when, and reason.
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const email = userData?.user?.email || null;
+        const uid = userData?.user?.id || null;
+        await (supabase as any).from("activity_log").insert({
+          entity_type: "customer_charge",
+          entity_id: customerId,
+          action: "reverse_charge",
+          user_email: email,
+          user_name: email,
+          changed_by: uid,
+          table_name: "transactions",
+          record_id: null,
+          details: {
+            group_id: g.groupId,
+            charge_date: g.date,
+            method: g.method,
+            total: g.total,
+            allocated: g.allocated,
+            surplus: g.surplus,
+            invoices: g.items.map((it) => ({
+              invoice_id: it.invoice_id || null,
+              invoice_number: it.invoice_number || null,
+              applied: it.applied,
+              paid_before: it.paid_before,
+              paid_after: it.paid_after,
+            })),
+            rpc_result: data,
+            reason: "manual_reverse_from_customer_detail",
+            executed_at: new Date().toISOString(),
+          },
+        });
+      } catch (auditErr) {
+        console.warn("[reverse_customer_charge] audit log failed (non-fatal)", auditErr);
+      }
+
+      await qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
+      await qc.invalidateQueries({ queryKey: ["customers"] });
+      await qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      await qc.invalidateQueries({ queryKey: ["invoices"] });
+      await qc.invalidateQueries({ queryKey: ["transactions"] });
+      toast.success("تم إلغاء الشحنة وإعادة أرصدة الفواتير");
+      setPendingReverse(null);
+    } catch (e: any) {
+      toast.error(e?.message || "تعذّر إلغاء الشحنة");
+    } finally {
+      setReversingGroupId(null);
+    }
   }
 
   const { data, isLoading } = useQuery({
