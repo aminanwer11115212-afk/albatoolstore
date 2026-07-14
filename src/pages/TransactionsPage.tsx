@@ -209,7 +209,21 @@ export default function TransactionsPage() {
                     <td className="px-4 py-3 text-foreground">{methodMap[t.method] || t.method || "-"}</td>
                     <td className="px-4 py-3 print:hidden">
                       <div className="flex items-center gap-1">
-                        <button onClick={async () => { if (!confirm("حذف هذه المعاملة؟")) return; try { await remove.mutateAsync(t.id); toast.success("تم الحذف"); } catch (e: any) { toast.error(e.message); } }}
+                        <button onClick={async () => {
+                          // منع الحذف الخام لمعاملات مرتبطة بفواتير/شحن رصيد لتفادي تشويش الأرصدة.
+                          // القاعدة: دفعات/رصيد العملاء تُلغى من صفحة تفاصيل العميل (زر «إلغاء الشحنة»)
+                          // أو بحذف الفاتورة نفسها (التي تحوّل الدفعة إلى رصيد دائن تلقائياً).
+                          if (t.category === "customer_payment" || t.category === "customer_credit") {
+                            toast.error("لا يمكن حذف دفعة/شحن رصيد من هنا. استخدم «إلغاء الشحنة» في تفاصيل العميل، أو احذف الفاتورة المرتبطة.", { duration: 6000 });
+                            return;
+                          }
+                          if (t.category === "supplier_payment") {
+                            toast.error("لا يمكن حذف دفعة مورد من هنا. احذفها من صفحة أوامر الشراء الخاصة بها.", { duration: 6000 });
+                            return;
+                          }
+                          if (!confirm("حذف هذه المعاملة؟")) return;
+                          try { await remove.mutateAsync(t.id); toast.success("تم الحذف"); } catch (e: any) { toast.error(e.message); }
+                        }}
                           className="px-2 py-1 bg-destructive/10 text-destructive rounded text-xs hover:bg-destructive/20 inline-flex items-center gap-1 min-h-[40px]"><Trash2 size={12} /> حذف</button>
                       </div>
                     </td>
