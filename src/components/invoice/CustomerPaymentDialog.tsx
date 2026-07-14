@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import DiscountInput from "@/components/shared/DiscountInput";
+import { Pin } from "lucide-react";
 
 type Method = "cash" | "bank" | "card" | "mobile";
 
