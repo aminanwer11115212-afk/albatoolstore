@@ -61,7 +61,8 @@ export function computeDisplayBalance(
  * then locale-formats without trailing zeros for whole numbers.
  */
 export function formatMoney(n: number | null | undefined): string {
-  const v = Math.round(Number(n || 0) * 100) / 100;
+  let v = Math.round(Number(n || 0) * 100) / 100;
+  if (Object.is(v, -0) || v === 0) v = 0; // normalize -0 → 0
   return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
