@@ -64,8 +64,12 @@ export default function CustomerPaymentDialog({
 }: Props) {
   const qc = useQueryClient();
   const { data: accounts, isLoading: accountsLoading, isError: accountsError, refetch: refetchAccounts } = useAccounts();
+  const { isAdmin, permissions } = useUserRole();
+  const canRecordPayment = isAdmin || permissions.record_payment !== false;
+  const canApplyDiscount = isAdmin || permissions.apply_discount !== false;
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const remaining = Math.max(0, Number(total || 0) - Number(paidBefore || 0));
 
