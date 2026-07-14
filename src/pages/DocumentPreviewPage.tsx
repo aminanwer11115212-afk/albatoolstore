@@ -5,6 +5,7 @@ import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 import { loadInvoiceExtras, loadQuoteExtras } from "@/utils/printExtras";
 import { ArrowRight, Loader2, Wallet } from "lucide-react";
 import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
+import InvoicePaymentHistory from "@/components/invoice/InvoicePaymentHistory";
 import DiscountInput from "@/components/shared/DiscountInput";
 import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
 import { toast } from "sonner";
