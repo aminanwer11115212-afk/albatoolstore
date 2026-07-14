@@ -80,9 +80,17 @@ export default function ToolbarSettingsMenu({ screenKey, zoom }: Props) {
   /** ينفّذ فعل القفل/فك القفل (مع حالة التخصيص) ويظهر Toast. */
   const performLockToggle = () => {
     const wasLocked = isLocked;
-    if (customizing && !wasLocked) {
-      toggleCustomizing();
-      // اضمن التزام التغييرات قبل التقاط لقطة القفل.
+    // اقرأ حالة التخصيص من localStorage مباشرة لتفادي أي مسار stale-closure.
+    let isCustomizing = customizing;
+    try {
+      if (typeof window !== "undefined") {
+        isCustomizing = localStorage.getItem("neobilling:toolbar-customizing:global:v1") === "1";
+      }
+    } catch { /* noop */ }
+    if (isCustomizing && !wasLocked) {
+      // اكتب "0" في التخزين مباشرة ثم استدعِ toggleCustomizing لتحديث الحالة.
+      try { localStorage.setItem("neobilling:toolbar-customizing:global:v1", "0"); } catch { /* noop */ }
+      if (customizing) toggleCustomizing();
       window.setTimeout(() => {
         toggleLock();
       }, 0);
