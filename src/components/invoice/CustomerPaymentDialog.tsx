@@ -688,6 +688,40 @@ export default function CustomerPaymentDialog({
                 <div className="text-[10px] text-muted-foreground rounded-md border border-dashed p-2 leading-relaxed">
                   ⌨︎ <b>Enter</b>: التالي · <b>Ctrl+Enter</b>: حفظ · <b>Esc</b>: إغلاق
                 </div>
+
+                {!isPos && recentInvoices.length > 0 && (
+                  <div className="rounded-md border bg-muted/20 p-2">
+                    <div className="text-[10px] font-bold text-muted-foreground mb-1.5">آخر 5 فواتير للعميل</div>
+                    <div className="space-y-1">
+                      {recentInvoices.map((inv) => {
+                        const paid = Math.max(0, Number(inv.paid_amount) || 0);
+                        const totalNet = Math.max(0, (Number(inv.total) || 0) - (Number(inv.discount) || 0));
+                        const due = Math.max(0, totalNet - paid);
+                        const isPaid = due < 0.01;
+                        const isPartial = paid > 0.01 && due > 0.01;
+                        return (
+                          <div key={inv.id} className="flex items-center justify-between gap-2 text-[11px] border-b border-border/40 last:border-0 pb-1 last:pb-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span
+                                className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
+                                  isPaid ? "bg-emerald-500" : isPartial ? "bg-amber-500" : "bg-destructive"
+                                }`}
+                              />
+                              <span className="font-medium truncate">{inv.invoice_number || "—"}</span>
+                              <span className="text-muted-foreground text-[10px] shrink-0">{inv.date}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 tabular-nums">
+                              <span className="text-muted-foreground">{totalNet.toLocaleString()}</span>
+                              <span className={`font-bold ${isPaid ? "text-emerald-600" : "text-destructive"}`}>
+                                {isPaid ? "مسدّدة" : due.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
