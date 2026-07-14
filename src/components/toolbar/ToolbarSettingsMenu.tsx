@@ -215,7 +215,7 @@ export default function ToolbarSettingsMenu({ screenKey, zoom }: Props) {
         <button
           type="button"
           onClick={handleSaveCustomization}
-          aria-label="حفظ ترتيب الأزرار وإنهاء التخصيص"
+          aria-label="حفظ ترتيب الأزرار"
           title="حفظ التخصيص — التغييرات تُحفظ تلقائياً، اضغط هنا لإنهاء وضع التخصيص"
           style={{
             display: "inline-flex",
