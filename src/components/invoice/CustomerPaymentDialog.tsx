@@ -148,6 +148,35 @@ export default function CustomerPaymentDialog({
 
   const selectedAccount = (accountOptions as any[]).find((a) => a.id === accountId) || null;
 
+  const jaberAccount = useMemo(() => {
+    return (accountOptions as any[]).find((a) => {
+      const s = `${a.name || ""} ${a.bank_name || ""}`;
+      return /اولاد\s*جابر|أولاد\s*جابر/.test(s);
+    }) || null;
+  }, [accountOptions]);
+
+  function requestSave() {
+    const n = Number(amount) || 0;
+    const disc = Math.max(0, Number(discount) || 0);
+    if (n < 0 || (Number(discount) || 0) < 0) return toast.error("لا يُسمح بقيم سالبة");
+    if (n <= 0 && disc <= 0) return toast.error("أدخل مبلغ أو خصم أكبر من صفر");
+    // صلاحيات: منع تسجيل مبلغ عام أو خصم لغير المخولين
+    const rem = Math.max(0, remaining - disc);
+    const generalAmount = Math.max(0, n - rem); // أي فائض عن المتبقي = مبلغ عام (رصيد دائن)
+    if (generalAmount > 0.01 && !canRecordPayment) {
+      return toast.error("ليست لديك صلاحية تسجيل مبلغ عام (فائض/رصيد دائن) — تواصل مع المسؤول");
+    }
+    if (disc > 0 && !canApplyDiscount) {
+      return toast.error("ليست لديك صلاحية تطبيق خصم إضافي — تواصل مع المسؤول");
+    }
+    if (n > 0 && !accountId) return toast.error("اختر الحساب");
+    if (n > 0 && isBankPaymentMethod(method)) {
+      const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo });
+      if (err) return toast.error(err);
+    }
+    setConfirmOpen(true);
+  }
+
   async function handleSave() {
     if (savingRef.current) {
       toast.info("يتم حفظ الدفعة بالفعل — انتظر لحظة", { id: "cust-pay-inflight" });
@@ -155,12 +184,6 @@ export default function CustomerPaymentDialog({
     }
     const n = Number(amount) || 0;
     const disc = Math.max(0, Number(discount) || 0);
-    if (n <= 0 && disc <= 0) return toast.error("أدخل مبلغ أو خصم أكبر من صفر");
-    if (n > 0 && !accountId) return toast.error("اختر الحساب");
-    if (n > 0 && isBankPaymentMethod(method)) {
-      const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo });
-      if (err) return toast.error(err);
-    }
 
     savingRef.current = true;
     setSaving(true);
