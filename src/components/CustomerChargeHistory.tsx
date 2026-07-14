@@ -2,13 +2,14 @@ import { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle, Download, AlertTriangle, CheckCircle2, ArrowUpDown } from "lucide-react";
+import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle, Download, AlertTriangle, CheckCircle2, ArrowUpDown, Undo2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { computeReconciliation, sortGroups, type SortKey } from "@/lib/chargeReconciliation";
+import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
 
 const PAGE_SIZE = 10;
 const LS_KEY = (cid: string) => `albatool.chargeHistory.filters.${cid}`;
@@ -51,6 +52,32 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
   const [sort, setSort] = useState<SortKey>(initial.sort);
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [reconMsg, setReconMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [reversingGroupId, setReversingGroupId] = useState<string | null>(null);
+  const confirmDelete = useConfirmDelete();
+
+  async function handleReverseGroup(g: ChargeGroup) {
+    confirmDelete({
+      title: "إلغاء شحنة رصيد",
+      description: `سيتم عكس شحنة الرصيد بتاريخ ${g.date} (${fmt(g.total)}). ستُعاد المبالغ الموزَّعة على الفواتير كديون مستحقّة، ويُلغى الفائض من الرصيد الدائن. لا يمكن التراجع عن هذا الإجراء.`,
+      confirmLabel: "نعم، ألغِ الشحنة",
+      successMessage: "تم إلغاء الشحنة وإعادة أرصدة الفواتير",
+      onConfirm: async () => {
+        setReversingGroupId(g.groupId);
+        try {
+          const { data, error } = await (supabase as any).rpc("reverse_customer_charge", { _group_id: g.groupId });
+          if (error) throw new Error(error.message);
+          if (!data?.ok) throw new Error(data?.reason || "فشل إلغاء الشحنة");
+          await qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
+          await qc.invalidateQueries({ queryKey: ["customers"] });
+          await qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+          await qc.invalidateQueries({ queryKey: ["invoices"] });
+          await qc.invalidateQueries({ queryKey: ["transactions"] });
+        } finally {
+          setReversingGroupId(null);
+        }
+      },
+    });
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["customer-charge-history", customerId],
@@ -284,6 +311,18 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
               <div className="tabular-nums">الإجمالي: <span className="font-bold text-foreground">{fmt(g.total)}</span></div>
               {g.allocated > 0.01 && (<div className="tabular-nums text-emerald-600">سُدِّد: <span className="font-bold">{fmt(g.allocated)}</span></div>)}
               {g.surplus > 0.01 && (<div className="tabular-nums text-primary">فائض: <span className="font-bold">{fmt(g.surplus)}</span></div>)}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => handleReverseGroup(g)}
+                disabled={reversingGroupId === g.groupId}
+                data-testid="reverse-charge-btn"
+                title="إلغاء هذه الشحنة وإعادة الأرصدة"
+              >
+                {reversingGroupId === g.groupId ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                إلغاء الشحنة
+              </Button>
             </div>
           </div>
 

@@ -4,18 +4,29 @@ import { applyStockDeltaForLines } from "@/utils/stockDeduction";
 export type DeleteInvoiceResult = {
   restoredStock: boolean;
   invoiceNumber: string | null;
+  convertedToCredit: number;
 };
 
 /**
  * يحذف فاتورة بالكامل (مع كل توابعها) ويُرجع كميات بنودها إلى المخزون
- * فقط إذا كانت الفاتورة قد خُصمت سابقاً (stock_deduction_id موجود).
- *
- * إن فشل إرجاع المخزون → يُلقي خطأ ولا يحذف الفاتورة.
+ * إن كانت خُصمت سابقاً. إن كانت الفاتورة قد سُدّدت جزئياً/كلياً، يتم
+ * تحويل الدفعات المرتبطة بها إلى **رصيد دائن للعميل** تلقائياً عبر RPC
+ * ذرّي `delete_invoice_with_reconciliation` — حتى لا يُفقد المبلغ.
  */
 export async function deleteInvoiceWithStockRestore(
   invoiceId: string,
 ): Promise<DeleteInvoiceResult> {
   if (!invoiceId) throw new Error("invoiceId مطلوب");
+
+  // 0) تحويل الدفعات إلى رصيد دائن (ذرّياً على DB) قبل الحذف الفعلي.
+  //    الفشل هنا يوقف كامل العملية — لا نحذف فاتورة بلا مصالحة مالية.
+  const { data: reconc, error: reconErr } = await (supabase as any).rpc(
+    "delete_invoice_with_reconciliation",
+    { _invoice_id: invoiceId },
+  );
+  if (reconErr) throw new Error(`تعذّرت مصالحة الدفعات: ${reconErr.message}`);
+  const convertedToCredit = Number(reconc?.paid_amount || 0);
+
 
   // 1) قراءة بيانات الحارس + رقم الفاتورة + حالة سير العمل
   const { data: inv, error: invErr } = await supabase
@@ -94,7 +105,13 @@ export async function deleteInvoiceWithStockRestore(
   if (typeof window !== "undefined") {
     try { window.dispatchEvent(new Event("products:changed")); } catch {}
     try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+    try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+    try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
   }
 
-  return { restoredStock, invoiceNumber: (inv as any).invoice_number ?? null };
+  return {
+    restoredStock,
+    invoiceNumber: (inv as any).invoice_number ?? null,
+    convertedToCredit,
+  };
 }

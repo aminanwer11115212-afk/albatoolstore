@@ -2463,10 +2463,12 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                     // يُرجع المخزون فقط إن كانت الفاتورة مُخصومة (stock_deduction_id موجود)،
                     // ثم يحذف كل التوابع والفاتورة. أي فشل يوقف العملية.
                     let restoredStock = false;
+                    let convertedToCredit = 0;
                     try {
                       const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
                       const res = await deleteInvoiceWithStockRestore(targetId);
                       restoredStock = res.restoredStock;
+                      convertedToCredit = res.convertedToCredit || 0;
                     } catch (delErr: any) {
                       console.error("[InvoiceCreatePage] delete failed", delErr);
                       toast.error(`فشل الحذف: ${delErr?.message || "خطأ غير معروف"}`, { duration: 8000 });
@@ -2486,14 +2488,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                     setShipping(0);
                     setSavedInvoiceId(null);
 
-                    toast.success(
-                      (invoiceNumber
-                        ? `تم حذف الفاتورة «${invoiceNumber}» بالكامل`
-                        : "تم حذف الفاتورة بالكامل")
-                        + (restoredStock ? " وإرجاع الكميات إلى المخزون" : "")
-                        + " — جارٍ فتح فاتورة جديدة",
-                      { duration: 5000 }
-                    );
+                    const msgParts = [
+                      invoiceNumber ? `تم حذف الفاتورة «${invoiceNumber}» بالكامل` : "تم حذف الفاتورة بالكامل",
+                    ];
+                    if (restoredStock) msgParts.push("وإرجاع الكميات إلى المخزون");
+                    if (convertedToCredit > 0.01) msgParts.push(`وتحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
+                    msgParts.push("— جارٍ فتح فاتورة جديدة");
+                    toast.success(msgParts.join(" "), { duration: 6000 });
 
                     queryClient.setQueriesData<any>(
                       { predicate: (q) => {

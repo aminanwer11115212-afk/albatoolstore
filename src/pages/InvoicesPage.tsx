@@ -107,7 +107,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
       errorMessage: "تعذّر حذف الفاتورة",
       onConfirm: async () => {
         const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
-        const { restoredStock } = await deleteInvoiceWithStockRestore(id);
+        const { restoredStock, convertedToCredit } = await deleteInvoiceWithStockRestore(id);
         qc.setQueriesData<any>(
           { predicate: (q) => {
             const key = q.queryKey[0];
@@ -118,7 +118,12 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
         qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
         qc.invalidateQueries({ queryKey: ["invoices-full"] });
         qc.invalidateQueries({ queryKey: ["invoices"] });
-        toast.success(restoredStock ? "تم حذف الفاتورة وإرجاع الكميات إلى المخزون" : "تم حذف الفاتورة");
+        qc.invalidateQueries({ queryKey: ["customers"] });
+        qc.invalidateQueries({ queryKey: ["transactions"] });
+        const parts = ["تم حذف الفاتورة"];
+        if (restoredStock) parts.push("وإرجاع الكميات إلى المخزون");
+        if (convertedToCredit > 0.01) parts.push(`وتحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
+        toast.success(parts.join(" "));
       },
     });
   };
