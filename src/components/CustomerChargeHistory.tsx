@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
-import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle } from "lucide-react";
+import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 /**
  * سجلّ شحن رصيد العميل — يُجمّع الحركات حسب `allocation->>group_id`.
@@ -73,8 +74,44 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
 
   const fmt = (n: number) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
+  const invoiceStateLabel = (remaining: number, status?: string) => {
+    if (remaining <= 0.01 || status === "paid") return { label: "مسددة", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" };
+    if (status === "partial") return { label: "عليه (جزئية)", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" };
+    return { label: "عليه", cls: "bg-destructive/15 text-destructive" };
+  };
+
+  const exportCsv = () => {
+    const header = ["group_id","date","method","account","total_charge","allocated","surplus","invoice_number","invoice_date","invoice_total","applied","remaining_after","new_status"];
+    const rows: string[] = [header.join(",")];
+    const esc = (v: any) => `"${String(v ?? "").replace(/"/g,'""')}"`;
+    for (const g of groups) {
+      const meta = [g.groupId, g.date, methodLabel(g.method), g.bankName ? `${g.bankName} - ${g.accountName || ""}` : (g.accountName || ""), g.total, g.allocated, g.surplus];
+      if (!g.items.length) {
+        rows.push([...meta, "", "", "", "", "", g.surplus > 0.01 ? "surplus_only" : ""].map(esc).join(","));
+      } else {
+        for (const it of g.items) {
+          rows.push([...meta, it.invoice_number || "", it.invoice_date || "", it.invoice_total, it.applied, it.remaining_after, it.new_status || ""].map(esc).join(","));
+        }
+      }
+    }
+    const blob = new Blob(["\uFEFF" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `charge-history-${customerId}-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-3 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm text-muted-foreground">إجمالي العمليات: <span className="font-bold text-foreground">{groups.length}</span></div>
+        <Button size="sm" variant="outline" onClick={exportCsv} data-testid="export-charge-history-csv">
+          <Download size={14} className="ml-1" /> تصدير CSV
+        </Button>
+      </div>
+
       {groups.map((g) => (
         <div key={g.groupId} className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-muted/40 border-b border-border">
@@ -130,14 +167,10 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
                       <td className={`px-3 py-2 tabular-nums font-semibold ${it.remaining_after > 0.01 ? "text-destructive" : "text-emerald-700"}`}>
                         {fmt(it.remaining_after)}
                       </td>
-                      <td className="px-3 py-2">
-                        {it.new_status === "paid" ? (
-                          <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">مسددة</span>
-                        ) : it.new_status === "partial" ? (
-                          <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">جزئية</span>
-                        ) : (
-                          <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{it.new_status || "—"}</span>
-                        )}
+                      <td className="px-3 py-2" data-testid="invoice-state">
+                        {(() => { const s = invoiceStateLabel(it.remaining_after, it.new_status); return (
+                          <span className={`text-xs px-2 py-0.5 rounded ${s.cls}`}>{s.label}</span>
+                        ); })()}
                       </td>
                       <td className="px-3 py-2">
                         {it.invoice_id && (
