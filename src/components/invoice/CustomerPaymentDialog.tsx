@@ -86,6 +86,8 @@ export default function CustomerPaymentDialog({
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [ackAdjustments, setAckAdjustments] = useState(false);
+  useEffect(() => { if (confirmOpen) setAckAdjustments(false); }, [confirmOpen]);
 
   const remaining = Math.max(0, Number(total || 0) - Number(paidBefore || 0));
 
@@ -462,8 +464,21 @@ export default function CustomerPaymentDialog({
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoices-full"] });
       qc.invalidateQueries({ queryKey: ["invoice-revisions", invoiceId] });
+      // تحديث كشف حساب العميل + المعاينة + إدارة العملاء
+      qc.invalidateQueries({ queryKey: ["customer-statement"] });
+      qc.invalidateQueries({ queryKey: ["customer-transactions"] });
+      qc.invalidateQueries({ queryKey: ["customer_balance_stats"] });
+      qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
       try { window.dispatchEvent(new Event("invoice-payments:changed")); } catch {}
+      // انتظر اكتمال إعادة الجلب للمفاتيح الحرجة قبل تحرير أزرار الحفظ
+      await Promise.allSettled([
+        qc.refetchQueries({ queryKey: ["customer-statement"] }),
+        qc.refetchQueries({ queryKey: ["customer-transactions"] }),
+        qc.refetchQueries({ queryKey: ["customers"] }),
+        qc.refetchQueries({ queryKey: ["invoices-with-customers"] }),
+      ]);
 
       if (customerId && !isPos) {
         const prevNet = custBalance
@@ -543,19 +558,19 @@ export default function CustomerPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !saving && onOpenChange(v)}>
       <DialogContent
-        className="max-w-xl w-[94vw] sm:w-[560px] max-h-[90vh] overflow-y-auto p-3 sm:p-4"
+        className="max-w-xl w-[calc(100vw-16px)] sm:w-[560px] max-h-[92vh] overflow-y-auto p-2 sm:p-4"
         dir="rtl"
         onKeyDown={onDialogKeyDown}
         data-pay-scope
       >
         <DialogHeader className="pb-1">
-          <DialogTitle className="text-sm sm:text-base leading-tight">
+          <DialogTitle className="text-[13px] sm:text-base leading-tight truncate">
             تسجيل دفعة على {invoiceNumber || "الفاتورة"}
             {customerName ? ` — ${customerName}` : ""}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-2 grid-cols-1 md:grid-cols-2 md:auto-rows-min">
+        <div className="grid gap-2 grid-cols-1 md:grid-cols-2 md:auto-rows-min min-w-0">
 
           {/* العمود الأيمن: ملخّص الحسابات */}
           {(() => {
@@ -907,7 +922,7 @@ export default function CustomerPaymentDialog({
         <DialogFooter className="gap-2 flex-col sm:flex-row pt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving} className="min-h-[40px] w-full sm:w-auto">إلغاء</Button>
           <Button onClick={requestSave} disabled={saving} data-testid="open-confirm-payment" className="min-h-[40px] w-full sm:w-auto">
-            {saving ? "جارٍ الحفظ..." : "حفظ الدفعة (Ctrl+Enter)"}
+            {saving ? "جارٍ التحديث…" : "حفظ الدفعة (Ctrl+Enter)"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -962,12 +977,38 @@ export default function CustomerPaymentDialog({
             );
           })()}
 
-          <DialogFooter className="gap-2 flex-col sm:flex-row">
-            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving} className="min-h-[40px] w-full sm:w-auto">رجوع</Button>
-            <Button onClick={handleSave} disabled={saving} data-testid="confirm-payment" className="min-h-[40px] w-full sm:w-auto">
-              {saving ? "جارٍ الحفظ..." : "تأكيد الحفظ"}
-            </Button>
-          </DialogFooter>
+          {(() => {
+            const disc = Math.max(0, Number(discount) || 0);
+            const credit = custBalance?.credit || 0;
+            const cu = Math.min(Math.max(0, Number(creditUse) || 0), credit);
+            const needsAck = disc > 0 || cu > 0;
+            return (
+              <>
+                {needsAck && (
+                  <label className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-50/60 dark:bg-amber-950/30 p-2 text-[12px] text-amber-900 dark:text-amber-100 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={ackAdjustments}
+                      onChange={(e) => setAckAdjustments(e.target.checked)}
+                      className="mt-0.5 shrink-0"
+                      data-testid="ack-adjustments"
+                    />
+                    <span>
+                      أؤكّد التسويات:
+                      {disc > 0 ? ` خصم إضافي ${disc.toLocaleString()} · ` : " "}
+                      {cu > 0 ? `خصم من الرصيد الدائن ${cu.toLocaleString()}` : ""}
+                    </span>
+                  </label>
+                )}
+                <DialogFooter className="gap-2 flex-col sm:flex-row">
+                  <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={saving} className="min-h-[40px] w-full sm:w-auto">رجوع</Button>
+                  <Button onClick={handleSave} disabled={saving || (needsAck && !ackAdjustments)} data-testid="confirm-payment" className="min-h-[40px] w-full sm:w-auto">
+                    {saving ? "جارٍ التحديث…" : "تأكيد الحفظ"}
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </Dialog>
