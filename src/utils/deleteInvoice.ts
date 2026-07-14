@@ -17,10 +17,10 @@ export async function deleteInvoiceWithStockRestore(
 ): Promise<DeleteInvoiceResult> {
   if (!invoiceId) throw new Error("invoiceId مطلوب");
 
-  // 1) قراءة بيانات الحارس + رقم الفاتورة
+  // 1) قراءة بيانات الحارس + رقم الفاتورة + حالة سير العمل
   const { data: inv, error: invErr } = await supabase
     .from("invoices")
-    .select("id, invoice_number, stock_deduction_id")
+    .select("id, invoice_number, stock_deduction_id, stock_deducted_at, workflow_status")
     .eq("id", invoiceId)
     .maybeSingle();
   if (invErr) throw new Error(`تعذّر قراءة الفاتورة: ${invErr.message}`);
@@ -33,9 +33,14 @@ export async function deleteInvoiceWithStockRestore(
     .eq("invoice_id", invoiceId);
   if (itErr) throw new Error(`تعذّر قراءة بنود الفاتورة: ${itErr.message}`);
 
-  // 3) إرجاع المخزون فقط إن كانت الفاتورة مُخصومة فعلاً
+  // 3) إرجاع المخزون إن كانت الفاتورة قد خُصمت — إما عبر الحارس الحديث
+  //    (stock_deduction_id / stock_deducted_at) أو ضمنياً لأن سير العمل
+  //    تجاوز حالة "جديد" (الفواتير القديمة قبل إدخال الحارس).
   let restoredStock = false;
-  const wasDeducted = !!(inv as any).stock_deduction_id;
+  const wasDeducted =
+    !!(inv as any).stock_deduction_id ||
+    !!(inv as any).stock_deducted_at ||
+    ((inv as any).workflow_status && (inv as any).workflow_status !== "new");
   if (wasDeducted && items && items.length > 0) {
     await applyStockDeltaForLines(items as any[], []);
     restoredStock = true;

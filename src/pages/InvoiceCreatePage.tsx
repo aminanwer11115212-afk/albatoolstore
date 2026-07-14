@@ -219,6 +219,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
   const [showMessageImport, setShowMessageImport] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  // بعد حذف الفاتورة نمنع أي حفظ تلقائي لاحق (unsaved-guard) قد يعيد إنشائها.
+  const deletedRef = useRef(false);
   const { isAdmin } = useUserRole();
   const customerInputRef = useRef<HTMLInputElement>(null);
   const quickProductRef = useRef<HTMLInputElement>(null);
@@ -778,6 +780,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
 
   // ---------- Save ----------
   async function saveInvoice(opts: { andNew?: boolean; skipNavigate?: boolean; silent?: boolean } = {}): Promise<boolean> {
+    // بعد الحذف: لا نسمح بأي حفظ تلقائي/يدوي حتى لا نُعيد إنشاء الفاتورة المحذوفة.
+    if (deletedRef.current) return false;
     // حارس متزامن لمنع الإدراج المتوازي/المكرر (نقر مزدوج، saveThen + نقر يدوي، StrictMode...)
     if (isSavingRef.current) return false;
     isSavingRef.current = true;
@@ -2470,6 +2474,18 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                       return;
                     }
 
+                    // بعد نجاح الحذف: أوقف أي إعادة حفظ تلقائي من حارس التعديلات غير المحفوظة،
+                    // وامسح الحقول محلياً حتى لا يعتبر isDirty الصفحة "بحاجة للحفظ".
+                    deletedRef.current = true;
+                    setRows([]);
+                    setCustomer(null);
+                    setCustomerSearch("");
+                    setNotes("");
+                    setInternalNote("");
+                    setGeneralDiscount(0);
+                    setShipping(0);
+                    setSavedInvoiceId(null);
+
                     toast.success(
                       (invoiceNumber
                         ? `تم حذف الفاتورة «${invoiceNumber}» بالكامل`
@@ -2482,7 +2498,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                     queryClient.setQueriesData<any>(
                       { predicate: (q) => {
                         const key = q.queryKey[0];
-                        return key === "invoices-with-customers" || key === "invoices";
+                        return key === "invoices-with-customers" || key === "invoices" || key === "invoices-full";
                       }},
                       (old: any) => {
                         if (!Array.isArray(old)) return old;
@@ -2490,11 +2506,17 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                       }
                     );
                     queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+                    queryClient.invalidateQueries({ queryKey: ["invoices-full"] });
                     queryClient.invalidateQueries({ queryKey: ["invoices"] });
 
                     setClearConfirmOpen(false);
                     setClearing(false);
-                    navigate(pos ? "/invoices/cash/list" : "/invoices/create", { replace: true });
+                    // نؤجل الملاحة تكة واحدة حتى يُحدَّث isDirtyRef داخل حارس التعديلات
+                    // إلى false (بعد إفراغ الحقول)، فلا يعترض pushState ويطلق حفظاً وهمياً.
+                    setTimeout(() => {
+                      deletedRef.current = false;
+                      navigate(pos ? "/invoices/cash/list" : "/invoices/create", { replace: true });
+                    }, 0);
                     return;
                   }
 
