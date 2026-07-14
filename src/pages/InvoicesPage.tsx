@@ -547,7 +547,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                         <button
                           type="button"
                           className="btn-xs btn-danger"
-                          onClick={() => handleDelete(inv.id)}
+                          onClick={() => handleDelete(inv.id, { invoice_number: inv.invoice_number, date: fmtDate(inv.date) })}
                           title="حذف"
                         >
                           🗑
@@ -595,7 +595,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                       {pickCustomerWhatsApp(inv.customers) && (
                         <button className="btn-xs btn-primary" onClick={() => handleWhatsApp(inv)}>✉ واتساب</button>
                       )}
-                      <button className="btn-xs btn-danger" onClick={() => handleDelete(inv.id)}>🗑 حذف</button>
+                      <button className="btn-xs btn-danger" onClick={() => handleDelete(inv.id, { invoice_number: inv.invoice_number, date: fmtDate(inv.date) })}>🗑 حذف</button>
                     </>
                   }
                 />
