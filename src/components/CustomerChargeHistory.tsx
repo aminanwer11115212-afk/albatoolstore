@@ -52,6 +52,32 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
   const [sort, setSort] = useState<SortKey>(initial.sort);
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [reconMsg, setReconMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [reversingGroupId, setReversingGroupId] = useState<string | null>(null);
+  const confirmDelete = useConfirmDelete();
+
+  async function handleReverseGroup(g: ChargeGroup) {
+    confirmDelete({
+      title: "إلغاء شحنة رصيد",
+      description: `سيتم عكس شحنة الرصيد بتاريخ ${g.date} (${fmt(g.total)}). ستُعاد المبالغ الموزَّعة على الفواتير كديون مستحقّة، ويُلغى الفائض من الرصيد الدائن. لا يمكن التراجع عن هذا الإجراء.`,
+      confirmLabel: "نعم، ألغِ الشحنة",
+      successMessage: "تم إلغاء الشحنة وإعادة أرصدة الفواتير",
+      onConfirm: async () => {
+        setReversingGroupId(g.groupId);
+        try {
+          const { data, error } = await (supabase as any).rpc("reverse_customer_charge", { _group_id: g.groupId });
+          if (error) throw new Error(error.message);
+          if (!data?.ok) throw new Error(data?.reason || "فشل إلغاء الشحنة");
+          await qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
+          await qc.invalidateQueries({ queryKey: ["customers"] });
+          await qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+          await qc.invalidateQueries({ queryKey: ["invoices"] });
+          await qc.invalidateQueries({ queryKey: ["transactions"] });
+        } finally {
+          setReversingGroupId(null);
+        }
+      },
+    });
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["customer-charge-history", customerId],
