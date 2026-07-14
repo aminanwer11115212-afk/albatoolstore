@@ -316,6 +316,16 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
           />
         )}
       </div>
+
+      <ChargeBalanceDialog
+        open={chargeOpen}
+        onOpenChange={setChargeOpen}
+        onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["customer-fresh", customer.id] });
+          qc.invalidateQueries({ queryKey: ["customer-invoices", customer.id] });
+          qc.invalidateQueries({ queryKey: ["customers"] });
+        }}
+      />
     </div>
   );
 }
