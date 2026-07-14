@@ -343,6 +343,7 @@ const App = () => {
             <Route path="/staff/customers" element={lazyEl(<StaffLayout><PermGuard anyOf={["view_customers", "add_customer"]}><StaffCustomersPage /></PermGuard></StaffLayout>, "العملاء")} />
             <Route path="/staff/profile" element={lazyEl(<StaffLayout><StaffProfilePage /></StaffLayout>, "الملف الشخصي")} />
             <Route path="/" element={lazyEl(<Dashboard />, "الرئيسية")} />
+            <Route path="/offline-queue" element={lazyEl(<OfflineQueuePage />, "سجل المزامنة")} />
             {/* Sales */}
             <Route path="/invoices" element={lazyEl(<InvoicesPage />, "إدارة الفواتير")} />
             <Route path="/invoices/create" element={lazyEl(<InvoiceCreatePage />, "فاتورة جديدة")} />
