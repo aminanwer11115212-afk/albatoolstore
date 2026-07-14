@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useCompanySettings } from "@/hooks/useData";
 import { useAppearance, type ThemeColor, type FontSize } from "@/hooks/useAppearance";
 import { toast } from "sonner";
+import { runOrQueue } from "@/lib/offlineQueue";
 import { supabase } from "@/integrations/supabase/client";
 import { Settings, Building, Receipt, Globe, Clock, Palette, Mail, Upload, Image, Phone, MapPin, FileText, Hash, Percent, DollarSign, Check, RotateCcw, Lock, Unlock, Columns3, Scissors } from "lucide-react";
 import { lockAllPagesColumnWidths, unlockAllPagesColumnWidths, resetAllPagesColumnWidths } from "@/hooks/useColumnWidths";
@@ -92,15 +93,22 @@ export default function CompanySettingsPage() {
     try {
       const id = data?.[0]?.id;
       if (id) {
-        const { error } = await supabase.from("company_settings").update({
-          company_name: form.company_name, phone: form.phone, email: form.email,
-          address: form.address, tax_number: form.tax_number,
-          currency: form.currency,
-          logo_url: form.logo_url,
-          city: form.city, region: form.region, country: form.country,
-          postbox: form.postbox, website: form.website,
-        } as any).eq("id", id);
+        const { queued, error } = await runOrQueue({
+          table: "company_settings",
+          op: "update",
+          payload: {
+            company_name: form.company_name, phone: form.phone, email: form.email,
+            address: form.address, tax_number: form.tax_number,
+            currency: form.currency,
+            logo_url: form.logo_url,
+            city: form.city, region: form.region, country: form.country,
+            postbox: form.postbox, website: form.website,
+          },
+          match: { id },
+          label: "حفظ إعدادات الشركة",
+        });
         if (error) throw error;
+        if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
       }
       toast.success("تم حفظ الإعدادات");
     } catch (e: any) { toast.error(e.message); }
@@ -112,22 +120,25 @@ export default function CompanySettingsPage() {
     try {
       const id = data?.[0]?.id;
       if (id) {
-        const { error } = await supabase.from("company_settings").update({
-          tax_number: form.tax_number,
-          invoice_prefix: billingForm.invoice_prefix,
-          quote_prefix: billingForm.quote_prefix,
-          purchase_prefix: billingForm.purchase_prefix,
-          recurring_prefix: billingForm.recurring_prefix,
-          return_prefix: billingForm.return_prefix,
-          transaction_prefix: billingForm.transaction_prefix,
-          payment_terms_days: parseInt(billingForm.payment_terms_days) || 30,
-          show_discount: billingForm.show_discount,
-          show_shipping: billingForm.show_shipping,
-          invoice_notes: billingForm.invoice_notes,
-          invoice_footer: billingForm.invoice_footer,
-          bank_name: billingForm.bank_name,
-          bank_account: billingForm.bank_account,
-          iban: billingForm.iban,
+        const { queued, error } = await runOrQueue({
+          table: "company_settings",
+          op: "update",
+          payload: {
+            tax_number: form.tax_number,
+            invoice_prefix: billingForm.invoice_prefix,
+            quote_prefix: billingForm.quote_prefix,
+            purchase_prefix: billingForm.purchase_prefix,
+            recurring_prefix: billingForm.recurring_prefix,
+            return_prefix: billingForm.return_prefix,
+            transaction_prefix: billingForm.transaction_prefix,
+            payment_terms_days: parseInt(billingForm.payment_terms_days) || 30,
+            show_discount: billingForm.show_discount,
+            show_shipping: billingForm.show_shipping,
+            invoice_notes: billingForm.invoice_notes,
+            invoice_footer: billingForm.invoice_footer,
+            bank_name: billingForm.bank_name,
+            bank_account: billingForm.bank_account,
+            iban: billingForm.iban,
         } as any).eq("id", id);
         if (error) throw error;
       }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { runOrQueue } from "@/lib/offlineQueue";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,18 +78,24 @@ export default function AccountsOpeningBalanceDialog({ open, onOpenChange }: Pro
       if (Math.abs(diff) >= 0.01) {
         const today = new Date().toISOString().split("T")[0];
         const isIncome = diff > 0;
-        const { error } = await supabase.from("transactions").insert({
-          type: isIncome ? "income" : "expense",
-          amount: Math.abs(diff),
-          date: today,
-          description: `تسوية رصيد افتتاحي - ${a.name}`,
-          category: "opening_balance_adjustment",
-          account_id: a.id,
-          method: "cash",
-          debit: isIncome ? Math.abs(diff) : 0,
-          credit: isIncome ? 0 : Math.abs(diff),
-        } as any);
+        const { queued, error } = await runOrQueue({
+          table: "transactions",
+          op: "insert",
+          payload: {
+            type: isIncome ? "income" : "expense",
+            amount: Math.abs(diff),
+            date: today,
+            description: `تسوية رصيد افتتاحي - ${a.name}`,
+            category: "opening_balance_adjustment",
+            account_id: a.id,
+            method: "cash",
+            debit: isIncome ? Math.abs(diff) : 0,
+            credit: isIncome ? 0 : Math.abs(diff),
+          },
+          label: "تسوية رصيد افتتاحي",
+        });
         if (error) { toast.error("فشل الحفظ: " + error.message); return; }
+        if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
       }
       toast.success(`تم تحديث رصيد ${a.name}`);
       setAccounts(prev => prev.map(x => x.id === a.id ? { ...x, balance: targetBalance } : x));

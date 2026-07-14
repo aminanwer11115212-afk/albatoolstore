@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { runOrQueue } from "@/lib/offlineQueue";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,12 +82,18 @@ export default function ExchangeRateDialog({ open, onOpenChange, onSaved }: Prop
     setSaving(true);
 
     // Save new rate
-    const { error: erErr } = await supabase.from("exchange_rates").insert({
-      currency_code: foreignCode,
-      rate_to_base: newRateNum,
-      effective_date: new Date().toISOString().slice(0, 10),
+    const { queued: erQueued, error: erErr } = await runOrQueue({
+      table: "exchange_rates",
+      op: "insert",
+      payload: {
+        currency_code: foreignCode,
+        rate_to_base: newRateNum,
+        effective_date: new Date().toISOString().slice(0, 10),
+      },
+      label: "حفظ سعر الصرف",
     });
     if (erErr) { setSaving(false); toast.error("فشل حفظ المعدل: " + erErr.message); return; }
+    if (erQueued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
 
     // Update all product sale_price = foreign_price * newRate (parallel batches of 25)
     let updated = 0;
@@ -96,7 +103,7 @@ export default function ExchangeRateDialog({ open, onOpenChange, onSaved }: Prop
       const results = await Promise.all(batch.map((p) => {
         const fp = Number(p.foreign_price || 0);
         if (!fp) return Promise.resolve({ error: null, skip: true } as any);
-        return supabase.from("products").update({ sale_price: fp * newRateNum }).eq("id", p.id);
+        return runOrQueue({ table: "products", op: "update", payload: { sale_price: fp * newRateNum }, match: { id: p.id }, label: "تحديث سعر منتج" });
       }));
       updated += results.filter((r: any) => !r.error && !r.skip).length;
     }
