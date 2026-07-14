@@ -2081,9 +2081,46 @@ export default function CustomersPage() {
           usageNames={unlinkDialog.usageNames}
           usageCount={unlinkDialog.usageCount}
           onConfirm={unlinkDialog.onConfirm}
-          onDone={() => setUnlinkDialog(null)}
+
+      {phonePicker && (
+        <PhonePickerDialog
+          open={!!phonePicker}
+          onOpenChange={(v) => { if (!v) setPhonePicker(null); }}
+          initialValue={phonePicker.initialValue}
+          customerName={phonePicker.customerName}
+          fieldLabel="واتساب / رقم الهاتف"
+          validate={(v) => {
+            const t = normalizePhoneInput(v);
+            if (!t) return null;
+            if (!isValidWhatsAppPhone(t)) return "رقم غير صالح للإرسال (8-15 خانة)";
+            const dups = findDuplicatesByPhone(t, phonePicker.customerId);
+            return dups.length > 0 ? `رقم مكرر مع: ${dups.map((d: any) => d.name).slice(0, 2).join("، ")}` : null;
+          }}
+          onSave={async (v) => {
+            const norm = normalizePhoneInput(v) || null;
+            const patch = phonePicker.field === "whatsapp" ? { whatsapp: norm } : { phone: norm };
+            await updateRowField(phonePicker.customerId, patch);
+            setPhonePicker(null);
+          }}
         />
       )}
+
+      <QuickAddTransporterDialog
+        open={quickAddTrOpen}
+        onOpenChange={setQuickAddTrOpen}
+        initialName={pendingTransporterName}
+        onCreated={(row) => {
+          if (!row?.id) return;
+          setTransporters(prev => {
+            if (prev.some(t => t.id === row.id)) return prev;
+            return [...prev, { id: row.id, name: row.name }]
+              .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+          });
+          setPendingTransporterName("");
+          queryClient.invalidateQueries({ queryKey: ["transporters"] });
+        }}
+      />
     </div>
   );
 }
+
