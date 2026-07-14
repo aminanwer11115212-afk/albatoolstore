@@ -20,8 +20,6 @@ export async function fetchAllProducts<T = any>(
       .from("products")
       .select(columns)
       .order(orderBy.column, { ascending: orderBy.ascending ?? true, nullsFirst: false })
-      // كسر تعادل مستقر — يضمن ترتيباً ثابتاً عند تساوي العمود الأساسي
-      .order("id", { ascending: orderBy.ascending ?? true })
       .range(from, to);
     if (error) throw error;
     const rows = (data || []) as unknown as T[];
