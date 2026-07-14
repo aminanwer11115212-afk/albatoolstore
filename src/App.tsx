@@ -21,6 +21,7 @@ import { ColumnsResetFloatingButton } from "./components/ColumnsResetFloatingBut
 import { initPerfMonitor } from "./lib/perfMonitor";
 import { initPagePerf } from "./lib/pagePerf";
 import { prefetchPopularPages } from "./lib/prefetchRoutes";
+import { prefetchCoreData } from "./lib/prefetchCoreData";
 // كل الصفحات lazy — حتى Dashboard (recharts ~221KB) و LoginPage
 // لتقليل الباندل الأولي وتسريع First Paint.
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -252,10 +253,26 @@ const App = () => {
     } catch (e) {
       console.error("[prefetch] failed:", e);
     }
+    void prefetchCoreData(queryClient);
+
+    // إعادة تحميل البيانات الأساسية دورياً كل 5 دقائق (فقط عند وجود اتصال)
+    // لإبقاء نسخة الأوفلاين محدَّثة بدون انتظار زيارة المستخدم للصفحات.
+    const intervalId = setInterval(() => {
+      if (navigator.onLine) {
+        void prefetchCoreData(queryClient);
+      }
+    }, 5 * 60_000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
-    initOfflineFlush();
+    initOfflineFlush((r) => {
+      if (r.ok > 0) {
+        queryClient.invalidateQueries();
+        toast.success(`تمت مزامنة ${r.ok} عملية`);
+      }
+    });
   }, []);
 
   return (

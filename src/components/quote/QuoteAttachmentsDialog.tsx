@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Paperclip, Trash2, Upload, X, FileText, Download, Camera, Receipt, Truck, Image as ImageIcon, Trash, RotateCcw, Clock, Scissors } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { runOrQueue } from "@/lib/offlineQueue";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
 import { useCropQueue } from "@/hooks/useCropQueue";
@@ -116,15 +117,21 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
           .upload(path, file, { contentType: file.type });
         if (upErr) throw upErr;
         const { data: pub } = supabase.storage.from("quote-attachments").getPublicUrl(path);
-        const { error: insErr } = await supabase.from("quote_attachments").insert({
-          quote_id: quoteId,
-          file_url: pub.publicUrl,
-          file_name: file.name,
-          file_type: file.type,
-          file_size: file.size,
-          category: activeTab,
-        } as any);
+        const { queued: insQueued, error: insErr } = await runOrQueue({
+          table: "quote_attachments",
+          op: "insert",
+          payload: {
+            quote_id: quoteId,
+            file_url: pub.publicUrl,
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            category: activeTab,
+          },
+          label: "إضافة مرفق عرض سعر",
+        });
         if (insErr) throw insErr;
+        if (insQueued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
       }
       toast.success("تم رفع الملفات");
       load();
@@ -137,22 +144,30 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
 
   const softDelete = async (att: Attachment) => {
     if (!confirm(`نقل "${att.file_name}" إلى سلة المحذوفات؟`)) return;
-    const { error } = await supabase
-      .from("quote_attachments")
-      .update({ deleted_at: new Date().toISOString(), deleted_reason: "user_deleted" } as any)
-      .eq("id", att.id);
+    const { queued, error } = await runOrQueue({
+      table: "quote_attachments",
+      op: "update",
+      payload: { deleted_at: new Date().toISOString(), deleted_reason: "user_deleted" },
+      match: { id: att.id },
+      label: "نقل مرفق للسلة",
+    });
     if (error) return toast.error(error.message);
+    if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
     toast.success("نُقل إلى السلة");
     load();
   };
 
   const restore = async (att: Attachment) => {
     const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await supabase
-      .from("quote_attachments")
-      .update({ deleted_at: null, deleted_reason: null, expires_at: newExpiry } as any)
-      .eq("id", att.id);
+    const { queued, error } = await runOrQueue({
+      table: "quote_attachments",
+      op: "update",
+      payload: { deleted_at: null, deleted_reason: null, expires_at: newExpiry },
+      match: { id: att.id },
+      label: "استرجاع مرفق",
+    });
     if (error) return toast.error(error.message);
+    if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
     toast.success("تم الاسترجاع");
     load();
   };
@@ -166,8 +181,14 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
         const path = att.file_url.slice(idx + marker.length);
         await supabase.storage.from("quote-attachments").remove([path]);
       }
-      const { error } = await supabase.from("quote_attachments").delete().eq("id", att.id);
+      const { queued, error } = await runOrQueue({
+        table: "quote_attachments",
+        op: "delete",
+        match: { id: att.id },
+        label: "حذف مرفق نهائياً",
+      });
       if (error) throw error;
+      if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
       toast.success("حُذف نهائياً");
       setItems((prev) => prev.filter((x) => x.id !== att.id));
     } catch (e: any) {

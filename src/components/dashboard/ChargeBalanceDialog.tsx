@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { runOrQueue } from "@/lib/offlineQueue";
 import { validateBankTransferPayment, isAllowedBank } from "@/lib/bankTransferValidation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -122,18 +123,24 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
           : `شحن رصيد - ${method === "cash" ? "نقدي" : "بطاقة"}${notes ? ` - ${notes}` : ""}`;
 
       // حركة واحدة على مستوى العميل — التريغر يُحدّث credit_balance و net_balance تلقائياً
-      const { error: txErr } = await supabase.from("transactions").insert({
-        type: "income",
-        category: "customer_credit",
-        amount: amt,
-        credit: amt,
-        method,
-        date,
-        customer_id: customerId,
-        account_id: targetAccountId,
-        description,
-      } as any);
+      const { queued: txQueued, error: txErr } = await runOrQueue({
+        table: "transactions",
+        op: "insert",
+        payload: {
+          type: "income",
+          category: "customer_credit",
+          amount: amt,
+          credit: amt,
+          method,
+          date,
+          customer_id: customerId,
+          account_id: targetAccountId,
+          description,
+        },
+        label: "شحن رصيد عميل",
+      });
       if (txErr) throw txErr;
+      if (txQueued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
 
       // احفظ آخر حساب بنكي مستخدَم للاسترجاع لاحقًا
       if (method === "bank_transfer" && bankAccountId) {

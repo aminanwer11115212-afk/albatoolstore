@@ -10,6 +10,7 @@ import { getGeoImpact, deleteGeoOnly, deleteGeoCascade, EntityKind, kindLabel } 
 import QuickAddTransporterDialog from "@/components/dispatch/QuickAddTransporterDialog";
 import ContactPickerButton from "@/components/shared/ContactPickerButton";
 import { normalizePhoneInput } from "@/utils/phoneNormalize";
+import { runOrQueue } from "@/lib/offlineQueue";
 
 const sanitizePhone = normalizePhoneInput;
 
@@ -155,9 +156,14 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
 
   const addRegion = async (name: string): Promise<string | null> => {
     const nextSort = (regions.reduce((m, r) => Math.max(m, r.sort_order || 0), 0) || 0) + 1;
-    const { data, error } = await (supabase as any).from("regions")
-      .insert({ name: name.trim(), sort_order: nextSort }).select("id,name,sort_order").single();
+    const { queued, data, error } = await runOrQueue({
+      table: "regions",
+      op: "insert",
+      payload: { name: name.trim(), sort_order: nextSort },
+      label: "إضافة اتجاه",
+    });
     if (error) { toast.error(error.message); return null; }
+    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
     setRegions(prev => [...prev, data].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
     setForm(f => ({ ...f, region_id: data.id, state_id: null, city_id: null, locality_id: null }));
     toast.success(`تمت إضافة الاتجاه: ${data.name}`);
@@ -205,9 +211,14 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   // ── دوال إضافة (add) لكل قائمة ──
   const addState = async (name: string): Promise<string | null> => {
     if (!form.region_id) { toast.error("اختر الاتجاه أولاً"); return null; }
-    const { data, error } = await (supabase as any).from("states")
-      .insert({ name: name.trim(), region_id: form.region_id }).select("id,name,region_id").single();
+    const { queued, data, error } = await runOrQueue({
+      table: "states",
+      op: "insert",
+      payload: { name: name.trim(), region_id: form.region_id },
+      label: "إضافة ولاية",
+    });
     if (error) { toast.error(error.message); return null; }
+    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
     setStates(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, state_id: data.id, city_id: null, locality_id: null }));
     toast.success(`تمت إضافة الولاية: ${data.name}`);
@@ -216,9 +227,14 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   };
   const addCity = async (name: string): Promise<string | null> => {
     if (!form.state_id) { toast.error("اختر الولاية أولاً"); return null; }
-    const { data, error } = await (supabase as any).from("cities")
-      .insert({ name: name.trim(), state_id: form.state_id }).select("id,name,state_id").single();
+    const { queued, data, error } = await runOrQueue({
+      table: "cities",
+      op: "insert",
+      payload: { name: name.trim(), state_id: form.state_id },
+      label: "إضافة مدينة",
+    });
     if (error) { toast.error(error.message); return null; }
+    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
     setCities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, city_id: data.id, locality_id: null }));
     toast.success(`تمت إضافة المدينة: ${data.name}`);
@@ -227,9 +243,14 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   };
   const addLocality = async (name: string): Promise<string | null> => {
     if (!form.city_id) { toast.error("اختر المدينة أولاً"); return null; }
-    const { data, error } = await (supabase as any).from("localities")
-      .insert({ name: name.trim(), city_id: form.city_id }).select("id,name,city_id").single();
+    const { queued, data, error } = await runOrQueue({
+      table: "localities",
+      op: "insert",
+      payload: { name: name.trim(), city_id: form.city_id },
+      label: "إضافة محلية",
+    });
     if (error) { toast.error(error.message); return null; }
+    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
     setLocalities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, locality_id: data.id }));
     toast.success(`تمت إضافة المحلية: ${data.name}`);
@@ -245,9 +266,14 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     return null;
   };
   const addGroup = async (name: string): Promise<string | null> => {
-    const { data, error } = await supabase.from("customer_groups")
-      .insert({ name: name.trim() }).select("id,name").single();
+    const { queued, data, error } = await runOrQueue({
+      table: "customer_groups",
+      op: "insert",
+      payload: { name: name.trim() },
+      label: "إضافة مجموعة عملاء",
+    });
     if (error) { toast.error(error.message); return null; }
+    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
     setGroups(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, group_id: data.id }));
     toast.success(`تمت إضافة المجموعة: ${data.name}`);
@@ -255,9 +281,14 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     return data.id;
   };
   const addDestination = async (name: string): Promise<string | null> => {
-    const { data, error } = await (supabase as any).from("destinations")
-      .insert({ name: name.trim() }).select("id,name").single();
+    const { queued, data, error } = await runOrQueue({
+      table: "destinations",
+      op: "insert",
+      payload: { name: name.trim() },
+      label: "إضافة وجهة",
+    });
     if (error) { toast.error(error.message); return null; }
+    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
     setDestinations(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, destination_id: data.id }));
     toast.success(`تمت إضافة الوجهة: ${data.name}`);
@@ -280,8 +311,15 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     async (id: string, newName: string): Promise<boolean> => {
       const name = newName.trim();
       if (!name) { toast.error("الاسم مطلوب"); return false; }
-      const { error } = await (supabase as any).from(table).update({ name }).eq("id", id);
+      const { queued, error } = await runOrQueue({
+        table,
+        op: "update",
+        payload: { name },
+        match: { id },
+        label: "تعديل اسم",
+      });
       if (error) { toast.error(error.message); return false; }
+      if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
       setter(prev => {
         const next = prev.map(x => x.id === id ? { ...x, name } : x);
         return keepSortByName ? next.sort((a, b) => (a.name || "").localeCompare(b.name || "")) : next;
@@ -324,14 +362,39 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
       };
       let saved: any;
       if (form.id) {
-        const { data, error } = await supabase.from("customers").update(payload).eq("id", form.id).select().single();
+        const { queued, data, error } = await runOrQueue({
+          table: "customers",
+          op: "update",
+          payload,
+          match: { id: form.id },
+          label: "تعديل عميل",
+        });
         if (error) throw error;
+        if (queued) {
+          toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
+          try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+          onSaved({ ...payload, id: form.id });
+          onClose();
+          return;
+        }
         saved = data;
       } else {
         const { data: u } = await supabase.auth.getUser();
         if (u?.user?.id) payload.created_by_uid = u.user.id;
-        const { data, error } = await supabase.from("customers").insert(payload).select().single();
+        const { queued, data, error } = await runOrQueue({
+          table: "customers",
+          op: "insert",
+          payload,
+          label: "إضافة عميل",
+        });
         if (error) throw error;
+        if (queued) {
+          toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
+          try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+          onSaved(payload);
+          onClose();
+          return;
+        }
         saved = data;
       }
 

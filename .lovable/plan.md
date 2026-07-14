@@ -1,92 +1,57 @@
-## الهدف
-توثيق كل عملية خصم وأثرها على رصيد العميل (له/عليه)، تأكيد بصري للمستخدم أن الأرقام تحدّثت، وتغطية اختبارية شاملة تمنع ظهور قيم سالبة أو حسابات خاطئة.
+# خطة: تشغيل النظام كاملاً أوفلاين + مزامنة تلقائية
 
----
+## الوضع الحالي (ما هو موجود بالفعل)
+- `src/lib/queryPersister.ts` — يحفظ كل استعلامات React Query في IndexedDB (idb-keyval).
+- `src/lib/offlineQueue.ts` — طابور IndexedDB لعمليات الكتابة (insert/update/delete/upsert) + `runOrQueue` + `flushQueue` + إعادة محاولة كل دقيقتين + `online` event.
+- `src/lib/realtimeSync.ts` + `RealtimeSync.tsx` — يستقبل تغييرات كل الجداول من Supabase Realtime ويطلق invalidate.
+- `OfflineBanner.tsx` + `useOnlineStatus` — شريط علوي يوضّح انقطاع الاتصال وعدد العمليات المعلّقة.
+- `initOfflineFlush` مُهيّأ في `main.tsx`.
 
-## 1) سجل تدقيق الخصومات (Discount Audit Log)
+## الفجوات التي يجب سدّها
+1. **`OfflineBanner` غير مركّب في `AppLayout`** — الشريط لا يظهر فعلياً.
+2. **معظم handlers ما تزال تستدعي `supabase.from().insert/update/delete` مباشرة** — عند عدم الاتصال ترمي خطأ بدلاً من الحفظ في الطابور.
+3. **الاستعلامات (`useQuery`) لا تُخبر المستخدم أنها من الكاش** — لا مؤشر واضح.
+4. **`PersistQueryClientProvider` ليس مؤكداً في `main.tsx`** — يجب التحقق من ربط `createIDBPersister`.
+5. **Realtime + إعادة الجلب عند العودة** — بعد `online` يجب:
+   - flush الطابور أولاً
+   - ثم `queryClient.invalidateQueries()` شامل
+   - ثم إظهار toast "تمت المزامنة".
+6. **prefetch مُسبق للبيانات الأساسية** (customers, products, invoices) عند أول تحميل + في الخلفية دورياً، حتى لو المستخدم لم يزر الصفحة، تُصبح متاحة أوفلاين.
 
-### قاعدة البيانات
-- جدول جديد `public.discount_audit_log` عبر migration:
-  - `id uuid pk`, `created_at timestamptz`
-  - `entity_type text` ('invoice' | 'payment' | 'purchase_order')
-  - `entity_id uuid`, `entity_number text`
-  - `customer_id uuid null`, `supplier_id uuid null`
-  - `discount_before numeric`, `discount_added numeric`, `discount_after numeric`
-  - `total_before numeric`, `total_after numeric`
-  - `balance_before numeric`, `balance_after numeric` (رصيد العميل/المورد الصافي وقت التسجيل)
-  - `source text` ('customer_payment_dialog' | 'invoice_edit' | 'supplier_payment_dialog' | ...)
-  - `note text`, `created_by uuid`
-- GRANT للـ authenticated + service_role + RLS (authenticated select/insert).
+## التنفيذ عبر SUBAGENTS (بالتوازي)
 
-### واجهة السجل
-- صفحة جديدة `src/pages/DiscountAuditPage.tsx` على المسار `/reports/discount-audit`:
-  - جدول RTL بأعمدة: التاريخ، النوع، الرقم، العميل/المورد، الخصم المضاف، الإجمالي قبل/بعد، الرصيد قبل/بعد، المصدر، رابط الفاتورة/الدفعة.
-  - فلترة بالتاريخ + بحث بالعميل/الرقم عبر `startsWithMatch`.
-  - كل صف يحتوي لينك يفتح `/invoices/:id` أو `/purchases/:id`.
-- تبويب "سجل الخصومات" داخل `CustomerDetailView.tsx` و `SupplierDetailView.tsx` يعرض السجلات المرتبطة فقط.
-- ربط من `InvoiceViewPage.tsx`: زر صغير "سجل الخصم" يفتح Sheet فيه سجلات هذه الفاتورة.
+### Subagent 1 — طبقة الكتابة الأوفلاين
+- المهمة: تحويل كل استدعاءات `supabase.from(...).insert/update/delete/upsert` في `src/` إلى `runOrQueue` من `offlineQueue`.
+- يستثني: قراءات `select`، edge functions، storage، auth.
+- ينتج قائمة الملفات المعدّلة ويضيف toast "تم الحفظ محلياً وسيُرفع عند عودة الاتصال" عند `queued: true`.
 
-### كتابة السجل
-- ملف helper `src/utils/discountAuditLogger.ts` بدالة `logDiscountEvent({...})` تُستدعى بعد كل تحديث خصم ناجح داخل:
-  - `CustomerPaymentDialog.handleSave` (عند `disc > 0`)
-  - `SupplierPaymentDialog.handleSave`
-  - أي مكان يعدّل `invoices.discount` أو `purchase_orders.discount` (نتحقق من `InvoiceCreatePage`, `QuoteCreatePage`, `PurchaseCreatePage`).
+### Subagent 2 — تحسين طبقة القراءة والمزامنة
+- تأكيد `PersistQueryClientProvider` في `main.tsx` مع `createIDBPersister` و`maxAge: 30 يوم`.
+- إضافة `prefetchCoreData()` (customers, products, suppliers, invoices, quotes, accounts) عند `AppLayout` mount + refetch دوري كل 5 دقائق في الخلفية.
+- ربط `online` event ليُشغّل `flushQueue → invalidateQueries → toast نجاح`.
+- تفعيل `refetchOnReconnect: true` + `networkMode: 'offlineFirst'` على `queryClient`.
 
----
+### Subagent 3 — واجهة المستخدم + الشريط + الاختبارات
+- تركيب `<OfflineBanner />` في `AppLayout.tsx` أعلى `<main>`.
+- إضافة `<SyncStatusIndicator />` صغير في `AppNavbar` (أيقونة سحابة + عدّاد pending).
+- اختبار E2E `e2e/offline-mode.e2e.py`: يقطع الشبكة عبر Playwright `context.set_offline(true)`، ينشئ عميل، يعيد الاتصال، يتحقق من رفع البيانات.
+- اختبار وحدة `src/test/offlineQueueFlush.test.ts` لتفريغ الطابور والتعامل مع الأخطاء.
 
-## 2) توست تأكيد بعد إعادة الجلب
+## الملفات المتوقعة
+```
+src/main.tsx                          # PersistQueryClientProvider مؤكد
+src/lib/queryClient.ts (جديد)         # networkMode offlineFirst + refetchOnReconnect
+src/lib/prefetchCoreData.ts (جديد)    # prefetch للبيانات الأساسية
+src/components/layout/AppLayout.tsx   # OfflineBanner
+src/components/layout/AppNavbar.tsx   # SyncStatusIndicator
+src/components/SyncStatusIndicator.tsx (جديد)
+src/pages/**/*                        # تحويل mutations إلى runOrQueue (Subagent 1)
+e2e/offline-mode.e2e.py (جديد)
+src/test/offlineQueueFlush.test.ts (جديد)
+```
 
-- توسيع `CustomerPaymentDialog` و `SupplierPaymentDialog` و `ChargeBalanceDialog`:
-  - بعد `invalidateQueries`، انتظار `refetchQueries` للعميل/المورد المتأثر.
-  - قراءة الرصيد الجديد وعرض `toast.success("تم تحديث رصيد العميل: ${label} ${amount}")` مع الفارق (قبل/بعد).
-- helper مشترك `src/utils/balanceRefreshToast.ts` يُصدر التوست بنمط موحّد.
-- يعتمد على `netBalanceOf` لضمان أن العرض مطابق لبقية الصفحات.
-
----
-
-## 3) اختبارات وحدة/تكامل
-
-- `src/test/discountBalanceRecompute.test.ts`:
-  - محاكاة `recompute_customer_balance` عبر `GREATEST(total - paid, 0)` — تحقق من أن `balance >= 0` دائماً حتى مع خصم أكبر من المتبقي.
-  - حالات: خصم جزئي، خصم يساوي المتبقي (balance→0)، خصم أكبر (لا سالب)، خصم مع فائض دفعة.
-- `src/test/netBalanceOfDiscountCases.test.ts`:
-  - إضافة سيناريوهات: بعد خصم كامل الدين → net=−credit، بعد خصم جزئي → net يقل بمقدار الخصم، لا سالب في balance وحده.
-- `src/test/discountAuditLogger.test.ts`:
-  - يتأكد أن الـ helper يبني payload صحيح ويستدعي supabase.insert بالحقول المتوقعة.
-
----
-
-## 4) اختبار E2E
-
-- `e2e/discount-updates-balance.e2e.py`:
-  1. فتح فاتورة لعميل معلوم رصيده.
-  2. فتح شاشة تسجيل دفعة، إدخال خصم إضافي دون مبلغ.
-  3. الحفظ، انتظار التوست، التقاط screenshot.
-  4. التحقق أن قيمة `عليه` في نفس الحوار (customer balance card) تنخفض بمقدار الخصم.
-  5. فتح `/customers/:id` في تبويب ثانٍ والتأكد أن الرصيد الصافي محدّث دون F5.
-  6. فتح `/reports/discount-audit` والتحقق من وجود سطر جديد بنفس القيم.
-
----
-
-## تفاصيل تقنية
-
-| ملف | تعديل |
-|---|---|
-| migration جديد | جدول `discount_audit_log` + RLS + GRANT |
-| `src/utils/discountAuditLogger.ts` | جديد |
-| `src/utils/balanceRefreshToast.ts` | جديد |
-| `src/pages/DiscountAuditPage.tsx` | جديد + route في `App.tsx` |
-| `src/components/invoice/CustomerPaymentDialog.tsx` | استدعاء logger + toast تأكيد |
-| `src/components/purchase/SupplierPaymentDialog.tsx` | نفس الشيء |
-| `src/components/dashboard/ChargeBalanceDialog.tsx` | toast تأكيد بعد refetch |
-| `src/components/CustomerDetailView.tsx` | تبويب سجل الخصم |
-| `src/components/SupplierDetailView.tsx` | تبويب سجل الخصم |
-| `src/pages/InvoiceViewPage.tsx` | زر سجل الخصم |
-| 3 اختبارات وحدة + 1 E2E | جديد |
-
-## نقاط التحقق النهائية
-- Build نظيف + `tsgo` بدون أخطاء.
-- Migration ينفّذ بترتيب: CREATE → GRANT → ENABLE RLS → POLICY.
-- لا تُكتب سجلات إذا `disc == 0`.
-- كل التسميات عربية RTL، ألوان من design tokens فقط.
-- لا رصيد سالب في أي مسار.
+## معايير القبول
+- قطع الإنترنت → التنقل بين الصفحات يعمل والبيانات تظهر من الكاش.
+- إضافة عميل/فاتورة أوفلاين → toast "محفوظ محلياً" + عدّاد pending يزيد.
+- عودة الإنترنت → toast "تمت مزامنة N عملية" خلال ≤ 3 ثوانٍ + بيانات المستخدمين الآخرين تصل عبر Realtime تلقائياً.
+- لا خطأ في console، `tsgo` نظيف، جميع الاختبارات تنجح.

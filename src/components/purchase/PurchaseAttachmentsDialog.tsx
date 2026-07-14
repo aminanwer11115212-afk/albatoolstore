@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Paperclip, Trash2, Upload, X, FileText, Download, Camera, Receipt, Truck, Image as ImageIcon, Trash, RotateCcw, Clock, Scissors } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { runOrQueue } from "@/lib/offlineQueue";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
 import { useCropQueue } from "@/hooks/useCropQueue";
 import { useRecropImage } from "@/hooks/useRecropImage";
@@ -68,11 +69,15 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
           .from(BUCKET)
           .upload(path, cropped, { contentType: cropped.type, upsert: true });
         if (upErr) throw upErr;
-        const { error: updErr } = await (supabase as any)
-          .from("purchase_attachments")
-          .update({ file_size: cropped.size, file_type: cropped.type })
-          .eq("id", att.id);
+        const { queued: updQueued, error: updErr } = await runOrQueue({
+          table: "purchase_attachments",
+          op: "update",
+          payload: { file_size: cropped.size, file_type: cropped.type },
+          match: { id: att.id },
+          label: "تحديث مرفق بعد القص",
+        });
         if (updErr) throw updErr;
+        if (updQueued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
         toast.success("تم حفظ الصورة بعد إعادة القص");
         load();
       },
@@ -114,14 +119,20 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
             .upload(path, file, { contentType: file.type });
           if (upErr) throw upErr;
           const { data: pub } = supabase.storage.from("purchase-attachments").getPublicUrl(path);
-          const { error: insErr } = await (supabase as any).from("purchase_attachments").insert({
-            purchase_order_id: purchaseOrderId,
-            file_url: pub.publicUrl,
-            file_name: file.name,
-            file_type: file.type,
-            file_size: file.size,
-            category: activeTab,
+          const { queued: insQueued, error: insErr } = await runOrQueue({
+            table: "purchase_attachments",
+            op: "insert",
+            payload: {
+              purchase_order_id: purchaseOrderId,
+              file_url: pub.publicUrl,
+              file_name: file.name,
+              file_type: file.type,
+              file_size: file.size,
+              category: activeTab,
+            },
+            label: "إضافة مرفق أمر شراء",
           });
+          if (insQueued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
           if (insErr) {
             try { await supabase.storage.from("purchase-attachments").remove([path]); } catch {}
             throw insErr;
@@ -143,22 +154,30 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
 
   const softDelete = async (att: Attachment) => {
     if (!confirm(`نقل "${att.file_name}" إلى سلة المحذوفات؟`)) return;
-    const { error } = await (supabase as any)
-      .from("purchase_attachments")
-      .update({ deleted_at: new Date().toISOString(), deleted_reason: "user_deleted" })
-      .eq("id", att.id);
+    const { queued, error } = await runOrQueue({
+      table: "purchase_attachments",
+      op: "update",
+      payload: { deleted_at: new Date().toISOString(), deleted_reason: "user_deleted" },
+      match: { id: att.id },
+      label: "نقل مرفق للسلة",
+    });
     if (error) return toast.error(error.message);
+    if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
     toast.success("نُقل إلى السلة");
     load();
   };
 
   const restore = async (att: Attachment) => {
     const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await (supabase as any)
-      .from("purchase_attachments")
-      .update({ deleted_at: null, deleted_reason: null, expires_at: newExpiry })
-      .eq("id", att.id);
+    const { queued, error } = await runOrQueue({
+      table: "purchase_attachments",
+      op: "update",
+      payload: { deleted_at: null, deleted_reason: null, expires_at: newExpiry },
+      match: { id: att.id },
+      label: "استرجاع مرفق",
+    });
     if (error) return toast.error(error.message);
+    if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
     toast.success("تم الاسترجاع");
     load();
   };
@@ -172,8 +191,14 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
         const path = att.file_url.slice(idx + marker.length);
         await supabase.storage.from("purchase-attachments").remove([path]);
       }
-      const { error } = await (supabase as any).from("purchase_attachments").delete().eq("id", att.id);
+      const { queued, error } = await runOrQueue({
+        table: "purchase_attachments",
+        op: "delete",
+        match: { id: att.id },
+        label: "حذف مرفق نهائياً",
+      });
       if (error) throw error;
+      if (queued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
       toast.success("حُذف نهائياً");
       setItems((prev) => prev.filter((x) => x.id !== att.id));
     } catch (e: any) {
