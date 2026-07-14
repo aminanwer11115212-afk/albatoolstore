@@ -9,7 +9,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, Loader2, Undo2 } from "lucide-react";
+import { AlertTriangle, Download, Loader2, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export interface ReverseChargeItem {
   invoice_id?: string;
