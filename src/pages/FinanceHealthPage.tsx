@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { RefreshCw, CheckCircle2, XCircle, ChevronDown, ChevronUp, Activity } from "lucide-react";
+import { RefreshCw, CheckCircle2, XCircle, ChevronDown, ChevronUp, Activity, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { runAllInvariants, type FinanceHealthReport, type InvariantResult, type InvariantSeverity } from "@/lib/financeInvariants";
 
 const SEV_STYLE: Record<InvariantSeverity, { badge: string; label: string }> = {
