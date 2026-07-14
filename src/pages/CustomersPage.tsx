@@ -1868,25 +1868,25 @@ export default function CustomersPage() {
                           />
                         </td>
                         <td className="tabular-nums" style={{ padding: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <EditableCell
-                                value={c.whatsapp || ""}
-                                disabled={savingRow === c.id}
-                                onSave={(v) => updateRowField(c.id, { whatsapp: normalizePhoneInput(v) || null })}
-                                inputClassName="text-[11px] tabular-nums"
-                                placeholder="واتساب"
-                                inputMode="tel"
-                                dir="ltr"
-                                validate={(v) => {
-                                  const t = normalizePhoneInput(v);
-                                  if (!t) return null;
-                                  if (!isValidWhatsAppPhone(t)) return "رقم غير صالح للإرسال (8-15 خانة)";
-                                  const dups = findDuplicatesByPhone(t, c.id);
-                                  return dups.length > 0 ? `رقم مكرر مع: ${dups.map((d: any) => d.name).slice(0, 2).join("، ")}` : null;
-                                }}
-                              />
-                            </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 4px" }}>
+                            <button
+                              type="button"
+                              disabled={savingRow === c.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPhonePicker({
+                                  customerId: c.id,
+                                  initialValue: c.whatsapp || "",
+                                  customerName: c.name || "",
+                                  field: "whatsapp",
+                                });
+                              }}
+                              title="اضغط لتعديل الرقم أو استيراده من جهات الاتصال"
+                              className="text-[11px] tabular-nums text-right w-full truncate hover:text-primary hover:underline disabled:opacity-50 cursor-pointer bg-transparent border-0 outline-none"
+                              style={{ padding: "6px 4px", direction: "ltr" }}
+                            >
+                              {c.whatsapp || <span className="text-muted-foreground opacity-60">— اضغط للإدخال —</span>}
+                            </button>
                             {(() => {
                               const wa = pickCustomerWhatsApp(c);
                               if (!wa) return null;
