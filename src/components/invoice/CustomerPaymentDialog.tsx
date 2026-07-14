@@ -123,7 +123,12 @@ export default function CustomerPaymentDialog({
     if (accountOptions.length === 0) return;
     const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
     if (!accountId) {
-      // فضّل حساب "أولاد جابر" افتراضياً للتحويلات البنكية
+      // 1) حساب مثبَّت من المستخدم يفوز دائماً
+      if (method === "bank" && pinnedAccountId) {
+        const pinned = accountOptions.find((a: any) => a.id === pinnedAccountId);
+        if (pinned) { setAccountId(pinned.id); return; }
+      }
+      // 2) حساب "أولاد جابر" افتراضياً للتحويلات البنكية
       const jaber = (accountOptions as any[]).find((a) => {
         const s = `${a.name || ""} ${a.bank_name || ""}`;
         return /اولاد\s*جابر|أولاد\s*جابر/.test(s);
@@ -141,7 +146,7 @@ export default function CustomerPaymentDialog({
     if (!accountOptions.find((a: any) => a.id === accountId)) {
       setAccountId(accountOptions[0]?.id || "");
     }
-  }, [accountOptions, method]); // eslint-disable-line
+  }, [accountOptions, method, pinnedAccountId]); // eslint-disable-line
 
   // احفظ الحساب المختار فور تغييره — لا ننتظر الحفظ لتثبيت الاختيار
   useEffect(() => {
