@@ -106,6 +106,7 @@ export default function CustomerPaymentDialog({
   const [referenceNo, setReferenceNo] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [custBalance, setCustBalance] = useState<{ debt: number; credit: number } | null>(null);
+  const [recentInvoices, setRecentInvoices] = useState<Array<{ id: string; invoice_number: string | null; date: string; total: number; paid_amount: number; discount: number; }>>([]);
 
 
   const amountRef = useRef<HTMLInputElement | null>(null);
@@ -144,6 +145,20 @@ export default function CustomerPaymentDialog({
             }
           }
         })();
+        // اجلب آخر 5 فواتير للعميل (باستثناء الحالية)
+        (async () => {
+          const { data } = await supabase
+            .from("invoices")
+            .select("id, invoice_number, date, total, paid_amount, discount")
+            .eq("customer_id", customerId)
+            .neq("source", "pos")
+            .neq("id", invoiceId)
+            .order("date", { ascending: false })
+            .limit(5);
+          setRecentInvoices((data as any[]) || []);
+        })();
+      } else {
+        setRecentInvoices([]);
       }
     }
 
