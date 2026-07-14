@@ -2081,6 +2081,11 @@ export default function CustomersPage() {
           usageNames={unlinkDialog.usageNames}
           usageCount={unlinkDialog.usageCount}
           onConfirm={unlinkDialog.onConfirm}
+          onDone={() => setUnlinkDialog(null)}
+        />
+      )}
+
+
 
       {phonePicker && (
         <PhonePickerDialog
