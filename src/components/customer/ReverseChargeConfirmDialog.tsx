@@ -100,6 +100,17 @@ export function ReverseChargeConfirmDialog({
               {group.surplus > 0.01 && (
                 <div>الفائض (رصيد دائن): <span className="font-bold text-primary tabular-nums">{fmt(group.surplus)}</span></div>
               )}
+              {group.items.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ms-auto h-7"
+                  onClick={() => exportPreviewCsv(group)}
+                  data-testid="reverse-preview-csv"
+                >
+                  <Download size={12} className="ml-1" /> تصدير CSV للمعاينة
+                </Button>
+              )}
             </div>
 
             {group.items.length > 0 ? (
