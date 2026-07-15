@@ -13,10 +13,11 @@ export type DeleteInvoiceResult = {
 
 /**
  * يحذف فاتورة بالكامل (مع كل توابعها) ويُرجع كميات بنودها إلى المخزون
- * إن كانت خُصمت سابقاً. إن كانت الفاتورة قد سُدّدت جزئياً/كلياً، يتم
- * تحويل الدفعات المرتبطة بها إلى **رصيد دائن للعميل** تلقائياً عبر RPC
- * ذرّي `delete_invoice_with_reconciliation` — حتى لا يُفقد المبلغ.
- * يسجّل العملية في `activity_log` (من قام بالحذف ومتى وماذا استُرجع).
+ * إن كانت خُصمت سابقاً. عند الحذف تُحذف أيضاً **الدفعات المسجّلة على الفاتورة
+ * كلياً** (لأن المبلغ دُفع مقابل هذه الفاتورة تحديداً، وحذفها يُلغي كامل
+ * الأثر المالي) — ولا تُضاف كرصيد دائن للعميل. رصيد العميل لا يتأثّر إلا
+ * بالأرصدة المتراكمة/الشحن السابق (recompute_customer_balance يعيد الحساب
+ * من بقية الحركات). يسجّل العملية في `activity_log`.
  */
 export async function deleteInvoiceWithStockRestore(
   invoiceId: string,
@@ -24,7 +25,6 @@ export async function deleteInvoiceWithStockRestore(
   if (!invoiceId) throw new Error("invoiceId مطلوب");
 
   // 0) قراءة بيانات الحارس + رقم الفاتورة + معلومات لقطة الـ Audit قبل أي مصالحة.
-  //    نحتاج source/customer_id حتى لا تتحول فواتير الكاش إلى رصيد عميل بالخطأ.
   const { data: inv, error: invErr } = await supabase
     .from("invoices")
     .select("id, invoice_number, date, customer_id, total, paid_amount, status, source, stock_deduction_id, stock_deducted_at, workflow_status")
@@ -33,16 +33,17 @@ export async function deleteInvoiceWithStockRestore(
   if (invErr) throw new Error(`تعذّر قراءة الفاتورة: ${invErr.message}`);
   if (!inv) throw new Error("الفاتورة غير موجودة");
 
-  // 1) تحويل دفعات الفواتير العادية فقط إلى رصيد دائن. فواتير الكاش/POS لا تخص بطاقة عميل.
-  let convertedToCredit = 0;
-  const shouldReconcileCustomerCredit = !!(inv as any).customer_id && (inv as any).source !== "pos";
-  if (shouldReconcileCustomerCredit) {
+  // 1) حذف دفعات الفواتير العادية بالكامل (بدون تحويلها لرصيد عميل).
+  //    فواتير الكاش/POS لا تخص بطاقة عميل.
+  let deletedPayments = 0;
+  const shouldReconcilePayments = !!(inv as any).customer_id && (inv as any).source !== "pos";
+  if (shouldReconcilePayments) {
     const { data: reconc, error: reconErr } = await (supabase as any).rpc(
       "delete_invoice_with_reconciliation",
       { _invoice_id: invoiceId },
     );
-    if (reconErr) throw new Error(`تعذّرت مصالحة الدفعات: ${reconErr.message}`);
-    convertedToCredit = Number(reconc?.paid_amount || 0);
+    if (reconErr) throw new Error(`تعذّر إلغاء الدفعات: ${reconErr.message}`);
+    deletedPayments = Number(reconc?.deleted_payments || 0);
   }
 
   // 2) قراءة بنود الفاتورة
@@ -148,13 +149,13 @@ export async function deleteInvoiceWithStockRestore(
       details: {
         restored_stock: restoredStock,
         restored_items: restoredItems,
-        converted_to_credit: convertedToCredit,
-        converted_payments: convertedToCredit > 0.01
+        deleted_payments: deletedPayments,
+        payments_removed: deletedPayments > 0
           ? {
               invoice_number: (inv as any).invoice_number,
-              amount: convertedToCredit,
+              paid_amount: (inv as any).paid_amount,
               customer_id: (inv as any).customer_id,
-              reason: "invoice_deleted_payments_converted_to_customer_credit",
+              reason: "invoice_deleted_payments_removed_from_transactions",
               executed_at: new Date().toISOString(),
             }
           : null,
@@ -192,7 +193,7 @@ export async function deleteInvoiceWithStockRestore(
   return {
     restoredStock,
     invoiceNumber: (inv as any).invoice_number ?? null,
-    convertedToCredit,
+    convertedToCredit: 0,
     restoredItems,
     customerId,
     newCustomerBalance,
