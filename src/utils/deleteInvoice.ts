@@ -6,6 +6,9 @@ export type DeleteInvoiceResult = {
   invoiceNumber: string | null;
   convertedToCredit: number;
   restoredItems: Array<{ product_id: string | null; quantity: number }>;
+  customerId: string | null;
+  newCustomerBalance: number | null;
+  newCustomerCredit: number | null;
 };
 
 /**
@@ -159,7 +162,23 @@ export async function deleteInvoiceWithStockRestore(
     console.warn("[deleteInvoice] audit log failed (non-fatal)", auditErr);
   }
 
-  // 7) إخطار باقي الشاشات بتحديث المخزون والقوائم
+  // 7) اقرأ الرصيد الجديد للعميل بعد الحذف (بعد recompute) لعرضه في الـtoast
+  let newCustomerBalance: number | null = null;
+  let newCustomerCredit: number | null = null;
+  const customerId = (inv as any).customer_id ?? null;
+  if (customerId) {
+    try {
+      const { data: cust } = await (supabase as any)
+        .from("customers")
+        .select("balance, credit_balance")
+        .eq("id", customerId)
+        .maybeSingle();
+      newCustomerBalance = Number(cust?.balance ?? 0);
+      newCustomerCredit = Number(cust?.credit_balance ?? 0);
+    } catch {}
+  }
+
+  // 8) إخطار باقي الشاشات بتحديث المخزون والقوائم
   if (typeof window !== "undefined") {
     try { window.dispatchEvent(new Event("products:changed")); } catch {}
     try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
@@ -172,5 +191,8 @@ export async function deleteInvoiceWithStockRestore(
     invoiceNumber: (inv as any).invoice_number ?? null,
     convertedToCredit,
     restoredItems,
+    customerId,
+    newCustomerBalance,
+    newCustomerCredit,
   };
 }

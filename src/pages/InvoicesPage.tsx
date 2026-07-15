@@ -110,7 +110,13 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
       onConfirm: async () => {
         try {
           const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
-          const { restoredStock, convertedToCredit, invoiceNumber } = await deleteInvoiceWithStockRestore(id);
+          const {
+            restoredStock,
+            convertedToCredit,
+            invoiceNumber,
+            newCustomerBalance,
+            newCustomerCredit,
+          } = await deleteInvoiceWithStockRestore(id);
           qc.setQueriesData<any>(
             { predicate: (q) => {
               const key = q.queryKey[0];
@@ -124,7 +130,6 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
           qc.invalidateQueries({ queryKey: ["customers"] });
           qc.invalidateQueries({ queryKey: ["transactions"] });
           qc.invalidateQueries({ queryKey: ["products"] });
-          // كشف الحساب + معاينة الفاتورة + إحصاءات العملاء
           qc.invalidateQueries({ queryKey: ["customer-statement"] });
           qc.invalidateQueries({ queryKey: ["customer-transactions"] });
           qc.invalidateQueries({ queryKey: ["customer_balance_stats"] });
@@ -133,13 +138,26 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
           try { window.dispatchEvent(new Event("customers:changed")); } catch {}
           try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
           try { refetch(); } catch {}
+
           const invLabel = invoiceNumber ? `«${invoiceNumber}»` : "";
           const parts = [`تم حذف الفاتورة ${invLabel}`.trim()];
           if (restoredStock) parts.push("وإرجاع الكميات إلى المخزون");
           if (convertedToCredit > 0.01) parts.push(`وتحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
-          toast.success(parts.join(" "), { duration: 6000 });
+
+          const balBits: string[] = [];
+          if (newCustomerBalance !== null) {
+            balBits.push(`عليه ${Number(newCustomerBalance).toLocaleString()}`);
+          }
+          if (newCustomerCredit !== null && newCustomerCredit > 0.01) {
+            balBits.push(`له ${Number(newCustomerCredit).toLocaleString()}`);
+          }
+          const desc = [
+            "تم تحديث كشف الحساب وقائمة الفواتير وإدارة العملاء.",
+            balBits.length ? `الرصيد الجديد للعميل: ${balBits.join(" · ")}` : "",
+          ].filter(Boolean).join(" ");
+
+          toast.success(parts.join(" "), { duration: 6000, description: desc || undefined });
         } catch (err: any) {
-          // إعادة تحميل شاملة لضمان عدم بقاء أي حالة جزئية على الواجهة.
           qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
           qc.invalidateQueries({ queryKey: ["invoices-full"] });
           qc.invalidateQueries({ queryKey: ["invoices"] });
