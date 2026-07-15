@@ -7,6 +7,7 @@ import { Search, X, Printer } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
 
 export default function CustomerStatementPage() {
   const { data: customers } = useCustomers();
