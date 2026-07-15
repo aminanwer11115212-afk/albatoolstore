@@ -149,13 +149,13 @@ export async function deleteInvoiceWithStockRestore(
       details: {
         restored_stock: restoredStock,
         restored_items: restoredItems,
-        converted_to_credit: convertedToCredit,
-        converted_payments: convertedToCredit > 0.01
+        deleted_payments: deletedPayments,
+        payments_removed: deletedPayments > 0
           ? {
               invoice_number: (inv as any).invoice_number,
-              amount: convertedToCredit,
+              paid_amount: (inv as any).paid_amount,
               customer_id: (inv as any).customer_id,
-              reason: "invoice_deleted_payments_converted_to_customer_credit",
+              reason: "invoice_deleted_payments_removed_from_transactions",
               executed_at: new Date().toISOString(),
             }
           : null,
