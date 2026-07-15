@@ -456,9 +456,9 @@ ${showAccount ? (() => {
     }) : ""}
     ${row({ section: "majmoo-row", label: "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
     ${row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
-    <tr data-section="final-status" data-section-label="الحساب الكلي">
-      <td style="${cellR}background:#e8eef7;">الحساب الكلي</td>
-      <td data-section="final-total" data-section-label="الحساب الكلي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:11.5px;color:${finalColor};">${fmt(finalDisplay)}</td>
+    <tr data-section="final-status" data-section-label="رصيد العميل الحالي">
+      <td style="${cellR}background:#e8eef7;">رصيد العميل الحالي</td>
+      <td data-section="final-total" data-section-label="رصيد العميل الحالي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:11.5px;color:${finalColor};">${finalDisplay}</td>
       <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:9.5px;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
     </tr>
   </tbody>
