@@ -876,6 +876,13 @@ export default function InvoiceViewPage() {
           </div>
         </div>
 
+        {(invoice as any).source !== "pos" && invoice.customer_id && (
+          <InvoiceCustomerCreditBanner
+            customerId={invoice.customer_id}
+            invoiceNumber={invoice.invoice_number}
+          />
+        )}
+
         <div className="mt-6">
           <UnavailableItemsPanel
             isInvoice={true}
