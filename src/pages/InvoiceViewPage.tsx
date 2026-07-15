@@ -28,6 +28,7 @@ import InvoiceRevisionsDialog from "@/components/invoice/InvoiceRevisionsDialog"
 import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDialog";
 import UnavailableItemsPanel from "@/components/invoice/UnavailableItemsPanel";
 import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
+import InvoiceCustomerCreditBanner from "@/components/invoice/InvoiceCustomerCreditBanner";
 import { recordInvoiceRevision, diffRows } from "@/utils/invoiceRevisions";
 import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
@@ -874,6 +875,13 @@ export default function InvoiceViewPage() {
             <div className="flex justify-between text-destructive"><span>المتبقي:</span><span>{Math.max(0, Number(invoice.total || 0) - Number(invoice.paid_amount || 0)).toLocaleString("en", { minimumFractionDigits: 2 })}</span></div>
           </div>
         </div>
+
+        {(invoice as any).source !== "pos" && invoice.customer_id && (
+          <InvoiceCustomerCreditBanner
+            customerId={invoice.customer_id}
+            invoiceNumber={invoice.invoice_number}
+          />
+        )}
 
         <div className="mt-6">
           <UnavailableItemsPanel
