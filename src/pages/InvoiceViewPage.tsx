@@ -29,6 +29,8 @@ import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDia
 import UnavailableItemsPanel from "@/components/invoice/UnavailableItemsPanel";
 import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 import InvoiceCustomerCreditBanner from "@/components/invoice/InvoiceCustomerCreditBanner";
+import InvoiceAccountingAlert from "@/components/invoice/InvoiceAccountingAlert";
+import InvoiceAuditTab from "@/components/invoice/InvoiceAuditTab";
 import { recordInvoiceRevision, diffRows } from "@/utils/invoiceRevisions";
 import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
@@ -60,7 +62,7 @@ export default function InvoiceViewPage() {
   const [statusSaving, setStatusSaving] = useState(false);
   const [convertSaving, setConvertSaving] = useState(false);
   const [editingCell, setEditingCell] = useState<{ index: number; field: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<"document" | "conversion">("document");
+  const [activeTab, setActiveTab] = useState<"document" | "conversion" | "audit">("document");
   const [editValue, setEditValue] = useState("");
 
   // Payment form
@@ -688,10 +690,23 @@ export default function InvoiceViewPage() {
         >
           سجل التحويل
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("audit")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "audit" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        >
+          سجل التدقيق
+        </button>
       </div>
 
       {activeTab === "conversion" && invoice?.id && (
         <QuoteConversionLog mode="invoice" invoiceId={invoice.id} />
+      )}
+
+      {activeTab === "audit" && invoice?.id && (
+        <div className="pt-4">
+          <InvoiceAuditTab invoiceId={invoice.id} customerId={invoice.customer_id} />
+        </div>
       )}
 
       <div hidden={activeTab !== "document"}>
@@ -877,10 +892,21 @@ export default function InvoiceViewPage() {
         </div>
 
         {(invoice as any).source !== "pos" && invoice.customer_id && (
-          <InvoiceCustomerCreditBanner
-            customerId={invoice.customer_id}
-            invoiceNumber={invoice.invoice_number}
-          />
+          <>
+            <InvoiceAccountingAlert
+              invoiceId={invoice.id}
+              invoiceNumber={invoice.invoice_number}
+              customerId={invoice.customer_id}
+              total={Number(invoice.total || 0)}
+              paidAmount={Number(invoice.paid_amount || 0)}
+              discount={Number(invoice.discount || 0)}
+              isPos={(invoice as any).source === "pos"}
+            />
+            <InvoiceCustomerCreditBanner
+              customerId={invoice.customer_id}
+              invoiceNumber={invoice.invoice_number}
+            />
+          </>
         )}
 
         <div className="mt-6">

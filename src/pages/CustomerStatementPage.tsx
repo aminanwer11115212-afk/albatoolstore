@@ -7,6 +7,8 @@ import { Search, X, Printer } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
+import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
 
 export default function CustomerStatementPage() {
   const { data: customers } = useCustomers();
@@ -21,6 +23,8 @@ export default function CustomerStatementPage() {
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"all" | "paid" | "unpaid" | "partial">("all");
+  const [cashMode, setCashMode] = useState(false);
+  const [creditSourceFilter, setCreditSourceFilter] = useState<Set<CreditSource>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   const matches = useMemo(() => {
@@ -124,12 +128,38 @@ export default function CustomerStatementPage() {
     return (transactions || []).filter((t: any) => {
       if (fromDate && t.date < fromDate) return false;
       if (toDate && t.date > toDate) return false;
-      const amt = Number(t.amount || 0);
+      const amt = Math.abs(Number(t.amount || 0));
       if (minAmount && amt < Number(minAmount)) return false;
       if (maxAmount && amt > Number(maxAmount)) return false;
+      if (t.category === "customer_credit" && creditSourceFilter.size > 0) {
+        const info = classifyCreditRow(t);
+        if (!creditSourceFilter.has(info.source)) return false;
+      }
       return true;
     });
-  }, [transactions, fromDate, toDate, minAmount, maxAmount]);
+  }, [transactions, fromDate, toDate, minAmount, maxAmount, creditSourceFilter]);
+
+  // تجميع customer_credit حسب المصدر — لعرض ملخّص فرعي أعلى الجدول
+  const creditGroups = useMemo(() => {
+    const map = new Map<CreditSource, { label: string; total: number; count: number }>();
+    for (const t of filteredTransactions) {
+      if (t.category !== "customer_credit") continue;
+      const info = classifyCreditRow(t);
+      const cur = map.get(info.source) || { label: info.label, total: 0, count: 0 };
+      cur.total += Number(t.amount || 0);
+      cur.count += 1;
+      map.set(info.source, cur);
+    }
+    return Array.from(map.entries()).map(([source, v]) => ({ source, ...v }));
+  }, [filteredTransactions]);
+
+  // في وضع الكاش: أظهر فقط customer_payment + customer_credit
+  const cashRows = useMemo(() => {
+    if (!cashMode) return [];
+    return filteredTransactions.filter(
+      (t: any) => t.category === "customer_payment" || t.category === "customer_credit",
+    );
+  }, [cashMode, filteredTransactions]);
 
   const selectedCustomer = (customers || []).find((c: any) => c.id === selectedCustomerId);
   const totalInvoices = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.total || 0), 0);
@@ -369,27 +399,167 @@ export default function CustomerStatementPage() {
 
           {filteredTransactions.length > 0 && (
             <div data-section="transactions" data-section-label="المعاملات" className="legacy-card card-block">
-              <h3 className="px-5 py-3 font-semibold text-foreground border-b border-border">المعاملات ({filteredTransactions.length})</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-b border-border">
+                <h3 className="font-semibold text-foreground">
+                  المعاملات ({filteredTransactions.length})
+                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCashMode((v) => !v)}
+                    className={`text-xs px-3 py-1 rounded-full border transition ${cashMode ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-foreground border-border"}`}
+                    data-testid="cash-mode-toggle"
+                  >
+                    {cashMode ? "الوضع الكامل" : "وضع الكاش"}
+                  </button>
+                </div>
+              </div>
+
+              {/* شريط فلترة مصدر الرصيد الدائن */}
+              {creditGroups.length > 0 && (
+                <div className="px-5 py-3 border-b border-border bg-muted/20">
+                  <CreditConsumptionOrderControl compact />
+                </div>
+              )}
+              {creditGroups.length > 0 && (
+                <div className="px-5 py-3 border-b border-border bg-muted/30 space-y-2">
+                  <div className="text-[11px] text-muted-foreground">
+                    ملخّص الرصيد الدائن حسب المصدر:
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {CREDIT_SOURCE_OPTIONS.map((opt) => {
+                      const g = creditGroups.find((x) => x.source === opt.value);
+                      const active = creditSourceFilter.has(opt.value);
+                      const hasData = !!g;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          disabled={!hasData}
+                          onClick={() => {
+                            const next = new Set(creditSourceFilter);
+                            if (active) next.delete(opt.value);
+                            else next.add(opt.value);
+                            setCreditSourceFilter(next);
+                          }}
+                          className={`text-[11px] px-2 py-1 rounded-full border transition tabular-nums ${
+                            !hasData
+                              ? "opacity-40 cursor-not-allowed bg-muted border-border text-muted-foreground"
+                              : active
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-background border-border hover:bg-muted"
+                          }`}
+                        >
+                          {opt.label}
+                          {g ? ` · ${g.total.toLocaleString()} (${g.count})` : ""}
+                        </button>
+                      );
+                    })}
+                    {creditSourceFilter.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setCreditSourceFilter(new Set())}
+                        className="text-[11px] text-muted-foreground underline hover:text-foreground"
+                      >
+                        مسح الفلاتر
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="overflow-x-auto">
                 <table className="w-full text-sm mobile-stack-table">
-                  <thead><tr className="bg-muted">
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">النوع</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المبلغ</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الوصف</th>
-                  </tr></thead>
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">النوع</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المصدر</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الارتباط</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المبلغ</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الوصف</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    {filteredTransactions.map((t: any) => (
-                      <tr key={t.id} className="border-b border-border hover:bg-muted/50">
-                        <td data-label="التاريخ" className="px-5 py-3 text-foreground">{t.date}</td>
-                        <td data-label="النوع" className="px-5 py-3 text-foreground">{t.type === "income" ? "إيراد" : "مصروف"}</td>
-                        <td data-label="المبلغ" className="px-5 py-3 text-foreground">{Number(t.amount).toLocaleString()}</td>
-                        <td data-label="الوصف" className="px-5 py-3 text-muted-foreground">{t.description || "-"}</td>
-                      </tr>
-                    ))}
+                    {(cashMode ? cashRows : filteredTransactions).map((t: any) => {
+                      const isCredit = t.category === "customer_credit";
+                      const isPayment = t.category === "customer_payment";
+                      const info = isCredit ? classifyCreditRow(t) : null;
+                      const linked = t.reference_id
+                        ? `فاتورة #${String(t.reference_id).slice(0, 8)}`
+                        : "مستقل";
+                      const amt = Number(t.amount || 0);
+                      return (
+                        <tr key={t.id} className="border-b border-border hover:bg-muted/50">
+                          <td data-label="التاريخ" className="px-5 py-3 text-foreground tabular-nums">{t.date}</td>
+                          <td data-label="النوع" className="px-5 py-3 text-foreground">
+                            {isPayment
+                              ? "دفعة"
+                              : isCredit
+                                ? amt < 0
+                                  ? "استهلاك رصيد"
+                                  : "رصيد دائن"
+                                : t.type === "income"
+                                  ? "إيراد"
+                                  : "مصروف"}
+                          </td>
+                          <td data-label="المصدر" className="px-5 py-3">
+                            {info ? (
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${info.colorClass}`}>
+                                {info.label}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </td>
+                          <td data-label="الارتباط" className="px-5 py-3 text-xs">
+                            <span className={t.reference_id ? "text-foreground" : "text-muted-foreground"}>
+                              {linked}
+                            </span>
+                          </td>
+                          <td data-label="المبلغ" className={`px-5 py-3 font-semibold tabular-nums ${amt < 0 ? "text-amber-700" : "text-foreground"}`}>
+                            {amt.toLocaleString()}
+                          </td>
+                          <td data-label="الوصف" className="px-5 py-3 text-muted-foreground text-xs">{t.description || "-"}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+
+              {cashMode && (
+                <div className="px-5 py-3 border-t border-border bg-muted/30 grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">إجمالي المدفوع</div>
+                    <div className="font-bold tabular-nums text-success">
+                      {cashRows
+                        .filter((t: any) => t.category === "customer_payment")
+                        .reduce((s: number, t: any) => s + Number(t.amount || 0), 0)
+                        .toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">إجمالي الفائض (مستقل عن فاتورة)</div>
+                    <div className="font-bold tabular-nums text-emerald-700">
+                      {cashRows
+                        .filter((t: any) => t.category === "customer_credit" && !t.reference_id && Number(t.amount) > 0)
+                        .reduce((s: number, t: any) => s + Number(t.amount || 0), 0)
+                        .toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">إجمالي المستهلَك من الرصيد</div>
+                    <div className="font-bold tabular-nums text-amber-700">
+                      {Math.abs(
+                        cashRows
+                          .filter((t: any) => t.category === "customer_credit" && Number(t.amount) < 0)
+                          .reduce((s: number, t: any) => s + Number(t.amount || 0), 0),
+                      ).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
