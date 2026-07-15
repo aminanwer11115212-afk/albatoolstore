@@ -54,6 +54,16 @@ export function classifyCreditRow(row: {
     };
   }
 
+  // شحن رصيد يدوي — allocation.kind فاصل قاطع، لا يعتمد على وصف قد يحتوي "فائض"
+  if (kind === "surplus" || /شحن\s*رصيد/.test(desc)) {
+    return {
+      source: "manual_charge",
+      label: "شحن يدوي",
+      colorClass: "bg-blue-100 text-blue-800 border-blue-300",
+      linkedInvoice: null,
+    };
+  }
+
   // فائض من فاتورة
   if (/فائض/.test(desc) || linkedInvoice) {
     return {
@@ -61,16 +71,6 @@ export function classifyCreditRow(row: {
       label: "فائض فاتورة",
       colorClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
       linkedInvoice,
-    };
-  }
-
-  // شحن رصيد يدوي
-  if (kind === "surplus" || /شحن\s*رصيد|رصيد\s*فائض/.test(desc)) {
-    return {
-      source: "manual_charge",
-      label: "شحن يدوي",
-      colorClass: "bg-blue-100 text-blue-800 border-blue-300",
-      linkedInvoice: null,
     };
   }
 
