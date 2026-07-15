@@ -892,10 +892,21 @@ export default function InvoiceViewPage() {
         </div>
 
         {(invoice as any).source !== "pos" && invoice.customer_id && (
-          <InvoiceCustomerCreditBanner
-            customerId={invoice.customer_id}
-            invoiceNumber={invoice.invoice_number}
-          />
+          <>
+            <InvoiceAccountingAlert
+              invoiceId={invoice.id}
+              invoiceNumber={invoice.invoice_number}
+              customerId={invoice.customer_id}
+              total={Number(invoice.total || 0)}
+              paidAmount={Number(invoice.paid_amount || 0)}
+              discount={Number(invoice.discount || 0)}
+              isPos={(invoice as any).source === "pos"}
+            />
+            <InvoiceCustomerCreditBanner
+              customerId={invoice.customer_id}
+              invoiceNumber={invoice.invoice_number}
+            />
+          </>
         )}
 
         <div className="mt-6">
