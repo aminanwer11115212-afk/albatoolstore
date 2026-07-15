@@ -417,6 +417,11 @@ export default function CustomerStatementPage() {
 
               {/* شريط فلترة مصدر الرصيد الدائن */}
               {creditGroups.length > 0 && (
+                <div className="px-5 py-3 border-b border-border bg-muted/20">
+                  <CreditConsumptionOrderControl compact />
+                </div>
+              )}
+              {creditGroups.length > 0 && (
                 <div className="px-5 py-3 border-b border-border bg-muted/30 space-y-2">
                   <div className="text-[11px] text-muted-foreground">
                     ملخّص الرصيد الدائن حسب المصدر:
