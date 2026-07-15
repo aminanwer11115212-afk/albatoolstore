@@ -7,8 +7,7 @@ import {
   isBankPaymentMethod,
   filterAccountsForPayment,
 } from "@/lib/bankTransferValidation";
-import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
-import { splitPayment } from "@/utils/overpayment";
+import { computeInvoicePaymentAdjustment } from "@/utils/invoicePaymentMath";
 import { logDiscountEvent } from "@/utils/discountAuditLogger";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
 import { netBalanceOf } from "@/utils/balanceDisplay";
@@ -298,23 +297,25 @@ export default function CustomerPaymentDialog({
         .maybeSingle();
       if (rErr) throw rErr;
 
-      const nextDiscount = Math.max(0, Number(inv?.discount || 0) + disc);
-      const nextTotal = Math.max(0, Number(inv?.total || 0) - disc);
-      const alreadyPaid = Number(inv?.paid_amount || 0);
-      const remainingOnInvoice = Math.max(0, nextTotal - alreadyPaid);
-
-      // 1) استخدام الرصيد الدائن أولاً (لا يمكن أن يتجاوز المتبقي على الفاتورة)
-      const creditApplied = Math.min(cu, remainingOnInvoice);
-
-      // 2) توزيع النقد على ما تبقى + الفائض يذهب رصيدًا دائنًا جديدًا
-      const split = splitPayment({
-        amount: n,
-        total: nextTotal - creditApplied,
-        alreadyPaid,
+      const beforeTotal = Number(inv?.total || 0);
+      const beforePaid = Number(inv?.paid_amount || 0);
+      const beforeDiscount = Number(inv?.discount || 0);
+      const calc = computeInvoicePaymentAdjustment({
+        currentTotal: beforeTotal,
+        currentPaid: beforePaid,
+        currentDiscount: beforeDiscount,
+        paymentAmount: n,
+        discountAmount: disc,
+        creditUse: cu,
+        isPos: !!isPos,
       });
-      const newPaid = alreadyPaid + creditApplied + split.applied;
-      const newDue = Math.max(0, nextTotal - newPaid);
-      const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: newPaid });
+      const nextDiscount = calc.nextDiscount;
+      const nextTotal = calc.nextTotal;
+      const creditApplied = calc.creditApplied;
+      const split = { applied: calc.cashApplied, overpay: calc.cashOver };
+      const newPaid = calc.nextPaid;
+      const newDue = calc.newDue;
+      const nextStatus = calc.nextStatus;
 
       // (a) دفعة نقدية على الفاتورة
       if (split.applied > 0) {
@@ -399,6 +400,11 @@ export default function CustomerPaymentDialog({
         .eq("id", invoiceId);
       if (upErr) throw upErr;
 
+      await Promise.allSettled([
+        customerId && !isPos ? (supabase as any).rpc("recompute_customer_balance", { _customer_id: customerId }) : Promise.resolve(),
+        accountId && (split.applied > 0 || split.overpay > 0) ? (supabase as any).rpc("recompute_account_balance", { _account_id: accountId }) : Promise.resolve(),
+      ]);
+
       if (method === "bank" && accountId) {
         try { localStorage.setItem("lov:last-bank-account", accountId); } catch {}
       }
@@ -422,11 +428,11 @@ export default function CustomerPaymentDialog({
           action: "payment",
           changedBy,
           changes: {
-            paid_amount: { before: Number(inv?.paid_amount || 0), after: newPaid },
+            paid_amount: { before: beforePaid, after: newPaid },
             ...(disc > 0
               ? {
-                  discount: { before: Number(inv?.discount || 0), after: nextDiscount },
-                  total: { before: Number(inv?.total || 0), after: nextTotal },
+                  discount: { before: beforeDiscount, after: nextDiscount },
+                  total: { before: beforeTotal, after: nextTotal },
                 }
               : {}),
           },
@@ -471,6 +477,7 @@ export default function CustomerPaymentDialog({
       qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
       try { window.dispatchEvent(new Event("customers:changed")); } catch {}
       try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
       try { window.dispatchEvent(new Event("invoice-payments:changed")); } catch {}
       // انتظر اكتمال إعادة الجلب للمفاتيح الحرجة قبل تحرير أزرار الحفظ
       await Promise.allSettled([
@@ -490,10 +497,10 @@ export default function CustomerPaymentDialog({
             entity_id: invoiceId,
             entity_number: invoiceNumber || null,
             customer_id: customerId,
-            discount_before: Number(inv?.discount || 0),
+            discount_before: beforeDiscount,
             discount_added: disc,
             discount_after: nextDiscount,
-            total_before: Number(inv?.total || 0),
+            total_before: beforeTotal,
             total_after: nextTotal,
             balance_before: prevNet,
             balance_after: prevNet !== null ? prevNet - disc : null,
@@ -695,7 +702,7 @@ export default function CustomerPaymentDialog({
                     <div className="space-y-1">
                       {recentInvoices.map((inv) => {
                         const paid = Math.max(0, Number(inv.paid_amount) || 0);
-                        const totalNet = Math.max(0, (Number(inv.total) || 0) - (Number(inv.discount) || 0));
+                        const totalNet = Math.max(0, Number(inv.total) || 0);
                         const due = Math.max(0, totalNet - paid);
                         const isPaid = due < 0.01;
                         const isPartial = paid > 0.01 && due > 0.01;
@@ -757,7 +764,18 @@ export default function CustomerPaymentDialog({
                     label="خصم على الدفعة"
                     value={Number(discount) || 0}
                     grandBeforeDiscount={remaining}
-                    onChange={(v) => setDiscount(v && Number(v) >= 0 ? String(v) : "")}
+                    onChange={(v) => {
+                      const next = Math.max(0, Number(v) || 0);
+                      const oldDisc = Math.max(0, Number(discount) || 0);
+                      const credit = Math.max(0, Number(creditUse) || 0);
+                      const oldSuggested = Math.max(0, remaining - oldDisc - credit);
+                      const nextSuggested = Math.max(0, remaining - next - credit);
+                      const currentAmount = Number(amount) || 0;
+                      setDiscount(next > 0 ? String(next) : "");
+                      if (Math.abs(currentAmount - oldSuggested) <= 0.01 || Math.abs(currentAmount - remaining) <= 0.01) {
+                        setAmount(nextSuggested > 0 ? String(nextSuggested) : "");
+                      }
+                    }}
                     compact
                   />
                 ) : (

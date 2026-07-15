@@ -411,9 +411,14 @@ ${showItems ? (variant === "stocktake" ? `
 ${showAccount ? (() => {
   const prevNet = (Number(previousDebt) || 0) - (Number(previousCredit) || 0);
   const hasPrev = Math.abs(prevNet) > 0.01;
-  const invoiceValue = Number(grandTotal) || 0; // قيمة الفاتورة (بعد خصم البنود، شامل الشحن)
   const generalDiscount = balSum.hasDiscount ? balSum.discount : 0;
-  const jomlaHesab = invoiceValue - generalDiscount + prevNet; // جملة الحساب
+  const invoiceValue = Math.max(
+    (Number(grandTotal) || 0) + generalDiscount,
+    (Number(subtotal) || 0) + (Number(shipping) || 0),
+    Number(grandTotal) || 0,
+  ); // قيمة الفاتورة قبل الخصم
+  const netInvoiceValue = Number(grandTotal) || 0; // صافي الفاتورة بعد الخصم
+  const jomlaHesab = netInvoiceValue + prevNet; // جملة الحساب
   const hasPaid = !hidePaidBox && paidAmount > 0.01;
   const paidValue = hasPaid ? paidAmount : 0;
   const finalNet = jomlaHesab - paidAmount; // >0 عليه، <0 له

@@ -103,6 +103,27 @@ describe("integration: delete paid invoice → customer_credit conversion", () =
     expect(cust.balance).toBe(0);
     expect(cust.credit_balance).toBe(200);
   });
+
+  it("deleting discounted invoice removes net debt only: 25,200 - 200 = 25,000, no 200 drift", () => {
+    const invoices: Invoice[] = [
+      { id: "D", total: 25000, paid_amount: 0, status: "pending" },
+    ];
+    const before = recomputeCustomer(invoices, []);
+    expect(before.balance).toBe(25000);
+    const after = recomputeCustomer(invoices.filter((i) => i.id !== "D"), []);
+    expect(after.balance).toBe(0);
+    expect(after.credit_balance).toBe(0);
+  });
+
+  it("deleting POS discounted invoice never creates customer credit or regular debt", () => {
+    const invoices: Invoice[] = [
+      { id: "POS-D", total: 25000, paid_amount: 25000, status: "paid", source: "pos" },
+    ];
+    const before = recomputeCustomer(invoices, []);
+    expect(before.balance).toBe(0);
+    const after = recomputeCustomer([], []);
+    expect(after).toEqual({ balance: 0, credit_balance: 0 });
+  });
 });
 
 describe("integration: reverse_customer_charge scenarios", () => {

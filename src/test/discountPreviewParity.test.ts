@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { generatePrintHTML } from "@/utils/printTemplate";
 import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
+import { computeInvoicePaymentAdjustment } from "@/utils/invoicePaymentMath";
 
 /**
  * يضمن تطابق الخصم/الإجمالي/المتبقي/الحالة بين طبقات الحساب في التطبيق
@@ -65,5 +66,58 @@ describe("Discount / paid_amount / remaining / status — parity across preview 
 
   it("دفع صفر ولا خصم → pending", () => {
     expect(computeInvoiceStatusAfterPayment({ total: 100, paidAfter: 0 })).toBe("pending");
+  });
+
+  it("فاتورة 25,200 + خصم دفع 200 + دفع 25,000 → الخصم منفصل والمدفوع لا يساوي الخصم", () => {
+    const result = computeInvoicePaymentAdjustment({
+      currentTotal: 25200,
+      currentPaid: 0,
+      currentDiscount: 0,
+      paymentAmount: 25000,
+      discountAmount: 200,
+    });
+    expect(result.nextDiscount).toBe(200);
+    expect(result.nextTotal).toBe(25000);
+    expect(result.cashApplied).toBe(25000);
+    expect(result.nextPaid).toBe(25000);
+    expect(result.newDue).toBe(0);
+    expect(result.nextStatus).toBe("paid");
+  });
+
+  it("طباعة فاتورة 25,200 بعد خصم 200 تعرض قيمة قبل الخصم ثم الخصم ثم صافي الحساب", () => {
+    const html = generatePrintHTML({
+      type: "invoice",
+      number: "INV-DISC-25200",
+      date: "2026-01-01",
+      customer: { name: "عميل اختبار" },
+      items: [{ product_name: "صنف", quantity: 1, unit_price: 25200, tax_amount: 0, discount: 0, total: 25200 }],
+      subtotal: 25200,
+      taxTotal: 0,
+      discountTotal: 200,
+      grandTotal: 25000,
+      paidAmount: 25000,
+      dueAmount: 0,
+      company: {} as any,
+    });
+    expect(html).toContain("الخصم على الفاتورة");
+    expect(html).toContain("25,200");
+    expect(html).toContain("25,000");
+    expect(html).toContain("− 200");
+    expect(html).toContain("مسددة بالكامل");
+  });
+
+  it("فواتير الكاش عند خصم لاحق تقلل total وpaid_amount معاً حتى لا يظهر فرق", () => {
+    const result = computeInvoicePaymentAdjustment({
+      currentTotal: 25200,
+      currentPaid: 25200,
+      currentDiscount: 0,
+      discountAmount: 200,
+      isPos: true,
+    });
+    expect(result.nextDiscount).toBe(200);
+    expect(result.nextTotal).toBe(25000);
+    expect(result.nextPaid).toBe(25000);
+    expect(result.newDue).toBe(0);
+    expect(result.nextStatus).toBe("paid");
   });
 });

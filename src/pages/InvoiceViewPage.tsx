@@ -27,6 +27,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import InvoiceRevisionsDialog from "@/components/invoice/InvoiceRevisionsDialog";
 import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDialog";
 import UnavailableItemsPanel from "@/components/invoice/UnavailableItemsPanel";
+import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 import { recordInvoiceRevision, diffRows } from "@/utils/invoiceRevisions";
 import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
@@ -908,71 +909,23 @@ export default function InvoiceViewPage() {
       </div>
 
       {/* Payment Dialog */}
-      <Dialog open={showPayment} onOpenChange={setShowPayment}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-center bg-purple-600 text-white -m-6 mb-4 py-3 rounded-t-lg">تأكيد الدفعة</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4" dir="rtl">
-            <div className="flex gap-2">
-              <input type="date" value={payDate} onChange={e => setPayDate(e.target.value)}
-                className="flex-1 bg-muted rounded-lg px-3 py-2 text-sm border border-border" />
-              <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)}
-                className="w-32 bg-muted rounded-lg px-3 py-2 text-sm border border-border text-left" />
-              <input type="text" value={payCurrency} readOnly
-                className="w-16 bg-muted rounded-lg px-3 py-2 text-sm border border-border text-center" />
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1 text-right">طريقة الدفع او السداد</label>
-              <select value={payMethod} onChange={e => { setPayMethod(e.target.value); setPayAccount(""); setPayRef(""); }}
-                className="w-full bg-muted rounded-lg px-3 py-2 text-sm border border-border">
-                <option value="">اختر طريقة الدفع</option>
-                <option value="cash">نقدي</option>
-                <option value="bank">تحويل بنكي</option>
-                <option value="card">بطاقة</option>
-                <option value="check">شيك</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1 text-right">
-                {isBankMethod(payMethod) ? "الحساب البنكي *" : "الحساب"}
-              </label>
-              <select value={payAccount} onChange={e => setPayAccount(e.target.value)}
-                className="w-full bg-muted rounded-lg px-3 py-2 text-sm border border-border">
-                <option value="">اختر الحساب</option>
-                {filterAccountsForPayment(accounts as any[], payMethod).map((a: any) => {
-                  const flagged = isBankMethod(payMethod) && !isAllowedBank(a);
-                  return (
-                    <option key={a.id} value={a.id} disabled={flagged}>
-                      {a.is_default ? "★ " : ""}{a.name}
-                      {a.bank_name ? ` — ${a.bank_name}` : ""}
-                      {a.account_number ? ` / ${a.account_number}` : ""}
-                      {flagged ? " (بنك غير معتمد)" : ""}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-            {isBankMethod(payMethod) && (
-              <div>
-                <label className="text-sm text-muted-foreground block mb-1 text-right">رقم العملية / الإشعار البنكي (اختياري)</label>
-                <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)}
-                  placeholder="مثال: 12345678"
-                  className="w-full bg-muted rounded-lg px-3 py-2 text-sm border border-border" />
-              </div>
-            )}
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1 text-right">ملحوظة</label>
-              <input type="text" value={payNote} onChange={e => setPayNote(e.target.value)}
-                className="w-full bg-muted rounded-lg px-3 py-2 text-sm border border-border" />
-            </div>
-            <div className="flex gap-3 justify-center pt-2">
-              <Button onClick={handlePayment} className="bg-purple-600 hover:bg-purple-700 text-white px-8">قم بالدفع</Button>
-              <Button variant="outline" onClick={() => setShowPayment(false)} className="px-8">إغلاق</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CustomerPaymentDialog
+        open={showPayment}
+        onOpenChange={setShowPayment}
+        invoiceId={invoice.id}
+        invoiceNumber={invoice.invoice_number}
+        customerId={(invoice as any).source === "pos" ? null : invoice.customer_id}
+        customerName={invoice.customers?.name || (invoice as any).walk_in_customer_name || null}
+        total={Number(invoice.total || 0)}
+        paidBefore={Number(invoice.paid_amount || 0)}
+        isPos={(invoice as any).source === "pos" || invoice.type === "cash"}
+        onSaved={async () => {
+          await loadInvoice();
+          qc.invalidateQueries({ queryKey: ["invoices"] });
+          qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+          qc.invalidateQueries({ queryKey: ["customers"] });
+        }}
+      />
 
       {/* Status Change Dialog */}
       <Dialog open={showStatusChange} onOpenChange={setShowStatusChange}>
