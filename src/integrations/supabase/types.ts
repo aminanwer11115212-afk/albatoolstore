@@ -172,6 +172,7 @@ export type Database = {
           company_name: string
           country: string | null
           created_at: string
+          credit_consumption_order: string
           currency: string | null
           email: string | null
           iban: string | null
@@ -207,6 +208,7 @@ export type Database = {
           company_name?: string
           country?: string | null
           created_at?: string
+          credit_consumption_order?: string
           currency?: string | null
           email?: string | null
           iban?: string | null
@@ -242,6 +244,7 @@ export type Database = {
           company_name?: string
           country?: string | null
           created_at?: string
+          credit_consumption_order?: string
           currency?: string | null
           email?: string | null
           iban?: string | null
