@@ -81,6 +81,7 @@ export default function CustomerPaymentDialog({
   const qc = useQueryClient();
   const { data: accounts, isLoading: accountsLoading, isError: accountsError, refetch: refetchAccounts } = useAccounts();
   const { isAdmin, permissions } = useUserRole();
+  const consumptionOrder = useCreditConsumptionOrder();
   const canRecordPayment = isAdmin || permissions.record_payment !== false;
   const canApplyDiscount = isAdmin || permissions.apply_discount !== false;
   const savingRef = useRef(false);
