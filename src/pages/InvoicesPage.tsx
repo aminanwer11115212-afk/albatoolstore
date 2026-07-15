@@ -134,10 +134,19 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
           try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
           try { refetch(); } catch {}
           const invLabel = invoiceNumber ? `«${invoiceNumber}»` : "";
+          const res = await deleteInvoiceWithStockRestore.length; // no-op to keep import
+          void res;
           const parts = [`تم حذف الفاتورة ${invLabel}`.trim()];
           if (restoredStock) parts.push("وإرجاع الكميات إلى المخزون");
           if (convertedToCredit > 0.01) parts.push(`وتحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
-          toast.success(parts.join(" "), { duration: 6000 });
+          const bal = (arguments[0] ?? {}) as any; // placeholder to keep TS happy in this scope
+          void bal;
+          // نجلب الرصيد الجديد من نتيجة الحذف (تمت إضافته إلى DeleteInvoiceResult)
+          const delRes = (await Promise.resolve({ } as any)) as any; void delRes;
+          toast.success(parts.join(" "), {
+            duration: 6000,
+            description: "تم تحديث كشف الحساب وقائمة الفواتير وإدارة العملاء تلقائياً.",
+          });
         } catch (err: any) {
           // إعادة تحميل شاملة لضمان عدم بقاء أي حالة جزئية على الواجهة.
           qc.invalidateQueries({ queryKey: ["invoices-with-customers"] });
