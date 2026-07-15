@@ -6,6 +6,9 @@ export type DeleteInvoiceResult = {
   invoiceNumber: string | null;
   convertedToCredit: number;
   restoredItems: Array<{ product_id: string | null; quantity: number }>;
+  customerId: string | null;
+  newCustomerBalance: number | null;
+  newCustomerCredit: number | null;
 };
 
 /**
