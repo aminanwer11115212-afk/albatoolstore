@@ -389,16 +389,25 @@ export default function DocumentPreviewPage({ docType }: Props) {
                     if (Math.abs(nextDisc - cur) < 0.01) return;
                     setSavingDisc(true);
                     try {
-                      const base = (invMeta.subtotal || invMeta.total + cur);
+                      const base = invMeta.total + cur;
                       const nextTotal = Math.max(0, base - nextDisc);
-                      const nextDue = Math.max(0, nextTotal - invMeta.paidAmount);
-                      const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: invMeta.paidAmount });
+                      const nextPaid = invMeta.isPos && invMeta.paidAmount >= invMeta.total - 0.01
+                        ? nextTotal
+                        : invMeta.paidAmount;
+                      const nextDue = Math.max(0, nextTotal - nextPaid);
+                      const nextStatus = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: nextPaid });
                       const { error } = await (supabase as any)
                         .from("invoices")
-                        .update({ discount: nextDisc, total: nextTotal, due_amount: nextDue, status: nextStatus })
+                        .update({ discount: nextDisc, total: nextTotal, paid_amount: nextPaid, due_amount: nextDue, status: nextStatus })
                         .eq("id", invMeta.id);
                       if (error) throw error;
+                      if (invMeta.customerId && !invMeta.isPos) {
+                        await (supabase as any).rpc("recompute_customer_balance", { _customer_id: invMeta.customerId });
+                      }
+                      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+                      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
                       toast.success(`تم تحديث الخصم — الإجمالي ${nextTotal.toLocaleString()} — الحالة ${nextStatus}`);
+                      setInvMeta((m) => m ? { ...m, total: nextTotal, discount: nextDisc, paidAmount: nextPaid } : m);
                       setReloadTick((t) => t + 1);
                     } catch (e: any) {
                       toast.error(e?.message || "تعذّر حفظ الخصم");

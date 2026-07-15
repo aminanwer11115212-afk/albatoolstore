@@ -23,24 +23,27 @@ export async function deleteInvoiceWithStockRestore(
 ): Promise<DeleteInvoiceResult> {
   if (!invoiceId) throw new Error("invoiceId مطلوب");
 
-  // 0) تحويل الدفعات إلى رصيد دائن (ذرّياً على DB) قبل الحذف الفعلي.
-  //    الفشل هنا يوقف كامل العملية — لا نحذف فاتورة بلا مصالحة مالية.
-  const { data: reconc, error: reconErr } = await (supabase as any).rpc(
-    "delete_invoice_with_reconciliation",
-    { _invoice_id: invoiceId },
-  );
-  if (reconErr) throw new Error(`تعذّرت مصالحة الدفعات: ${reconErr.message}`);
-  const convertedToCredit = Number(reconc?.paid_amount || 0);
-
-
-  // 1) قراءة بيانات الحارس + رقم الفاتورة + معلومات لقطة الـ Audit
+  // 0) قراءة بيانات الحارس + رقم الفاتورة + معلومات لقطة الـ Audit قبل أي مصالحة.
+  //    نحتاج source/customer_id حتى لا تتحول فواتير الكاش إلى رصيد عميل بالخطأ.
   const { data: inv, error: invErr } = await supabase
     .from("invoices")
-    .select("id, invoice_number, date, customer_id, total, paid_amount, status, stock_deduction_id, stock_deducted_at, workflow_status")
+    .select("id, invoice_number, date, customer_id, total, paid_amount, status, source, stock_deduction_id, stock_deducted_at, workflow_status")
     .eq("id", invoiceId)
     .maybeSingle();
   if (invErr) throw new Error(`تعذّر قراءة الفاتورة: ${invErr.message}`);
   if (!inv) throw new Error("الفاتورة غير موجودة");
+
+  // 1) تحويل دفعات الفواتير العادية فقط إلى رصيد دائن. فواتير الكاش/POS لا تخص بطاقة عميل.
+  let convertedToCredit = 0;
+  const shouldReconcileCustomerCredit = !!(inv as any).customer_id && (inv as any).source !== "pos";
+  if (shouldReconcileCustomerCredit) {
+    const { data: reconc, error: reconErr } = await (supabase as any).rpc(
+      "delete_invoice_with_reconciliation",
+      { _invoice_id: invoiceId },
+    );
+    if (reconErr) throw new Error(`تعذّرت مصالحة الدفعات: ${reconErr.message}`);
+    convertedToCredit = Number(reconc?.paid_amount || 0);
+  }
 
   // 2) قراءة بنود الفاتورة
   const { data: items, error: itErr } = await supabase

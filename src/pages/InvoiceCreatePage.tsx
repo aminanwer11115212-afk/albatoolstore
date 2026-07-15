@@ -448,10 +448,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
             note: "",
           };
         });
+        const itemDiscounts = mapped.reduce((s: number, r: any) => s + ((Number(r.quantity) || 0) * (Number(r.unit_price) || 0) * (Number(r.discount) || 0) / 100), 0);
+        setGeneralDiscount(Math.max(0, (Number(inv.discount) || 0) - itemDiscounts));
         setRows(mapped);
         // احفظ بصمة البنود الأصلية لتخطّي إعادة الكتابة وعمليات المخزون لاحقاً إن لم تتغيّر
         originalItemsHashRef.current = invoiceItemsHash(mapped);
       } else {
+        setGeneralDiscount(Number(inv.discount) || 0);
         originalItemsHashRef.current = "";
       }
     })();
@@ -1260,6 +1263,10 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         }
         // حدِّث البصمة المرجعية لتعكس آخر حفظ ناجح للبنود
         originalItemsHashRef.current = currentItemsHash;
+      }
+
+      if (!pos && activeCustomer?.id) {
+        await (supabase as any).rpc("recompute_customer_balance", { _customer_id: activeCustomer.id });
       }
 
       if (!opts.silent) {
@@ -2402,13 +2409,15 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
             try {
               const { data } = await supabase
                 .from("invoices")
-                .select("total, paid_amount, due_amount")
+                .select("total, paid_amount, due_amount, discount")
                 .eq("id", editId)
                 .maybeSingle();
               if (data) {
                 setSavedTotal(Number((data as any).total || 0));
                 setSavedPaid(Number((data as any).paid_amount || 0));
                 setSavedDue(Number((data as any).due_amount || 0));
+                const itemDiscounts = rows.reduce((s: number, r: any) => s + ((Number(r.quantity) || 0) * (Number(r.unit_price) || 0) * (Number(r.discount) || 0) / 100), 0);
+                setGeneralDiscount(Math.max(0, Number((data as any).discount || 0) - itemDiscounts));
               }
               queryClient.invalidateQueries({ queryKey: ["invoices"] });
             } catch { /* noop */ }
