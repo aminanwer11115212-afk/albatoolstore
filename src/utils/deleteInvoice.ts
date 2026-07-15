@@ -193,7 +193,7 @@ export async function deleteInvoiceWithStockRestore(
   return {
     restoredStock,
     invoiceNumber: (inv as any).invoice_number ?? null,
-    convertedToCredit,
+    convertedToCredit: 0,
     restoredItems,
     customerId,
     newCustomerBalance,
