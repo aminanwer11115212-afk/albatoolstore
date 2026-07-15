@@ -103,6 +103,16 @@ export async function deleteInvoiceWithStockRestore(
   const { error: delErr } = await supabase.from("invoices").delete().eq("id", invoiceId);
   if (delErr) throw new Error(`فشل حذف الفاتورة: ${delErr.message}`);
 
+  // 5.1) شبكة أمان: أعِد حساب رصيد العميل صراحةً — الـ trigger يجب أن يفعل ذلك
+  //      لكن نضمن التصفير بعد الحذف حتى لو تأخّرت إعادة الحساب أو تعطّل الـ trigger.
+  if ((inv as any).customer_id) {
+    try {
+      await (supabase as any).rpc("recompute_customer_balance", { _customer_id: (inv as any).customer_id });
+    } catch (recErr) {
+      console.warn("[deleteInvoice] recompute_customer_balance failed (non-fatal)", recErr);
+    }
+  }
+
   // 6) سجل Audit — من قام بالحذف، متى، وما الذي استُرجع (بدون إيقاف العملية عند الفشل)
   const restoredItems = restoredStock
     ? (items || []).map((it: any) => ({ product_id: it.product_id ?? null, quantity: Number(it.quantity || 0) }))
