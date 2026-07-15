@@ -734,10 +734,28 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       if (cashApplied > 0) paidParts.push(`${cashApplied.toLocaleString()} على الفاتورة`);
       if (discount > 0) paidParts.push(`خصم ${discount.toLocaleString()}`);
       if (cashOver > 0) paidParts.push(`${cashOver.toLocaleString()} كسلفة`);
+      // اقرأ الرصيد الجديد للعميل لعرضه في رسالة النجاح — بعد أن ينتهي recompute من الـtriggers
+      let balanceDesc = "تم تحديث كشف الحساب والمعاينة وإدارة العملاء تلقائياً.";
+      if (savedCustomerId) {
+        try {
+          const { data: cust } = await supabase
+            .from("customers")
+            .select("balance, credit_balance")
+            .eq("id", savedCustomerId)
+            .maybeSingle();
+          const bal = Number((cust as any)?.balance ?? 0);
+          const cred = Number((cust as any)?.credit_balance ?? 0);
+          const bits: string[] = [];
+          bits.push(bal > 0.01 ? `عليه ${bal.toLocaleString()}` : "الرصيد مسدَّد");
+          if (cred > 0.01) bits.push(`له ${cred.toLocaleString()}`);
+          balanceDesc = `الرصيد الجديد للعميل: ${bits.join(" · ")} — كشف الحساب مُحدَّث.`;
+        } catch {}
+      }
       toast.success(
         `تم تسجيل الدفعة: ${paidParts.join(" + ") || "دفعة"} — الحالة: ${
           newSt === "paid" ? "مدفوعة" : newSt === "partial" ? "جزئية" : "معلّقة"
         }`,
+        { description: balanceDesc, duration: 6000 },
       );
       setPaymentDialogOpen(false);
     } catch (e: any) {
