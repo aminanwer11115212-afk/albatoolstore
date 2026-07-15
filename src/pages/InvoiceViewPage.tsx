@@ -60,7 +60,7 @@ export default function InvoiceViewPage() {
   const [statusSaving, setStatusSaving] = useState(false);
   const [convertSaving, setConvertSaving] = useState(false);
   const [editingCell, setEditingCell] = useState<{ index: number; field: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<"document" | "conversion">("document");
+  const [activeTab, setActiveTab] = useState<"document" | "conversion" | "audit">("document");
   const [editValue, setEditValue] = useState("");
 
   // Payment form
