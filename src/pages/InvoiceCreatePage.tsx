@@ -724,10 +724,21 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
 
       setSavedPaid(newPaid);
       setSavedDue(newDue);
+      setSavedTotal(nextTotal);
       setInvoiceStatus(newSt);
-      toast.success(cashOver > 0
-        ? `تم تسجيل الدفعة: ${cashApplied} على الفاتورة + ${cashOver} كسلفة لصالح العميل`
-        : "تم تسجيل الدفعة");
+      // إبلاغ باقي الشاشات (كشف الحساب، إدارة العملاء، معاينة الفاتورة) بالتحديث فوراً
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+      try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
+      const paidParts: string[] = [];
+      if (cashApplied > 0) paidParts.push(`${cashApplied.toLocaleString()} على الفاتورة`);
+      if (discount > 0) paidParts.push(`خصم ${discount.toLocaleString()}`);
+      if (cashOver > 0) paidParts.push(`${cashOver.toLocaleString()} كسلفة`);
+      toast.success(
+        `تم تسجيل الدفعة: ${paidParts.join(" + ") || "دفعة"} — الحالة: ${
+          newSt === "paid" ? "مدفوعة" : newSt === "partial" ? "جزئية" : "معلّقة"
+        }`,
+      );
       setPaymentDialogOpen(false);
     } catch (e: any) {
       const raw = String(e?.message || "تعذر تسجيل الدفعة");
