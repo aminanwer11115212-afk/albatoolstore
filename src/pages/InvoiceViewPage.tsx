@@ -29,6 +29,8 @@ import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDia
 import UnavailableItemsPanel from "@/components/invoice/UnavailableItemsPanel";
 import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 import InvoiceCustomerCreditBanner from "@/components/invoice/InvoiceCustomerCreditBanner";
+import InvoiceAccountingAlert from "@/components/invoice/InvoiceAccountingAlert";
+import InvoiceAuditTab from "@/components/invoice/InvoiceAuditTab";
 import { recordInvoiceRevision, diffRows } from "@/utils/invoiceRevisions";
 import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
