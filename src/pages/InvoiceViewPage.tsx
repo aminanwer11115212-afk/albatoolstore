@@ -690,10 +690,23 @@ export default function InvoiceViewPage() {
         >
           سجل التحويل
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("audit")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "audit" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        >
+          سجل التدقيق
+        </button>
       </div>
 
       {activeTab === "conversion" && invoice?.id && (
         <QuoteConversionLog mode="invoice" invoiceId={invoice.id} />
+      )}
+
+      {activeTab === "audit" && invoice?.id && (
+        <div className="pt-4">
+          <InvoiceAuditTab invoiceId={invoice.id} customerId={invoice.customer_id} />
+        </div>
       )}
 
       <div hidden={activeTab !== "document"}>
