@@ -1,99 +1,107 @@
-# خطة التحسينات الشاملة (5 دفعات)
+# خطة تحسين نظام الرصيد الدائن (customer_credit)
 
-كل دفعة مستقلة، تُنفَّذ بالتتابع، وتُقسَّم داخلياً عبر **subagents** متوازية للفحص والتتبع قبل الكتابة. لا نبدأ الدفعة التالية قبل تحقّق البناء + قراءة نتائج الدفعة السابقة.
+هذه خطة لخمس ميزات مترابطة تلمس قاعدة البيانات، منطق الدفع، صفحات كشف الحساب، وواجهة الفواتير.
 
----
+## 1) كشف الحساب: تجميع customer_credit حسب المصدر مع فلترة
 
-## الدفعة 1 — شاشة تسجيل الدفعة (UX + كيبورد + تثبيت)
+**الهدف:** المستخدم يرى بوضوح لماذا وُلد كل قيد رصيد دائن (فائض فاتورة / تعديل دفع / شحن يدوي / مرتجع…) ويقدر يفلتر حسب السبب.
 
-**الهدف:** إزالة الفراغات، جعل الحوار شبه مربّع، تحكم كامل بالكيبورد، وتوسيع التثبيت ليشمل «طريقة الدفع» + الحساب مع تطبيقهما تلقائياً عند الفتح.
+**التعديلات:**
+- إضافة عمود منطقي `credit_source` مشتق في العرض فقط (بدون تعديل schema) من `transactions.allocation->>'kind'` + `description` + وجود `reference_id`:
+  - `overpay_invoice` — فائض من فاتورة (description يحوي رقم فاتورة)
+  - `manual_charge` — شحن يدوي (`allocation.kind='surplus'` من allocate_customer_charge)
+  - `payment_adjust` — تعديل دفع لاحق
+  - `return_credit` — من مرتجع
+  - `unknown` — غير محدد
+- في `CustomerStatementPage.tsx`:
+  - تجميع قابل للطي (Accordion) لصفوف customer_credit حسب المصدر مع مجموع فرعي.
+  - شريط فلترة: Checkboxes للمصادر + بحث نصي في الوصف.
+  - عمود جديد "المصدر" ببادج ملوّن.
+- helper مشترك `src/utils/creditSource.ts` يصنّف الحركة.
 
-**Subagents (قراءة فقط، بالتوازي):**
-- A1: تدقيق `CustomerPaymentDialog.tsx` الحالي — قائمة كل الحقول، ترتيب DOM، أماكن الفراغات، عرض العمود الأيمن مقابل الأيسر.
-- A2: تتبّع كل الاستدعاءات لـ `CustomerPaymentDialog` (InvoiceCreate، DocumentPreview، أي مكان آخر) للتأكد من props وتوحيدها.
-- A3: مسح localStorage keys الحالية للتثبيت + اقتراح مفاتيح `lov:u:{uid}:payment:pinned-method` و`lov:u:{uid}:payment:pinned-account`.
+## 2) وضع "الكاش" لكشف الحساب
 
-**التنفيذ:**
-1. تخطيط جديد: `max-w-2xl aspect-square-ish` — grid عمودين متساويين، بدون scroll داخلي على الديسكتوب.
-2. `useEffect` تركيز أول حقل عند الفتح، `tabIndex` صريح لكل حقل، `Enter` = التقدّم للحقل التالي، `Ctrl+Enter` = فتح تأكيد الحفظ، `Esc` = إغلاق.
-3. زر «تثبيت الطريقة» بجانب select طريقة الدفع (نفس نمط زر تثبيت الحساب) + تأكيد قبل التغيير + زر فك تثبيت.
-4. عند الفتح: قراءة كلا المثبَّتين وتطبيقهما تلقائياً إن وُجدا.
+**الهدف:** المستخدم يرى فقط الحركات النقدية (customer_payment) مقابل customer_credit ويميز المرتبط بفاتورة من المستقل.
 
-**تحقّق:** build + فتح الحوار من صفحتين مختلفتين + اختبار كيبورد.
+**التعديلات:**
+- تبويب/زر جديد في `CustomerStatementPage` باسم "وضع الكاش":
+  - يُخفي أعمدة الفاتورة (رقم/تاريخ/إجمالي).
+  - يُبقي فقط: التاريخ، النوع (دفع/رصيد دائن)، المبلغ، الحساب، وبادج "مرتبط بفاتورة #123" أو "مستقل".
+  - إجماليات في الأسفل: إجمالي المدفوع، إجمالي الفائض المستقل، إجمالي المستهلَك من الرصيد.
+- المنطق نفسه المستخدم في `computeInvoicePaymentAdjustment` لضمان توحّد الأرقام.
 
----
+## 3) أولوية استخدام الرصيد الدائن (FIFO / LIFO)
 
-## الدفعة 2 — حفظ تخصيصات الواجهة محلياً لكل جهاز إلى الأبد
+**الهدف:** إعداد على مستوى الشركة يحدد أي customer_credit يُستهلك أولاً عند فاتورة جديدة.
 
-**الهدف:** ضمان أن كل تخصيص (أعمدة، عرض، ترتيب، حجم، حالة dialogs، toolbar، zoom، row heights) يُحفظ محلياً لكل جهاز ولا يُمسح أبداً.
+**التعديلات:**
+- إضافة عمود في `company_settings`: `credit_consumption_order text default 'fifo'` (`fifo` أو `lifo`) — migration.
+- في `CustomerPaymentDialog` عند حساب `creditUse`:
+  - قراءة الإعداد.
+  - جلب صفوف `customer_credit` مرتبة `date asc` (fifo) أو `date desc` (lifo).
+  - استهلاك المبلغ عبر إدخال صفوف customer_credit سالبة مطابقة لكل قيد بترتيب الأولوية بدل قيد واحد مجمّع.
+- إعداد UI في `/settings` (قسم المحاسبة): راديو FIFO/LIFO مع شرح.
 
-**Subagents:**
-- B1: جرد كل مفاتيح `lov:*` المستخدمة (grep على المشروع) + التحقّق من أنها كلها تمر بـ `formFactorKey` + `userScopedKey`.
-- B2: فحص `storageManager.ts` — التأكد أن whitelist يستثني كل مفاتيح `lov:u:*:ff:*` من التنظيف.
-- B3: فحص `useUiPrefsCloudSync` — هل يحفظ محلياً أولاً ثم يحاول المزامنة (offline-first)؟
+## 4) سجل التدقيق (Audit Trail) للفواتير والدفع والرصيد
 
-**التنفيذ:**
-1. توسيع `CORE_STORAGE_PREFIXES` في `storageManager.ts` ليحمي كل ما يبدأ بـ `lov:u:` و`lov:pinned-*`.
-2. إضافة migration محلي: عند البدء، لو وُجد مفتاح قديم بدون `ff:` ننسخه لكلا bucket‑ي mobile/desktop.
-3. توثيق العقد في `mem://features/ui-personalization`.
+**الهدف:** لكل فاتورة تبويب "سجل التدقيق" يُظهر: القيود المستهلكة، الفائض المتولّد، الحذف، مع أرقام القيود.
 
-**تحقّق:** unit test يشغّل `runCleanup(aggressive=true)` ويؤكّد بقاء مفاتيح `lov:u:` كلها.
+**التعديلات:**
+- استخدام جدول `invoice_revisions` الموجود + `discount_audit_log` + `transactions` (مفلترة بـ reference_id).
+- مكوّن جديد `src/components/invoice/InvoiceAuditTab.tsx`:
+  - جدول زمني موحّد: تاريخ | فعل | تفاصيل | مرجع القيد (transaction id مختصر) | المبلغ.
+  - أفعال: إنشاء، دفع، توليد فائض، استهلاك رصيد دائن، تعديل خصم، حذف.
+  - رابط لكل قيد يفتح Dialog بتفاصيل الـ allocation JSON.
+- تبويب في `InvoiceViewPage.tsx` بجانب المعاينة/الطباعة.
 
----
+## 5) تنبيه محاسبي في صفحة الفاتورة
 
-## الدفعة 3 — Reset صفر (فواتير/حسابات/عملاء/عروض/بنوك)
+**الهدف:** المستخدم لا يفوته أي فرق بين المدفوع والخصم، ولا أي customer_credit يخص العميل لم يُربَط بمرجع الفاتورة الحالية.
 
-**الهدف:** أداة آمنة تصفّر الحسابات والفواتير وعروض الأسعار وأرصدة العملاء والحسابات البنكية مع الحفاظ على الروابط (customers, products, accounts remain, only balances/documents cleared).
+**التعديلات:**
+- مكوّن جديد `InvoiceAccountingAlert.tsx` يُعرض داخل `InvoiceViewPage` عند تحقّق أي شرط:
+  - `discount + paid != total` → "الخصم المسجل لا يوازي الفارق — راجع الدفعات".
+  - وجود صفوف `customer_credit` للعميل بدون `reference_id` → "يوجد رصيد دائن للعميل غير مرتبط بأي فاتورة (X ج.س) — يُستهلك تلقائياً في فاتورة جديدة".
+  - عرض جدول مصغّر بالقيود المعنية + رابط لسجل التدقيق (الميزة 4).
+- نمط التنبيه: `border-amber-300 bg-amber-50` مع أيقونة، RTL.
 
-**Subagents:**
-- C1: خريطة الجداول المتأثرة + ترتيب الحذف الصحيح احتراماً للـ FK (items قبل headers، transactions قبل accounts…).
-- C2: تحديد أي RPC/triggers ستطلق أثناء الحذف الجماعي وكيف نعطّلها مؤقتاً (أو نستخدم `*_silent`).
-- C3: تصميم واجهة تأكيد بثلاث مراحل (اكتب "تصفير" + password admin + checkbox لكل مجموعة).
+## Technical Section
 
-**التنفيذ:**
-1. RPC `admin_reset_transactional_data(_scope jsonb)` — SECURITY DEFINER + `has_role(auth.uid(),'admin')` + يحذف بالترتيب.
-2. صفحة `SettingsPage → Danger Zone → تصفير البيانات` مع 4 checkboxes مستقلة: فواتير، عروض، معاملات/حسابات بنكية، أرصدة عملاء (recompute بعد الحذف تلقائياً).
-3. زر «نسخة احتياطية قبل التصفير» (export JSON) إجباري قبل التنفيذ.
+**Migrations:**
+```
+supabase/migrations/<ts>_credit_consumption_order.sql
+  - ALTER TABLE company_settings ADD COLUMN credit_consumption_order text
+      NOT NULL DEFAULT 'fifo'
+      CHECK (credit_consumption_order IN ('fifo','lifo'));
+```
+لا نضيف أعمدة على transactions — التصنيف مشتق UI-side لتجنّب backfill معقّد.
 
-**تحقّق:** اختبار على بيانات وهمية + التأكد أن `recompute_customer_balance` يعود بصفر.
+**ملفات جديدة:**
+- `src/utils/creditSource.ts` — classifier + labels عربية.
+- `src/components/statement/CreditSourceFilterBar.tsx`
+- `src/components/statement/CashModeToggle.tsx`
+- `src/components/invoice/InvoiceAuditTab.tsx`
+- `src/components/invoice/InvoiceAccountingAlert.tsx`
+- `src/hooks/useCreditConsumptionOrder.ts`
+- `src/test/creditSource.test.ts` + `src/test/creditConsumptionOrder.test.ts`
+- `e2e/customer-statement-credit-grouping.spec.ts`
+- `e2e/credit-consumption-fifo-lifo.spec.ts`
 
----
+**ملفات معدّلة:**
+- `src/pages/CustomerStatementPage.tsx` — تجميع/فلترة/وضع الكاش
+- `src/components/invoice/CustomerPaymentDialog.tsx` — منطق FIFO/LIFO عند creditUse
+- `src/pages/InvoiceViewPage.tsx` — تكامل التبويب + التنبيه
+- `src/pages/SettingsPage.tsx` (أو المكافئ) — إعداد الأولوية
 
-## الدفعة 4 — توافق كامل بين عرض السعر والفاتورة المحوَّلة
+**اعتبارات:**
+- كل الاستعلامات تحترم عزل POS (`.neq("source","pos")` أو استبعاد reference_id لفواتير POS).
+- كل مفتاح React Query المتأثر يُبطَّل بعد أي تغيير: `["transactions"]`, `["customer-statement", id]`, `["invoice", id]`, `["customers"]`.
+- كل نص عربي RTL، وكل الألوان من design tokens (لا hardcoded).
+- التنبيه في الفاتورة لا يظهر لفواتير POS.
 
-**الهدف:** أي خاصية تظهر/تُحفظ في الفاتورة يجب أن تُنقل من عرض السعر عند التحويل (customer, currency, exchange_rate, items, notes, discount, packaging refs, transport refs, attachments, custom fields).
+**نطاق مستبعد الآن (يمكن إضافته لاحقاً):**
+- تعديل schema لإضافة `credit_source` عمود حقيقي + backfill.
+- إشعارات push/بريد عند توليد رصيد دائن.
+- تقرير شامل لجميع العملاء بالفائض المتراكم.
 
-**Subagents:**
-- D1: قراءة `quoteToInvoice.ts` + مخطط جدول `invoices` vs `quotes` وإخراج جدول diff بالحقول.
-- D2: فحص `QuoteCreatePage` مقابل `InvoiceCreatePage` لأي حقل UI موجود في الأولى ومفقود في التحويل.
-- D3: فحص المرفقات (`quote_attachments` → `invoice_attachments`) هل تُنسخ فعلاً؟
-
-**التنفيذ:**
-1. سدّ فجوات الحقول المكتشفة في `quoteToInvoice.ts`.
-2. نسخ المرفقات عبر تكرار الروابط (بدون duplication في storage — نستخدم نفس المسار مع row جديدة تشير للـ invoice).
-3. اختبار تحويل شامل + مقارنة الحقول قبل/بعد.
-
-**تحقّق:** e2e موجود `quote-to-invoice-flow.spec.ts` + توسيعه.
-
----
-
-## الدفعة 5 — تدقيق شامل + إغلاق
-
-**Subagents (متوازية، 6 قطاعات وفق `albatool-ui-audit`):**
-- Sales · Inventory · Parties · Logistics · Finance · System
-
-كل واحد يُرجع JSON بأي regressions من الدفعات 1‑4. نصلح ما يظهر ثم ننشر.
-
----
-
-## القواعد أثناء التنفيذ
-- بعد كل دفعة: انتظار build + قراءة تقرير subagents قبل الانتقال.
-- لا تعديل ملفات auto-gen (`client.ts`, `types.ts`, `.env`, `config.toml`).
-- كل جدول جديد يحصل على GRANT + RLS في نفس migration.
-- كل حفظ يستخدم `savingRef` guard + `duplicateDocGuard`.
-- لا hardcoded colors — tokens فقط.
-
-## Details تقنية مختصرة
-- مفاتيح التثبيت: `lov:u:{uid}:payment:pinned-method`, `lov:u:{uid}:payment:pinned-account` (بدون form-factor — عام لكل الأجهزة لأنه تفضيل مالي).
-- Reset RPC يعيد `jsonb` تلخيصي (كم صف حُذف لكل جدول).
-- Migration الحفظ المحلي: idempotent — يعمل مرة واحدة عبر flag `lov:migration:ff-split:v1`.
+بعد الموافقة سأنفّذ الميزات الخمس دفعة واحدة مع الاختبارات.
