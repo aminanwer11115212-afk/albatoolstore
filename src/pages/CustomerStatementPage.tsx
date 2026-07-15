@@ -22,6 +22,8 @@ export default function CustomerStatementPage() {
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"all" | "paid" | "unpaid" | "partial">("all");
+  const [cashMode, setCashMode] = useState(false);
+  const [creditSourceFilter, setCreditSourceFilter] = useState<Set<CreditSource>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   const matches = useMemo(() => {
@@ -125,12 +127,38 @@ export default function CustomerStatementPage() {
     return (transactions || []).filter((t: any) => {
       if (fromDate && t.date < fromDate) return false;
       if (toDate && t.date > toDate) return false;
-      const amt = Number(t.amount || 0);
+      const amt = Math.abs(Number(t.amount || 0));
       if (minAmount && amt < Number(minAmount)) return false;
       if (maxAmount && amt > Number(maxAmount)) return false;
+      if (t.category === "customer_credit" && creditSourceFilter.size > 0) {
+        const info = classifyCreditRow(t);
+        if (!creditSourceFilter.has(info.source)) return false;
+      }
       return true;
     });
-  }, [transactions, fromDate, toDate, minAmount, maxAmount]);
+  }, [transactions, fromDate, toDate, minAmount, maxAmount, creditSourceFilter]);
+
+  // تجميع customer_credit حسب المصدر — لعرض ملخّص فرعي أعلى الجدول
+  const creditGroups = useMemo(() => {
+    const map = new Map<CreditSource, { label: string; total: number; count: number }>();
+    for (const t of filteredTransactions) {
+      if (t.category !== "customer_credit") continue;
+      const info = classifyCreditRow(t);
+      const cur = map.get(info.source) || { label: info.label, total: 0, count: 0 };
+      cur.total += Number(t.amount || 0);
+      cur.count += 1;
+      map.set(info.source, cur);
+    }
+    return Array.from(map.entries()).map(([source, v]) => ({ source, ...v }));
+  }, [filteredTransactions]);
+
+  // في وضع الكاش: أظهر فقط customer_payment + customer_credit
+  const cashRows = useMemo(() => {
+    if (!cashMode) return [];
+    return filteredTransactions.filter(
+      (t: any) => t.category === "customer_payment" || t.category === "customer_credit",
+    );
+  }, [cashMode, filteredTransactions]);
 
   const selectedCustomer = (customers || []).find((c: any) => c.id === selectedCustomerId);
   const totalInvoices = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.total || 0), 0);
