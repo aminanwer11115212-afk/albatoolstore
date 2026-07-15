@@ -629,17 +629,29 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     }
     setSavingPayment(true);
     try {
-      // الخصم يُعامَل كأنه قيمة سُدِّدت من المتبقي → يُضاف إلى المدفوع المنطقي لقفل الفاتورة.
-      // الفائض يُقسَّم تلقائياً: الجزء المغطّي يَقفل الفاتورة، والباقي يُسجَّل كسلفة لصالح العميل.
-      const _total = Number(savedTotal) || 0;
-      const split = splitPayment({
-        amount: amount + discount,
-        total: _total,
-        alreadyPaid: Number(savedPaid) || 0,
-      });
-      const newPaid = split.newPaid;
-      const newDue = split.newDue;
-      const newSt = computeInvoiceStatusAfterPayment({ total: _total, paidAfter: newPaid });
+      // اقرأ القيم الطازجة من قاعدة البيانات لتجنّب حالة قديمة في state
+      const { data: freshInv, error: readErr } = await supabase
+        .from("invoices")
+        .select("total, paid_amount, discount")
+        .eq("id", editId)
+        .maybeSingle();
+      if (readErr) throw readErr;
+
+      const prevTotal = Number((freshInv as any)?.total ?? savedTotal) || 0;
+      const prevPaid = Number((freshInv as any)?.paid_amount ?? savedPaid) || 0;
+      const prevDiscount = Number((freshInv as any)?.discount || 0);
+
+      // 1) الخصم يُطبَّق على الفاتورة نفسها (يقلّل total ويرفع discount) — لا يُضاف للمدفوع.
+      const nextDiscount = Math.max(0, prevDiscount + discount);
+      const nextTotal = Math.max(0, prevTotal - discount);
+      const remainingOnInvoice = Math.max(0, nextTotal - prevPaid);
+
+      // 2) المبلغ النقدي يُقسَّم: جزء يقفل الفاتورة + الفائض سلفة عميل
+      const cashApplied = Math.min(amount, remainingOnInvoice);
+      const cashOver = Math.max(0, amount - cashApplied);
+      const newPaid = prevPaid + cashApplied;
+      const newDue = Math.max(0, nextTotal - newPaid);
+      const newSt = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: newPaid });
 
       // فحص جهة العميل: تأكد أن status ضمن القيم المسموحة في قاعدة البيانات
       if (!isAllowedInvoiceStatus(newSt)) {
@@ -652,22 +664,25 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       const discountSuffix = discount > 0 ? ` - خصم: ${discount.toLocaleString()}` : "";
       const finalNote = `${payNote || ""}${refSuffix}${discountSuffix}`.trim();
 
-      const { error: upErr } = await supabase.from("invoices").update({
+      const updatePayload: any = {
         paid_amount: newPaid,
         due_amount: newDue,
         status: newSt,
         payment_method: payMethod || paymentMethod,
-      }).eq("id", editId);
-      if (upErr) throw upErr;
+      };
+      if (discount > 0) {
+        updatePayload.discount = nextDiscount;
+        updatePayload.total = nextTotal;
+      }
 
-      // كم من المبلغ النقدي الفعلي طُبِّق على الفاتورة (بعد خصم الخصم) وكم تجاوز كفائض
-      const cashApplied = Math.max(0, split.applied - discount);
-      const cashOver = Math.max(0, amount - cashApplied);
+      const { error: upErr } = await supabase.from("invoices").update(updatePayload).eq("id", editId);
+      if (upErr) throw upErr;
 
       // 1) قيد الدفعة المطبَّقة على الفاتورة
       if (payAccount && cashApplied > 0) {
         await supabase.from("transactions").insert({
           type: "income",
+          category: "customer_payment",
           amount: cashApplied,
           date: payDate,
           description: finalNote,
@@ -677,7 +692,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         } as any);
       }
       // 2) قيد الفائض كسلفة/دائن للعميل
-      if (payAccount && cashOver > 0) {
+      if (payAccount && cashOver > 0 && savedCustomerId) {
         await supabase.from("transactions").insert({
           type: "income",
           amount: cashOver,
@@ -694,9 +709,14 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         invoiceId: editId,
         action: "payment",
         changes: {
-          paid_amount: { before: savedPaid, after: newPaid },
+          paid_amount: { before: prevPaid, after: newPaid },
           status: { before: invoiceStatus, after: newSt },
-          ...(discount > 0 ? { discount_on_payment: { before: 0, after: discount } } : {}),
+          ...(discount > 0
+            ? {
+                discount: { before: prevDiscount, after: nextDiscount },
+                total: { before: prevTotal, after: nextTotal },
+              }
+            : {}),
           ...(cashOver > 0 ? { customer_credit: { before: 0, after: cashOver } } : {}),
         },
         note: `دفعة بقيمة ${amount}${discount > 0 ? ` + خصم ${discount}` : ""}${cashOver > 0 ? ` (مطبَّق ${cashApplied} + سلفة ${cashOver})` : ""} - ${payMethod || ""}${refSuffix}`,
@@ -704,10 +724,21 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
 
       setSavedPaid(newPaid);
       setSavedDue(newDue);
+      setSavedTotal(nextTotal);
       setInvoiceStatus(newSt);
-      toast.success(cashOver > 0
-        ? `تم تسجيل الدفعة: ${cashApplied} على الفاتورة + ${cashOver} كسلفة لصالح العميل`
-        : "تم تسجيل الدفعة");
+      // إبلاغ باقي الشاشات (كشف الحساب، إدارة العملاء، معاينة الفاتورة) بالتحديث فوراً
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+      try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
+      const paidParts: string[] = [];
+      if (cashApplied > 0) paidParts.push(`${cashApplied.toLocaleString()} على الفاتورة`);
+      if (discount > 0) paidParts.push(`خصم ${discount.toLocaleString()}`);
+      if (cashOver > 0) paidParts.push(`${cashOver.toLocaleString()} كسلفة`);
+      toast.success(
+        `تم تسجيل الدفعة: ${paidParts.join(" + ") || "دفعة"} — الحالة: ${
+          newSt === "paid" ? "مدفوعة" : newSt === "partial" ? "جزئية" : "معلّقة"
+        }`,
+      );
       setPaymentDialogOpen(false);
     } catch (e: any) {
       const raw = String(e?.message || "تعذر تسجيل الدفعة");

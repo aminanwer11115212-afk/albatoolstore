@@ -124,6 +124,14 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
           qc.invalidateQueries({ queryKey: ["customers"] });
           qc.invalidateQueries({ queryKey: ["transactions"] });
           qc.invalidateQueries({ queryKey: ["products"] });
+          // كشف الحساب + معاينة الفاتورة + إحصاءات العملاء
+          qc.invalidateQueries({ queryKey: ["customer-statement"] });
+          qc.invalidateQueries({ queryKey: ["customer-transactions"] });
+          qc.invalidateQueries({ queryKey: ["customer_balance_stats"] });
+          qc.invalidateQueries({ queryKey: ["invoice"] });
+          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+          try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+          try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
           try { refetch(); } catch {}
           const invLabel = invoiceNumber ? `«${invoiceNumber}»` : "";
           const parts = [`تم حذف الفاتورة ${invLabel}`.trim()];
