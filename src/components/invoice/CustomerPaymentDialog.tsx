@@ -352,9 +352,12 @@ export default function CustomerPaymentDialog({
         if (cErr) throw cErr;
       }
 
-      // (c) استخدام الرصيد الدائن — قيدان: قيد دفع (بدون حساب) وقيد تخفيض للرصيد الدائن (amount سالبة)
+      // (c) استخدام الرصيد الدائن — نقسمه على قيود customer_credit الموجودة
+      //     حسب أولوية الاستهلاك (FIFO/LIFO) من إعدادات الشركة، بحيث يظهر كل
+      //     استهلاك مربوطاً بمصدره الأصلي (allocation.consumed_from).
       if (creditApplied > 0 && !isPos && customerId) {
-        const desc = `استخدام رصيد دائن${invoiceNumber ? ` على الفاتورة ${invoiceNumber}` : ""}`;
+        const desc = `استخدام رصيد دائن${invoiceNumber ? ` على الفاتورة ${invoiceNumber}` : ""} (${consumptionOrder === "fifo" ? "الأقدم أولاً" : "الأحدث أولاً"})`;
+
         // قيد دفع بدون تدفق نقدي — يظهر في سجل دفعات العميل ويربط بالفاتورة
         const { error: cpErr } = await (supabase as any).from("transactions").insert({
           type: "income",
@@ -366,23 +369,75 @@ export default function CustomerPaymentDialog({
           method: "credit_balance",
           reference_id: invoiceId,
           description: desc,
-          allocation: { kind: "credit_used", invoice_id: invoiceId, invoice_number: invoiceNumber || null },
+          allocation: { kind: "credit_used", invoice_id: invoiceId, invoice_number: invoiceNumber || null, order: consumptionOrder },
         });
         if (cpErr) throw cpErr;
-        // خصم من رصيد العميل الدائن (recompute_customer_balance يجمع amount)
-        const { error: ccErr } = await (supabase as any).from("transactions").insert({
-          type: "expense",
-          category: "customer_credit",
-          customer_id: customerId,
-          account_id: null,
-          amount: -creditApplied,
-          date,
-          method: "credit_balance",
-          reference_id: invoiceId,
-          description: desc,
-          allocation: { kind: "credit_used", invoice_id: invoiceId, invoice_number: invoiceNumber || null },
-        });
-        if (ccErr) throw ccErr;
+
+        // جلب قيود customer_credit المتاحة (بعد طرح ما تم استهلاكه سابقاً) بمجموع لكل قيد
+        // نطلب كل الصفوف (موجب/سالب) ونحسب صافي كل مجموعة تعريفياً حسب created_at الأصلي
+        const { data: creditRows } = await (supabase as any)
+          .from("transactions")
+          .select("id, amount, date, description, allocation")
+          .eq("customer_id", customerId)
+          .eq("category", "customer_credit");
+
+        // نبني lots من الصفوف الموجبة (الأصل)، ونطرح منها ما استُهلك عبر consumed_from
+        const positives = ((creditRows as any[]) || []).filter((r) => Number(r.amount) > 0.01);
+        const consumedMap = new Map<string, number>();
+        for (const r of ((creditRows as any[]) || [])) {
+          const from = r.allocation?.consumed_from;
+          if (from && Number(r.amount) < 0) {
+            consumedMap.set(from, (consumedMap.get(from) || 0) + Math.abs(Number(r.amount)));
+          }
+        }
+        const lots = positives
+          .map((r) => ({
+            id: r.id as string,
+            date: r.date as string,
+            amount: Math.max(0, Number(r.amount) - (consumedMap.get(r.id) || 0)),
+          }))
+          .filter((l) => l.amount > 0.01);
+
+        const plan = allocateCreditConsumption(lots, creditApplied, consumptionOrder);
+
+        if (plan.length === 0) {
+          // fallback: قيد استهلاك واحد بدون consumed_from إذا لم نجد lots
+          const { error: ccErr } = await (supabase as any).from("transactions").insert({
+            type: "expense",
+            category: "customer_credit",
+            customer_id: customerId,
+            account_id: null,
+            amount: -creditApplied,
+            date,
+            method: "credit_balance",
+            reference_id: invoiceId,
+            description: desc,
+            allocation: { kind: "credit_used", invoice_id: invoiceId, invoice_number: invoiceNumber || null, order: consumptionOrder },
+          });
+          if (ccErr) throw ccErr;
+        } else {
+          for (const step of plan) {
+            const { error: ccErr } = await (supabase as any).from("transactions").insert({
+              type: "expense",
+              category: "customer_credit",
+              customer_id: customerId,
+              account_id: null,
+              amount: -step.consume,
+              date,
+              method: "credit_balance",
+              reference_id: invoiceId,
+              description: desc,
+              allocation: {
+                kind: "credit_used",
+                invoice_id: invoiceId,
+                invoice_number: invoiceNumber || null,
+                consumed_from: step.id,
+                order: consumptionOrder,
+              },
+            });
+            if (ccErr) throw ccErr;
+          }
+        }
       }
 
       const updatePayload: any = {
