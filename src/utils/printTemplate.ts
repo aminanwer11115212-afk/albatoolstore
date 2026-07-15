@@ -422,9 +422,11 @@ ${showAccount ? (() => {
   const hasPaid = !hidePaidBox && paidAmount > 0.01;
   const paidValue = hasPaid ? paidAmount : 0;
   const finalNet = jomlaHesab - paidAmount; // >0 عليه، <0 له
-  const finalDisplay = Math.max(finalNet, 0); // نُبقي التعاقد مع share: لا سالب
-  const finalBadge = finalNet > 0.01 ? "عليه" : finalNet < -0.01 ? "له" : "مسددة بالكامل";
-  const finalColor = finalNet > 0.01 ? "#c0392b" : "#16a34a";
+  // رصيد العميل الحالي: موجب (عليه) بإشارة +، سالب (له) بإشارة −، صفر = خالص
+  const isSettled = Math.abs(finalNet) <= 0.01;
+  const finalDisplay = isSettled ? "خالص" : `${finalNet > 0 ? "+ " : "− "}${fmt(Math.abs(finalNet))}`;
+  const finalBadge = isSettled ? "" : finalNet > 0 ? "عليه" : "له";
+  const finalColor = isSettled ? "#111" : finalNet > 0 ? "#c0392b" : "#16a34a";
   // خلايا بنمط Excel: حدود رفيعة رمادية، خلفية عنوان فاتحة، خط رقمي أحادي المسافات، مضغوط في الأسفل.
   const cellR = "padding:3px 6px;text-align:right;font-weight:700;color:#111;background:#f4f6f8;border:1px solid #b8bcc4;line-height:1.1;font-size:10px;";
   const cellL = "padding:3px 6px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.1;font-family:'Consolas','Courier New',monospace;font-size:10.5px;letter-spacing:0.2px;";
@@ -454,9 +456,9 @@ ${showAccount ? (() => {
     }) : ""}
     ${row({ section: "majmoo-row", label: "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
     ${row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
-    <tr data-section="final-status" data-section-label="الحساب الكلي">
-      <td style="${cellR}background:#e8eef7;">الحساب الكلي</td>
-      <td data-section="final-total" data-section-label="الحساب الكلي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:11.5px;color:${finalColor};">${fmt(finalDisplay)}</td>
+    <tr data-section="final-status" data-section-label="رصيد العميل الحالي">
+      <td style="${cellR}background:#e8eef7;">رصيد العميل الحالي</td>
+      <td data-section="final-total" data-section-label="رصيد العميل الحالي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:11.5px;color:${finalColor};">${finalDisplay}</td>
       <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:9.5px;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
     </tr>
   </tbody>
