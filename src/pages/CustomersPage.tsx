@@ -1661,7 +1661,7 @@ export default function CustomersPage() {
                         );
                       });
                     })()}
-                    <th style={{ position: "relative" }}>إعدادات<ColumnResizeHandle onMouseDown={(e) => startColDrag(11, e)} hidden={colsLocked} /></th>
+                    <th style={{ position: "relative" }}>إعدادات<ColumnResizeHandle onMouseDown={(e) => startColDrag(visibleMiddleKeys.length + 1, e)} hidden={colsLocked} /></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1803,9 +1803,9 @@ export default function CustomersPage() {
                     </td>
                   </tr>
                   {isLoading ? (
-                    <tr><td colSpan={12} style={{ textAlign: "center", padding: 30 }}>Processing...</td></tr>
+                    <tr><td colSpan={totalVisibleCols} style={{ textAlign: "center", padding: 30 }}>Processing...</td></tr>
                   ) : paginated.length === 0 ? (
-                    <tr><td colSpan={12} style={{ textAlign: "center", padding: 30 }}>لا يوجد عملاء</td></tr>
+                    <tr><td colSpan={totalVisibleCols} style={{ textAlign: "center", padding: 30 }}>لا يوجد عملاء</td></tr>
                   ) : paginated.map((c: any, i: number) => {
                     const rowCls = ((page - 1) * perPage + i) % 2 === 0 ? "odd" : "even";
                     const rowH = getRowH(c.id);
