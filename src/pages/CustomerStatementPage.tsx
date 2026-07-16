@@ -131,23 +131,44 @@ export default function CustomerStatementPage() {
       if (!selectedCustomerId) return [];
       // 1) IDs of POS (cash) invoices for this customer — used to exclude
       //    their linked payment transactions from the regular statement.
-      const { data: posInvs } = await supabase
+      // 2) IDs of NON-POS invoices — نضمّ أي حركة تشير لأي فاتورة عادية
+      //    حتى لو انقطع الربط عن customer_id (حالات نادرة/بيانات قديمة).
+      const { data: allInvs } = await supabase
         .from("invoices")
-        .select("id")
-        .eq("customer_id", selectedCustomerId)
-        .eq("source", "pos");
-      const posIds = new Set((posInvs || []).map((r: any) => r.id));
+        .select("id, source")
+        .eq("customer_id", selectedCustomerId);
+      const posIds = new Set((allInvs || []).filter((r: any) => r.source === "pos").map((r: any) => r.id));
+      const nonPosIds = (allInvs || []).filter((r: any) => r.source !== "pos").map((r: any) => r.id);
 
-      const { data, error } = await supabase
+      // (أ) كل الحركات المرتبطة مباشرة بالعميل
+      const byCustomer = supabase
         .from("transactions")
         .select("*")
         .eq("customer_id", selectedCustomerId)
         .order("date", { ascending: false });
-      if (error) throw error;
-      // Exclude any transaction whose reference_id points to a POS invoice
-      // (payments / cash-credit رصيد) so cash sales never bleed into the
-      // regular customer statement.
-      return (data || []).filter((t: any) => !t.reference_id || !posIds.has(t.reference_id));
+      // (ب) حركات مرتبطة بفواتير غير POS للعميل ولو بدون customer_id
+      const byRef = nonPosIds.length
+        ? supabase
+            .from("transactions")
+            .select("*")
+            .in("reference_id", nonPosIds as any)
+            .order("date", { ascending: false })
+        : Promise.resolve({ data: [] as any[], error: null });
+
+      const [a, b] = await Promise.all([byCustomer, byRef as any]);
+      if (a.error) throw a.error;
+      if ((b as any).error) throw (b as any).error;
+
+      const merged = new Map<string, any>();
+      for (const t of a.data || []) merged.set(t.id, t);
+      for (const t of (b as any).data || []) if (!merged.has(t.id)) merged.set(t.id, t);
+
+      // استبعاد أي حركة مرتبطة بفاتورة POS (كاش) حتى لا تتسرّب
+      const rows = Array.from(merged.values()).filter(
+        (t: any) => !t.reference_id || !posIds.has(t.reference_id),
+      );
+      rows.sort((x, y) => String(y.date || "").localeCompare(String(x.date || "")));
+      return rows;
     },
     enabled: !!selectedCustomerId,
     refetchOnMount: "always",
