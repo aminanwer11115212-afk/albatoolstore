@@ -176,6 +176,53 @@ export default function CustomerStatementPage() {
   const totalInvoices = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.total || 0), 0);
   const totalPaid = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.paid_amount || 0), 0);
 
+  // ===== Deleted-invoices: search / user filter / sort =====
+  const deletedUsers = useMemo(() => {
+    const s = new Set<string>();
+    (deletedInvoices || []).forEach((d) => { if (d.user_email) s.add(d.user_email); });
+    return Array.from(s).sort();
+  }, [deletedInvoices]);
+
+  const visibleDeleted = useMemo(() => {
+    const q = delSearch.trim().toLowerCase();
+    let rows = (deletedInvoices || []).filter((d) => {
+      if (delUserFilter && d.user_email !== delUserFilter) return false;
+      if (!q) return true;
+      const hay = `${d.invoice_number || ""} ${d.date || ""} ${d.user_email || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+    const dir = delSortDir === "asc" ? 1 : -1;
+    rows = [...rows].sort((a, b) => {
+      const av = (a as any)[delSortKey] ?? "";
+      const bv = (b as any)[delSortKey] ?? "";
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), "ar") * dir;
+    });
+    return rows;
+  }, [deletedInvoices, delSearch, delUserFilter, delSortKey, delSortDir]);
+
+  const toggleDelSort = (k: typeof delSortKey) => {
+    if (delSortKey === k) setDelSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setDelSortKey(k); setDelSortDir("desc"); }
+  };
+
+  // ===== Balance reconciliation: expected (unfiltered) vs stored =====
+  const reconciliation = useMemo(() => {
+    if (!selectedCustomer) return null;
+    const allInv = (invoices || []) as any[];
+    const expectedOpen = allInv
+      .filter((i) => i.status !== "cancelled")
+      .reduce((s, i) => s + Math.max(Number(i.total || 0) - Number(i.paid_amount || 0), 0), 0);
+    const stored = Number((selectedCustomer as any).balance || 0);
+    const delta = expectedOpen - stored;
+    return {
+      expectedOpen,
+      stored,
+      delta,
+      ok: Math.abs(delta) < 0.01,
+    };
+  }, [invoices, selectedCustomer]);
+
   const resetFilters = () => {
     setFromDate(""); setToDate(""); setMinAmount(""); setMaxAmount(""); setPaymentStatus("all");
   };
