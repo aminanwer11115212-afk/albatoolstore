@@ -9,6 +9,7 @@ import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
+import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 
 export default function CustomerStatementPage() {
   const { data: customers } = useCustomers();
