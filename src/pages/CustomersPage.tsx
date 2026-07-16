@@ -1855,157 +1855,189 @@ export default function CustomersPage() {
                             (page - 1) * perPage + i + 1
                           )}
                         </td>
-                        <td style={{ padding: 0 }}>
-                          <EditableCell
-                            value={c.name || ""}
-                            disabled={savingRow === c.id}
-                            onSave={(v) => updateRowField(c.id, { name: v.trim() })}
-                            inputClassName="text-[12px] font-medium"
-                            displayClassName="text-primary hover:underline font-medium cursor-text"
-                            placeholder="اسم العميل"
-                            onOpenView={() => setViewCustomer(c)}
-                          />
-                        </td>
-                        <td style={{ padding: 0 }}>
-                          <EditableCell
-                            value={c.address || ""}
-                            disabled={savingRow === c.id}
-                            onSave={(v) => updateRowField(c.id, { address: v.trim() || null })}
-                            inputClassName="text-[11px]"
-                            placeholder="العنوان"
-                          />
-                        </td>
-                        <td className="tabular-nums" style={{ padding: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 4px" }}>
-                            <button
-                              type="button"
-                              disabled={savingRow === c.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPhonePicker({
-                                  customerId: c.id,
-                                  initialValue: c.whatsapp || "",
-                                  customerName: c.name || "",
-                                  field: "whatsapp",
-                                });
-                              }}
-                              title="اضغط لتعديل الرقم أو استيراده من جهات الاتصال"
-                              className="text-[11px] tabular-nums text-right w-full truncate hover:text-primary hover:underline disabled:opacity-50 cursor-pointer bg-transparent border-0 outline-none"
-                              style={{ padding: "6px 4px", direction: "ltr" }}
-                            >
-                              {c.whatsapp || <span className="text-muted-foreground opacity-60">— اضغط للإدخال —</span>}
-                            </button>
-                            {(() => {
-                              const wa = pickCustomerWhatsApp(c);
-                              if (!wa) return null;
-                              return (
-                                <button
-                                  type="button"
-                                  title={`إرسال واتساب إلى ${wa}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openWhatsApp(wa, `مرحباً ${c.name || ""} 👋`);
-                                  }}
-                                  style={{ background: "#25D366", color: "#fff", border: 0, borderRadius: 3, padding: "2px 6px", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
-                                >
-                                  💬
-                                </button>
-                              );
-                            })()}
-                          </div>
-                        </td>
-                        <td>
-                          <InlineSearchSelect
-                            value={c.region_id || ""}
-                            options={regions.map(r => ({ value: r.id, label: r.name }))}
-                            onChange={(v) => updateRowField(c.id, { region_id: v || null, state_id: null, city_id: null, locality_id: null })}
-                            onAdd={async (name) => await createRegion(name)}
-                            placeholder="—"
-                            addLabel="إضافة منطقة"
-                            disabled={savingRow === c.id}
-                            title="تغيير الاتجاه"
-                          />
-                        </td>
-                        <td>
-                          <InlineSearchSelect
-                            value={c.state_id || ""}
-                            options={states.filter(s => !c.region_id || s.region_id === c.region_id).map(s => ({ value: s.id, label: s.name }))}
-                            onChange={(v) => updateRowField(c.id, { state_id: v || null, city_id: null, locality_id: null })}
-                            onAdd={async (name) => await createState(name, c.region_id)}
-                            placeholder="—"
-                            addLabel="إضافة ولاية"
-                            disabled={savingRow === c.id || !c.region_id}
-                            title="تغيير الولاية"
-                          />
-                        </td>
-                        <td style={{ padding: 0 }}>
-                          <InlineSearchSelect
-                            value={c.city_id || ""}
-                            options={cities.filter(ci => !c.state_id || ci.state_id === c.state_id).map(ci => ({ value: ci.id, label: ci.name }))}
-                            onChange={(v) => updateRowField(c.id, { city_id: v || null, locality_id: null })}
-                            onAdd={async (name) => await createCity(name, c.state_id)}
-                            onDelete={async (o) => await deleteCity(o.value)}
-                            placeholder="—"
-                            addLabel="إضافة مدينة"
-                            disabled={savingRow === c.id || !c.state_id}
-                            title="تغيير المدينة"
-                          />
-                        </td>
-                        <td>
-                          <InlineSearchSelect
-                            value={c.locality_id || ""}
-                            options={localities.filter(l => !c.city_id || l.city_id === c.city_id).map(l => ({ value: l.id, label: l.name }))}
-                            onChange={(v) => updateRowField(c.id, { locality_id: v || null })}
-                            onAdd={async (name) => await createLocality(name, c.city_id)}
-                            onDelete={async (o) => await deleteLocality(o.value)}
-                            placeholder="—"
-                            addLabel="إضافة محلية"
-                            disabled={savingRow === c.id || !c.city_id}
-                            title="تغيير المحلية"
-                          />
-                        </td>
-                        <td>
-                          <InlineSearchSelect
-                            value={c.group_id || ""}
-                            options={groups.map(g => ({ value: g.id, label: g.name }))}
-                            onChange={(v) => updateRowField(c.id, { group_id: v || null })}
-                            onAdd={async (name) => await createGroup(name)}
-                            onDelete={async (o) => await deleteGroup(o.value)}
-                            showDeleteButton
-                            placeholder="—"
-                            addLabel="إضافة مجموعة"
-                            disabled={savingRow === c.id}
-                            title="تغيير المجموعة"
-                          />
-                        </td>
-                        <td>
-                          <InlineSearchSelect
-                            value={customerTransporter[c.id] || ""}
-                            options={transporters.map(t => ({ value: t.id, label: t.name }))}
-                            onChange={(v) => updateCustomerTransporter(c.id, v)}
-                            onAdd={async (name) => await createTransporter(name)}
-                            onDelete={async (o) => await deleteTransporter(o.value)}
-                            showDeleteButton
-                            placeholder="—"
-                            addLabel="إضافة ناقل"
-                            disabled={savingRow === c.id}
-                            title="تغيير الترحيلات"
-                          />
-                        </td>
-                        <td>
-                          <InlineSearchSelect
-                            value={customerDestination[c.id] || ""}
-                            options={destinations.map(d => ({ value: d.id, label: d.name }))}
-                            onChange={(v) => updateCustomerDestination(c.id, v)}
-                            onAdd={async (name) => await createDestination(name)}
-                            onDelete={async (o) => await deleteDestination(o.value)}
-                            showDeleteButton
-                            placeholder="—"
-                            addLabel="إضافة وجهة"
-                            disabled={savingRow === c.id}
-                            title="تغيير الوجهة"
-                          />
-                        </td>
+                        {(() => {
+                          const rowCells: Record<CustomerColKey, { td: React.ReactNode; tdProps?: React.HTMLAttributes<HTMLTableCellElement> & { style?: React.CSSProperties; className?: string } }> = {
+                            name: {
+                              tdProps: { style: { padding: 0 } },
+                              td: (
+                                <EditableCell
+                                  value={c.name || ""}
+                                  disabled={savingRow === c.id}
+                                  onSave={(v) => updateRowField(c.id, { name: v.trim() })}
+                                  inputClassName="text-[12px] font-medium"
+                                  displayClassName="text-primary hover:underline font-medium cursor-text"
+                                  placeholder="اسم العميل"
+                                  onOpenView={() => setViewCustomer(c)}
+                                />
+                              ),
+                            },
+                            address: {
+                              tdProps: { style: { padding: 0 } },
+                              td: (
+                                <EditableCell
+                                  value={c.address || ""}
+                                  disabled={savingRow === c.id}
+                                  onSave={(v) => updateRowField(c.id, { address: v.trim() || null })}
+                                  inputClassName="text-[11px]"
+                                  placeholder="العنوان"
+                                />
+                              ),
+                            },
+                            phone: {
+                              tdProps: { className: "tabular-nums", style: { padding: 0 } },
+                              td: (
+                                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 4px" }}>
+                                  <button
+                                    type="button"
+                                    disabled={savingRow === c.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPhonePicker({
+                                        customerId: c.id,
+                                        initialValue: c.whatsapp || "",
+                                        customerName: c.name || "",
+                                        field: "whatsapp",
+                                      });
+                                    }}
+                                    title="اضغط لتعديل الرقم أو استيراده من جهات الاتصال"
+                                    className="text-[11px] tabular-nums text-right w-full truncate hover:text-primary hover:underline disabled:opacity-50 cursor-pointer bg-transparent border-0 outline-none"
+                                    style={{ padding: "6px 4px", direction: "ltr" }}
+                                  >
+                                    {c.whatsapp || <span className="text-muted-foreground opacity-60">— اضغط للإدخال —</span>}
+                                  </button>
+                                  {(() => {
+                                    const wa = pickCustomerWhatsApp(c);
+                                    if (!wa) return null;
+                                    return (
+                                      <button
+                                        type="button"
+                                        title={`إرسال واتساب إلى ${wa}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openWhatsApp(wa, `مرحباً ${c.name || ""} 👋`);
+                                        }}
+                                        style={{ background: "#25D366", color: "#fff", border: 0, borderRadius: 3, padding: "2px 6px", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                                      >
+                                        💬
+                                      </button>
+                                    );
+                                  })()}
+                                </div>
+                              ),
+                            },
+                            region: {
+                              td: (
+                                <InlineSearchSelect
+                                  value={c.region_id || ""}
+                                  options={regions.map(r => ({ value: r.id, label: r.name }))}
+                                  onChange={(v) => updateRowField(c.id, { region_id: v || null, state_id: null, city_id: null, locality_id: null })}
+                                  onAdd={async (name) => await createRegion(name)}
+                                  placeholder="—"
+                                  addLabel="إضافة منطقة"
+                                  disabled={savingRow === c.id}
+                                  title="تغيير الاتجاه"
+                                />
+                              ),
+                            },
+                            state: {
+                              td: (
+                                <InlineSearchSelect
+                                  value={c.state_id || ""}
+                                  options={states.filter(s => !c.region_id || s.region_id === c.region_id).map(s => ({ value: s.id, label: s.name }))}
+                                  onChange={(v) => updateRowField(c.id, { state_id: v || null, city_id: null, locality_id: null })}
+                                  onAdd={async (name) => await createState(name, c.region_id)}
+                                  placeholder="—"
+                                  addLabel="إضافة ولاية"
+                                  disabled={savingRow === c.id || !c.region_id}
+                                  title="تغيير الولاية"
+                                />
+                              ),
+                            },
+                            city: {
+                              tdProps: { style: { padding: 0 } },
+                              td: (
+                                <InlineSearchSelect
+                                  value={c.city_id || ""}
+                                  options={cities.filter(ci => !c.state_id || ci.state_id === c.state_id).map(ci => ({ value: ci.id, label: ci.name }))}
+                                  onChange={(v) => updateRowField(c.id, { city_id: v || null, locality_id: null })}
+                                  onAdd={async (name) => await createCity(name, c.state_id)}
+                                  onDelete={async (o) => await deleteCity(o.value)}
+                                  placeholder="—"
+                                  addLabel="إضافة مدينة"
+                                  disabled={savingRow === c.id || !c.state_id}
+                                  title="تغيير المدينة"
+                                />
+                              ),
+                            },
+                            locality: {
+                              td: (
+                                <InlineSearchSelect
+                                  value={c.locality_id || ""}
+                                  options={localities.filter(l => !c.city_id || l.city_id === c.city_id).map(l => ({ value: l.id, label: l.name }))}
+                                  onChange={(v) => updateRowField(c.id, { locality_id: v || null })}
+                                  onAdd={async (name) => await createLocality(name, c.city_id)}
+                                  onDelete={async (o) => await deleteLocality(o.value)}
+                                  placeholder="—"
+                                  addLabel="إضافة محلية"
+                                  disabled={savingRow === c.id || !c.city_id}
+                                  title="تغيير المحلية"
+                                />
+                              ),
+                            },
+                            group: {
+                              td: (
+                                <InlineSearchSelect
+                                  value={c.group_id || ""}
+                                  options={groups.map(g => ({ value: g.id, label: g.name }))}
+                                  onChange={(v) => updateRowField(c.id, { group_id: v || null })}
+                                  onAdd={async (name) => await createGroup(name)}
+                                  onDelete={async (o) => await deleteGroup(o.value)}
+                                  showDeleteButton
+                                  placeholder="—"
+                                  addLabel="إضافة مجموعة"
+                                  disabled={savingRow === c.id}
+                                  title="تغيير المجموعة"
+                                />
+                              ),
+                            },
+                            transporter: {
+                              td: (
+                                <InlineSearchSelect
+                                  value={customerTransporter[c.id] || ""}
+                                  options={transporters.map(t => ({ value: t.id, label: t.name }))}
+                                  onChange={(v) => updateCustomerTransporter(c.id, v)}
+                                  onAdd={async (name) => await createTransporter(name)}
+                                  onDelete={async (o) => await deleteTransporter(o.value)}
+                                  showDeleteButton
+                                  placeholder="—"
+                                  addLabel="إضافة ناقل"
+                                  disabled={savingRow === c.id}
+                                  title="تغيير الترحيلات"
+                                />
+                              ),
+                            },
+                            destination: {
+                              td: (
+                                <InlineSearchSelect
+                                  value={customerDestination[c.id] || ""}
+                                  options={destinations.map(d => ({ value: d.id, label: d.name }))}
+                                  onChange={(v) => updateCustomerDestination(c.id, v)}
+                                  onAdd={async (name) => await createDestination(name)}
+                                  onDelete={async (o) => await deleteDestination(o.value)}
+                                  showDeleteButton
+                                  placeholder="—"
+                                  addLabel="إضافة وجهة"
+                                  disabled={savingRow === c.id}
+                                  title="تغيير الوجهة"
+                                />
+                              ),
+                            },
+                          };
+                          return visibleMiddleKeys.map(k => {
+                            const cell = rowCells[k];
+                            return <td key={k} {...(cell.tdProps || {})}>{cell.td}</td>;
+                          });
+                        })()}
                         <td>
                           <span className="legacy-actions">
                             <button type="button" className="btn-xs btn-success" onClick={() => openView(c)} title="عرض">
