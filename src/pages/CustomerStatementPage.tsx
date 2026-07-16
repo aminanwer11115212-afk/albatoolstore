@@ -280,6 +280,31 @@ export default function CustomerStatementPage() {
             description: t.description || "—",
           })),
         }] : []),
+        ...(visibleDeleted.length ? [{
+          key: "deleted_invoices",
+          label: `فواتير محذوفة/ملغاة (${visibleDeleted.length}) — لا تُحسب في المجاميع`,
+          headerColor: "#b91c1c",
+          columns: [
+            { key: "invoice_number", label: "رقم الفاتورة", align: "center" as const },
+            { key: "date", label: "التاريخ", align: "center" as const },
+            { key: "total", label: "الإجمالي", numeric: true },
+            { key: "deleted_payments", label: "المدفوع المُلغى", numeric: true },
+            { key: "items_count", label: "عدد البنود", numeric: true },
+            { key: "restored_stock", label: "المخزون", align: "center" as const },
+            { key: "deleted_at", label: "حُذفت في", align: "center" as const },
+            { key: "user_email", label: "بواسطة", align: "center" as const },
+          ],
+          rows: visibleDeleted.map((d) => ({
+            invoice_number: d.invoice_number || "—",
+            date: d.date || "—",
+            total: Number(d.total || 0),
+            deleted_payments: Number(d.deleted_payments || d.paid_amount || 0),
+            items_count: d.items_count,
+            restored_stock: d.restored_stock ? "أُرجع" : "—",
+            deleted_at: new Date(d.deleted_at).toLocaleString(),
+            user_email: d.user_email || "—",
+          })),
+        }] : []),
       ],
     };
     sessionStorage.setItem("lov_financial_report_preview", JSON.stringify(payload));
