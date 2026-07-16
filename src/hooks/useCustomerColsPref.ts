@@ -160,12 +160,31 @@ export function useCustomerColsPref() {
     setPrefs(readPrefs(uid, ff));
   }, [uid, ff]);
 
+  // Toast مُجمَّع: أي تغيير على التفضيلات يُظهر إشعار «تم الحفظ» واحد بعد
+  // 400ms من آخر تعديل — يمنع فيضان الإشعارات أثناء السحب/التبديل السريع.
+  const toastTimerRef = useRef<number | null>(null);
+  const suppressToastRef = useRef(false);
+  const flashSavedToast = useCallback((msg = "تم حفظ تفضيلات الأعمدة") => {
+    if (suppressToastRef.current) return;
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => {
+      toast.success(msg, {
+        id: "customer-cols-saved",
+        description: ff === "mobile" ? "على هذا الموبايل فقط" : "على سطح المكتب فقط",
+      });
+    }, 400);
+  }, [ff]);
+  useEffect(() => () => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+  }, []);
+
   const persist = useCallback(
     (next: Prefs) => {
       setPrefs(next);
       writePrefs(uid, ff, next);
+      flashSavedToast();
     },
-    [uid, ff],
+    [uid, ff, flashSavedToast],
   );
 
   const moveUp = useCallback((key: CustomerColKey) => {
@@ -176,9 +195,10 @@ export function useCustomerColsPref() {
       [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
       const nextPrefs = { ...cur, order: next };
       writePrefs(uid, ff, nextPrefs);
+      flashSavedToast();
       return nextPrefs;
     });
-  }, [uid, ff]);
+  }, [uid, ff, flashSavedToast]);
 
   const moveDown = useCallback((key: CustomerColKey) => {
     setPrefs((cur) => {
@@ -188,9 +208,10 @@ export function useCustomerColsPref() {
       [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
       const nextPrefs = { ...cur, order: next };
       writePrefs(uid, ff, nextPrefs);
+      flashSavedToast();
       return nextPrefs;
     });
-  }, [uid, ff]);
+  }, [uid, ff, flashSavedToast]);
 
   const moveToEnd = useCallback((key: CustomerColKey) => {
     setPrefs((cur) => {
@@ -200,9 +221,10 @@ export function useCustomerColsPref() {
       next.push(key);
       const nextPrefs = { ...cur, order: next };
       writePrefs(uid, ff, nextPrefs);
+      flashSavedToast();
       return nextPrefs;
     });
-  }, [uid, ff]);
+  }, [uid, ff, flashSavedToast]);
 
   /**
    * إعادة ترتيب بسحب/إفلات: انقل `sourceKey` إلى موضع `targetKey`.
@@ -218,9 +240,10 @@ export function useCustomerColsPref() {
       const next = [...without.slice(0, insertAt), sourceKey, ...without.slice(insertAt)];
       const nextPrefs = { ...cur, order: next };
       writePrefs(uid, ff, nextPrefs);
+      flashSavedToast();
       return nextPrefs;
     });
-  }, [uid, ff]);
+  }, [uid, ff, flashSavedToast]);
 
   const toggleHidden = useCallback((key: CustomerColKey) => {
     setPrefs((cur) => {
@@ -228,17 +251,25 @@ export function useCustomerColsPref() {
       const hidden = has ? cur.hidden.filter((k) => k !== key) : [...cur.hidden, key];
       const nextPrefs = { ...cur, hidden };
       writePrefs(uid, ff, nextPrefs);
+      flashSavedToast(has ? "تم إظهار العمود" : "تم إخفاء العمود");
       return nextPrefs;
     });
-  }, [uid, ff]);
+  }, [uid, ff, flashSavedToast]);
 
   /**
    * إعادة التعيين للحالة الافتراضية: كل الأعمدة ظاهرة بالترتيب الأصلي —
    * فقط للـ form-factor الحالي، بحيث لا نمس تفضيلات الجهاز الآخر.
    */
   const reset = useCallback(() => {
+    // اكتم الـtoast الافتراضي من `persist` واعرض توست إعادة الضبط بدلاً منه.
+    suppressToastRef.current = true;
     persist({ order: [...DEFAULT_ORDER], hidden: [] });
-  }, [persist]);
+    suppressToastRef.current = false;
+    toast.success("تمت إعادة تعيين تفضيلات الأعمدة", {
+      id: "customer-cols-reset",
+      description: ff === "mobile" ? "على هذا الموبايل فقط" : "على سطح المكتب فقط",
+    });
+  }, [persist, ff]);
 
   const visibleOrder = useMemo(
     () => prefs.order.filter((k) => !prefs.hidden.includes(k)),
