@@ -35,7 +35,7 @@ const FAMILIES: Record<string, Family> = {
   },
   invoice_items: {
     events: ["invoice-items:changed"],
-    keys: [["invoice-items"], ["invoices"], ["invoices-with-customers"]],
+    keys: [["invoice-items"], ["invoices"], ["invoices-with-customers"], ["customer-statement"]],
   },
   quotes: {
     events: ["quotes:changed"],
