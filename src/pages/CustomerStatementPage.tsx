@@ -34,6 +34,14 @@ export default function CustomerStatementPage() {
   const [delUserFilter, setDelUserFilter] = useState("");
   const [delSortKey, setDelSortKey] = useState<"deleted_at" | "date" | "invoice_number" | "user_email" | "total">("deleted_at");
   const [delSortDir, setDelSortDir] = useState<"asc" | "desc">("desc");
+  // Invoices table: search + sort
+  const [invSearch, setInvSearch] = useState("");
+  const [invSortKey, setInvSortKey] = useState<"invoice_number" | "date" | "total" | "paid_amount" | "remaining">("date");
+  const [invSortDir, setInvSortDir] = useState<"asc" | "desc">("desc");
+  // Transactions table: type filter + sort
+  const [txTypeFilter, setTxTypeFilter] = useState<"all" | "payment" | "credit" | "credit_consume" | "other">("all");
+  const [txSortKey, setTxSortKey] = useState<"date" | "amount" | "type">("date");
+  const [txSortDir, setTxSortDir] = useState<"asc" | "desc">("desc");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const matches = useMemo(() => {
@@ -124,7 +132,8 @@ export default function CustomerStatementPage() {
 
 
   const filteredInvoices = useMemo(() => {
-    return (invoices || []).filter((inv: any) => {
+    const q = invSearch.trim().toLowerCase();
+    let rows = (invoices || []).filter((inv: any) => {
       if (fromDate && inv.date < fromDate) return false;
       if (toDate && inv.date > toDate) return false;
       const total = Number(inv.total || 0);
@@ -134,12 +143,39 @@ export default function CustomerStatementPage() {
       if (paymentStatus === "paid" && paid < total) return false;
       if (paymentStatus === "unpaid" && paid > 0) return false;
       if (paymentStatus === "partial" && (paid === 0 || paid >= total)) return false;
+      if (q && !String(inv.invoice_number || "").toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [invoices, fromDate, toDate, minAmount, maxAmount, paymentStatus]);
+    const dir = invSortDir === "asc" ? 1 : -1;
+    rows = [...rows].sort((a: any, b: any) => {
+      let av: any, bv: any;
+      if (invSortKey === "remaining") {
+        av = Number(a.total || 0) - Number(a.paid_amount || 0);
+        bv = Number(b.total || 0) - Number(b.paid_amount || 0);
+      } else if (invSortKey === "total" || invSortKey === "paid_amount") {
+        av = Number(a[invSortKey] || 0); bv = Number(b[invSortKey] || 0);
+      } else {
+        av = a[invSortKey] ?? ""; bv = b[invSortKey] ?? "";
+      }
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), "ar", { numeric: true }) * dir;
+    });
+    return rows;
+  }, [invoices, fromDate, toDate, minAmount, maxAmount, paymentStatus, invSearch, invSortKey, invSortDir]);
+
+  const toggleInvSort = (k: typeof invSortKey) => {
+    if (invSortKey === k) setInvSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setInvSortKey(k); setInvSortDir("desc"); }
+  };
+
+  const classifyTx = (t: any): "payment" | "credit" | "credit_consume" | "other" => {
+    if (t.category === "customer_payment") return "payment";
+    if (t.category === "customer_credit") return Number(t.amount || 0) < 0 ? "credit_consume" : "credit";
+    return "other";
+  };
 
   const filteredTransactions = useMemo(() => {
-    return (transactions || []).filter((t: any) => {
+    let rows = (transactions || []).filter((t: any) => {
       if (fromDate && t.date < fromDate) return false;
       if (toDate && t.date > toDate) return false;
       const amt = Math.abs(Number(t.amount || 0));
@@ -149,9 +185,25 @@ export default function CustomerStatementPage() {
         const info = classifyCreditRow(t);
         if (!creditSourceFilter.has(info.source)) return false;
       }
+      if (txTypeFilter !== "all" && classifyTx(t) !== txTypeFilter) return false;
       return true;
     });
-  }, [transactions, fromDate, toDate, minAmount, maxAmount, creditSourceFilter]);
+    const dir = txSortDir === "asc" ? 1 : -1;
+    rows = [...rows].sort((a: any, b: any) => {
+      let av: any, bv: any;
+      if (txSortKey === "amount") { av = Number(a.amount || 0); bv = Number(b.amount || 0); }
+      else if (txSortKey === "type") { av = classifyTx(a); bv = classifyTx(b); }
+      else { av = a.date ?? ""; bv = b.date ?? ""; }
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), "ar", { numeric: true }) * dir;
+    });
+    return rows;
+  }, [transactions, fromDate, toDate, minAmount, maxAmount, creditSourceFilter, txTypeFilter, txSortKey, txSortDir]);
+
+  const toggleTxSort = (k: typeof txSortKey) => {
+    if (txSortKey === k) setTxSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setTxSortKey(k); setTxSortDir("desc"); }
+  };
 
   // تجميع customer_credit حسب المصدر — لعرض ملخّص فرعي أعلى الجدول
   const creditGroups = useMemo(() => {
@@ -209,7 +261,7 @@ export default function CustomerStatementPage() {
     else { setDelSortKey(k); setDelSortDir("desc"); }
   };
 
-  // ===== Balance reconciliation: expected (unfiltered) vs stored =====
+  // ===== Balance reconciliation: statement math vs netBalanceOf (shared across pages) =====
   const reconciliation = useMemo(() => {
     if (!selectedCustomer) return null;
     const allInv = (invoices || []) as any[];
@@ -217,12 +269,22 @@ export default function CustomerStatementPage() {
       .filter((i) => i.status !== "cancelled")
       .reduce((s, i) => s + Math.max(Number(i.total || 0) - Number(i.paid_amount || 0), 0), 0);
     const stored = Number((selectedCustomer as any).balance || 0);
+    const credit = Number((selectedCustomer as any).credit_balance || 0);
+    // net as computed by the statement itself, from the raw invoice/credit math
+    const statementNet = expectedOpen - credit;
+    // net as displayed everywhere else (Customers page, Debt report, InvoiceCreate header, CustomerDetail)
+    const sharedNet = netBalanceOf(selectedCustomer);
     const delta = expectedOpen - stored;
+    const netDelta = statementNet - sharedNet;
     return {
       expectedOpen,
       stored,
+      credit,
+      statementNet,
+      sharedNet,
       delta,
-      ok: Math.abs(delta) < 0.01,
+      netDelta,
+      ok: Math.abs(delta) < 0.01 && Math.abs(netDelta) < 0.01,
     };
   }, [invoices, selectedCustomer]);
 
@@ -317,14 +379,25 @@ export default function CustomerStatementPage() {
   return (
     <div className="space-y-6" dir="rtl">
       {selectedCustomer && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2 flex-wrap">
           <button
             type="button"
             onClick={handleOpenPrint}
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:opacity-90 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
           >
             <Printer className="h-4 w-4" />
-            معاينة وطباعة كشف الحساب
+            معاينة وطباعة
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              try { sessionStorage.setItem("lov_financial_report_autoexport", "pdf"); } catch { /* ignore */ }
+              handleOpenPrint();
+            }}
+            className="inline-flex items-center gap-2 bg-emerald-600 text-white hover:opacity-90 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
+            title="ينتقل لصفحة المعاينة ثم يبدأ تنزيل PDF تلقائياً — يشمل الفواتير المحذوفة/الملغاة بتفاصيلها"
+          >
+            📄 تصدير PDF
           </button>
         </div>
       )}
@@ -459,40 +532,79 @@ export default function CustomerStatementPage() {
             <div
               data-section="reconciliation"
               data-section-label="تحقق الرصيد"
-              className={`rounded-xl border p-4 shadow-sm text-sm flex flex-wrap items-center gap-x-6 gap-y-2 ${
+              className={`rounded-xl border p-4 shadow-sm text-sm space-y-2 ${
                 reconciliation.ok
                   ? "bg-emerald-500/5 border-emerald-500/30 text-emerald-800"
                   : "bg-destructive/5 border-destructive/40 text-destructive"
               }`}
             >
-              <span className="font-semibold">
-                {reconciliation.ok ? "✅ الرصيد مطابق" : "⚠️ عدم تطابق في الرصيد"}
-              </span>
-              <span className="text-xs">
-                المتوقع (فواتير − مدفوعات، باستثناء الملغاة): <b className="tabular-nums">{reconciliation.expectedOpen.toLocaleString()}</b>
-              </span>
-              <span className="text-xs">
-                المخزَّن في بطاقة العميل: <b className="tabular-nums">{reconciliation.stored.toLocaleString()}</b>
-              </span>
-              {!reconciliation.ok && (
-                <span className="text-xs">
-                  الفارق: <b className="tabular-nums">{reconciliation.delta.toLocaleString()}</b>
-                  <span className="ms-2 opacity-80">— قد يلزم إعادة حساب الأرصدة من صفحة تقرير الديون.</span>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                <span className="font-semibold">
+                  {reconciliation.ok ? "✅ الرصيد مطابق في كل الصفحات" : "⚠️ عدم تطابق في الرصيد"}
                 </span>
-              )}
+                <span className="text-xs">
+                  المتوقع (فواتير مفتوحة): <b className="tabular-nums">{reconciliation.expectedOpen.toLocaleString()}</b>
+                </span>
+                <span className="text-xs">
+                  المخزَّن في بطاقة العميل: <b className="tabular-nums">{reconciliation.stored.toLocaleString()}</b>
+                </span>
+                <span className="text-xs">
+                  الرصيد الدائن: <b className="tabular-nums">{reconciliation.credit.toLocaleString()}</b>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
+                <span>
+                  صافي كشف الحساب (مفتوح − دائن): <b className="tabular-nums">{reconciliation.statementNet.toLocaleString()}</b>
+                </span>
+                <span>
+                  صافي الفواتير/تقرير المديونين/بطاقة العميل (netBalanceOf): <b className="tabular-nums">{reconciliation.sharedNet.toLocaleString()}</b>
+                </span>
+                {!reconciliation.ok && (
+                  <span>
+                    الفارق: <b className="tabular-nums">
+                      {(Math.abs(reconciliation.delta) > 0.01 ? reconciliation.delta : reconciliation.netDelta).toLocaleString()}
+                    </b>
+                    <span className="ms-2 opacity-80">— قد يلزم إعادة حساب الأرصدة من صفحة تقرير الديون.</span>
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
           <div data-section="invoices" data-section-label="الفواتير" className="legacy-card card-block">
-            <h3 className="px-5 py-3 font-semibold text-foreground border-b border-border">الفواتير ({filteredInvoices.length})</h3>
+            <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 justify-between">
+              <h3 className="font-semibold text-foreground">الفواتير ({filteredInvoices.length})</h3>
+              <div className="relative">
+                <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={invSearch}
+                  onChange={(e) => setInvSearch(e.target.value)}
+                  placeholder="بحث برقم الفاتورة"
+                  className="bg-muted rounded pr-7 pl-2 py-1 text-xs text-foreground border border-border outline-none focus:ring-1 focus:ring-primary w-56"
+                />
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm mobile-stack-table">
                 <thead><tr className="bg-muted">
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">رقم الفاتورة</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المبلغ</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المدفوع</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المتبقي</th>
+                  {([
+                    ["invoice_number","رقم الفاتورة"],
+                    ["date","التاريخ"],
+                    ["total","المبلغ"],
+                    ["paid_amount","المدفوع"],
+                    ["remaining","المتبقي"],
+                  ] as const).map(([k,label]) => {
+                    const active = invSortKey === k;
+                    return (
+                      <th key={k} className="text-right px-5 py-3 font-semibold text-muted-foreground">
+                        <button type="button" onClick={() => toggleInvSort(k as any)} className="inline-flex items-center gap-1 hover:text-foreground">
+                          {label}
+                          <span className="text-[10px] opacity-70">{active ? (invSortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+                        </button>
+                      </th>
+                    );
+                  })}
                 </tr></thead>
                 <tbody>
                   {isLoading ? <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
@@ -510,6 +622,7 @@ export default function CustomerStatementPage() {
               </table>
             </div>
           </div>
+
 
           {(deletedInvoices || []).length > 0 && (
             <div data-section="deleted-invoices" data-section-label="فواتير محذوفة" className="legacy-card card-block border-destructive/30">
@@ -604,6 +717,18 @@ export default function CustomerStatementPage() {
                   المعاملات ({filteredTransactions.length})
                 </h3>
                 <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={txTypeFilter}
+                    onChange={(e) => setTxTypeFilter(e.target.value as any)}
+                    className="bg-muted rounded px-2 py-1 text-xs text-foreground border border-border outline-none"
+                    title="نوع العملية"
+                  >
+                    <option value="all">كل الأنواع</option>
+                    <option value="payment">دفعة</option>
+                    <option value="credit">رصيد دائن</option>
+                    <option value="credit_consume">استهلاك رصيد</option>
+                    <option value="other">أخرى</option>
+                  </select>
                   <button
                     type="button"
                     onClick={() => setCashMode((v) => !v)}
@@ -672,11 +797,28 @@ export default function CustomerStatementPage() {
                 <table className="w-full text-sm mobile-stack-table">
                   <thead>
                     <tr className="bg-muted">
-                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
-                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">النوع</th>
+                      {([
+                        ["date","التاريخ"],
+                        ["type","النوع"],
+                      ] as const).map(([k,label]) => {
+                        const active = txSortKey === k;
+                        return (
+                          <th key={k} className="text-right px-5 py-3 font-semibold text-muted-foreground">
+                            <button type="button" onClick={() => toggleTxSort(k as any)} className="inline-flex items-center gap-1 hover:text-foreground">
+                              {label}
+                              <span className="text-[10px] opacity-70">{active ? (txSortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+                            </button>
+                          </th>
+                        );
+                      })}
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المصدر</th>
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الارتباط</th>
-                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المبلغ</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">
+                        <button type="button" onClick={() => toggleTxSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground">
+                          المبلغ
+                          <span className="text-[10px] opacity-70">{txSortKey === "amount" ? (txSortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+                        </button>
+                      </th>
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الوصف</th>
                     </tr>
                   </thead>
