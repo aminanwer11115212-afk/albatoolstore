@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { containsAny, fuzzyMatch, damerauLevenshtein } from "../src/utils/searchMatch";
+import { containsAny, fuzzyMatch, damerauLevenshtein } from "./searchMatch";
 
 /**
  * اختبارات وحدة للبحث الذكي: تحمّل أخطاء إملائية بسيطة (استبدال/إضافة/حذف
