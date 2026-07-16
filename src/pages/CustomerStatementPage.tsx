@@ -452,6 +452,34 @@ export default function CustomerStatementPage() {
             </div>
           </div>
 
+          {reconciliation && (
+            <div
+              data-section="reconciliation"
+              data-section-label="تحقق الرصيد"
+              className={`rounded-xl border p-4 shadow-sm text-sm flex flex-wrap items-center gap-x-6 gap-y-2 ${
+                reconciliation.ok
+                  ? "bg-emerald-500/5 border-emerald-500/30 text-emerald-800"
+                  : "bg-destructive/5 border-destructive/40 text-destructive"
+              }`}
+            >
+              <span className="font-semibold">
+                {reconciliation.ok ? "✅ الرصيد مطابق" : "⚠️ عدم تطابق في الرصيد"}
+              </span>
+              <span className="text-xs">
+                المتوقع (فواتير − مدفوعات، باستثناء الملغاة): <b className="tabular-nums">{reconciliation.expectedOpen.toLocaleString()}</b>
+              </span>
+              <span className="text-xs">
+                المخزَّن في بطاقة العميل: <b className="tabular-nums">{reconciliation.stored.toLocaleString()}</b>
+              </span>
+              {!reconciliation.ok && (
+                <span className="text-xs">
+                  الفارق: <b className="tabular-nums">{reconciliation.delta.toLocaleString()}</b>
+                  <span className="ms-2 opacity-80">— قد يلزم إعادة حساب الأرصدة من صفحة تقرير الديون.</span>
+                </span>
+              )}
+            </div>
+          )}
+
           <div data-section="invoices" data-section-label="الفواتير" className="legacy-card card-block">
             <h3 className="px-5 py-3 font-semibold text-foreground border-b border-border">الفواتير ({filteredInvoices.length})</h3>
             <div className="overflow-x-auto">
