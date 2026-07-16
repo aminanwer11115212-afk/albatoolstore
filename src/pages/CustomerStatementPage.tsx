@@ -11,6 +11,7 @@ import { netBalanceOf } from "@/utils/balanceDisplay";
 import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
+import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 
 export default function CustomerStatementPage() {
@@ -542,26 +543,32 @@ export default function CustomerStatementPage() {
           : "0";
         return (
         <>
-          <div data-section="summary" data-section-label="صناديق الملخص" className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <CustomerBalanceHero
+            customer={selectedCustomer}
+            totalInvoices={totalInvoices}
+            totalPaid={totalPaid}
+          />
+
+          <div data-section="summary" data-section-label="صناديق الملخص" className="grid grid-cols-2 md:grid-cols-5 gap-4 animate-in fade-in duration-500">
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <p className="text-sm text-muted-foreground">العميل</p>
-              <p className="text-lg font-bold text-foreground">{selectedCustomer.name}</p>
+              <p className="text-lg font-bold text-foreground truncate">{selectedCustomer.name}</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <p className="text-sm text-muted-foreground">إجمالي الفواتير</p>
-              <p className="text-lg font-bold text-primary">{totalInvoices.toLocaleString()}</p>
+              <p className="text-lg font-bold text-primary tabular-nums">{totalInvoices.toLocaleString()}</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <p className="text-sm text-muted-foreground">المدفوع</p>
-              <p className="text-lg font-bold text-success">{totalPaid.toLocaleString()}</p>
+              <p className="text-lg font-bold text-success tabular-nums">{totalPaid.toLocaleString()}</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <p className="text-sm text-muted-foreground">المتبقي</p>
-              <p className="text-lg font-bold text-destructive">{(totalInvoices - totalPaid).toLocaleString()}</p>
+              <p className="text-lg font-bold text-destructive tabular-nums">{(totalInvoices - totalPaid).toLocaleString()}</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <p className="text-sm text-muted-foreground">الرصيد الحالي ({balanceLabel})</p>
-              <p className={`text-lg font-bold ${balanceColor}`}>{balanceDisplay}</p>
+              <p className={`text-lg font-bold tabular-nums ${balanceColor}`}>{balanceDisplay}</p>
             </div>
           </div>
 
