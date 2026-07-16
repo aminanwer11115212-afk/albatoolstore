@@ -295,13 +295,14 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         if (currentId) {
           const { data: bal } = await supabase
             .from("customers")
-            .select("balance, credit_balance")
+            .select("balance, credit_balance, net_balance")
             .eq("id", currentId)
             .maybeSingle();
           if (bal) {
             setCustomerBalances({
               debt: Number((bal as any).balance || 0),
               credit: Number((bal as any).credit_balance || 0),
+              net: (bal as any).net_balance != null ? Number((bal as any).net_balance) : undefined,
             });
           }
         }
