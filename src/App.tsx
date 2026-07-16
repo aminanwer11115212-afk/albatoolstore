@@ -98,6 +98,7 @@ const GoalsPage = lazy(() => import("./pages/GoalsPage"));
 const EmployeesPage = lazy(() => import("./pages/EmployeesPage"));
 const TodayInvoicesPage = lazy(() => import("./pages/TodayInvoicesPage"));
 const CustomerStatementPage = lazy(() => import("./pages/CustomerStatementPage"));
+const CustomerStatementsPage = lazy(() => import("./pages/CustomerStatementsPage"));
 const SignUpPage = lazy(() => import("./pages/SignUpPage"));
 const SupplierStatementPage = lazy(() => import("./pages/SupplierStatementPage"));
 const StatementPreviewPage = lazy(() => import("./pages/StatementPreviewPage"));
