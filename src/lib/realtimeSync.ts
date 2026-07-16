@@ -29,11 +29,13 @@ const FAMILIES: Record<string, Family> = {
       ["recent-invoices"],
       ["today-invoices"],
       ["customers"],
+      ["customer-statement"],
+      ["customer-transactions"],
     ],
   },
   invoice_items: {
     events: ["invoice-items:changed"],
-    keys: [["invoice-items"], ["invoices"], ["invoices-with-customers"]],
+    keys: [["invoice-items"], ["invoices"], ["invoices-with-customers"], ["customer-statement"]],
   },
   quotes: {
     events: ["quotes:changed"],
@@ -74,6 +76,8 @@ const FAMILIES: Record<string, Family> = {
       ["customers"],
       ["suppliers"],
       ["dashboard-stats"],
+      ["customer-statement"],
+      ["customer-transactions"],
     ],
   },
   purchase_orders: {
