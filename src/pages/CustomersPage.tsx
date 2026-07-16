@@ -912,6 +912,7 @@ export default function CustomersPage() {
             className="flex items-center gap-2 bg-muted text-foreground border border-border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors">
             🚚 اللوجستيات
           </button>
+          <CustomerColsControl prefs={colsPref} />
           <button onClick={() => { setDialogInitial(null); setDialogOpen(true); }}
             className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
             <Plus size={16} /> عميل جديد
