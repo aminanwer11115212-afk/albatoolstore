@@ -19,6 +19,8 @@ interface StatementParty {
   address?: string;
   email?: string;
   balance?: number;
+  credit_balance?: number;
+  net_balance?: number;
 }
 
 export interface StatementInvoiceRow {
