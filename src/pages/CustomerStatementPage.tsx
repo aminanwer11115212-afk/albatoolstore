@@ -261,7 +261,7 @@ export default function CustomerStatementPage() {
     else { setDelSortKey(k); setDelSortDir("desc"); }
   };
 
-  // ===== Balance reconciliation: expected (unfiltered) vs stored =====
+  // ===== Balance reconciliation: statement math vs netBalanceOf (shared across pages) =====
   const reconciliation = useMemo(() => {
     if (!selectedCustomer) return null;
     const allInv = (invoices || []) as any[];
@@ -269,12 +269,22 @@ export default function CustomerStatementPage() {
       .filter((i) => i.status !== "cancelled")
       .reduce((s, i) => s + Math.max(Number(i.total || 0) - Number(i.paid_amount || 0), 0), 0);
     const stored = Number((selectedCustomer as any).balance || 0);
+    const credit = Number((selectedCustomer as any).credit_balance || 0);
+    // net as computed by the statement itself, from the raw invoice/credit math
+    const statementNet = expectedOpen - credit;
+    // net as displayed everywhere else (Customers page, Debt report, InvoiceCreate header, CustomerDetail)
+    const sharedNet = netBalanceOf(selectedCustomer);
     const delta = expectedOpen - stored;
+    const netDelta = statementNet - sharedNet;
     return {
       expectedOpen,
       stored,
+      credit,
+      statementNet,
+      sharedNet,
       delta,
-      ok: Math.abs(delta) < 0.01,
+      netDelta,
+      ok: Math.abs(delta) < 0.01 && Math.abs(netDelta) < 0.01,
     };
   }, [invoices, selectedCustomer]);
 
