@@ -562,7 +562,7 @@ export default function CompanySettingsPage() {
         </Card>
       )}
 
-      {activeTab === "danger" && <DangerZoneTab />}
+      {/* «منطقة الخطر» أُزيلت — الوصول عبر Ctrl+Shift+9 */}
 
 
       <ImageCropDialog
