@@ -60,7 +60,7 @@ export default function LocationChips({ label, items, value, onChange, onAdd, di
     const activeEl = containerRef.current?.querySelector<HTMLButtonElement>(
       `#${CSS.escape(optionId(filtered[next].id))}`,
     );
-    activeEl?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    activeEl?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   };
 
   const activeDescId = activeIdx >= 0 && filtered[activeIdx] ? optionId(filtered[activeIdx].id) : undefined;
