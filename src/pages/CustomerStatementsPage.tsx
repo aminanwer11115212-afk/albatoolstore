@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, FileText, X, AlertTriangle } from "lucide-react";
 import { useCustomers } from "@/hooks/useData";
-import { startsWithAny } from "@/utils/searchMatch";
+import { containsAny } from "@/utils/searchMatch";
 import { netBalanceOf, formatMoney } from "@/utils/balanceDisplay";
 
 /**
@@ -41,7 +41,7 @@ export default function CustomerStatementsPage() {
     const list = (customers || []) as any[];
     const query = q.trim();
     const filtered = query
-      ? list.filter((c) => startsWithAny([c.name, c.phone], query))
+      ? list.filter((c) => containsAny([c.name, c.phone, c.company], query))
       : list;
     return filtered
       .map((c) => ({ ...c, _net: netBalanceOf(c) }))
