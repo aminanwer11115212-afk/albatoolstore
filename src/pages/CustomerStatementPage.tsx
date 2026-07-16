@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useCompanySettings } from "@/hooks/useData";
@@ -15,7 +15,10 @@ export default function CustomerStatementPage() {
   const { data: customers } = useCustomers();
   const { data: companyArr } = useCompanySettings();
   const company = (companyArr as any)?.[0] || null;
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const params = useParams<{ id?: string }>();
+  const [searchParams] = useSearchParams();
+  const initialId = params.id || searchParams.get("customer") || "";
+  const [selectedCustomerId, setSelectedCustomerId] = useState(initialId);
   const [search, setSearch] = useState("");
   const [showSugg, setShowSugg] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);

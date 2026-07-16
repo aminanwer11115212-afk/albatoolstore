@@ -148,13 +148,14 @@ export default function CustomerDebtReportPage() {
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">المستحق من الفواتير</th>
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">رصيد دائن</th>
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الصافي</th>
+                <th className="text-right px-4 py-3 font-semibold text-muted-foreground print:hidden">إجراءات</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               ) : (debtors || []).length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا توجد مبالغ مستحقة</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد مبالغ مستحقة</td></tr>
               ) : (
                 (debtors || []).map((c, i) => {
                   const mismatch = Math.abs(c.balance - c.computed_due) > 0.01;
@@ -175,6 +176,14 @@ export default function CustomerDebtReportPage() {
                       </td>
                       <td className="px-4 py-3 font-bold text-destructive">
                         {c.net_balance.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 print:hidden">
+                        <a
+                          href={`/customers/${c.id}/statement`}
+                          className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:opacity-90 inline-flex items-center gap-1"
+                        >
+                          كشف حساب
+                        </a>
                       </td>
                     </tr>
                   );
