@@ -24,7 +24,7 @@ const quickActions = [
   { label: "المعاملات", path: "/transactions", icon: Calculator, tags: "transaction" },
   { label: "الإعدادات", path: "/settings/company", icon: Settings, tags: "settings" },
   { label: "الإحصائيات", path: "/reports/statistics", icon: FileText, tags: "statistics" },
-  { label: "كشف حساب عميل", path: "/reports/customer-statement", icon: FileText, tags: "statement" },
+  { label: "كشوفات حسابات العملاء", path: "/customers/statements", icon: FileText, tags: "statement kashf customer" },
 ];
 
 type NotificationItem = {
