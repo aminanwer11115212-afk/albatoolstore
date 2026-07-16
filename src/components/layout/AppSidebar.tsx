@@ -170,7 +170,7 @@ const menuSections: MenuSection[] = [
         label: "التقارير المالية", icon: <BarChart3 size={18} />,
         children: [
           { label: "كشف الحساب", path: "/reports/account-statement" },
-          { label: "كشف حساب عميل", path: "/reports/customer-statement" },
+          { label: "كشوفات حسابات العملاء", path: "/customers/statements" },
           { label: "كشف حساب مورد", path: "/reports/supplier-statement" },
           { label: "بيان الدخل", path: "/reports/income" },
           { label: "بيان المصروفات", path: "/reports/expenses" },
