@@ -26,6 +26,11 @@ export default function CustomerStatementPage() {
   const [paymentStatus, setPaymentStatus] = useState<"all" | "paid" | "unpaid" | "partial">("all");
   const [cashMode, setCashMode] = useState(false);
   const [creditSourceFilter, setCreditSourceFilter] = useState<Set<CreditSource>>(new Set());
+  // Deleted-invoices section controls
+  const [delSearch, setDelSearch] = useState("");
+  const [delUserFilter, setDelUserFilter] = useState("");
+  const [delSortKey, setDelSortKey] = useState<"deleted_at" | "date" | "invoice_number" | "user_email" | "total">("deleted_at");
+  const [delSortDir, setDelSortDir] = useState<"asc" | "desc">("desc");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const matches = useMemo(() => {
