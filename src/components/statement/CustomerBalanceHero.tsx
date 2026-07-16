@@ -1,6 +1,7 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { netBalanceOf, formatMoney } from "@/utils/balanceDisplay";
-import { TrendingUp, TrendingDown, CheckCircle2 } from "lucide-react";
+import { TrendingUp, TrendingDown, CheckCircle2, ArrowRight } from "lucide-react";
 
 /**
  * بطاقة عرض بارزة لصافي رصيد العميل — تُستخدم في أعلى صفحة كشف الحساب.
