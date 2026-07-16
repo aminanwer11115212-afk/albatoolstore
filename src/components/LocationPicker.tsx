@@ -239,6 +239,7 @@ export default function LocationPicker({ value, onChange, required, className, i
               onAdd={addState}
               disabled={loading}
               emptyHint="لا توجد ولايات — أضف واحدة"
+              filter={search}
             />
           )}
 
