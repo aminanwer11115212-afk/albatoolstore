@@ -3,7 +3,7 @@ import { useCompanySettings } from "@/hooks/useData";
 import { useAppearance, type ThemeColor, type FontSize } from "@/hooks/useAppearance";
 import { toast } from "sonner";
 import { runOrQueue } from "@/lib/offlineQueue";
-import { supabase } from "@/integrations/supabase/client";
+
 import { Settings, Building, Receipt, Globe, Clock, Palette, Mail, Upload, Image, Phone, MapPin, FileText, Hash, Percent, DollarSign, Check, RotateCcw, Lock, Unlock, Columns3, Scissors } from "lucide-react";
 
 import { lockAllPagesColumnWidths, unlockAllPagesColumnWidths, resetAllPagesColumnWidths } from "@/hooks/useColumnWidths";
