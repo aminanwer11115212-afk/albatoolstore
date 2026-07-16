@@ -16,7 +16,7 @@ export function useDocumentCustomer() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerSugg, setShowCustomerSugg] = useState(false);
-  const [customerBalances, setCustomerBalances] = useState<{ debt: number; credit: number } | null>(null);
+  const [customerBalances, setCustomerBalances] = useState<{ debt: number; credit: number; net?: number } | null>(null);
 
   const selectedCustomerIdRef = useRef<string | null>(null);
   useEffect(() => {
