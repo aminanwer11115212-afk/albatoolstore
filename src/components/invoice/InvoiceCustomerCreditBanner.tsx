@@ -28,6 +28,7 @@ interface CreditRow {
 export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber, refreshKey = 0 }: Props) {
   const [fromThis, setFromThis] = useState<CreditRow[]>([]);
   const [currentCredit, setCurrentCredit] = useState<number>(0);
+  const [custNet, setCustNet] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +44,7 @@ export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber,
           .order("date", { ascending: false }),
         (supabase as any)
           .from("customers")
-          .select("credit_balance")
+          .select("balance, credit_balance, net_balance")
           .eq("id", customerId)
           .maybeSingle(),
       ]);
@@ -54,6 +55,7 @@ export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber,
         : [];
       setFromThis(filtered);
       setCurrentCredit(Number(cust?.credit_balance || 0));
+      setCustNet(netBalanceOf(cust));
     })();
     return () => {
       cancelled = true;
