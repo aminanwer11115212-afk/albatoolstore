@@ -108,7 +108,8 @@ export default function CustomerStatementPage() {
       return (data || []).filter((t: any) => !t.reference_id || !posIds.has(t.reference_id));
     },
     enabled: !!selectedCustomerId,
-  });
+  const { data: deletedInvoices } = useDeletedInvoicesForCustomer(selectedCustomerId, fromDate, toDate);
+
 
   const filteredInvoices = useMemo(() => {
     return (invoices || []).filter((inv: any) => {
