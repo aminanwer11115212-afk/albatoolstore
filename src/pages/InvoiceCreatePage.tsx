@@ -1730,11 +1730,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                       </span>
                     )}
                     {(() => {
-                      // القاعدة الموحّدة: صافي الحساب فقط — لا نُظهر "له" إلا إذا كانت كل الفواتير مسدّدة
-                      // ويوجد رصيد فائض للعميل. غير ذلك نُظهر "عليه" بمقدار الصافي (بعد خصم رصيده).
-                      const debt = Number(customerBalances?.debt || 0);
-                      const credit = Number(customerBalances?.credit || 0);
-                      const net = debt - credit;
+                      // مصدر الحقيقة الموحّد: netBalanceOf (يفضّل net_balance المحسوب من DB)
+                      const { netBalanceOf } = require("@/utils/balanceDisplay") as typeof import("@/utils/balanceDisplay");
+                      const net = netBalanceOf({
+                        balance: Number(customerBalances?.debt || 0),
+                        credit_balance: Number(customerBalances?.credit || 0),
+                        net_balance: customerBalances?.net,
+                      });
                       if (Math.abs(net) < 0.01) {
                         if (!customer.phone) {
                           return <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>خالص</span>;
@@ -1745,18 +1747,28 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                         return (
                           <>
                             {customer.phone && <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 9, flexShrink: 0 }}>·</span>}
-                            <span style={{ color: "hsl(var(--destructive))", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(var(--destructive)/0.08)", borderRadius: 3, padding: "0 3px" }}>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/customers/${customer.id}/statement`)}
+                              title="فتح كشف الحساب"
+                              style={{ color: "hsl(var(--destructive))", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(var(--destructive)/0.08)", borderRadius: 3, padding: "0 3px", border: "none", cursor: "pointer" }}
+                            >
                               عليه {net.toLocaleString()}
-                            </span>
+                            </button>
                           </>
                         );
                       }
                       return (
                         <>
                           {customer.phone && <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 9, flexShrink: 0 }}>·</span>}
-                          <span style={{ color: "hsl(142 70% 35%)", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(142 70% 35% / 0.08)", borderRadius: 3, padding: "0 3px" }}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/customers/${customer.id}/statement`)}
+                            title="فتح كشف الحساب"
+                            style={{ color: "hsl(142 70% 35%)", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(142 70% 35% / 0.08)", borderRadius: 3, padding: "0 3px", border: "none", cursor: "pointer" }}
+                          >
                             له {Math.abs(net).toLocaleString()}
-                          </span>
+                          </button>
                         </>
                       );
                     })()}
