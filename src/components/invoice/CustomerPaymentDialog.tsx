@@ -634,7 +634,18 @@ export default function CustomerPaymentDialog({
           </DialogTitle>
         </DialogHeader>
 
+        {!isPos && custBalance && (
+          <div className="mb-2">
+            <div className="text-[10px] text-muted-foreground mb-1">رصيد العميل الحالي</div>
+            <CustomerAccountSummary
+              customer={{ balance: custBalance.debt, credit_balance: custBalance.credit }}
+              size="sm"
+            />
+          </div>
+        )}
+
         <div className="grid gap-2 grid-cols-1 md:grid-cols-2 md:auto-rows-min min-w-0">
+
 
           {/* العمود الأيمن: ملخّص الحسابات */}
           {(() => {
