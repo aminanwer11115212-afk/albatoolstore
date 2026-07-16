@@ -65,6 +65,14 @@ export default function FinancialReportPreviewPage() {
     });
     setSections(found);
     applyHidden(hidden);
+    // Auto-export if requested (set by the invoking page, e.g. CustomerStatementPage → "تصدير PDF")
+    try {
+      const flag = sessionStorage.getItem("lov_financial_report_autoexport");
+      if (flag === "pdf") {
+        sessionStorage.removeItem("lov_financial_report_autoexport");
+        setTimeout(() => { handleDownloadPdf().catch(() => {}); }, 400);
+      }
+    } catch { /* ignore */ }
   };
 
   const applyHidden = (state: Record<string, boolean>) => {
