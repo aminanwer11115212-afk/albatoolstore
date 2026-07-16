@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, KeyboardEvent } from "react";
 import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -19,6 +19,41 @@ const schema = z.object({
   destination_ids: z.array(z.string().uuid()).min(1, "اختر وجهة واحدة على الأقل"),
 });
 
+const DRAFT_KEY = "lov:quick-add-transporter:draft";
+
+type Draft = {
+  name: string;
+  phone: string;
+  address: string;
+  notes: string;
+  destIds: string[];
+};
+
+function loadDraft(): Partial<Draft> {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return {};
+    const d = JSON.parse(raw);
+    return {
+      name: typeof d.name === "string" ? d.name : "",
+      phone: typeof d.phone === "string" ? d.phone : "",
+      address: typeof d.address === "string" ? d.address : "",
+      notes: typeof d.notes === "string" ? d.notes : "",
+      destIds: Array.isArray(d.destIds) ? d.destIds.filter((x: any) => typeof x === "string") : [],
+    };
+  } catch {
+    return {};
+  }
+}
+
+function saveDraft(d: Draft) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch {}
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch {}
+}
+
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -27,8 +62,6 @@ type Props = {
 };
 
 export default function QuickAddTransporterDialog({ open, onOpenChange, onCreated, initialName }: Props) {
-  // تجنّب تشغيل الـ hooks الداخلية (useQuery داخل useDestinations) عند إغلاق الحوار
-  // كي لا نطالب المستهلكين باستدعاء الحوار داخل QueryClientProvider دائماً.
   if (!open) {
     return null as any;
   }
@@ -38,25 +71,40 @@ export default function QuickAddTransporterDialog({ open, onOpenChange, onCreate
 function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initialName }: Props) {
   const qc = useQueryClient();
   const { data: destinations } = useDestinations();
-  const [name, setName] = useState(initialName || "");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [destIds, setDestIds] = useState<string[]>([]);
-  const [notes, setNotes] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  // زامن الاسم كلما فُتح الحوار باسم مبدئي جديد
-  useEffect(() => { if (open) setName(initialName || ""); }, [open, initialName]);
+  // Restore persisted draft on first mount
+  const initial = useMemo(() => loadDraft(), []);
+  const [name, setName] = useState(initialName || initial.name || "");
+  const [phone, setPhone] = useState(initial.phone || "");
+  const [address, setAddress] = useState(initial.address || "");
+  const [destIds, setDestIds] = useState<string[]>(initial.destIds || []);
+  const [notes, setNotes] = useState(initial.notes || "");
+  const [busy, setBusy] = useState(false);
+  const [destError, setDestError] = useState<string | null>(null);
+
+  useEffect(() => { if (open && initialName) setName(initialName); }, [open, initialName]);
+
+  // Persist draft whenever fields change
+  useEffect(() => {
+    saveDraft({ name, phone, address, notes, destIds });
+  }, [name, phone, address, notes, destIds]);
 
   const reset = () => {
     setName(""); setPhone(""); setAddress(""); setDestIds([]); setNotes("");
+    setDestError(null);
   };
 
   const toggleDest = (id: string) => {
+    setDestError(null);
     setDestIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const save = async () => {
+    if (destIds.length === 0) {
+      setDestError("اختر وجهة واحدة على الأقل");
+      toast.error("اختر وجهة واحدة على الأقل");
+      return;
+    }
     const parsed = schema.safeParse({ name, phone, address, destination_ids: destIds });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message || "بيانات غير صحيحة");
@@ -95,6 +143,7 @@ function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initial
       try { window.dispatchEvent(new Event("customer-logistics:changed")); } catch {}
       onCreated?.(data);
       reset();
+      clearDraft();
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e.message || "تعذّر الحفظ");
@@ -104,9 +153,10 @@ function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initial
   };
 
   const destList = (destinations as any[]) || [];
+  const canSave = destIds.length > 0 && name.trim().length > 0 && phone.trim().length >= 4 && address.trim().length > 0;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); }}>
       <DialogContent dir="rtl" className="max-w-md">
         <DialogHeader>
           <DialogTitle>إضافة ناقل جديد</DialogTitle>
@@ -125,13 +175,43 @@ function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initial
             <Input id="tr-address" value={address} maxLength={255} onChange={(e) => setAddress(e.target.value)} placeholder="يظهر في تقرير الترحيلات" />
           </div>
           <div className="grid gap-1.5">
-            <Label>الوجهات التي يوصّل إليها *</Label>
+            <div className="flex items-center justify-between">
+              <Label id="dest-label">الوجهات التي يوصّل إليها *</Label>
+              {destList.length > 0 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => { setDestError(null); setDestIds(destList.map((d: any) => d.id)); }}
+                    className="text-[11px] px-2 py-0.5 rounded border border-border hover:bg-accent"
+                    aria-label="تحديد كل الوجهات"
+                  >
+                    تحديد الكل
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDestIds([])}
+                    className="text-[11px] px-2 py-0.5 rounded border border-border hover:bg-accent"
+                    aria-label="مسح كل الوجهات المحددة"
+                    disabled={destIds.length === 0}
+                  >
+                    مسح الكل
+                  </button>
+                </div>
+              )}
+            </div>
             <DestinationsMultiSelect
               options={destList}
               selectedIds={destIds}
               onToggle={toggleDest}
               onClear={(id) => setDestIds((prev) => prev.filter((x) => x !== id))}
+              onSelectAll={() => { setDestError(null); setDestIds(destList.map((d: any) => d.id)); }}
+              onClearAll={() => setDestIds([])}
+              ariaLabelledBy="dest-label"
+              invalid={!!destError}
             />
+            {destError && (
+              <div role="alert" className="text-[11px] text-destructive">{destError}</div>
+            )}
             {destIds.length > 0 && (
               <div className="text-[11px] text-muted-foreground">
                 الترتيب: {destIds
@@ -148,7 +228,7 @@ function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initial
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>إلغاء</Button>
-          <Button onClick={save} disabled={busy}>{busy ? "جارٍ الحفظ…" : "حفظ"}</Button>
+          <Button onClick={save} disabled={busy || !canSave}>{busy ? "جارٍ الحفظ…" : "حفظ"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -160,15 +240,27 @@ function DestinationsMultiSelect({
   selectedIds,
   onToggle,
   onClear,
+  onSelectAll,
+  onClearAll,
+  ariaLabelledBy,
+  invalid,
 }: {
   options: any[];
   selectedIds: string[];
   onToggle: (id: string) => void;
   onClear: (id: string) => void;
+  onSelectAll: () => void;
+  onClearAll: () => void;
+  ariaLabelledBy?: string;
+  invalid?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [activeIdx, setActiveIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const listboxId = "dest-listbox";
 
   useEffect(() => {
     if (!open) return;
@@ -182,13 +274,52 @@ function DestinationsMultiSelect({
     return () => document.removeEventListener("mousedown", handler, true);
   }, [open]);
 
-  const filtered = search.trim()
-    ? options.filter((o) => startsWithMatch(o.name, search))
-    : options;
+  const filtered = useMemo(
+    () => (search.trim() ? options.filter((o) => startsWithMatch(o.name, search)) : options),
+    [options, search],
+  );
+
+  useEffect(() => { setActiveIdx(0); }, [search, open]);
 
   const selectedOptions = selectedIds
     .map((id) => options.find((o) => o.id === id))
     .filter(Boolean) as any[];
+
+  const closeAndFocusTrigger = useCallback(() => {
+    setOpen(false); setSearch("");
+    setTimeout(() => triggerRef.current?.focus(), 0);
+  }, []);
+
+  const onTriggerKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    // Backspace on trigger removes last chip
+    if ((e.key === "Backspace" || e.key === "Delete") && !open && selectedIds.length > 0) {
+      e.preventDefault();
+      onClear(selectedIds[selectedIds.length - 1]);
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setOpen(true);
+      setTimeout(() => searchRef.current?.focus(), 0);
+    }
+  };
+
+  const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") { e.preventDefault(); closeAndFocusTrigger(); return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, filtered.length - 1)); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); return; }
+    if (e.key === "Home") { e.preventDefault(); setActiveIdx(0); return; }
+    if (e.key === "End") { e.preventDefault(); setActiveIdx(Math.max(filtered.length - 1, 0)); return; }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const item = filtered[activeIdx];
+      if (item) onToggle(item.id);
+      return;
+    }
+    if (e.key === "Tab") {
+      setOpen(false); setSearch("");
+    }
+  };
 
   if (options.length === 0) {
     return (
@@ -198,12 +329,21 @@ function DestinationsMultiSelect({
     );
   }
 
+  const activeId = filtered[activeIdx] ? `dest-opt-${filtered[activeIdx].id}` : undefined;
+
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full min-h-[38px] flex flex-wrap items-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-right"
+        onKeyDown={onTriggerKey}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-labelledby={ariaLabelledBy}
+        aria-invalid={invalid || undefined}
+        className={`w-full min-h-[38px] flex flex-wrap items-center gap-1 rounded-md border bg-background px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring ${invalid ? "border-destructive" : "border-border"}`}
       >
         {selectedOptions.length === 0 ? (
           <span className="text-muted-foreground flex-1">اختر الوجهات...</span>
@@ -213,44 +353,90 @@ function DestinationsMultiSelect({
               key={o.id}
               className="inline-flex items-center gap-1 rounded bg-primary/10 text-primary px-1.5 py-0.5 text-xs"
             >
-              {o.name}
-              <X
-                className="h-3 w-3 cursor-pointer"
+              <span>{o.name}</span>
+              <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); onClear(o.id); }}
-              />
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " " || e.key === "Backspace" || e.key === "Delete") {
+                    e.preventDefault(); e.stopPropagation();
+                    onClear(o.id);
+                  }
+                }}
+                aria-label={`إزالة الوجهة ${o.name}`}
+                className="rounded-full hover:bg-primary/20 focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </span>
           ))
         )}
-        <ChevronDown className="h-4 w-4 text-muted-foreground mr-auto" />
+        <ChevronDown className="h-4 w-4 text-muted-foreground mr-auto" aria-hidden="true" />
       </button>
 
       {open && (
         <div className="absolute z-50 mt-1 left-0 right-0 rounded-md border border-border bg-popover shadow-lg overflow-hidden">
           <div className="p-1.5 border-b border-border">
             <div className="relative">
-              <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               <input
+                ref={searchRef}
                 autoFocus
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={onSearchKey}
                 placeholder="بحث..."
-                className="w-full h-8 rounded bg-muted px-7 text-xs outline-none"
+                aria-label="ابحث عن وجهة"
+                aria-controls={listboxId}
+                aria-activedescendant={activeId}
+                className="w-full h-8 rounded bg-muted px-7 text-xs outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
+            <div className="flex items-center gap-1 mt-1.5">
+              <button
+                type="button"
+                onClick={onSelectAll}
+                className="text-[11px] px-2 py-0.5 rounded border border-border hover:bg-accent"
+              >
+                تحديد الكل
+              </button>
+              <button
+                type="button"
+                onClick={onClearAll}
+                className="text-[11px] px-2 py-0.5 rounded border border-border hover:bg-accent"
+                disabled={selectedIds.length === 0}
+              >
+                مسح الكل
+              </button>
+              <span className="text-[10px] text-muted-foreground mr-auto">
+                {selectedIds.length} / {options.length}
+              </span>
+            </div>
           </div>
-          <div className="max-h-48 overflow-y-auto">
+          <div
+            id={listboxId}
+            role="listbox"
+            aria-multiselectable="true"
+            aria-labelledby={ariaLabelledBy}
+            className="max-h-48 overflow-y-auto"
+          >
             {filtered.length === 0 ? (
               <div className="text-xs text-muted-foreground text-center py-3">لا نتائج</div>
-            ) : filtered.map((o: any) => {
+            ) : filtered.map((o: any, idx: number) => {
               const isSel = selectedIds.includes(o.id);
+              const isActive = idx === activeIdx;
               return (
                 <div
                   key={o.id}
+                  id={`dest-opt-${o.id}`}
+                  role="option"
+                  aria-selected={isSel}
                   onClick={() => onToggle(o.id)}
-                  className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-accent"
+                  onMouseEnter={() => setActiveIdx(idx)}
+                  className={`flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer ${isActive ? "bg-accent" : "hover:bg-accent"}`}
                 >
                   <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSel ? "bg-primary border-primary" : "border-border"}`}>
-                    {isSel && <Check className="h-3 w-3 text-primary-foreground" />}
+                    {isSel && <Check className="h-3 w-3 text-primary-foreground" aria-hidden="true" />}
                   </div>
                   <span>{o.name}</span>
                 </div>
