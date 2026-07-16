@@ -107,16 +107,59 @@ export default function CustomerColsControl(props: {
             className="max-h-[60vh] overflow-y-auto p-1.5"
             data-testid="customer-cols-list"
             data-form-factor={formFactor}
+            role="listbox"
+            aria-label="ترتيب أعمدة صفحة العملاء — استخدم أزرار الأسهم مع Alt للتحريك"
           >
             {order.map((key, idx) => {
               const isHidden = hidden.includes(key);
               const isLast = idx === order.length - 1;
+              const isFirst = idx === 0;
               const showIndicatorBefore = dragOver?.key === key && dragOver.before;
               const showIndicatorAfter = dragOver?.key === key && !dragOver.before;
+              const label = CUSTOMERS_COL_LABELS[key as CustomerColKey];
+              const onRowKeyDown = (e: React.KeyboardEvent) => {
+                // Alt+Up/Down = حرّك العنصر ذاته؛ Up/Down بدون Alt = انقل التركيز.
+                if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+                  e.preventDefault();
+                  if (e.key === "ArrowUp" && !isFirst) prefs.moveUp(key as CustomerColKey);
+                  if (e.key === "ArrowDown" && !isLast) prefs.moveDown(key as CustomerColKey);
+                  // Move focus to follow the item.
+                  requestAnimationFrame(() => {
+                    const list = (e.currentTarget as HTMLElement).parentElement;
+                    const nextEl = list?.querySelector<HTMLElement>(`[data-col-key="${key}"]`);
+                    nextEl?.focus();
+                  });
+                  return;
+                }
+                if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                  e.preventDefault();
+                  const list = (e.currentTarget as HTMLElement).parentElement;
+                  const rows = list ? Array.from(list.querySelectorAll<HTMLElement>("[data-col-key]")) : [];
+                  const cur = rows.indexOf(e.currentTarget as HTMLElement);
+                  const nxt = e.key === "ArrowUp" ? cur - 1 : cur + 1;
+                  if (nxt >= 0 && nxt < rows.length) rows[nxt].focus();
+                  return;
+                }
+                if (e.key === " " || e.key === "Enter") {
+                  // مسافة/إدخال على الصف = تبديل الإخفاء (تعادُل زر العين).
+                  e.preventDefault();
+                  toggleHidden(key as CustomerColKey);
+                }
+                if (e.key === "End") {
+                  e.preventDefault();
+                  if (!isLast) moveToEnd(key as CustomerColKey);
+                }
+              };
               return (
                 <div
                   key={key}
                   draggable
+                  tabIndex={0}
+                  role="option"
+                  aria-selected={!isHidden}
+                  aria-label={`${label} — الموضع ${idx + 1} من ${order.length}${isHidden ? " (مخفي)" : ""}. Alt+سهم للتحريك، مسافة للإخفاء، End لجعله الأخير.`}
+                  aria-grabbed={dragOver?.key === key ? true : undefined}
+                  onKeyDown={onRowKeyDown}
                   onDragStart={onDragStart(key as CustomerColKey)}
                   onDragOver={onDragOver(key as CustomerColKey)}
                   onDrop={onDrop(key as CustomerColKey)}
@@ -124,15 +167,17 @@ export default function CustomerColsControl(props: {
                   data-testid={`customer-col-row-${key}`}
                   data-col-key={key}
                   data-col-index={idx}
-                  className={`relative flex items-center gap-1 px-1.5 py-1 rounded cursor-grab active:cursor-grabbing hover:bg-muted/50 ${
+                  className={`relative flex items-center gap-1 px-1.5 py-1 rounded cursor-grab active:cursor-grabbing hover:bg-muted/50 outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                     showIndicatorBefore ? "border-t-2 border-primary" : ""
                   } ${showIndicatorAfter ? "border-b-2 border-primary" : ""}`}
                 >
-                  <GripVertical size={14} className="text-muted-foreground" />
+                  <GripVertical size={14} className="text-muted-foreground" aria-hidden="true" />
                   <button
                     type="button"
                     onClick={() => toggleHidden(key as CustomerColKey)}
                     className="p-1 hover:text-primary"
+                    aria-label={isHidden ? `إظهار عمود ${label}` : `إخفاء عمود ${label}`}
+                    aria-pressed={!isHidden}
                     title={isHidden ? "إظهار العمود" : "إخفاء العمود"}
                     data-testid={`customer-col-toggle-${key}`}
                   >
@@ -143,14 +188,15 @@ export default function CustomerColsControl(props: {
                       isHidden ? "line-through text-muted-foreground" : "text-foreground font-semibold"
                     }`}
                   >
-                    {CUSTOMERS_COL_LABELS[key as CustomerColKey]}
-                    <span className="ms-2 text-[10px] text-muted-foreground">#{idx + 1}</span>
+                    {label}
+                    <span className="ms-2 text-[10px] text-muted-foreground" aria-hidden="true">#{idx + 1}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => moveToEnd(key as CustomerColKey)}
                     disabled={isLast}
                     className="p-1 disabled:opacity-30 hover:text-primary"
+                    aria-label={`نقل عمود ${label} إلى النهاية`}
                     title="اجعله آخر عمود"
                     data-testid={`customer-col-end-${key}`}
                   >
@@ -162,8 +208,10 @@ export default function CustomerColsControl(props: {
           </div>
 
           <div className="text-[10px] text-muted-foreground p-2 border-t border-border leading-relaxed">
-            اسحب أي صف لتغيير ترتيبه. التفضيلات محفوظة لك حصراً — منفصلة تماماً
-            بين الموبايل والديسكتوب (الحالي: {formFactor === "mobile" ? "موبايل" : "سطح مكتب"}).
+            اسحب أي صف لتغيير ترتيبه، أو استخدم <kbd>Alt</kbd>+<kbd>↑/↓</kbd> للتحريك بلوحة المفاتيح
+            و<kbd>مسافة</kbd> للإخفاء و<kbd>End</kbd> للنقل إلى النهاية.
+            التفضيلات محفوظة لك حصراً — منفصلة تماماً بين الموبايل والديسكتوب
+            (الحالي: {formFactor === "mobile" ? "موبايل" : "سطح مكتب"}).
             المجموع {CUSTOMERS_MIDDLE_KEYS.length} أعمدة قابلة للتخصيص.
           </div>
         </PopoverContent>
