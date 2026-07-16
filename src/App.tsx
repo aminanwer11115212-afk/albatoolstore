@@ -483,7 +483,7 @@ const App = () => {
             <Route path="/settings/theme" element={lazyEl(<CompanySettingsPage />, "إعدادات المظهر")} />
             <Route path="/settings/smtp" element={lazyEl(<CompanySettingsPage />, "إعدادات SMTP")} />
             <Route path="/settings/columns" element={lazyEl(<CompanySettingsPage />, "أعمدة الجداول")} />
-            <Route path="/settings/danger" element={lazyEl(<CompanySettingsPage />, "منطقة الخطر")} />
+            {/* «منطقة الخطر» أُزيلت من الإعدادات ونُقلت إلى اختصار المطوّر Ctrl+Shift+9 */}
             {/* Support, Calendar, About */}
             <Route path="/support" element={lazyEl(<SupportTicketsPage />, "الدعم الفني")} />
             <Route path="/calendar" element={lazyEl(<CalendarPage />, "التقويم")} />
