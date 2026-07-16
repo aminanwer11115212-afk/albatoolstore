@@ -79,28 +79,25 @@ export default function CustomerStatementsPage() {
 
   return (
     <div className="space-y-4" dir="rtl">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <FileText size={22} />
-            كشوفات حسابات العملاء
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            اختر عميلًا لعرض كشف حسابه التفصيلي — الأرقام موحّدة مع باقي النظام.
-          </p>
-        </div>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-muted-foreground">
-            العملاء: <b className="text-foreground">{totals.count}</b>
-          </span>
-          <span className="text-muted-foreground">
-            إجمالي المديونية:{" "}
-            <b className="text-destructive tabular-nums">{formatMoney(totals.debt)}</b>
-          </span>
-          <span className="text-muted-foreground">
-            إجمالي الدائن:{" "}
-            <b className="text-emerald-600 tabular-nums">{formatMoney(totals.credit)}</b>
-          </span>
+      {/* Hero: عنوان + إجماليات موحدة (netBalanceOf) بشكل بارز مع أنيميشن دخول */}
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-l from-primary/5 via-card to-card p-5 md:p-6 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div aria-hidden className="pointer-events-none absolute -top-16 -start-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-16 -end-16 h-48 w-48 rounded-full bg-destructive/10 blur-3xl" />
+        <div className="relative flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+              <FileText size={22} className="text-primary" />
+              كشوفات حسابات العملاء
+            </h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              اختر عميلًا لعرض كشف حسابه التفصيلي — الأرقام موحّدة عبر netBalanceOf في كل النظام.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 min-w-[280px]">
+            <TotalPill label="العملاء" value={totals.count} tone="primary" plain />
+            <TotalPill label="المديونية" value={totals.debt} tone="destructive" />
+            <TotalPill label="الدائن" value={totals.credit} tone="success" />
+          </div>
         </div>
       </div>
 
@@ -115,8 +112,8 @@ export default function CustomerStatementsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={handleKey}
-            placeholder="ابحث بالاسم أو رقم الهاتف — اضغط Enter لفتح الكشف"
-            className="w-full h-11 pr-10 pl-10 rounded-lg border border-border bg-background text-foreground"
+            placeholder="ابحث بالاسم أو الشركة أو الهاتف — اضغط Enter لفتح الكشف"
+            className="w-full h-11 pr-10 pl-10 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none transition"
           />
           {q && (
             <button
