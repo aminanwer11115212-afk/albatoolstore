@@ -137,9 +137,10 @@ export default function HiddenDevResetDialog() {
         }
         await supabase
           .from("customers")
-          .update({ preferred_transporter_id: null } as any)
-          .not("preferred_transporter_id", "is", null as any);
+          .update({ updated_at: new Date().toISOString() } as any)
+          .gte("created_at" as any, "1900-01-01");
         const { error: eTr } = await supabase.from("transporters").delete().not("id", "is", null as any);
+
         if (eTr) throw eTr;
         collected.transporters = { ok: true };
       }
