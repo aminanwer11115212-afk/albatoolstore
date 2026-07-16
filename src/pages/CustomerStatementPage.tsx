@@ -144,6 +144,9 @@ export default function CustomerStatementPage() {
       return (data || []).filter((t: any) => !t.reference_id || !posIds.has(t.reference_id));
     },
     enabled: !!selectedCustomerId,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const { data: deletedInvoices } = useDeletedInvoicesForCustomer(selectedCustomerId, fromDate, toDate);
