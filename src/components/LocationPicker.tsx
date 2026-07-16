@@ -106,6 +106,38 @@ export default function LocationPicker({ value, onChange, required, className, i
   const addCity = () => addRow("cities", "state_id", value.state_id, "اسم المدينة:", () => loadCities(value.state_id!), (id) => ({ ...value, city_id: id, locality_id: null }));
   const addLocality = () => addRow("localities", "city_id", value.city_id, "اسم المحلية:", () => loadLocalities(value.city_id!), (id) => ({ ...value, locality_id: id }));
 
+  // فلترة موحّدة تُستخدم في الوضعين
+  const q = search.trim();
+  const filterList = <T extends { name: string }>(arr: T[]) =>
+    !q ? arr : arr.filter(x => (x.name || "").includes(q));
+  const fStates = filterList(states);
+  const fCities = filterList(cities);
+  const fLocalities = filterList(localities);
+
+  const SearchBar = (
+    <div className="relative mb-3">
+      <Search size={14} className="absolute top-1/2 -translate-y-1/2 right-3 text-muted-foreground pointer-events-none" />
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="ابحث في الولايات والمدن والمحليات…"
+        className={`${baseInput} pr-9 pl-8`}
+        aria-label="بحث في المواقع"
+      />
+      {search && (
+        <button
+          type="button"
+          onClick={() => setSearch("")}
+          className="absolute top-1/2 -translate-y-1/2 left-2 p-1 rounded-md hover:bg-muted text-muted-foreground"
+          aria-label="مسح البحث"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  );
+
   // ============ وضع القوائم القديم (fallback) ============
   if (mode === "list") {
     return (
