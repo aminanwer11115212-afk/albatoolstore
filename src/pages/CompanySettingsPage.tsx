@@ -4,8 +4,8 @@ import { useAppearance, type ThemeColor, type FontSize } from "@/hooks/useAppear
 import { toast } from "sonner";
 import { runOrQueue } from "@/lib/offlineQueue";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, Building, Receipt, Globe, Clock, Palette, Mail, Upload, Image, Phone, MapPin, FileText, Hash, Percent, DollarSign, Check, RotateCcw, Lock, Unlock, Columns3, Scissors, AlertTriangle, Trash2 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Settings, Building, Receipt, Globe, Clock, Palette, Mail, Upload, Image, Phone, MapPin, FileText, Hash, Percent, DollarSign, Check, RotateCcw, Lock, Unlock, Columns3, Scissors } from "lucide-react";
+
 import { lockAllPagesColumnWidths, unlockAllPagesColumnWidths, resetAllPagesColumnWidths } from "@/hooks/useColumnWidths";
 import { useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
 import { Separator } from "@/components/ui/separator";
-import { useQueryClient } from "@tanstack/react-query";
+
 
 const tabs = [
   { key: "company", label: "الشركة", icon: <Building size={16} />, path: "/settings/company" },
