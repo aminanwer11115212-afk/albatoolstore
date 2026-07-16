@@ -148,13 +148,31 @@ export default function CustomerStatementsPage() {
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="text-center py-10 text-muted-foreground">
-                    جاري التحميل...
+                    <span className="inline-block h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin align-middle me-2" />
+                    جاري تحميل بيانات العملاء...
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-10">
+                    <div className="inline-flex items-center gap-2 text-destructive">
+                      <AlertTriangle size={18} />
+                      <span>تعذّر جلب بيانات العملاء (netBalanceOf).</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">{(error as any)?.message || "خطأ غير معروف"}</div>
+                    <button
+                      type="button"
+                      onClick={() => refetch()}
+                      className="mt-3 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded hover:opacity-90"
+                    >
+                      إعادة المحاولة
+                    </button>
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-10 text-muted-foreground">
-                    لا يوجد عملاء مطابقون
+                    {q ? `لا يوجد عملاء مطابقون لـ "${q}"` : "لا يوجد عملاء بعد"}
                   </td>
                 </tr>
               ) : (
