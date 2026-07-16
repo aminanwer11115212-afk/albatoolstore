@@ -147,6 +147,7 @@ export default function LocationPicker({ value, onChange, required, className, i
             <MapIcon size={12} /> عرض كخريطة
           </button>
         </div>
+        {SearchBar}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <label className="block text-xs text-muted-foreground mb-1">الاتجاه {required && <span className="text-destructive">*</span>}</label>
@@ -162,7 +163,7 @@ export default function LocationPicker({ value, onChange, required, className, i
             </label>
             <select value={value.state_id || ""} onChange={e => onChange({ ...value, state_id: e.target.value || null, locality_id: null, city_id: null })} disabled={!value.region_id} className={cls}>
               <option value="">-- اختر الولاية --</option>
-              {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {fStates.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
@@ -172,7 +173,7 @@ export default function LocationPicker({ value, onChange, required, className, i
             </label>
             <select value={value.city_id || ""} onChange={e => onChange({ ...value, city_id: e.target.value || null, locality_id: null })} disabled={!value.state_id} className={cls}>
               <option value="">-- اختر المدينة --</option>
-              {cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {fCities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
@@ -182,7 +183,7 @@ export default function LocationPicker({ value, onChange, required, className, i
             </label>
             <select value={value.locality_id || ""} onChange={e => onChange({ ...value, locality_id: e.target.value || null })} disabled={!value.city_id} className={cls}>
               <option value="">-- اختر المحلية --</option>
-              {localities.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              {fLocalities.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </div>
         </div>
@@ -212,11 +213,13 @@ export default function LocationPicker({ value, onChange, required, className, i
         </button>
       </div>
 
+      {SearchBar}
+
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_1fr] gap-4 items-start">
         <div>
           <SudanMap selectedId={selectedMapId} onSelect={onMapSelect} />
           <div className="text-[11px] text-muted-foreground text-center mt-1">
-            انقر على منطقة للاختيار {required && <span className="text-destructive">*</span>}
+            انقر أو استخدم الأسهم ثم Enter {required && <span className="text-destructive">*</span>}
           </div>
         </div>
 
