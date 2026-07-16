@@ -10,7 +10,7 @@ import {
 import { computeInvoicePaymentAdjustment } from "@/utils/invoicePaymentMath";
 import { logDiscountEvent } from "@/utils/discountAuditLogger";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
-import { netBalanceOf } from "@/utils/balanceDisplay";
+import { netBalanceOf, CustomerAccountSummary } from "@/utils/balanceDisplay";
 import { useUserRole } from "@/hooks/useUserRole";
 import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { useCreditConsumptionOrder, allocateCreditConsumption } from "@/hooks/useCreditConsumptionOrder";
