@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, X, Maximize2, Minimize2 } from "lucide-react";
-import { netBalanceOf } from "@/utils/balanceDisplay";
+import { netBalanceOf, CustomerAccountSummary } from "@/utils/balanceDisplay";
 import { useCustomers } from "@/hooks/useData";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
@@ -966,9 +966,6 @@ export default function CustomersPage() {
               <div className="text-center text-sm text-muted-foreground py-8">{recentDebtorsSearch ? "لا توجد نتائج مطابقة" : "لا يوجد عملاء مديونون"}</div>
             ) : recentDebtors.map((c: any, i: number) => {
               const fmtD = c._last ? c._last.split("-").reverse().join("-") : "—";
-              const debt = Number(c.balance || 0);
-              const credit = Number(c.credit_balance || 0);
-              const net = debt - credit;
               const reason = (c.notes || c.debt_reason || "").toString().trim();
               return (
                 <button
@@ -984,21 +981,8 @@ export default function CustomersPage() {
                     <span className="text-[10px] text-muted-foreground whitespace-nowrap">{fmtD}</span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 mt-2 text-[11px]">
-                    <div className="bg-destructive/10 rounded px-2 py-1 text-center">
-                      <div className="text-muted-foreground">المديونية</div>
-                      <div className="font-bold tabular-nums text-destructive">{debt.toLocaleString()}</div>
-                    </div>
-                    <div className="bg-emerald-500/10 rounded px-2 py-1 text-center">
-                      <div className="text-muted-foreground">الدائن</div>
-                      <div className="font-bold tabular-nums text-emerald-600">{credit.toLocaleString()}</div>
-                    </div>
-                    <div className={`rounded px-2 py-1 text-center ${net > 0 ? "bg-destructive/15" : net < 0 ? "bg-emerald-500/15" : "bg-muted"}`}>
-                      <div className="text-muted-foreground">الصافي</div>
-                      <div className={`font-bold tabular-nums ${net > 0 ? "text-destructive" : net < 0 ? "text-emerald-600" : "text-foreground"}`}>
-                        {Math.abs(net).toLocaleString()} <span className="text-[9px] font-normal">{net > 0 ? "عليه" : net < 0 ? "له" : ""}</span>
-                      </div>
-                    </div>
+                  <div className="mt-2">
+                    <CustomerAccountSummary customer={c} size="sm" />
                   </div>
 
                   <div className="flex items-start justify-between mt-2 gap-2 text-[11px] text-muted-foreground">
@@ -1073,7 +1057,7 @@ export default function CustomersPage() {
                   ...c,
                   _debt: Number(c.balance || 0),
                   _credit: Number(c.credit_balance || 0),
-                  _net: Number(c.balance || 0) - Number(c.credit_balance || 0),
+                  _net: netBalanceOf(c),
                 }))
                 .filter((c: any) => balanceSheetView === "debt" ? c._debt > 0 : c._credit > 0)
                 .sort((a: any, b: any) => balanceSheetView === "debt" ? b._debt - a._debt : b._credit - a._credit);
