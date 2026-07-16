@@ -87,6 +87,7 @@ const menuSections: MenuSection[] = [
       {
         label: "عملاء", icon: <Users size={18} />,
         children: [
+          { label: "كشوفات حسابات العملاء", path: "/customers/statements" },
           { label: "تقرير المبالغ المستحقة", path: "/customers/debt-report" },
           { label: "عميل جديد", path: "/customers/create" },
           { label: "إدارة العملاء", path: "/customers" },
