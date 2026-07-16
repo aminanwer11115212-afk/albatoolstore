@@ -32,6 +32,7 @@ export default function LocationPicker({ value, onChange, required, className, i
   const [localities, setLocalities] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"map" | "list">(() => {
     if (typeof window === "undefined") return "map";
     const saved = window.localStorage.getItem(MODE_KEY);
