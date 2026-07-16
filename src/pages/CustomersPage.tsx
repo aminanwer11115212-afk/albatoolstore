@@ -1558,22 +1558,23 @@ export default function CustomersPage() {
                   <tr>
                     <th style={{ position: "relative" }}>{filterActivity === "with_balance" ? "صافي مدين" : filterActivity === "with_credit" ? "صافي دائن" : "#"}<ColumnResizeHandle onMouseDown={(e) => startColDrag(0, e)} hidden={colsLocked} /></th>
                     {(() => {
-                      const headers: { i: number; key: string; label: string; filter?: { kind: "text" | "select"; value: string; setValue: (v: string) => void; options?: { value: string; label: string }[]; placeholder?: string } }[] = [
-                        { i: 1, key: "name", label: "اسم العميل", filter: { kind: "text", value: filterName, setValue: setFilterName, placeholder: "ابحث بالاسم..." } },
-                        { i: 2, key: "address", label: "عنوان", filter: { kind: "text", value: filterAddress, setValue: setFilterAddress, placeholder: "ابحث بالعنوان..." } },
-                        { i: 3, key: "phone", label: "واتساب", filter: { kind: "select", value: filterWaValid, setValue: (v) => setFilterWaValid(v as any), options: [
+                      const headerDefs: Record<CustomerColKey, { label: string; filter?: { kind: "text" | "select"; value: string; setValue: (v: string) => void; options?: { value: string; label: string }[]; placeholder?: string } }> = {
+                        name: { label: "اسم العميل", filter: { kind: "text", value: filterName, setValue: setFilterName, placeholder: "ابحث بالاسم..." } },
+                        address: { label: CUSTOMERS_COL_LABELS.address, filter: { kind: "text", value: filterAddress, setValue: setFilterAddress, placeholder: "ابحث بالعنوان..." } },
+                        phone: { label: "واتساب", filter: { kind: "select", value: filterWaValid, setValue: (v) => setFilterWaValid(v as any), options: [
                           { value: "valid", label: "✅ صالح للإرسال" },
                           { value: "invalid", label: "⚠️ رقم غير صالح" },
                           { value: "missing", label: "✖ بدون رقم" },
                         ] } },
-                        { i: 4, key: "region", label: "الاتجاه", filter: { kind: "select", value: filterRegion, setValue: (v) => { setFilterRegion(v); setFilterState(""); setFilterCity(""); setFilterLocality(""); }, options: regions.map(r => ({ value: r.id, label: r.name })) } },
-                        { i: 5, key: "state", label: "الولاية", filter: { kind: "select", value: filterState, setValue: (v) => { setFilterState(v); setFilterCity(""); setFilterLocality(""); }, options: filteredStates.map(s => ({ value: s.id, label: s.name })) } },
-                        { i: 6, key: "city", label: "المدينة", filter: { kind: "select", value: filterCity, setValue: (v) => { setFilterCity(v); setFilterLocality(""); }, options: filteredCities.map(c => ({ value: c.id, label: c.name })) } },
-                        { i: 7, key: "locality", label: "المحلية", filter: { kind: "select", value: filterLocality, setValue: setFilterLocality, options: (filterCity ? localities.filter(l => l.city_id === filterCity) : filteredLocalities).map(l => ({ value: l.id, label: l.name })) } },
-                        { i: 8, key: "group", label: "المجموعة", filter: { kind: "select", value: filterGroup, setValue: setFilterGroup, options: groups.map(g => ({ value: g.id, label: g.name })) } },
-                        { i: 9, key: "transporter", label: "ترحيلات", filter: { kind: "select", value: filterTransporter, setValue: setFilterTransporter, options: transporters.map(t => ({ value: t.id, label: t.name })) } },
-                        { i: 10, key: "destination", label: "الوجهة", filter: { kind: "select", value: filterDestination, setValue: setFilterDestination, options: destinations.map(d => ({ value: d.id, label: d.name })) } },
-                      ];
+                        region: { label: "الاتجاه", filter: { kind: "select", value: filterRegion, setValue: (v) => { setFilterRegion(v); setFilterState(""); setFilterCity(""); setFilterLocality(""); }, options: regions.map(r => ({ value: r.id, label: r.name })) } },
+                        state: { label: "الولاية", filter: { kind: "select", value: filterState, setValue: (v) => { setFilterState(v); setFilterCity(""); setFilterLocality(""); }, options: filteredStates.map(s => ({ value: s.id, label: s.name })) } },
+                        city: { label: "المدينة", filter: { kind: "select", value: filterCity, setValue: (v) => { setFilterCity(v); setFilterLocality(""); }, options: filteredCities.map(c => ({ value: c.id, label: c.name })) } },
+                        locality: { label: "المحلية", filter: { kind: "select", value: filterLocality, setValue: setFilterLocality, options: (filterCity ? localities.filter(l => l.city_id === filterCity) : filteredLocalities).map(l => ({ value: l.id, label: l.name })) } },
+                        group: { label: "المجموعة", filter: { kind: "select", value: filterGroup, setValue: setFilterGroup, options: groups.map(g => ({ value: g.id, label: g.name })) } },
+                        transporter: { label: "ترحيلات", filter: { kind: "select", value: filterTransporter, setValue: setFilterTransporter, options: transporters.map(t => ({ value: t.id, label: t.name })) } },
+                        destination: { label: "الوجهة", filter: { kind: "select", value: filterDestination, setValue: setFilterDestination, options: destinations.map(d => ({ value: d.id, label: d.name })) } },
+                      };
+                      const headers = visibleMiddleKeys.map((k, idx) => ({ i: idx + 1, key: k as string, label: headerDefs[k].label, filter: headerDefs[k].filter }));
                       return headers.map(col => {
                         const filterActive = !!col.filter?.value;
                         const isOpen = openFilter?.key === col.key;
