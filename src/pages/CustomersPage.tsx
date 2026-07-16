@@ -1057,7 +1057,7 @@ export default function CustomersPage() {
                   ...c,
                   _debt: Number(c.balance || 0),
                   _credit: Number(c.credit_balance || 0),
-                  _net: Number(c.balance || 0) - Number(c.credit_balance || 0),
+                  _net: netBalanceOf(c),
                 }))
                 .filter((c: any) => balanceSheetView === "debt" ? c._debt > 0 : c._credit > 0)
                 .sort((a: any, b: any) => balanceSheetView === "debt" ? b._debt - a._debt : b._credit - a._credit);
