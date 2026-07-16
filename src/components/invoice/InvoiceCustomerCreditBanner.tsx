@@ -101,6 +101,16 @@ export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber,
             </span>
           )}
         </div>
+        <div className="pt-1 border-t border-emerald-200/60 dark:border-emerald-900/50">
+          رصيد العميل الحالي:{" "}
+          {Math.abs(custNet) < 0.01 ? (
+            <b>خالص</b>
+          ) : custNet > 0 ? (
+            <b className="text-destructive tabular-nums">عليه {custNet.toLocaleString()}</b>
+          ) : (
+            <b className="text-emerald-700 dark:text-emerald-300 tabular-nums">له {Math.abs(custNet).toLocaleString()}</b>
+          )}
+        </div>
         <Link
           to={`/reports/customer-statement?customer=${customerId}`}
           className="inline-flex items-center gap-1 text-primary underline mt-1"
