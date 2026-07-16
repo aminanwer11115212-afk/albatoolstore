@@ -45,6 +45,20 @@ export default function CustomerStatementPage() {
   const [txSortKey, setTxSortKey] = useState<"date" | "amount" | "type">("date");
   const [txSortDir, setTxSortDir] = useState<"asc" | "desc">("desc");
   const inputRef = useRef<HTMLInputElement>(null);
+  // تبويبات صفحة كشف الحساب: الفواتير / محذوفة / حركات مالية.
+  // الرصيد وصناديق الملخص وتحقّق الرصيد تظل مرئية دائماً فوق التبويبات.
+  const [tab, setTab] = useState<"invoices" | "deleted" | "transactions">("invoices");
+  const [exportingPdf, setExportingPdf] = useState(false);
+  // مؤشر تصدير PDF: نستمع للحدث الذي يبعثه FinancialReportPreviewPage
+  useEffect(() => {
+    const onDone = (e: any) => {
+      setExportingPdf(false);
+      if (e?.detail?.ok) toast.success("تم تصدير كشف الحساب PDF");
+      else toast.error("فشل تصدير PDF: " + (e?.detail?.error || "خطأ غير معروف"));
+    };
+    window.addEventListener("lov:pdf-export-result", onDone as any);
+    return () => window.removeEventListener("lov:pdf-export-result", onDone as any);
+  }, []);
 
   const matches = useMemo(() => {
     const q = search.trim();
