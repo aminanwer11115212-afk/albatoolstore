@@ -19,6 +19,7 @@ import AppLayout from "./components/layout/AppLayout";
 import ProductsCacheSync from "./components/ProductsCacheSync";
 import RealtimeSync from "./components/RealtimeSync";
 import CriticalErrorDialog from "./components/CriticalErrorDialog";
+import HiddenDevResetDialog from "./components/HiddenDevResetDialog";
 import SplashScreen from "./components/SplashScreen";
 import NavigationPerfTracker from "./components/NavigationPerfTracker";
 import { ColumnResizeDebugHud } from "./components/ColumnResizeDebugHud";
