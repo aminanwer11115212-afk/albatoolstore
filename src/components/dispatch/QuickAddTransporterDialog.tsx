@@ -126,23 +126,12 @@ function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initial
           </div>
           <div className="grid gap-1.5">
             <Label>الوجهات التي يوصّل إليها *</Label>
-            <div className="max-h-40 overflow-y-auto border border-border rounded-md p-2 bg-muted/30">
-              {destList.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-2 text-center">
-                  لا توجد وجهات — أضف وجهات أولاً من صفحة إدارة الوجهات.
-                </div>
-              ) : destList.map((d: any) => (
-                <label key={d.id} className="flex items-center gap-2 py-1 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={destIds.includes(d.id)}
-                    onChange={() => toggleDest(d.id)}
-                    className="w-4 h-4"
-                  />
-                  <span>{d.name}</span>
-                </label>
-              ))}
-            </div>
+            <DestinationsMultiSelect
+              options={destList}
+              selectedIds={destIds}
+              onToggle={toggleDest}
+              onClear={(id) => setDestIds((prev) => prev.filter((x) => x !== id))}
+            />
             {destIds.length > 0 && (
               <div className="text-[11px] text-muted-foreground">
                 الترتيب: {destIds
