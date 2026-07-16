@@ -58,6 +58,20 @@ export function customerColsStorageKey(uid: string, ff: FormFactor): string {
   return `lov:u:${uid}:ff:${ff}:customers:cols`;
 }
 
+/**
+ * مفاتيح قديمة يمكن أن تحتوي على تفضيلات المستخدم قبل الفصل بين
+ * الموبايل والديسكتوب. عند غياب المفتاح الحالي، نُرقّي أول قيمة صالحة
+ * منها بصمت — دون حذف الأصل لتظل قابلة للاستعادة.
+ */
+function legacyKeyCandidates(uid: string): string[] {
+  return [
+    `lov:u:${uid}:customers:cols`,
+    `lov:u:${uid}:legacy:customers:cols`,
+    `customers:cols`,
+    `lov:customers:cols`,
+  ];
+}
+
 function sanitize(raw: any): Prefs {
   const order = Array.isArray(raw?.order)
     ? (raw.order.filter((k: any) => CUSTOMERS_MIDDLE_KEYS.includes(k)) as CustomerColKey[])
@@ -72,14 +86,46 @@ function sanitize(raw: any): Prefs {
   return { order: fullOrder, hidden };
 }
 
-function readPrefs(uid: string, ff: FormFactor): Prefs {
+function tryReadKey(key: string): Prefs | null {
   try {
-    const raw = localStorage.getItem(customerColsStorageKey(uid, ff));
-    if (!raw) return { order: [...DEFAULT_ORDER], hidden: [] };
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
     return sanitize(JSON.parse(raw));
   } catch {
-    return { order: [...DEFAULT_ORDER], hidden: [] };
+    return null;
   }
+}
+
+/**
+ * ترقية صامتة: إن لم يكن هناك تفضيل تحت المفتاح الجديد، نبحث عن أول
+ * قيمة صالحة في المفاتيح القديمة ونكتبها تحت المفتاح الجديد. لا نلمس
+ * القيمة القديمة (توافق رجوعي مع كود قد يقرأها لاحقاً).
+ */
+function migrateLegacyIfNeeded(uid: string, ff: FormFactor): Prefs | null {
+  const newKey = customerColsStorageKey(uid, ff);
+  if (localStorage.getItem(newKey) != null) return null;
+  for (const legacy of legacyKeyCandidates(uid)) {
+    const val = tryReadKey(legacy);
+    if (val) {
+      try {
+        localStorage.setItem(newKey, JSON.stringify(val));
+      } catch {
+        /* ignore quota */
+      }
+      return val;
+    }
+  }
+  return null;
+}
+
+function readPrefs(uid: string, ff: FormFactor): Prefs {
+  const migrated = (() => {
+    try { return migrateLegacyIfNeeded(uid, ff); } catch { return null; }
+  })();
+  if (migrated) return migrated;
+  const direct = tryReadKey(customerColsStorageKey(uid, ff));
+  if (direct) return direct;
+  return { order: [...DEFAULT_ORDER], hidden: [] };
 }
 
 function writePrefs(uid: string, ff: FormFactor, prefs: Prefs) {
