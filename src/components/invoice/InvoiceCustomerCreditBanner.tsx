@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Wallet, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { netBalanceOf } from "@/utils/balanceDisplay";
 
 interface Props {
   customerId: string | null | undefined;
@@ -27,6 +28,7 @@ interface CreditRow {
 export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber, refreshKey = 0 }: Props) {
   const [fromThis, setFromThis] = useState<CreditRow[]>([]);
   const [currentCredit, setCurrentCredit] = useState<number>(0);
+  const [custNet, setCustNet] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +44,7 @@ export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber,
           .order("date", { ascending: false }),
         (supabase as any)
           .from("customers")
-          .select("credit_balance")
+          .select("balance, credit_balance, net_balance")
           .eq("id", customerId)
           .maybeSingle(),
       ]);
@@ -53,6 +55,7 @@ export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber,
         : [];
       setFromThis(filtered);
       setCurrentCredit(Number(cust?.credit_balance || 0));
+      setCustNet(netBalanceOf(cust));
     })();
     return () => {
       cancelled = true;
@@ -96,6 +99,16 @@ export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber,
               {" "}
               — يُستخدم تلقائياً على أي فاتورة جديدة من حقل «استخدام رصيد دائن»
             </span>
+          )}
+        </div>
+        <div className="pt-1 border-t border-emerald-200/60 dark:border-emerald-900/50">
+          رصيد العميل الحالي:{" "}
+          {Math.abs(custNet) < 0.01 ? (
+            <b>خالص</b>
+          ) : custNet > 0 ? (
+            <b className="text-destructive tabular-nums">عليه {custNet.toLocaleString()}</b>
+          ) : (
+            <b className="text-emerald-700 dark:text-emerald-300 tabular-nums">له {Math.abs(custNet).toLocaleString()}</b>
           )}
         </div>
         <Link

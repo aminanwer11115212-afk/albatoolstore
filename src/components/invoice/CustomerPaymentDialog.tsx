@@ -10,7 +10,7 @@ import {
 import { computeInvoicePaymentAdjustment } from "@/utils/invoicePaymentMath";
 import { logDiscountEvent } from "@/utils/discountAuditLogger";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
-import { netBalanceOf } from "@/utils/balanceDisplay";
+import { netBalanceOf, CustomerAccountSummary } from "@/utils/balanceDisplay";
 import { useUserRole } from "@/hooks/useUserRole";
 import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
 import { useCreditConsumptionOrder, allocateCreditConsumption } from "@/hooks/useCreditConsumptionOrder";
@@ -634,7 +634,18 @@ export default function CustomerPaymentDialog({
           </DialogTitle>
         </DialogHeader>
 
+        {!isPos && custBalance && (
+          <div className="mb-2">
+            <div className="text-[10px] text-muted-foreground mb-1">رصيد العميل الحالي</div>
+            <CustomerAccountSummary
+              customer={{ balance: custBalance.debt, credit_balance: custBalance.credit }}
+              size="sm"
+            />
+          </div>
+        )}
+
         <div className="grid gap-2 grid-cols-1 md:grid-cols-2 md:auto-rows-min min-w-0">
+
 
           {/* العمود الأيمن: ملخّص الحسابات */}
           {(() => {
