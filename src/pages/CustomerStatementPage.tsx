@@ -77,12 +77,18 @@ export default function CustomerStatementPage() {
     const refresh = () => {
       qc.invalidateQueries({ queryKey: ["customer-statement"] });
       qc.invalidateQueries({ queryKey: ["customer-transactions"] });
+      // فواتير محذوفة تُخزَّن كـ tombstones في activity_log — لازم إبطالها فوراً
+      qc.invalidateQueries({ queryKey: ["activity-log"] });
     };
     window.addEventListener("invoices:changed", refresh);
     window.addEventListener("customers:changed", refresh);
+    window.addEventListener("transactions:changed", refresh);
+    window.addEventListener("activity-log:changed", refresh);
     return () => {
       window.removeEventListener("invoices:changed", refresh);
       window.removeEventListener("customers:changed", refresh);
+      window.removeEventListener("transactions:changed", refresh);
+      window.removeEventListener("activity-log:changed", refresh);
     };
   }, [qc]);
 
