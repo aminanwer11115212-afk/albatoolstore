@@ -5,6 +5,10 @@ export type DeleteInvoiceResult = {
   restoredStock: boolean;
   invoiceNumber: string | null;
   convertedToCredit: number;
+  /** Total quantity summed across restored items (0 when none). */
+  totalRestoredQty: number;
+  /** Amount of payments removed from transactions ledger for this invoice. */
+  deletedPayments: number;
   restoredItems: Array<{ product_id: string | null; quantity: number }>;
   customerId: string | null;
   newCustomerBalance: number | null;
