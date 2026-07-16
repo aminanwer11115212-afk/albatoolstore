@@ -291,6 +291,25 @@ export async function convertQuoteToInvoice(
     .from("quotes").delete().eq("id", quoteId);
   if (delQuoteErr) console.error("[convertQuoteToInvoice] delete quote failed", delQuoteErr);
 
+  // 8. إعادة حساب رصيد العميل صراحةً + بث أحداث تحديث الكاش
+  //    حتى تعرض CustomerStatementPage / CustomersPage الأرقام الجديدة
+  //    فوراً دون الاعتماد فقط على triggers realtime التي قد تتأخر.
+  if (quote.customer_id) {
+    try {
+      await (supabase as any).rpc("recompute_customer_balance", {
+        _customer_id: quote.customer_id,
+      });
+    } catch (e) {
+      console.error("[convertQuoteToInvoice] recompute_customer_balance failed", e);
+    }
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("invoices:changed"));
+    window.dispatchEvent(new Event("quotes:changed"));
+    window.dispatchEvent(new Event("customers:changed"));
+    window.dispatchEvent(new Event("transactions:changed"));
+  }
+
   return {
     invoiceId: inv.id,
     invoiceNumber: invNum,
