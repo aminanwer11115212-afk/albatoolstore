@@ -140,7 +140,7 @@ export default function InvoiceAccountingAlert({
           </ul>
           {customerId && (
             <Link
-              to={`/reports/customer-statement?customer=${customerId}`}
+              to={`/customers/${customerId}/statement`}
               className="inline-flex items-center gap-1 text-primary underline mt-1"
             >
               <ExternalLink size={12} /> عرض كشف الحساب الكامل
