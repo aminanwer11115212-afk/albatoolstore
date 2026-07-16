@@ -117,7 +117,14 @@ export function parseCSV(text: string): ParsedContact[] {
 /** يحدد النوع تلقائياً حسب المحتوى/الامتداد ويحلل. */
 export async function parseContactsFile(file: File): Promise<ParsedContact[]> {
   const name = (file.name || "").toLowerCase();
-  const text = await file.text();
+  const text = typeof (file as any).text === "function"
+    ? await (file as any).text()
+    : await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result || ""));
+        fr.onerror = () => reject(fr.error);
+        fr.readAsText(file);
+      });
   if (name.endsWith(".vcf") || /BEGIN:VCARD/i.test(text)) return parseVCard(text);
   if (name.endsWith(".csv") || /,/.test(text)) return parseCSV(text);
   // fallback: حاول vCard ثم CSV
