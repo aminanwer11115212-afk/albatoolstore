@@ -482,24 +482,69 @@ export default function CustomerStatementPage() {
 
           {(deletedInvoices || []).length > 0 && (
             <div data-section="deleted-invoices" data-section-label="فواتير محذوفة" className="legacy-card card-block border-destructive/30">
-              <h3 className="px-5 py-3 font-semibold text-destructive border-b border-border flex items-center gap-2">
-                <span>🗑</span>
-                فواتير محذوفة ({deletedInvoices!.length})
-                <span className="text-[11px] font-normal text-muted-foreground">— لا تُحسب في المجاميع، الرصيد أُعيد حسابه</span>
-              </h3>
+              <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 justify-between">
+                <h3 className="font-semibold text-destructive flex items-center gap-2">
+                  <span>🗑</span>
+                  فواتير محذوفة ({visibleDeleted.length} / {deletedInvoices!.length})
+                  <span className="text-[11px] font-normal text-muted-foreground">— لا تُحسب في المجاميع، الرصيد أُعيد حسابه</span>
+                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                    <input
+                      type="text"
+                      value={delSearch}
+                      onChange={(e) => setDelSearch(e.target.value)}
+                      placeholder="بحث بالرقم/التاريخ/المستخدم"
+                      className="bg-muted rounded pr-7 pl-2 py-1 text-xs text-foreground border border-border outline-none focus:ring-1 focus:ring-primary w-56"
+                    />
+                  </div>
+                  <select
+                    value={delUserFilter}
+                    onChange={(e) => setDelUserFilter(e.target.value)}
+                    className="bg-muted rounded px-2 py-1 text-xs text-foreground border border-border outline-none"
+                  >
+                    <option value="">كل المستخدمين</option>
+                    {deletedUsers.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                  {(delSearch || delUserFilter) && (
+                    <button type="button" onClick={() => { setDelSearch(""); setDelUserFilter(""); }}
+                      className="text-[11px] text-muted-foreground underline hover:text-foreground">مسح</button>
+                  )}
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm mobile-stack-table">
                   <thead><tr className="bg-destructive/5">
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">رقم الفاتورة</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الإجمالي</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المدفوع المُلغى</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">البنود</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">حُذفت في</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">بواسطة</th>
+                    {([
+                      ["invoice_number", "رقم الفاتورة"],
+                      ["date", "التاريخ"],
+                      ["total", "الإجمالي"],
+                      ["deleted_payments", "المدفوع المُلغى"],
+                      ["items_count", "البنود"],
+                      ["deleted_at", "حُذفت في"],
+                      ["user_email", "بواسطة"],
+                    ] as const).map(([k, label]) => {
+                      const sortable = ["invoice_number","date","total","deleted_at","user_email"].includes(k as string);
+                      const active = delSortKey === k;
+                      return (
+                        <th key={k} className="text-right px-5 py-3 font-semibold text-muted-foreground">
+                          {sortable ? (
+                            <button type="button" onClick={() => toggleDelSort(k as any)} className="inline-flex items-center gap-1 hover:text-foreground">
+                              {label}
+                              <span className="text-[10px] opacity-70">{active ? (delSortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+                            </button>
+                          ) : label}
+                        </th>
+                      );
+                    })}
                   </tr></thead>
                   <tbody>
-                    {deletedInvoices!.map((d) => (
+                    {visibleDeleted.length === 0 ? (
+                      <tr><td colSpan={7} className="text-center py-6 text-muted-foreground text-xs">لا توجد نتائج مطابقة</td></tr>
+                    ) : visibleDeleted.map((d) => (
                       <tr key={d.id} className="border-b border-border bg-destructive/5 hover:bg-destructive/10">
                         <td data-label="رقم الفاتورة" className="px-5 py-3 text-foreground line-through">{d.invoice_number || "—"}</td>
                         <td data-label="التاريخ" className="px-5 py-3 text-foreground tabular-nums">{d.date || "—"}</td>
