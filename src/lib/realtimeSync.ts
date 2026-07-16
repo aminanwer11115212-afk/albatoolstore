@@ -31,7 +31,12 @@ const FAMILIES: Record<string, Family> = {
       ["customers"],
       ["customer-statement"],
       ["customer-transactions"],
+      ["activity-log"],
     ],
+  },
+  activity_log: {
+    events: ["activity-log:changed"],
+    keys: [["activity-log"]],
   },
   invoice_items: {
     events: ["invoice-items:changed"],
