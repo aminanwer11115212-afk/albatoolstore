@@ -265,6 +265,7 @@ export default function LocationPicker({ value, onChange, required, className, i
               onAdd={addLocality}
               disabled={loading}
               emptyHint="لا توجد محليات — أضف واحدة"
+              filter={search}
             />
           )}
         </div>
