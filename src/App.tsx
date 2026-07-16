@@ -318,6 +318,7 @@ const App = () => {
       <Toaster />
       <Sonner />
       <CriticalErrorDialog />
+      <HiddenDevResetDialog />
       {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
       <BrowserRouter>
         <NavigationPerfTracker />
