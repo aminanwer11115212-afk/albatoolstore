@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useDestinations } from "@/hooks/useData";
+import { startsWithMatch } from "@/utils/searchMatch";
+import { ChevronDown, X, Check, Search } from "lucide-react";
 
 const schema = z.object({
   name: z.string().trim().min(1, "الاسم مطلوب").max(120, "الاسم طويل جداً"),
@@ -124,23 +126,12 @@ function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initial
           </div>
           <div className="grid gap-1.5">
             <Label>الوجهات التي يوصّل إليها *</Label>
-            <div className="max-h-40 overflow-y-auto border border-border rounded-md p-2 bg-muted/30">
-              {destList.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-2 text-center">
-                  لا توجد وجهات — أضف وجهات أولاً من صفحة إدارة الوجهات.
-                </div>
-              ) : destList.map((d: any) => (
-                <label key={d.id} className="flex items-center gap-2 py-1 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={destIds.includes(d.id)}
-                    onChange={() => toggleDest(d.id)}
-                    className="w-4 h-4"
-                  />
-                  <span>{d.name}</span>
-                </label>
-              ))}
-            </div>
+            <DestinationsMultiSelect
+              options={destList}
+              selectedIds={destIds}
+              onToggle={toggleDest}
+              onClear={(id) => setDestIds((prev) => prev.filter((x) => x !== id))}
+            />
             {destIds.length > 0 && (
               <div className="text-[11px] text-muted-foreground">
                 الترتيب: {destIds
@@ -161,5 +152,113 @@ function QuickAddTransporterDialogInner({ open, onOpenChange, onCreated, initial
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DestinationsMultiSelect({
+  options,
+  selectedIds,
+  onToggle,
+  onClear,
+}: {
+  options: any[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  onClear: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
+  }, [open]);
+
+  const filtered = search.trim()
+    ? options.filter((o) => startsWithMatch(o.name, search))
+    : options;
+
+  const selectedOptions = selectedIds
+    .map((id) => options.find((o) => o.id === id))
+    .filter(Boolean) as any[];
+
+  if (options.length === 0) {
+    return (
+      <div className="text-xs text-muted-foreground py-2 text-center border border-border rounded-md bg-muted/30">
+        لا توجد وجهات — أضف وجهات أولاً من صفحة إدارة الوجهات.
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full min-h-[38px] flex flex-wrap items-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-right"
+      >
+        {selectedOptions.length === 0 ? (
+          <span className="text-muted-foreground flex-1">اختر الوجهات...</span>
+        ) : (
+          selectedOptions.map((o) => (
+            <span
+              key={o.id}
+              className="inline-flex items-center gap-1 rounded bg-primary/10 text-primary px-1.5 py-0.5 text-xs"
+            >
+              {o.name}
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); onClear(o.id); }}
+              />
+            </span>
+          ))
+        )}
+        <ChevronDown className="h-4 w-4 text-muted-foreground mr-auto" />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 left-0 right-0 rounded-md border border-border bg-popover shadow-lg overflow-hidden">
+          <div className="p-1.5 border-b border-border">
+            <div className="relative">
+              <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="بحث..."
+                className="w-full h-8 rounded bg-muted px-7 text-xs outline-none"
+              />
+            </div>
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="text-xs text-muted-foreground text-center py-3">لا نتائج</div>
+            ) : filtered.map((o: any) => {
+              const isSel = selectedIds.includes(o.id);
+              return (
+                <div
+                  key={o.id}
+                  onClick={() => onToggle(o.id)}
+                  className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-accent"
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSel ? "bg-primary border-primary" : "border-border"}`}>
+                    {isSel && <Check className="h-3 w-3 text-primary-foreground" />}
+                  </div>
+                  <span>{o.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
