@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Plus, Map as MapIcon, List as ListIcon } from "lucide-react";
+import { Plus, Map as MapIcon, List as ListIcon, Search, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SudanMap from "@/components/location/SudanMap";
@@ -32,6 +32,7 @@ export default function LocationPicker({ value, onChange, required, className, i
   const [localities, setLocalities] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"map" | "list">(() => {
     if (typeof window === "undefined") return "map";
     const saved = window.localStorage.getItem(MODE_KEY);
@@ -105,6 +106,38 @@ export default function LocationPicker({ value, onChange, required, className, i
   const addCity = () => addRow("cities", "state_id", value.state_id, "اسم المدينة:", () => loadCities(value.state_id!), (id) => ({ ...value, city_id: id, locality_id: null }));
   const addLocality = () => addRow("localities", "city_id", value.city_id, "اسم المحلية:", () => loadLocalities(value.city_id!), (id) => ({ ...value, locality_id: id }));
 
+  // فلترة موحّدة تُستخدم في الوضعين
+  const q = search.trim();
+  const filterList = <T extends { name: string }>(arr: T[]) =>
+    !q ? arr : arr.filter(x => (x.name || "").includes(q));
+  const fStates = filterList(states);
+  const fCities = filterList(cities);
+  const fLocalities = filterList(localities);
+
+  const SearchBar = (
+    <div className="relative mb-3">
+      <Search size={14} className="absolute top-1/2 -translate-y-1/2 right-3 text-muted-foreground pointer-events-none" />
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="ابحث في الولايات والمدن والمحليات…"
+        className={`${baseInput} pr-9 pl-8`}
+        aria-label="بحث في المواقع"
+      />
+      {search && (
+        <button
+          type="button"
+          onClick={() => setSearch("")}
+          className="absolute top-1/2 -translate-y-1/2 left-2 p-1 rounded-md hover:bg-muted text-muted-foreground"
+          aria-label="مسح البحث"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  );
+
   // ============ وضع القوائم القديم (fallback) ============
   if (mode === "list") {
     return (
@@ -114,6 +147,7 @@ export default function LocationPicker({ value, onChange, required, className, i
             <MapIcon size={12} /> عرض كخريطة
           </button>
         </div>
+        {SearchBar}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <label className="block text-xs text-muted-foreground mb-1">الاتجاه {required && <span className="text-destructive">*</span>}</label>
@@ -129,7 +163,7 @@ export default function LocationPicker({ value, onChange, required, className, i
             </label>
             <select value={value.state_id || ""} onChange={e => onChange({ ...value, state_id: e.target.value || null, locality_id: null, city_id: null })} disabled={!value.region_id} className={cls}>
               <option value="">-- اختر الولاية --</option>
-              {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {fStates.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
@@ -139,7 +173,7 @@ export default function LocationPicker({ value, onChange, required, className, i
             </label>
             <select value={value.city_id || ""} onChange={e => onChange({ ...value, city_id: e.target.value || null, locality_id: null })} disabled={!value.state_id} className={cls}>
               <option value="">-- اختر المدينة --</option>
-              {cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {fCities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
@@ -149,7 +183,7 @@ export default function LocationPicker({ value, onChange, required, className, i
             </label>
             <select value={value.locality_id || ""} onChange={e => onChange({ ...value, locality_id: e.target.value || null })} disabled={!value.city_id} className={cls}>
               <option value="">-- اختر المحلية --</option>
-              {localities.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              {fLocalities.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </div>
         </div>
@@ -179,11 +213,13 @@ export default function LocationPicker({ value, onChange, required, className, i
         </button>
       </div>
 
+      {SearchBar}
+
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_1fr] gap-4 items-start">
         <div>
           <SudanMap selectedId={selectedMapId} onSelect={onMapSelect} />
           <div className="text-[11px] text-muted-foreground text-center mt-1">
-            انقر على منطقة للاختيار {required && <span className="text-destructive">*</span>}
+            انقر أو استخدم الأسهم ثم Enter {required && <span className="text-destructive">*</span>}
           </div>
         </div>
 
@@ -203,6 +239,7 @@ export default function LocationPicker({ value, onChange, required, className, i
               onAdd={addState}
               disabled={loading}
               emptyHint="لا توجد ولايات — أضف واحدة"
+              filter={search}
             />
           )}
 
@@ -215,6 +252,7 @@ export default function LocationPicker({ value, onChange, required, className, i
               onAdd={addCity}
               disabled={loading}
               emptyHint="لا توجد مدن — أضف واحدة"
+              filter={search}
             />
           )}
 
@@ -227,6 +265,7 @@ export default function LocationPicker({ value, onChange, required, className, i
               onAdd={addLocality}
               disabled={loading}
               emptyHint="لا توجد محليات — أضف واحدة"
+              filter={search}
             />
           )}
         </div>
