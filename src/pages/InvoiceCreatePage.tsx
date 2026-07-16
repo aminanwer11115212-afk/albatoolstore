@@ -2453,13 +2453,10 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                     // حذف موحّد عبر deleteInvoiceWithStockRestore:
                     // يُرجع المخزون فقط إن كانت الفاتورة مُخصومة (stock_deduction_id موجود)،
                     // ثم يحذف كل التوابع والفاتورة. أي فشل يوقف العملية.
-                    let restoredStock = false;
-                    let convertedToCredit = 0;
+                    let deleteRes: any = null;
                     try {
                       const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
-                      const res = await deleteInvoiceWithStockRestore(targetId);
-                      restoredStock = res.restoredStock;
-                      convertedToCredit = res.convertedToCredit || 0;
+                      deleteRes = await deleteInvoiceWithStockRestore(targetId);
                     } catch (delErr: any) {
                       console.error("[InvoiceCreatePage] delete failed", delErr);
                       toast.error(`فشل الحذف: ${delErr?.message || "خطأ غير معروف"}`, { duration: 8000 });
@@ -2479,13 +2476,10 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                     setShipping(0);
                     setSavedInvoiceId(null);
 
-                    const msgParts = [
-                      invoiceNumber ? `تم حذف الفاتورة «${invoiceNumber}» بالكامل` : "تم حذف الفاتورة بالكامل",
-                    ];
-                    if (restoredStock) msgParts.push("وإرجاع الكميات إلى المخزون");
-                    if (convertedToCredit > 0.01) msgParts.push(`وتحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
-                    msgParts.push("— جارٍ فتح فاتورة جديدة");
-                    toast.success(msgParts.join(" "), { duration: 6000 });
+                    try {
+                      const { showInvoiceDeletedToast } = await import("@/utils/deleteInvoiceToast");
+                      showInvoiceDeletedToast(deleteRes, { isPos: !!pos, extraSuffix: "جارٍ فتح فاتورة جديدة" });
+                    } catch {}
 
                     queryClient.setQueriesData<any>(
                       { predicate: (q) => {
