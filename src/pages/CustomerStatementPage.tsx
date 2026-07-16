@@ -797,11 +797,28 @@ export default function CustomerStatementPage() {
                 <table className="w-full text-sm mobile-stack-table">
                   <thead>
                     <tr className="bg-muted">
-                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
-                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">النوع</th>
+                      {([
+                        ["date","التاريخ"],
+                        ["type","النوع"],
+                      ] as const).map(([k,label]) => {
+                        const active = txSortKey === k;
+                        return (
+                          <th key={k} className="text-right px-5 py-3 font-semibold text-muted-foreground">
+                            <button type="button" onClick={() => toggleTxSort(k as any)} className="inline-flex items-center gap-1 hover:text-foreground">
+                              {label}
+                              <span className="text-[10px] opacity-70">{active ? (txSortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+                            </button>
+                          </th>
+                        );
+                      })}
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المصدر</th>
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الارتباط</th>
-                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المبلغ</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">
+                        <button type="button" onClick={() => toggleTxSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground">
+                          المبلغ
+                          <span className="text-[10px] opacity-70">{txSortKey === "amount" ? (txSortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+                        </button>
+                      </th>
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الوصف</th>
                     </tr>
                   </thead>
