@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, X, Maximize2, Minimize2 } from "lucide-react";
-import { netBalanceOf } from "@/utils/balanceDisplay";
+import { netBalanceOf, CustomerAccountSummary } from "@/utils/balanceDisplay";
 import { useCustomers } from "@/hooks/useData";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
