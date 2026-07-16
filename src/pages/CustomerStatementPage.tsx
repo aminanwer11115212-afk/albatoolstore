@@ -717,6 +717,18 @@ export default function CustomerStatementPage() {
                   المعاملات ({filteredTransactions.length})
                 </h3>
                 <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={txTypeFilter}
+                    onChange={(e) => setTxTypeFilter(e.target.value as any)}
+                    className="bg-muted rounded px-2 py-1 text-xs text-foreground border border-border outline-none"
+                    title="نوع العملية"
+                  >
+                    <option value="all">كل الأنواع</option>
+                    <option value="payment">دفعة</option>
+                    <option value="credit">رصيد دائن</option>
+                    <option value="credit_consume">استهلاك رصيد</option>
+                    <option value="other">أخرى</option>
+                  </select>
                   <button
                     type="button"
                     onClick={() => setCashMode((v) => !v)}
