@@ -451,6 +451,7 @@ const App = () => {
             <Route path="/reports/today-invoices" element={lazyEl(<TodayInvoicesPage />, "فواتير اليوم")} />
             <Route path="/reports/customer-statement" element={lazyEl(<CustomerStatementPage />, "كشف حساب العميل")} />
             <Route path="/customers/:id/statement" element={lazyEl(<CustomerStatementPage />, "كشف حساب العميل")} />
+            <Route path="/customers/statements" element={lazyEl(<CustomerStatementsPage />, "كشوفات حسابات العملاء")} />
             <Route path="/reports/supplier-statement" element={lazyEl(<SupplierStatementPage />, "كشف حساب المورد")} />
             <Route path="/reports/statement-preview" element={lazyEl(<StatementPreviewPage />, "معاينة كشف الحساب")} />
             <Route path="/reports/bank-transfers" element={lazyEl(<BankTransfersReportPage />, "تقرير التحويلات البنكية")} />
