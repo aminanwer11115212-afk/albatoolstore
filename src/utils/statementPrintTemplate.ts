@@ -94,12 +94,16 @@ export function generateStatementHTML(data: StatementData): string {
   const periodAr = toArabicDigits(periodTxt);
   const currency = company?.currency || "";
 
-  // الرصيد الموحّد + حالته (مدين/دائن/مُسوّى)
+  // الرصيد الموحّد + حالته (مدين/دائن/مُسوّى) — مصدر واحد: netBalanceOf
+  // يضمن تطابق الرقم المطبوع/المُشارك مع ما يظهر في شاشة كشف الحساب
+  // بعد تقريب DB وحسابات UI.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { netBalanceOf } = require("@/utils/balanceDisplay") as typeof import("@/utils/balanceDisplay");
   const balanceVal =
-    typeof party.balance === "number"
-      ? party.balance
-      : kind === "customer"
-        ? Number(totals.remaining || 0)
+    kind === "customer"
+      ? netBalanceOf(party as any)
+      : typeof party.balance === "number"
+        ? party.balance
         : Number(totals.balance || 0);
   const balanceState =
     Math.abs(balanceVal) < 0.01
