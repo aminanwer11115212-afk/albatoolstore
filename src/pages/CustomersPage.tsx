@@ -752,6 +752,9 @@ export default function CustomersPage() {
     colsLocked,
   );
   const { getHeight: getRowH, startDrag: startRowDrag, resetHeight: resetRowH, locked: rowsLocked, setLocked: setRowsLocked } = useRowHeights("customers:rowH");
+  const colsPref = useCustomerColsPref();
+  const visibleMiddleKeys = colsPref.visibleOrder;
+  const totalVisibleCols = 1 /* # */ + visibleMiddleKeys.length + 1 /* settings */;
 
   const handleQuickAdd = async () => {
     const name = quickAdd.name.trim();
