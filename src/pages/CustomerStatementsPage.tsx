@@ -237,3 +237,30 @@ export default function CustomerStatementsPage() {
     </div>
   );
 }
+
+function TotalPill({
+  label,
+  value,
+  tone,
+  plain = false,
+}: {
+  label: string;
+  value: number;
+  tone: "primary" | "success" | "destructive";
+  plain?: boolean;
+}) {
+  const map = {
+    primary: "bg-primary/8 text-primary border-primary/20",
+    success: "bg-success/8 text-success border-success/20",
+    destructive: "bg-destructive/8 text-destructive border-destructive/20",
+  } as const;
+  return (
+    <div className={`rounded-xl border ${map[tone]} px-3 py-2 text-center transition-transform hover:-translate-y-0.5`}>
+      <div className="text-[10px] font-medium opacity-80">{label}</div>
+      <div className="text-base font-bold tabular-nums mt-0.5">
+        {plain ? value.toLocaleString() : formatMoney(value)}
+      </div>
+    </div>
+  );
+}
+
