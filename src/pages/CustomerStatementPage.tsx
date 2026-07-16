@@ -1,14 +1,16 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useCompanySettings } from "@/hooks/useData";
-import { Search, X, Printer } from "lucide-react";
+import { Search, X, Printer, Loader2 } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
+import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 
 export default function CustomerStatementPage() {
