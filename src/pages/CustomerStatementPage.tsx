@@ -26,6 +26,11 @@ export default function CustomerStatementPage() {
   const [paymentStatus, setPaymentStatus] = useState<"all" | "paid" | "unpaid" | "partial">("all");
   const [cashMode, setCashMode] = useState(false);
   const [creditSourceFilter, setCreditSourceFilter] = useState<Set<CreditSource>>(new Set());
+  // Deleted-invoices section controls
+  const [delSearch, setDelSearch] = useState("");
+  const [delUserFilter, setDelUserFilter] = useState("");
+  const [delSortKey, setDelSortKey] = useState<"deleted_at" | "date" | "invoice_number" | "user_email" | "total">("deleted_at");
+  const [delSortDir, setDelSortDir] = useState<"asc" | "desc">("desc");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const matches = useMemo(() => {
@@ -171,6 +176,53 @@ export default function CustomerStatementPage() {
   const totalInvoices = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.total || 0), 0);
   const totalPaid = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.paid_amount || 0), 0);
 
+  // ===== Deleted-invoices: search / user filter / sort =====
+  const deletedUsers = useMemo(() => {
+    const s = new Set<string>();
+    (deletedInvoices || []).forEach((d) => { if (d.user_email) s.add(d.user_email); });
+    return Array.from(s).sort();
+  }, [deletedInvoices]);
+
+  const visibleDeleted = useMemo(() => {
+    const q = delSearch.trim().toLowerCase();
+    let rows = (deletedInvoices || []).filter((d) => {
+      if (delUserFilter && d.user_email !== delUserFilter) return false;
+      if (!q) return true;
+      const hay = `${d.invoice_number || ""} ${d.date || ""} ${d.user_email || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+    const dir = delSortDir === "asc" ? 1 : -1;
+    rows = [...rows].sort((a, b) => {
+      const av = (a as any)[delSortKey] ?? "";
+      const bv = (b as any)[delSortKey] ?? "";
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), "ar") * dir;
+    });
+    return rows;
+  }, [deletedInvoices, delSearch, delUserFilter, delSortKey, delSortDir]);
+
+  const toggleDelSort = (k: typeof delSortKey) => {
+    if (delSortKey === k) setDelSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setDelSortKey(k); setDelSortDir("desc"); }
+  };
+
+  // ===== Balance reconciliation: expected (unfiltered) vs stored =====
+  const reconciliation = useMemo(() => {
+    if (!selectedCustomer) return null;
+    const allInv = (invoices || []) as any[];
+    const expectedOpen = allInv
+      .filter((i) => i.status !== "cancelled")
+      .reduce((s, i) => s + Math.max(Number(i.total || 0) - Number(i.paid_amount || 0), 0), 0);
+    const stored = Number((selectedCustomer as any).balance || 0);
+    const delta = expectedOpen - stored;
+    return {
+      expectedOpen,
+      stored,
+      delta,
+      ok: Math.abs(delta) < 0.01,
+    };
+  }, [invoices, selectedCustomer]);
+
   const resetFilters = () => {
     setFromDate(""); setToDate(""); setMinAmount(""); setMaxAmount(""); setPaymentStatus("all");
   };
@@ -226,6 +278,31 @@ export default function CustomerStatementPage() {
             type: t.type === "income" ? "إيراد" : t.type === "expense" ? "مصروف" : t.type || "—",
             amount: Number(t.amount || 0),
             description: t.description || "—",
+          })),
+        }] : []),
+        ...(visibleDeleted.length ? [{
+          key: "deleted_invoices",
+          label: `فواتير محذوفة/ملغاة (${visibleDeleted.length}) — لا تُحسب في المجاميع`,
+          headerColor: "#b91c1c",
+          columns: [
+            { key: "invoice_number", label: "رقم الفاتورة", align: "center" as const },
+            { key: "date", label: "التاريخ", align: "center" as const },
+            { key: "total", label: "الإجمالي", numeric: true },
+            { key: "deleted_payments", label: "المدفوع المُلغى", numeric: true },
+            { key: "items_count", label: "عدد البنود", numeric: true },
+            { key: "restored_stock", label: "المخزون", align: "center" as const },
+            { key: "deleted_at", label: "حُذفت في", align: "center" as const },
+            { key: "user_email", label: "بواسطة", align: "center" as const },
+          ],
+          rows: visibleDeleted.map((d) => ({
+            invoice_number: d.invoice_number || "—",
+            date: d.date || "—",
+            total: Number(d.total || 0),
+            deleted_payments: Number(d.deleted_payments || d.paid_amount || 0),
+            items_count: d.items_count,
+            restored_stock: d.restored_stock ? "أُرجع" : "—",
+            deleted_at: new Date(d.deleted_at).toLocaleString(),
+            user_email: d.user_email || "—",
           })),
         }] : []),
       ],
@@ -375,6 +452,34 @@ export default function CustomerStatementPage() {
             </div>
           </div>
 
+          {reconciliation && (
+            <div
+              data-section="reconciliation"
+              data-section-label="تحقق الرصيد"
+              className={`rounded-xl border p-4 shadow-sm text-sm flex flex-wrap items-center gap-x-6 gap-y-2 ${
+                reconciliation.ok
+                  ? "bg-emerald-500/5 border-emerald-500/30 text-emerald-800"
+                  : "bg-destructive/5 border-destructive/40 text-destructive"
+              }`}
+            >
+              <span className="font-semibold">
+                {reconciliation.ok ? "✅ الرصيد مطابق" : "⚠️ عدم تطابق في الرصيد"}
+              </span>
+              <span className="text-xs">
+                المتوقع (فواتير − مدفوعات، باستثناء الملغاة): <b className="tabular-nums">{reconciliation.expectedOpen.toLocaleString()}</b>
+              </span>
+              <span className="text-xs">
+                المخزَّن في بطاقة العميل: <b className="tabular-nums">{reconciliation.stored.toLocaleString()}</b>
+              </span>
+              {!reconciliation.ok && (
+                <span className="text-xs">
+                  الفارق: <b className="tabular-nums">{reconciliation.delta.toLocaleString()}</b>
+                  <span className="ms-2 opacity-80">— قد يلزم إعادة حساب الأرصدة من صفحة تقرير الديون.</span>
+                </span>
+              )}
+            </div>
+          )}
+
           <div data-section="invoices" data-section-label="الفواتير" className="legacy-card card-block">
             <h3 className="px-5 py-3 font-semibold text-foreground border-b border-border">الفواتير ({filteredInvoices.length})</h3>
             <div className="overflow-x-auto">
@@ -405,24 +510,69 @@ export default function CustomerStatementPage() {
 
           {(deletedInvoices || []).length > 0 && (
             <div data-section="deleted-invoices" data-section-label="فواتير محذوفة" className="legacy-card card-block border-destructive/30">
-              <h3 className="px-5 py-3 font-semibold text-destructive border-b border-border flex items-center gap-2">
-                <span>🗑</span>
-                فواتير محذوفة ({deletedInvoices!.length})
-                <span className="text-[11px] font-normal text-muted-foreground">— لا تُحسب في المجاميع، الرصيد أُعيد حسابه</span>
-              </h3>
+              <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 justify-between">
+                <h3 className="font-semibold text-destructive flex items-center gap-2">
+                  <span>🗑</span>
+                  فواتير محذوفة ({visibleDeleted.length} / {deletedInvoices!.length})
+                  <span className="text-[11px] font-normal text-muted-foreground">— لا تُحسب في المجاميع، الرصيد أُعيد حسابه</span>
+                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                    <input
+                      type="text"
+                      value={delSearch}
+                      onChange={(e) => setDelSearch(e.target.value)}
+                      placeholder="بحث بالرقم/التاريخ/المستخدم"
+                      className="bg-muted rounded pr-7 pl-2 py-1 text-xs text-foreground border border-border outline-none focus:ring-1 focus:ring-primary w-56"
+                    />
+                  </div>
+                  <select
+                    value={delUserFilter}
+                    onChange={(e) => setDelUserFilter(e.target.value)}
+                    className="bg-muted rounded px-2 py-1 text-xs text-foreground border border-border outline-none"
+                  >
+                    <option value="">كل المستخدمين</option>
+                    {deletedUsers.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                  {(delSearch || delUserFilter) && (
+                    <button type="button" onClick={() => { setDelSearch(""); setDelUserFilter(""); }}
+                      className="text-[11px] text-muted-foreground underline hover:text-foreground">مسح</button>
+                  )}
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm mobile-stack-table">
                   <thead><tr className="bg-destructive/5">
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">رقم الفاتورة</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الإجمالي</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المدفوع المُلغى</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">البنود</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">حُذفت في</th>
-                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">بواسطة</th>
+                    {([
+                      ["invoice_number", "رقم الفاتورة"],
+                      ["date", "التاريخ"],
+                      ["total", "الإجمالي"],
+                      ["deleted_payments", "المدفوع المُلغى"],
+                      ["items_count", "البنود"],
+                      ["deleted_at", "حُذفت في"],
+                      ["user_email", "بواسطة"],
+                    ] as const).map(([k, label]) => {
+                      const sortable = ["invoice_number","date","total","deleted_at","user_email"].includes(k as string);
+                      const active = delSortKey === k;
+                      return (
+                        <th key={k} className="text-right px-5 py-3 font-semibold text-muted-foreground">
+                          {sortable ? (
+                            <button type="button" onClick={() => toggleDelSort(k as any)} className="inline-flex items-center gap-1 hover:text-foreground">
+                              {label}
+                              <span className="text-[10px] opacity-70">{active ? (delSortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+                            </button>
+                          ) : label}
+                        </th>
+                      );
+                    })}
                   </tr></thead>
                   <tbody>
-                    {deletedInvoices!.map((d) => (
+                    {visibleDeleted.length === 0 ? (
+                      <tr><td colSpan={7} className="text-center py-6 text-muted-foreground text-xs">لا توجد نتائج مطابقة</td></tr>
+                    ) : visibleDeleted.map((d) => (
                       <tr key={d.id} className="border-b border-border bg-destructive/5 hover:bg-destructive/10">
                         <td data-label="رقم الفاتورة" className="px-5 py-3 text-foreground line-through">{d.invoice_number || "—"}</td>
                         <td data-label="التاريخ" className="px-5 py-3 text-foreground tabular-nums">{d.date || "—"}</td>
