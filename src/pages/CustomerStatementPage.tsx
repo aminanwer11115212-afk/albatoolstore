@@ -12,7 +12,7 @@ import CreditConsumptionOrderControl from "@/components/statement/CreditConsumpt
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 
 export default function CustomerStatementPage() {
-  const { data: customers } = useCustomers();
+  const { data: customers, isLoading: customersLoading, isError: customersError } = useCustomers();
   const { data: companyArr } = useCompanySettings();
   const company = (companyArr as any)?.[0] || null;
   const params = useParams<{ id?: string }>();
