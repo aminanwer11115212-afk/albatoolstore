@@ -379,14 +379,25 @@ export default function CustomerStatementPage() {
   return (
     <div className="space-y-6" dir="rtl">
       {selectedCustomer && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2 flex-wrap">
           <button
             type="button"
             onClick={handleOpenPrint}
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:opacity-90 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
           >
             <Printer className="h-4 w-4" />
-            معاينة وطباعة كشف الحساب
+            معاينة وطباعة
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              try { sessionStorage.setItem("lov_financial_report_autoexport", "pdf"); } catch { /* ignore */ }
+              handleOpenPrint();
+            }}
+            className="inline-flex items-center gap-2 bg-emerald-600 text-white hover:opacity-90 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
+            title="ينتقل لصفحة المعاينة ثم يبدأ تنزيل PDF تلقائياً — يشمل الفواتير المحذوفة/الملغاة بتفاصيلها"
+          >
+            📄 تصدير PDF
           </button>
         </div>
       )}
