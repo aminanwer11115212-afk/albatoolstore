@@ -2,6 +2,7 @@
 // ويُفتح عبر openPrintWindow الموجودة في printTemplate.ts كي يحصل تلقائياً
 // على شريط الأدوات العلوي: طباعة + تحميل PDF + مشاركة PDF عبر واتساب +
 // مشاركة نص واتساب + تخصيص رؤية الأقسام (👁️).
+import { netBalanceOf } from "@/utils/balanceDisplay";
 
 interface StatementCompany {
   company_name?: string;
