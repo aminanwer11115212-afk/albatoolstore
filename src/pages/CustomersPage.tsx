@@ -16,6 +16,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
+import { useCustomerColsPref, CUSTOMERS_COL_LABELS, type CustomerColKey } from "@/hooks/useCustomerColsPref";
+import CustomerColsControl from "@/components/customers/CustomerColsControl";
 import { userScopedLegacyKey } from "@/lib/userScopedKey";
 import { formFactorScopedLegacyKey } from "@/lib/formFactorKey";
 import { useRowHeights } from "@/hooks/useRowHeights";
