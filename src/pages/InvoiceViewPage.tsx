@@ -316,15 +316,12 @@ export default function InvoiceViewPage() {
     setDeleting(true);
     try {
       const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
-      const { restoredStock, convertedToCredit, invoiceNumber } = await deleteInvoiceWithStockRestore(invoice.id);
-      const invLabel = invoiceNumber ? `«${invoiceNumber}»` : "";
-      const parts = [
-        restoredStock
-          ? `تم حذف الفاتورة ${invLabel} وإرجاع الكميات إلى المخزون`
-          : `تم حذف الفاتورة ${invLabel}`,
-      ];
-      if (convertedToCredit > 0.01) parts.push(`— تم تحويل ${convertedToCredit.toLocaleString()} إلى رصيد دائن للعميل`);
-      toast.success(parts.join(" "), { duration: 6000 });
+      const { showInvoiceDeletedToast } = await import("@/utils/deleteInvoiceToast");
+      const res = await deleteInvoiceWithStockRestore(invoice.id);
+      try { qc.invalidateQueries({ queryKey: ["customer-statement"] }); } catch {}
+      try { qc.invalidateQueries({ queryKey: ["customer-transactions"] }); } catch {}
+      try { qc.invalidateQueries({ queryKey: ["activity-log", "invoice-deletions"] }); } catch {}
+      showInvoiceDeletedToast(res, { isPos: (invoice as any).source === "pos" });
       navigate("/invoices", { replace: true });
     } catch (e: any) {
       // إعادة تحميل الفاتورة لضمان أن أي تعديل جزئي (لو حصل) يظهر على الفور.
