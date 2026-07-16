@@ -76,6 +76,8 @@ const FAMILIES: Record<string, Family> = {
       ["customers"],
       ["suppliers"],
       ["dashboard-stats"],
+      ["customer-statement"],
+      ["customer-transactions"],
     ],
   },
   purchase_orders: {
