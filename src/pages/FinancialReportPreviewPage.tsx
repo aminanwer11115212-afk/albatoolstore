@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Printer, Download, MessageCircle, FileText } from "lucide-react";
+import { toast } from "sonner";
 import { generateFinancialReportHTML, type FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { openWhatsApp } from "@/utils/whatsapp";
 
@@ -139,16 +140,22 @@ export default function FinancialReportPreviewPage() {
 
   const handleDownloadPdf = async () => {
     setBusy("pdf");
+    toast.loading("جارٍ توليد ملف PDF...", { id: "pdf-gen" });
     try {
       const blob = await generatePdfBlob();
-      if (!blob) return;
+      if (!blob) throw new Error("لا يوجد محتوى للتصدير");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url; a.download = cleanFileName(docTitle, "pdf");
       document.body.appendChild(a); a.click();
       setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+      toast.success("تم تنزيل PDF بنجاح", { id: "pdf-gen" });
+      // Signal to the invoking page (e.g. CustomerStatementPage) that export finished.
+      window.dispatchEvent(new CustomEvent("lov:pdf-export-result", { detail: { ok: true, title: docTitle } }));
     } catch (e: any) {
-      alert("فشل توليد PDF: " + (e?.message || e));
+      const msg = e?.message || String(e);
+      toast.error("فشل توليد PDF: " + msg, { id: "pdf-gen" });
+      window.dispatchEvent(new CustomEvent("lov:pdf-export-result", { detail: { ok: false, error: msg } }));
     } finally { setBusy(""); }
   };
 

@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useCompanySettings } from "@/hooks/useData";
 import { Search, X, Printer, Loader2 } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
-import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import { startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
