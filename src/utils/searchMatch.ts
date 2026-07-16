@@ -84,6 +84,54 @@ export function containsAny(fields: Array<unknown>, query: unknown): boolean {
   const q = normalizeAr(query);
   if (!q) return true;
   for (const f of fields) if (containsMatch(f, q)) return true;
+  // fuzzy fallback: tolerate single typo (insert/delete/replace) أو تبادل حرفين
+  if (q.length >= 3) {
+    for (const f of fields) if (fuzzyMatch(f, q, 1)) return true;
+  }
+  return false;
+}
+
+/**
+ * مسافة تحرير Damerau-Levenshtein (مع تبادل حرفين متجاورين كخطوة واحدة).
+ * تُستخدم لتحمل الأخطاء الإملائية البسيطة في البحث.
+ */
+export function damerauLevenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  const d: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) d[i][0] = i;
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost,
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[m][n];
+}
+
+/**
+ * مطابقة مبنية على مسافة تحرير — للأسماء الجزئية مع تحمّل خطأ إملائي واحد
+ * أو تبادل ترتيب حرفين متجاورين. تُقارن ضد نافذة بطول الاستعلام من بداية
+ * النص وكل توكن، لتفادي مطابقة النصوص الطويلة بالخطأ.
+ */
+export function fuzzyMatch(haystack: unknown, query: unknown, maxDist = 1): boolean {
+  const q = normalizeAr(query);
+  if (!q) return true;
+  const h = normalizeAr(haystack);
+  if (!h) return false;
+  if (damerauLevenshtein(h.slice(0, q.length), q) <= maxDist) return true;
+  for (const t of h.split(" ")) {
+    if (!t) continue;
+    if (damerauLevenshtein(t.slice(0, q.length), q) <= maxDist) return true;
+  }
   return false;
 }
 
