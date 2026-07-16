@@ -194,10 +194,13 @@ export async function deleteInvoiceWithStockRestore(
     try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
   }
 
+  const totalRestoredQty = restoredItems.reduce((s, it) => s + Number(it.quantity || 0), 0);
   return {
     restoredStock,
     invoiceNumber: (inv as any).invoice_number ?? null,
     convertedToCredit: 0,
+    totalRestoredQty,
+    deletedPayments,
     restoredItems,
     customerId,
     newCustomerBalance,
