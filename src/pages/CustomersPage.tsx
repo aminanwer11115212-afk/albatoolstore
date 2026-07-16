@@ -966,9 +966,6 @@ export default function CustomersPage() {
               <div className="text-center text-sm text-muted-foreground py-8">{recentDebtorsSearch ? "لا توجد نتائج مطابقة" : "لا يوجد عملاء مديونون"}</div>
             ) : recentDebtors.map((c: any, i: number) => {
               const fmtD = c._last ? c._last.split("-").reverse().join("-") : "—";
-              const debt = Number(c.balance || 0);
-              const credit = Number(c.credit_balance || 0);
-              const net = debt - credit;
               const reason = (c.notes || c.debt_reason || "").toString().trim();
               return (
                 <button
@@ -984,21 +981,8 @@ export default function CustomersPage() {
                     <span className="text-[10px] text-muted-foreground whitespace-nowrap">{fmtD}</span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 mt-2 text-[11px]">
-                    <div className="bg-destructive/10 rounded px-2 py-1 text-center">
-                      <div className="text-muted-foreground">المديونية</div>
-                      <div className="font-bold tabular-nums text-destructive">{debt.toLocaleString()}</div>
-                    </div>
-                    <div className="bg-emerald-500/10 rounded px-2 py-1 text-center">
-                      <div className="text-muted-foreground">الدائن</div>
-                      <div className="font-bold tabular-nums text-emerald-600">{credit.toLocaleString()}</div>
-                    </div>
-                    <div className={`rounded px-2 py-1 text-center ${net > 0 ? "bg-destructive/15" : net < 0 ? "bg-emerald-500/15" : "bg-muted"}`}>
-                      <div className="text-muted-foreground">الصافي</div>
-                      <div className={`font-bold tabular-nums ${net > 0 ? "text-destructive" : net < 0 ? "text-emerald-600" : "text-foreground"}`}>
-                        {Math.abs(net).toLocaleString()} <span className="text-[9px] font-normal">{net > 0 ? "عليه" : net < 0 ? "له" : ""}</span>
-                      </div>
-                    </div>
+                  <div className="mt-2">
+                    <CustomerAccountSummary customer={c} size="sm" />
                   </div>
 
                   <div className="flex items-start justify-between mt-2 gap-2 text-[11px] text-muted-foreground">
