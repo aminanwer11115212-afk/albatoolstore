@@ -132,7 +132,8 @@ export default function CustomerStatementPage() {
 
 
   const filteredInvoices = useMemo(() => {
-    return (invoices || []).filter((inv: any) => {
+    const q = invSearch.trim().toLowerCase();
+    let rows = (invoices || []).filter((inv: any) => {
       if (fromDate && inv.date < fromDate) return false;
       if (toDate && inv.date > toDate) return false;
       const total = Number(inv.total || 0);
@@ -142,12 +143,39 @@ export default function CustomerStatementPage() {
       if (paymentStatus === "paid" && paid < total) return false;
       if (paymentStatus === "unpaid" && paid > 0) return false;
       if (paymentStatus === "partial" && (paid === 0 || paid >= total)) return false;
+      if (q && !String(inv.invoice_number || "").toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [invoices, fromDate, toDate, minAmount, maxAmount, paymentStatus]);
+    const dir = invSortDir === "asc" ? 1 : -1;
+    rows = [...rows].sort((a: any, b: any) => {
+      let av: any, bv: any;
+      if (invSortKey === "remaining") {
+        av = Number(a.total || 0) - Number(a.paid_amount || 0);
+        bv = Number(b.total || 0) - Number(b.paid_amount || 0);
+      } else if (invSortKey === "total" || invSortKey === "paid_amount") {
+        av = Number(a[invSortKey] || 0); bv = Number(b[invSortKey] || 0);
+      } else {
+        av = a[invSortKey] ?? ""; bv = b[invSortKey] ?? "";
+      }
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), "ar", { numeric: true }) * dir;
+    });
+    return rows;
+  }, [invoices, fromDate, toDate, minAmount, maxAmount, paymentStatus, invSearch, invSortKey, invSortDir]);
+
+  const toggleInvSort = (k: typeof invSortKey) => {
+    if (invSortKey === k) setInvSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setInvSortKey(k); setInvSortDir("desc"); }
+  };
+
+  const classifyTx = (t: any): "payment" | "credit" | "credit_consume" | "other" => {
+    if (t.category === "customer_payment") return "payment";
+    if (t.category === "customer_credit") return Number(t.amount || 0) < 0 ? "credit_consume" : "credit";
+    return "other";
+  };
 
   const filteredTransactions = useMemo(() => {
-    return (transactions || []).filter((t: any) => {
+    let rows = (transactions || []).filter((t: any) => {
       if (fromDate && t.date < fromDate) return false;
       if (toDate && t.date > toDate) return false;
       const amt = Math.abs(Number(t.amount || 0));
@@ -157,9 +185,25 @@ export default function CustomerStatementPage() {
         const info = classifyCreditRow(t);
         if (!creditSourceFilter.has(info.source)) return false;
       }
+      if (txTypeFilter !== "all" && classifyTx(t) !== txTypeFilter) return false;
       return true;
     });
-  }, [transactions, fromDate, toDate, minAmount, maxAmount, creditSourceFilter]);
+    const dir = txSortDir === "asc" ? 1 : -1;
+    rows = [...rows].sort((a: any, b: any) => {
+      let av: any, bv: any;
+      if (txSortKey === "amount") { av = Number(a.amount || 0); bv = Number(b.amount || 0); }
+      else if (txSortKey === "type") { av = classifyTx(a); bv = classifyTx(b); }
+      else { av = a.date ?? ""; bv = b.date ?? ""; }
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), "ar", { numeric: true }) * dir;
+    });
+    return rows;
+  }, [transactions, fromDate, toDate, minAmount, maxAmount, creditSourceFilter, txTypeFilter, txSortKey, txSortDir]);
+
+  const toggleTxSort = (k: typeof txSortKey) => {
+    if (txSortKey === k) setTxSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setTxSortKey(k); setTxSortDir("desc"); }
+  };
 
   // تجميع customer_credit حسب المصدر — لعرض ملخّص فرعي أعلى الجدول
   const creditGroups = useMemo(() => {
