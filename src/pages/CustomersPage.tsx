@@ -501,16 +501,40 @@ export default function CustomersPage() {
     }).slice(0, 50);
   }, [customers, lastActivity, recentDebtorsSearch]);
 
+  // whitelist صارمة للأعمدة القابلة للتحديث من الواجهة — يمنع بشكل قاطع
+  // تسرّب balance/credit_balance/net_balance من أي patch إلى قاعدة البيانات.
+  // المصدر الوحيد لتلك الأعمدة هو recompute_customer_balance في DB.
+  const CUSTOMER_UPDATABLE_COLUMNS = new Set<string>([
+    "name", "phone", "email", "address", "city", "state", "country",
+    "group_id", "notes", "tax_number", "commercial_registration",
+    "contact_person", "whatsapp", "website", "code", "opening_balance",
+    "credit_limit", "payment_terms", "is_active", "tags",
+    "billing_address", "shipping_address", "preferred_transporter_id",
+    "customer_type", "discount_percentage",
+  ]);
+  const sanitizeCustomerPatch = (patch: Record<string, any>) => {
+    const clean: Record<string, any> = {};
+    for (const [k, v] of Object.entries(patch || {})) {
+      if (CUSTOMER_UPDATABLE_COLUMNS.has(k)) clean[k] = v;
+    }
+    return clean;
+  };
+
   const updateRowField = (id: string, patch: Record<string, any>) => {
+    const safePatch = sanitizeCustomerPatch(patch);
+    if (Object.keys(safePatch).length === 0) {
+      setSavingRow(null);
+      return;
+    }
     // Optimistic فوري — التطبيق على الواجهة قبل أي انتظار للخادم
     const prev = queryClient.getQueryData<any[]>(["customers"]);
     queryClient.setQueryData<any[]>(["customers"], (old) =>
-      (old || []).map((c: any) => c.id === id ? { ...c, ...patch } : c)
+      (old || []).map((c: any) => c.id === id ? { ...c, ...safePatch } : c)
     );
     // الحفظ في الخلفية بدون أي await — لا يمنع المستخدم من المتابعة
     (async () => {
       try {
-        const { error } = await (supabase as any).from("customers").update(patch).eq("id", id);
+        const { error } = await (supabase as any).from("customers").update(safePatch).eq("id", id);
         if (error) throw error;
         queryClient.invalidateQueries({ queryKey: ["customers"], refetchType: "active" });
         window.dispatchEvent(new Event("customers:changed"));
