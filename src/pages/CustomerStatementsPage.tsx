@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Search, FileText, X } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Search, FileText, X, AlertTriangle } from "lucide-react";
 import { useCustomers } from "@/hooks/useData";
 import { startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf, formatMoney } from "@/utils/balanceDisplay";
@@ -10,17 +10,32 @@ import { netBalanceOf, formatMoney } from "@/utils/balanceDisplay";
  * تعرض قائمة العملاء مع صافي الرصيد (netBalanceOf — نفس المصدر في كل النظام)،
  * بحث فوري بالاسم/الهاتف، Enter يفتح كشف حساب أول نتيجة على المسار الموحّد
  * /customers/:id/statement.
+ *
+ * حالة البحث محفوظة في URL (?q=...) حتى ترجع للصفحة فتظهر نفس النتائج.
  */
 export default function CustomerStatementsPage() {
   const navigate = useNavigate();
-  const { data: customers, isLoading } = useCustomers();
-  const [q, setQ] = useState("");
+  const { data: customers, isLoading, isError, error, refetch } = useCustomers();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [q, setQ] = useState(() => searchParams.get("q") || "");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // مزامنة q ↔ URL (بدون إغراق التاريخ)
+  useEffect(() => {
+    const cur = searchParams.get("q") || "";
+    if (cur === q) return;
+    const next = new URLSearchParams(searchParams);
+    if (q) next.set("q", q);
+    else next.delete("q");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+
 
   const rows = useMemo(() => {
     const list = (customers || []) as any[];
