@@ -12,7 +12,7 @@ import CreditConsumptionOrderControl from "@/components/statement/CreditConsumpt
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 
 export default function CustomerStatementPage() {
-  const { data: customers } = useCustomers();
+  const { data: customers, isLoading: customersLoading, isError: customersError } = useCustomers();
   const { data: companyArr } = useCompanySettings();
   const company = (companyArr as any)?.[0] || null;
   const params = useParams<{ id?: string }>();
@@ -447,6 +447,19 @@ export default function CustomerStatementPage() {
             )}
           </div>
         </div>
+
+        {selectedCustomerId && !customersLoading && !selectedCustomer && (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 text-destructive p-4 text-sm flex items-center gap-2">
+            <span>⚠️</span>
+            <span>لم يتم العثور على العميل المطلوب (id: <code className="tabular-nums">{selectedCustomerId.slice(0, 8)}</code>) — ربما تم حذفه أو الرابط قديم.</span>
+          </div>
+        )}
+        {customersError && (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 text-destructive p-4 text-sm">
+            ⚠️ تعذّر جلب بيانات العملاء (netBalanceOf) — تحقّق من الاتصال ثم أعد المحاولة.
+          </div>
+        )}
+
 
         {selectedCustomerId && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t border-border">

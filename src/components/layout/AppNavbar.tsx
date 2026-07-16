@@ -421,7 +421,9 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
     const customerItems: SearchItem[] = results.customers.map((c) => ({
       kind: "customer", id: c.id, label: c.name,
       sub: [c.phone, c.company].filter(Boolean).join(" • "),
-      path: `/customers?view=${c.id}`, icon: Users,
+      // بحث العميل من الشريط يفتح مباشرة كشف حساب العميل الجديد
+      // (بدل الواجهة المنبثقة القديمة في صفحة العملاء).
+      path: `/customers/${c.id}/statement`, icon: Users,
     }));
     return [
       { title: "العملاء", items: customerItems },
