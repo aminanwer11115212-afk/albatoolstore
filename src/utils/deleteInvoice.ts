@@ -5,6 +5,10 @@ export type DeleteInvoiceResult = {
   restoredStock: boolean;
   invoiceNumber: string | null;
   convertedToCredit: number;
+  /** Total quantity summed across restored items (0 when none). */
+  totalRestoredQty: number;
+  /** Amount of payments removed from transactions ledger for this invoice. */
+  deletedPayments: number;
   restoredItems: Array<{ product_id: string | null; quantity: number }>;
   customerId: string | null;
   newCustomerBalance: number | null;
@@ -190,10 +194,13 @@ export async function deleteInvoiceWithStockRestore(
     try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
   }
 
+  const totalRestoredQty = restoredItems.reduce((s, it) => s + Number(it.quantity || 0), 0);
   return {
     restoredStock,
     invoiceNumber: (inv as any).invoice_number ?? null,
     convertedToCredit: 0,
+    totalRestoredQty,
+    deletedPayments,
     restoredItems,
     customerId,
     newCustomerBalance,

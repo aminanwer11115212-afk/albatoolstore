@@ -1,110 +1,53 @@
-# خطة مراجعة وتوحيد مفهوم الحسابات في كامل النظام
+# الدفعة 4 — كشف الحساب + سجل الحذف + توست الحذف
 
-الهدف: توحيد "مفهوم رصيد العميل" عبر كل السطوح (الفواتير، حوار الدفع، صفحة العملاء، كشف الحساب، التقارير، الطباعة) بحيث لا يظهر رقمان مختلفان لنفس العميل في أي مكان، وتكون مصادر الحقيقة واضحة ومحددة.
+## 1) توست الحذف (كل صفحات الحذف)
+- `deleteInvoiceWithStockRestore` بالفعل يُرجع `newCustomerBalance` + `newCustomerCredit` + `restoredItems` + `deletedPayments` (عبر `convertedToCredit`/details).
+- توحيد التوست عبر util جديد `src/utils/deleteInvoiceToast.ts`:
+  - سطر 1: `تم حذف الفاتورة {invoice_number}`.
+  - سطر 2: عدد بنود المخزون المُرجَعة + إجمالي الكميات.
+  - سطر 3: إن كان هناك `deletedPayments > 0` → `أُلغيت دفعات بقيمة X` (من `paid_amount` قبل الحذف).
+  - سطر 4 (للفواتير العادية غير POS): `رصيد العميل الآن: عليه X / له Y / مسدَّد` — عبر `netBalanceOf({balance:newCustomerBalance, credit_balance:newCustomerCredit})` و `describeBalance`.
+- استبدال كل نداءات `toast()` بعد الحذف في:
+  - `InvoicesPage.tsx`, `TodayInvoicesPage.tsx`, `InvoiceViewPage.tsx`, `InvoiceEditPage.tsx`, `CashInvoicesPage`/`CashInvoiceEditPage`, `CustomerStatementPage` (زر حذف مضمن إن وُجد).
 
-## المشكلة الحالية (تشخيص)
+## 2) صفة الرد من util الحذف
+- تعديل `DeleteInvoiceResult` لإضافة:
+  - `deletedPayments: number` (المبلغ المُلغى فعلياً).
+  - `totalRestoredQty: number` (مجموع الكميات المُرجَعة للمخزون).
+- تحديث الاختبارات الحالية لإدراج الحقلين (لا كسر).
 
-1. **تعدد مصادر الرقم**: بعض الصفحات تقرأ `customers.balance` مباشرة، وأخرى تحسب من `invoices`، وأخرى تستخدم `net_balance = balance − credit_balance`، وأخرى تستخدم helper `netBalanceOf`.
-2. **مفهوم "الرصيد الدائن" غير موحّد**: أحياناً يُعرض كعمود مستقل، وأحياناً مطروح من المديونية، وأحياناً كبطاقة ثالثة.
-3. **حوار الدفع (`CustomerPaymentDialog`)** يعرض المتبقي على الفاتورة فقط دون سياق رصيد العميل الكلي.
-4. **نوافذ المديونية في صفحة العملاء**: البادج/الشريط قد يعرض `balance` الخام بينما كشف الحساب يعرض `net_balance` → فرق ظاهري.
-5. **POS Isolation** مطبّق في `recompute_customer_balance` وفي بعض القوائم فقط، لكن ليس في كل بطاقات الملخص.
-6. **الطباعة** توحّدت مؤخراً على "رصيد العميل الحالي" لكن كشف الحساب المطبوع (`statementPrintTemplate`) لم يُراجَع بنفس المنهجية.
+## 3) كشف حساب العميل يعرض الفواتير المحذوفة
+- مصدر البيانات: جدول `activity_log` (موجود) مع `entity_type='invoice' AND action='delete' AND (old_data->>'customer_id')=$1`.
+- في `CustomerStatementPage.tsx` و `PublicCustomerStatementPage.tsx`:
+  - جلب سجلات الحذف الخاصة بالعميل ضمن نفس نطاق التاريخ.
+  - عرضها كصفوف في الجدول برمز 🗑 وخلفية `bg-destructive/5`، مع:
+    - رقم الفاتورة (من `old_data.invoice_number`)
+    - التاريخ (`old_data.date`)
+    - الإجمالي (`old_data.total`) بلون مشطوب
+    - المدفوع الذي أُلغي (`details.deleted_payments`)
+    - عدد البنود (`details.items_count`) + عبارة "أُرجعت للمخزون" إن `details.restored_stock`.
+  - عمود جديد "المصدر" يميّز: فاتورة / سند قبض / **فاتورة محذوفة**.
+  - لا تدخل في المجاميع (لأنها فعلياً أُلغيت — الرصيد أعيد حسابه بالفعل).
 
-## المبدأ الحاكم (Single Source of Truth)
+## 4) توحيد رأس كشف الحساب
+- استخدام `CustomerAccountSummary` بحجم `md` في رأس `CustomerStatementPage` و `PublicCustomerStatementPage` بدلاً من الحساب اليدوي الحالي.
+- تحديث `statementPrintTemplate.ts` ليطبع سطر "رصيد العميل الحالي" الموحّد (نص واحد: مسدَّد/عليه X/له Y) بدل الحقلين المنفصلين.
 
-```
-رصيد العميل الحالي = net_balance (محسوب في DB)
-                    = Σ(المتبقي على الفواتير غير الملغاة وغير-POS)
-                    − Σ(customer_credit للعميل)
+## 5) تحديث سريع بعد الحذف
+- بعد الحذف نُطلق بالفعل `invoices:changed / customers:changed / transactions:changed / products:changed`.
+- إضافة `queryClient.invalidateQueries` صريح لمفاتيح: `["customer-statement", customerId]`, `["activity-log", "invoice-deletions", customerId]`, `["customers"]`, `["dashboard-stats"]`.
 
-net > 0  → "عليه X" (مدين لنا)   — أحمر
-net < 0  → "له X"  (دائن)         — أخضر
-net = 0  → "خالص"                 — رمادي
-```
+## تنفيذ
+دفعة واحدة (5 ملفات جديدة/معدّلة + ملف اختبار):
+1. `src/utils/deleteInvoice.ts` — يُرجع `deletedPayments` + `totalRestoredQty`.
+2. `src/utils/deleteInvoiceToast.ts` — util موحّد.
+3. `src/hooks/useDeletedInvoicesForCustomer.ts` — hook للجلب من `activity_log`.
+4. `src/pages/CustomerStatementPage.tsx` — دمج الصفوف + رأس موحّد.
+5. `src/pages/PublicCustomerStatementPage.tsx` — نفس التعديلات (للقراءة العامة عبر توكن).
+6. `src/utils/statementPrintTemplate.ts` — سطر الرصيد الموحّد + تمرير الحذف.
+7. استبدال `toast(...)` في `InvoicesPage`, `TodayInvoicesPage`, `InvoiceViewPage`, `InvoiceEditPage`, `CashInvoicesPage`, `CashInvoiceEditPage`.
+8. `src/test/deleteInvoiceToast.test.ts` — يغطي الحالات الأربع (خالص/مدين/دائن/POS).
 
-كل عرض في النظام يجب أن يمر عبر `netBalanceOf()` + `computeDisplayBalance()` + `CustomerAccountSummary` من `src/utils/balanceDisplay.tsx`. ممنوع أي حساب يدوي في مكوّن جديد.
-
----
-
-## الخطة على 5 دفعات (Batches)
-
-### الدفعة 1 — تدقيق ومسح شامل (لا كود)
-- جرد كل مكان يعرض رقم رصيد/مديونية/دائن للعميل: صفحات، بطاقات، بادجات، قوائم منسدلة، حوارات دفع، طباعة، Share pages، تقارير.
-- إنتاج جدول: `[Surface | File:Line | Field used | Should be]` وتحديد الخارجين عن المعيار.
-- المخرَج: `.lovable/audit/balance-surfaces.md`.
-
-### الدفعة 2 — توحيد صفحة العملاء (`CustomersPage` + `CustomerDetailView`)
-- استبدال أي بادج/رقم مباشر بـ `CustomerAccountSummary` (3 خلايا: مدين | دائن | صافي) أو `BalanceChip` للمساحات الضيقة.
-- بطاقة "إجماليات العملاء" أعلى الصفحة تستخدم `get_customer_balance_stats` RPC فقط (موجودة).
-- فلاتر "المدينون / الدائنون / الخالصون" تعتمد على `net_balance` وليس `balance`.
-- ملف الاختبار: `src/test/customersPageBalanceParity.test.tsx`.
-
-### الدفعة 3 — توحيد حوار الدفع (`CustomerPaymentDialog`) وصفحة الفاتورة
-- إضافة رأس ملخص في الحوار: `CustomerAccountSummary` (compact) للعميل قبل بدء الدفع، لكي يرى المستخدم رصيده الحالي.
-- توضيح ثلاثة حقول منفصلة: "متبقي الفاتورة"، "رصيد دائن سيُستخدم"، "دفعة نقدية جديدة".
-- شريط ناتج مباشر في الأسفل: "بعد الحفظ سيصبح رصيد العميل: X" (محسوب لحظياً).
-- في `InvoiceViewPage`: توحيد كل ظهور للرصيد على `computeDisplayBalance` + مسمّى "رصيد العميل الحالي".
-- تحديث `InvoiceCustomerCreditBanner` ليتّسق مع نفس التسمية والألوان.
-- اختبار E2E: `e2e/payment-dialog-shows-customer-net.spec.ts`.
-
-### الدفعة 4 — توحيد كشف الحساب (`CustomerStatementPage` + `PublicCustomerStatementPage`)
-- إضافة رأس موحّد في أعلى الصفحة يستخدم `CustomerAccountSummary` (كبير) بدلاً من البطاقات المخصصة الحالية.
-- الرصيد الجاري في الجدول يبدأ من 0 ويُبنى من الحركات فقط (invoice + transaction) بعد استبعاد POS و`reference_id` لفواتير POS — نفس المنطق الموجود مع ضمان مطابقته لـ `net_balance` في السطر الأخير.
-- إضافة سطر تحقق (Invariant check) في الـ dev-mode فقط: إذا اختلف `runningBalance` النهائي عن `net_balance` بأكثر من 0.01 → toast تحذيري + سجل في `financeInvariants`.
-- توحيد قالب الطباعة `statementPrintTemplate` مع `printTemplate` (نفس المسمّيات والألوان).
-- اختبار: `src/test/statementRunningVsNetParity.test.ts`.
-
-### الدفعة 5 — توحيد التقارير والطباعة العامة
-- `CustomerDebtReportPage` + `TodayInvoicesPage` (تبويب العملاء) + تقارير الديون + أي مكان يعرض قوائم عملاء بمبالغ:
-  - عمود واحد للرصيد باستخدام `computeDisplayBalance`، بدل عمودَي balance/credit منفصلين إلا في وضع "تفصيلي".
-  - إضافة toggle "عرض تفصيلي (مدين | دائن | صافي)" ← يفعّل `CustomerAccountSummary`.
-- تحديث `financialReportPrintTemplate` بنفس المسمّى "رصيد العميل الحالي".
-- تحديث `InvoiceAccountingAlert` ليقرأ من نفس المصدر (بدون استعلام إضافي).
-- اختبار E2E موحّد: `e2e/balance-parity-across-surfaces.spec.ts` — يفتح 6 صفحات لنفس العميل ويؤكد أن الرقم المعروض متطابق.
-
----
-
-## Technical Section
-
-### مبادئ ثابتة
-1. **لا استعلام مباشر لـ `customers.balance` أو `credit_balance` منفرداً في أي مكوّن جديد** — دائماً عبر `netBalanceOf`.
-2. **لا كتابة يدوية لأعمدة الرصيد** — Triggers هي المصدر (`recompute_customer_balance`).
-3. **POS Isolation** يُطبَّق في كل استعلام يعرض حركات عميل: `.neq('source','pos')` للفواتير + استبعاد `reference_id ∈ pos_invoice_ids` للـ transactions.
-4. **React Query Keys** المتأثرة عند أي دفع/تعديل: `['customers']`, `['customer', id]`, `['customer-statement', id]`, `['invoice', id]`, `['transactions']`.
-5. **الألوان**: أحمر = `hsl(var(--destructive))`، أخضر = `hsl(142 70% 35%)` (كما هو معرّف في `balanceDisplay.tsx`)، رمادي للتسوية. لا hardcoded.
-6. **RTL + Arabic** إلزامي لكل نص جديد.
-
-### ملفات مخطط إنشاؤها
-- `.lovable/audit/balance-surfaces.md` (الدفعة 1)
-- `src/components/statement/StatementNetBalanceHeader.tsx` (الدفعة 4)
-- `src/components/invoice/PaymentDialogCustomerContext.tsx` (الدفعة 3)
-- `src/test/customersPageBalanceParity.test.tsx` (الدفعة 2)
-- `src/test/statementRunningVsNetParity.test.ts` (الدفعة 4)
-- `e2e/payment-dialog-shows-customer-net.spec.ts` (الدفعة 3)
-- `e2e/balance-parity-across-surfaces.spec.ts` (الدفعة 5)
-
-### ملفات مخطط تعديلها
-- `src/pages/CustomersPage.tsx`, `src/components/customer/CustomerDetailView.tsx` (الدفعة 2)
-- `src/components/invoice/CustomerPaymentDialog.tsx`, `src/pages/InvoiceViewPage.tsx`, `src/components/invoice/InvoiceCustomerCreditBanner.tsx` (الدفعة 3)
-- `src/pages/CustomerStatementPage.tsx`, `src/pages/PublicCustomerStatementPage.tsx`, `src/utils/statementPrintTemplate.ts` (الدفعة 4)
-- `src/pages/CustomerDebtReportPage.tsx`, `src/pages/TodayInvoicesPage.tsx`, `src/utils/financialReportPrintTemplate.ts`, `src/components/invoice/InvoiceAccountingAlert.tsx` (الدفعة 5)
-
-### بدون تغييرات على قاعدة البيانات
-لا migrations في هذه الخطة — كل شيء يستفيد من `net_balance` المحسوب مسبقاً وTriggers الموجودة. أي تعديل schema يُؤجَّل لخطة منفصلة.
-
-### الاستبعادات (خارج النطاق الآن)
-- تغيير طريقة حساب `net_balance` في DB.
-- تعدد العملات في العرض الموحّد (يحتاج خطة منفصلة).
-- تصدير Excel/PDF للحساب الموحّد (يمكن إضافته بعد الدفعة 5).
-
----
-
-## طريقة التنفيذ
-
-كل دفعة تُنفَّذ في رسالة منفصلة، وبعد كل دفعة:
-1. build/type check يمر.
-2. اختبار الدفعة أخضر.
-3. لقطة/تحقق من صفحتين على الأقل.
-
-الدفعة 1 هي المدخل (تدقيق فقط) وستحدد بدقة أي صفحات تحتاج تدخّل أكبر مما هو مذكور. ابدأ بها؟
+## غير مشمول (خارج النطاق)
+- الدفعة 5 (تقارير الديون + Alert المحاسبي) تبقى للجولة التالية.
+- حذف الفواتير من `activity_log` بالفعل موجود من التعديل السابق — لا حاجة لـmigration.

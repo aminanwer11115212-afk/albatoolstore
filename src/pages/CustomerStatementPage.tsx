@@ -9,6 +9,7 @@ import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
+import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 
 export default function CustomerStatementPage() {
   const { data: customers } = useCustomers();
@@ -108,6 +109,11 @@ export default function CustomerStatementPage() {
     },
     enabled: !!selectedCustomerId,
   });
+
+  const { data: deletedInvoices } = useDeletedInvoicesForCustomer(selectedCustomerId, fromDate, toDate);
+
+
+
 
   const filteredInvoices = useMemo(() => {
     return (invoices || []).filter((inv: any) => {
@@ -396,6 +402,47 @@ export default function CustomerStatementPage() {
               </table>
             </div>
           </div>
+
+          {(deletedInvoices || []).length > 0 && (
+            <div data-section="deleted-invoices" data-section-label="فواتير محذوفة" className="legacy-card card-block border-destructive/30">
+              <h3 className="px-5 py-3 font-semibold text-destructive border-b border-border flex items-center gap-2">
+                <span>🗑</span>
+                فواتير محذوفة ({deletedInvoices!.length})
+                <span className="text-[11px] font-normal text-muted-foreground">— لا تُحسب في المجاميع، الرصيد أُعيد حسابه</span>
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm mobile-stack-table">
+                  <thead><tr className="bg-destructive/5">
+                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">رقم الفاتورة</th>
+                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
+                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الإجمالي</th>
+                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المدفوع المُلغى</th>
+                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">البنود</th>
+                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">حُذفت في</th>
+                    <th className="text-right px-5 py-3 font-semibold text-muted-foreground">بواسطة</th>
+                  </tr></thead>
+                  <tbody>
+                    {deletedInvoices!.map((d) => (
+                      <tr key={d.id} className="border-b border-border bg-destructive/5 hover:bg-destructive/10">
+                        <td data-label="رقم الفاتورة" className="px-5 py-3 text-foreground line-through">{d.invoice_number || "—"}</td>
+                        <td data-label="التاريخ" className="px-5 py-3 text-foreground tabular-nums">{d.date || "—"}</td>
+                        <td data-label="الإجمالي" className="px-5 py-3 text-muted-foreground line-through tabular-nums">{d.total.toLocaleString()}</td>
+                        <td data-label="المدفوع المُلغى" className="px-5 py-3 tabular-nums text-amber-700">{d.deleted_payments > 0 ? d.deleted_payments.toLocaleString() : (d.paid_amount > 0 ? d.paid_amount.toLocaleString() : "—")}</td>
+                        <td data-label="البنود" className="px-5 py-3 text-xs text-muted-foreground">
+                          {d.items_count} بند
+                          {d.restored_stock && <span className="ms-2 inline-block px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 text-[10px]">أُرجعت للمخزون</span>}
+                        </td>
+                        <td data-label="حُذفت في" className="px-5 py-3 text-xs text-muted-foreground tabular-nums">{new Date(d.deleted_at).toLocaleString()}</td>
+                        <td data-label="بواسطة" className="px-5 py-3 text-xs text-muted-foreground">{d.user_email || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+
 
           {filteredTransactions.length > 0 && (
             <div data-section="transactions" data-section-label="المعاملات" className="legacy-card card-block">
