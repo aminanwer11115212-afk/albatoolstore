@@ -338,10 +338,14 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     (async () => {
       const { data: bal } = await supabase
         .from("customers")
-        .select("balance, credit_balance")
+        .select("balance, credit_balance, net_balance")
         .eq("id", customer.id)
         .maybeSingle();
-      if (bal) setCustomerBalances({ debt: Number((bal as any).balance || 0), credit: Number((bal as any).credit_balance || 0) });
+      if (bal) setCustomerBalances({
+        debt: Number((bal as any).balance || 0),
+        credit: Number((bal as any).credit_balance || 0),
+        net: (bal as any).net_balance != null ? Number((bal as any).net_balance) : undefined,
+      });
       else setCustomerBalances(null);
     })();
     (async () => {
