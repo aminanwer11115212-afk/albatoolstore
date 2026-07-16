@@ -128,39 +128,9 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
               <ArrowLeft size={16} /> رجوع
             </button>
             <button
-              onClick={async () => {
-                const { data: companyRow } = await supabase
-                  .from("company_settings")
-                  .select("company_name, phone, address, email, logo_url, currency")
-                  .maybeSingle();
-                const payload: StatementData = {
-                  kind: "customer",
-                  party: {
-                    id: customer.id,
-                    name: customer.name,
-                    phone: customer.phone,
-                    address: customer.address || customer.city,
-                    email: customer.email,
-                    balance: netBalanceOf(customer as any),
-                  },
-                  company: (companyRow as any) || undefined,
-                  invoices: invoices.map((inv: any) => ({
-                    invoice_number: inv.invoice_number,
-                    date: inv.date,
-                    total: Number(inv.total || 0),
-                    paid_amount: Number(inv.paid_amount || 0),
-                    status: inv.status,
-                  })),
-                  totals: {
-                    invoicesTotal: stats.totalSales,
-                    paidTotal: stats.totalPaid,
-                    remaining: stats.totalDue,
-                  },
-                };
-                sessionStorage.setItem("lov_statement_preview", JSON.stringify(payload));
-                navigate("/reports/statement-preview");
-              }}
+              onClick={() => navigate(`/customers/${customer.id}/statement`)}
               className="bg-card border border-border text-foreground px-3 py-2 rounded-lg text-sm flex items-center gap-1 hover:bg-muted"
+              title="فتح كشف الحساب الكامل"
             >
               <ClipboardList size={16} /> كشف حساب
             </button>
