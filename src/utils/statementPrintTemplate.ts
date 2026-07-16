@@ -104,12 +104,6 @@ export function generateStatementHTML(data: StatementData): string {
       : typeof party.balance === "number"
         ? party.balance
         : Number(totals.balance || 0);
-  const balanceVal =
-    kind === "customer"
-      ? netBalanceOf(party as any)
-      : typeof party.balance === "number"
-        ? party.balance
-        : Number(totals.balance || 0);
   const balanceState =
     Math.abs(balanceVal) < 0.01
       ? "✅ مُسوّى"
