@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, FileText, X, AlertTriangle } from "lucide-react";
 import { useCustomers } from "@/hooks/useData";
-import { startsWithAny } from "@/utils/searchMatch";
+import { containsAny } from "@/utils/searchMatch";
 import { netBalanceOf, formatMoney } from "@/utils/balanceDisplay";
 
 /**
