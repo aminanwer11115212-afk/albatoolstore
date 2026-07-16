@@ -1667,128 +1667,133 @@ export default function CustomersPage() {
                 <tbody>
                   <tr style={{ background: "hsl(var(--primary) / 0.06)", borderBottom: "2px solid hsl(var(--primary) / 0.3)" }}>
                     <td style={{ textAlign: "center", fontWeight: 700, color: "hsl(var(--primary))" }}>+</td>
-                    <td>
-                      <input
-                        type="text"
-                        value={quickAdd.name}
-                        onChange={(e) => setQuickAdd({ ...quickAdd, name: e.target.value })}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(); }}
-                        placeholder="اسم العميل الجديد..."
-                        disabled={quickSaving}
-                        className="bg-background border border-border rounded px-1 py-0.5 text-[12px] w-full min-w-0 font-medium"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={quickAdd.address}
-                        onChange={(e) => setQuickAdd({ ...quickAdd, address: e.target.value })}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(); }}
-                        placeholder="العنوان"
-                        disabled={quickSaving}
-                        className="bg-background border border-border rounded px-1 py-0.5 text-[11px] w-full min-w-0"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={quickAdd.phone}
-                        onChange={(e) => setQuickAdd({ ...quickAdd, phone: e.target.value })}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(); }}
-                        placeholder="الهاتف"
-                        inputMode="tel"
-                        dir="ltr"
-                        disabled={quickSaving}
-                        className="bg-background border border-border rounded px-1 py-0.5 text-[11px] w-full min-w-0 tabular-nums"
-                        style={quickAdd.phone && findDuplicatesByPhone(quickAdd.phone).length > 0 ? { borderColor: "hsl(var(--destructive))" } : undefined}
-                        title={quickAdd.phone && findDuplicatesByPhone(quickAdd.phone).length > 0 ? "رقم مكرر" : undefined}
-                      />
-                    </td>
-                    <td>
-                      <InlineSearchSelect
-                        value={quickAdd.region_id}
-                        options={regions.map(r => ({ value: r.id, label: r.name }))}
-                        onChange={(v) => setQuickAdd({ ...quickAdd, region_id: v, state_id: "", city_id: "", locality_id: "" })}
-                        onAdd={async (name) => await createRegion(name)}
-                        placeholder="— الاتجاه —"
-                        addLabel="إضافة منطقة"
-                        disabled={quickSaving}
-                      />
-                    </td>
-                    <td>
-                      <InlineSearchSelect
-                        value={quickAdd.state_id}
-                        options={states.filter(s => !quickAdd.region_id || s.region_id === quickAdd.region_id).map(s => ({ value: s.id, label: s.name }))}
-                        onChange={(v) => setQuickAdd({ ...quickAdd, state_id: v, city_id: "", locality_id: "" })}
-                        onAdd={async (name) => await createState(name, quickAdd.region_id)}
-                        placeholder="— الولاية —"
-                        addLabel="إضافة ولاية"
-                        disabled={quickSaving || !quickAdd.region_id}
-                      />
-                    </td>
-                    <td>
-                      <InlineSearchSelect
-                        value={quickAdd.city_id}
-                        options={cities.filter(ci => !quickAdd.state_id || ci.state_id === quickAdd.state_id).map(ci => ({ value: ci.id, label: ci.name }))}
-                        onChange={(v) => setQuickAdd({ ...quickAdd, city_id: v, locality_id: "" })}
-                        onAdd={async (name) => await createCity(name, quickAdd.state_id)}
-                        onDelete={async (o) => await deleteCity(o.value)}
-                        placeholder="— المدينة —"
-                        addLabel="إضافة مدينة"
-                        disabled={quickSaving || !quickAdd.state_id}
-                      />
-                    </td>
-                    <td>
-                      <InlineSearchSelect
-                        value={(quickAdd as any).locality_id || ""}
-                        options={localities.filter(l => !quickAdd.city_id || l.city_id === quickAdd.city_id).map(l => ({ value: l.id, label: l.name }))}
-                        onChange={(v) => setQuickAdd({ ...quickAdd, locality_id: v } as any)}
-                        onAdd={async (name) => await createLocality(name, quickAdd.city_id)}
-                        onDelete={async (o) => await deleteLocality(o.value)}
-                        placeholder="— المحلية —"
-                        addLabel="إضافة محلية"
-                        disabled={quickSaving || !quickAdd.city_id}
-                      />
-                    </td>
-                    <td>
-                      <InlineSearchSelect
-                        value={quickAdd.group_id}
-                        options={groups.map(g => ({ value: g.id, label: g.name }))}
-                        onChange={(v) => setQuickAdd({ ...quickAdd, group_id: v })}
-                        onAdd={async (name) => await createGroup(name)}
-                        onDelete={async (o) => await deleteGroup(o.value)}
-                        showDeleteButton
-                        placeholder="— المجموعة —"
-                        addLabel="إضافة مجموعة"
-                        disabled={quickSaving}
-                      />
-                    </td>
-                    <td>
-                      <InlineSearchSelect
-                        value={quickAdd.transporter_id}
-                        options={transporters.map(t => ({ value: t.id, label: t.name }))}
-                        onChange={(v) => setQuickAdd({ ...quickAdd, transporter_id: v })}
-                        onAdd={async (name) => await createTransporter(name)}
-                        onDelete={async (o) => await deleteTransporter(o.value)}
-                        showDeleteButton
-                        placeholder="— ترحيلات —"
-                        addLabel="إضافة ناقل"
-                        disabled={quickSaving}
-                      />
-                    </td>
-                    <td>
-                      <InlineSearchSelect
-                        value={quickAdd.destination_id}
-                        options={destinations.map(d => ({ value: d.id, label: d.name }))}
-                        onChange={(v) => setQuickAdd({ ...quickAdd, destination_id: v })}
-                        onAdd={async (name) => await createDestination(name)}
-                        onDelete={async (o) => await deleteDestination(o.value)}
-                        showDeleteButton
-                        placeholder="— الوجهة —"
-                        addLabel="إضافة وجهة"
-                        disabled={quickSaving}
-                      />
-                    </td>
+                    {(() => {
+                      const quickCells: Record<CustomerColKey, React.ReactNode> = {
+                        name: (
+                          <input
+                            type="text"
+                            value={quickAdd.name}
+                            onChange={(e) => setQuickAdd({ ...quickAdd, name: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(); }}
+                            placeholder="اسم العميل الجديد..."
+                            disabled={quickSaving}
+                            className="bg-background border border-border rounded px-1 py-0.5 text-[12px] w-full min-w-0 font-medium"
+                          />
+                        ),
+                        address: (
+                          <input
+                            type="text"
+                            value={quickAdd.address}
+                            onChange={(e) => setQuickAdd({ ...quickAdd, address: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(); }}
+                            placeholder="العنوان"
+                            disabled={quickSaving}
+                            className="bg-background border border-border rounded px-1 py-0.5 text-[11px] w-full min-w-0"
+                          />
+                        ),
+                        phone: (
+                          <input
+                            type="text"
+                            value={quickAdd.phone}
+                            onChange={(e) => setQuickAdd({ ...quickAdd, phone: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(); }}
+                            placeholder="الهاتف"
+                            inputMode="tel"
+                            dir="ltr"
+                            disabled={quickSaving}
+                            className="bg-background border border-border rounded px-1 py-0.5 text-[11px] w-full min-w-0 tabular-nums"
+                            style={quickAdd.phone && findDuplicatesByPhone(quickAdd.phone).length > 0 ? { borderColor: "hsl(var(--destructive))" } : undefined}
+                            title={quickAdd.phone && findDuplicatesByPhone(quickAdd.phone).length > 0 ? "رقم مكرر" : undefined}
+                          />
+                        ),
+                        region: (
+                          <InlineSearchSelect
+                            value={quickAdd.region_id}
+                            options={regions.map(r => ({ value: r.id, label: r.name }))}
+                            onChange={(v) => setQuickAdd({ ...quickAdd, region_id: v, state_id: "", city_id: "", locality_id: "" })}
+                            onAdd={async (name) => await createRegion(name)}
+                            placeholder="— الاتجاه —"
+                            addLabel="إضافة منطقة"
+                            disabled={quickSaving}
+                          />
+                        ),
+                        state: (
+                          <InlineSearchSelect
+                            value={quickAdd.state_id}
+                            options={states.filter(s => !quickAdd.region_id || s.region_id === quickAdd.region_id).map(s => ({ value: s.id, label: s.name }))}
+                            onChange={(v) => setQuickAdd({ ...quickAdd, state_id: v, city_id: "", locality_id: "" })}
+                            onAdd={async (name) => await createState(name, quickAdd.region_id)}
+                            placeholder="— الولاية —"
+                            addLabel="إضافة ولاية"
+                            disabled={quickSaving || !quickAdd.region_id}
+                          />
+                        ),
+                        city: (
+                          <InlineSearchSelect
+                            value={quickAdd.city_id}
+                            options={cities.filter(ci => !quickAdd.state_id || ci.state_id === quickAdd.state_id).map(ci => ({ value: ci.id, label: ci.name }))}
+                            onChange={(v) => setQuickAdd({ ...quickAdd, city_id: v, locality_id: "" })}
+                            onAdd={async (name) => await createCity(name, quickAdd.state_id)}
+                            onDelete={async (o) => await deleteCity(o.value)}
+                            placeholder="— المدينة —"
+                            addLabel="إضافة مدينة"
+                            disabled={quickSaving || !quickAdd.state_id}
+                          />
+                        ),
+                        locality: (
+                          <InlineSearchSelect
+                            value={(quickAdd as any).locality_id || ""}
+                            options={localities.filter(l => !quickAdd.city_id || l.city_id === quickAdd.city_id).map(l => ({ value: l.id, label: l.name }))}
+                            onChange={(v) => setQuickAdd({ ...quickAdd, locality_id: v } as any)}
+                            onAdd={async (name) => await createLocality(name, quickAdd.city_id)}
+                            onDelete={async (o) => await deleteLocality(o.value)}
+                            placeholder="— المحلية —"
+                            addLabel="إضافة محلية"
+                            disabled={quickSaving || !quickAdd.city_id}
+                          />
+                        ),
+                        group: (
+                          <InlineSearchSelect
+                            value={quickAdd.group_id}
+                            options={groups.map(g => ({ value: g.id, label: g.name }))}
+                            onChange={(v) => setQuickAdd({ ...quickAdd, group_id: v })}
+                            onAdd={async (name) => await createGroup(name)}
+                            onDelete={async (o) => await deleteGroup(o.value)}
+                            showDeleteButton
+                            placeholder="— المجموعة —"
+                            addLabel="إضافة مجموعة"
+                            disabled={quickSaving}
+                          />
+                        ),
+                        transporter: (
+                          <InlineSearchSelect
+                            value={quickAdd.transporter_id}
+                            options={transporters.map(t => ({ value: t.id, label: t.name }))}
+                            onChange={(v) => setQuickAdd({ ...quickAdd, transporter_id: v })}
+                            onAdd={async (name) => await createTransporter(name)}
+                            onDelete={async (o) => await deleteTransporter(o.value)}
+                            showDeleteButton
+                            placeholder="— ترحيلات —"
+                            addLabel="إضافة ناقل"
+                            disabled={quickSaving}
+                          />
+                        ),
+                        destination: (
+                          <InlineSearchSelect
+                            value={quickAdd.destination_id}
+                            options={destinations.map(d => ({ value: d.id, label: d.name }))}
+                            onChange={(v) => setQuickAdd({ ...quickAdd, destination_id: v })}
+                            onAdd={async (name) => await createDestination(name)}
+                            onDelete={async (o) => await deleteDestination(o.value)}
+                            showDeleteButton
+                            placeholder="— الوجهة —"
+                            addLabel="إضافة وجهة"
+                            disabled={quickSaving}
+                          />
+                        ),
+                      };
+                      return visibleMiddleKeys.map(k => <td key={k}>{quickCells[k]}</td>);
+                    })()}
                     <td style={{ textAlign: "center" }}>
                       <button
                         type="button"
