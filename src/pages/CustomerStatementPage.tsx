@@ -406,14 +406,19 @@ export default function CustomerStatementPage() {
           </button>
           <button
             type="button"
+            disabled={exportingPdf}
+            data-testid="statement-export-pdf"
             onClick={() => {
               try { sessionStorage.setItem("lov_financial_report_autoexport", "pdf"); } catch { /* ignore */ }
+              setExportingPdf(true);
+              toast.loading("جارٍ تجهيز PDF...", { id: "pdf-export" });
               handleOpenPrint();
             }}
-            className="inline-flex items-center gap-2 bg-emerald-600 text-white hover:opacity-90 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
-            title="ينتقل لصفحة المعاينة ثم يبدأ تنزيل PDF تلقائياً — يشمل الفواتير المحذوفة/الملغاة بتفاصيلها"
+            className="inline-flex items-center gap-2 bg-emerald-600 text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
+            title="ينتقل لصفحة المعاينة ثم يبدأ تنزيل PDF تلقائياً — الرقم المطبوع هو نفس netBalanceOf المعروض هنا"
           >
-            📄 تصدير PDF
+            {exportingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>📄</span>}
+            {exportingPdf ? "جارٍ التصدير..." : "تصدير PDF"}
           </button>
         </div>
       )}
@@ -465,15 +470,18 @@ export default function CustomerStatementPage() {
         </div>
 
         {selectedCustomerId && !customersLoading && !selectedCustomer && (
-          <div className="rounded-xl border border-destructive/40 bg-destructive/5 text-destructive p-4 text-sm flex items-center gap-2">
-            <span>⚠️</span>
-            <span>لم يتم العثور على العميل المطلوب (id: <code className="tabular-nums">{selectedCustomerId.slice(0, 8)}</code>) — ربما تم حذفه أو الرابط قديم.</span>
-          </div>
+          <CustomerStatementErrorState
+            title="لم يتم العثور على العميل"
+            message="قد يكون تم حذف العميل أو أن الرابط قديم — عُد إلى قائمة العملاء واختر عميلاً آخر."
+            detail={`id: ${selectedCustomerId.slice(0, 8)}`}
+          />
         )}
         {customersError && (
-          <div className="rounded-xl border border-destructive/40 bg-destructive/5 text-destructive p-4 text-sm">
-            ⚠️ تعذّر جلب بيانات العملاء (netBalanceOf) — تحقّق من الاتصال ثم أعد المحاولة.
-          </div>
+          <CustomerStatementErrorState
+            title="تعذّر جلب بيانات العملاء"
+            message="فشل حساب netBalanceOf — تحقّق من الاتصال ثم أعد المحاولة."
+            onRetry={() => window.location.reload()}
+          />
         )}
 
 
@@ -600,7 +608,31 @@ export default function CustomerStatementPage() {
             </div>
           )}
 
-          <div data-section="invoices" data-section-label="الفواتير" className="legacy-card card-block">
+          {/* شريط تبويبات: يفصل الأقسام التفصيلية عن صناديق الرصيد الدائم أعلى الصفحة */}
+          <div data-testid="statement-tabs" role="tablist" className="flex flex-wrap gap-1 border-b border-border">
+            {([
+              ["invoices", `الفواتير (${filteredInvoices.length})`],
+              ["deleted", `الفواتير المحذوفة (${(deletedInvoices || []).length})`],
+              ["transactions", `الحركات المالية (${filteredTransactions.length})`],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
+                className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                  tab === key
+                    ? "border-primary text-primary bg-primary/5"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div data-section="invoices" data-section-label="الفواتير" className={`legacy-card card-block ${tab === "invoices" ? "" : "hidden"}`}>
             <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 justify-between">
               <h3 className="font-semibold text-foreground">الفواتير ({filteredInvoices.length})</h3>
               <div className="relative">
@@ -654,7 +686,7 @@ export default function CustomerStatementPage() {
 
 
           {(deletedInvoices || []).length > 0 && (
-            <div data-section="deleted-invoices" data-section-label="فواتير محذوفة" className="legacy-card card-block border-destructive/30">
+            <div data-section="deleted-invoices" data-section-label="فواتير محذوفة" className={`legacy-card card-block border-destructive/30 ${tab === "deleted" ? "" : "hidden"}`}>
               <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 justify-between">
                 <h3 className="font-semibold text-destructive flex items-center gap-2">
                   <span>🗑</span>
@@ -740,7 +772,7 @@ export default function CustomerStatementPage() {
 
 
           {filteredTransactions.length > 0 && (
-            <div data-section="transactions" data-section-label="المعاملات" className="legacy-card card-block">
+            <div data-section="transactions" data-section-label="المعاملات" className={`legacy-card card-block ${tab === "transactions" ? "" : "hidden"}`}>
               <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-b border-border">
                 <h3 className="font-semibold text-foreground">
                   المعاملات ({filteredTransactions.length})
