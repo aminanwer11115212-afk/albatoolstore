@@ -532,40 +532,79 @@ export default function CustomerStatementPage() {
             <div
               data-section="reconciliation"
               data-section-label="تحقق الرصيد"
-              className={`rounded-xl border p-4 shadow-sm text-sm flex flex-wrap items-center gap-x-6 gap-y-2 ${
+              className={`rounded-xl border p-4 shadow-sm text-sm space-y-2 ${
                 reconciliation.ok
                   ? "bg-emerald-500/5 border-emerald-500/30 text-emerald-800"
                   : "bg-destructive/5 border-destructive/40 text-destructive"
               }`}
             >
-              <span className="font-semibold">
-                {reconciliation.ok ? "✅ الرصيد مطابق" : "⚠️ عدم تطابق في الرصيد"}
-              </span>
-              <span className="text-xs">
-                المتوقع (فواتير − مدفوعات، باستثناء الملغاة): <b className="tabular-nums">{reconciliation.expectedOpen.toLocaleString()}</b>
-              </span>
-              <span className="text-xs">
-                المخزَّن في بطاقة العميل: <b className="tabular-nums">{reconciliation.stored.toLocaleString()}</b>
-              </span>
-              {!reconciliation.ok && (
-                <span className="text-xs">
-                  الفارق: <b className="tabular-nums">{reconciliation.delta.toLocaleString()}</b>
-                  <span className="ms-2 opacity-80">— قد يلزم إعادة حساب الأرصدة من صفحة تقرير الديون.</span>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                <span className="font-semibold">
+                  {reconciliation.ok ? "✅ الرصيد مطابق في كل الصفحات" : "⚠️ عدم تطابق في الرصيد"}
                 </span>
-              )}
+                <span className="text-xs">
+                  المتوقع (فواتير مفتوحة): <b className="tabular-nums">{reconciliation.expectedOpen.toLocaleString()}</b>
+                </span>
+                <span className="text-xs">
+                  المخزَّن في بطاقة العميل: <b className="tabular-nums">{reconciliation.stored.toLocaleString()}</b>
+                </span>
+                <span className="text-xs">
+                  الرصيد الدائن: <b className="tabular-nums">{reconciliation.credit.toLocaleString()}</b>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
+                <span>
+                  صافي كشف الحساب (مفتوح − دائن): <b className="tabular-nums">{reconciliation.statementNet.toLocaleString()}</b>
+                </span>
+                <span>
+                  صافي الفواتير/تقرير المديونين/بطاقة العميل (netBalanceOf): <b className="tabular-nums">{reconciliation.sharedNet.toLocaleString()}</b>
+                </span>
+                {!reconciliation.ok && (
+                  <span>
+                    الفارق: <b className="tabular-nums">
+                      {(Math.abs(reconciliation.delta) > 0.01 ? reconciliation.delta : reconciliation.netDelta).toLocaleString()}
+                    </b>
+                    <span className="ms-2 opacity-80">— قد يلزم إعادة حساب الأرصدة من صفحة تقرير الديون.</span>
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
           <div data-section="invoices" data-section-label="الفواتير" className="legacy-card card-block">
-            <h3 className="px-5 py-3 font-semibold text-foreground border-b border-border">الفواتير ({filteredInvoices.length})</h3>
+            <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 justify-between">
+              <h3 className="font-semibold text-foreground">الفواتير ({filteredInvoices.length})</h3>
+              <div className="relative">
+                <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={invSearch}
+                  onChange={(e) => setInvSearch(e.target.value)}
+                  placeholder="بحث برقم الفاتورة"
+                  className="bg-muted rounded pr-7 pl-2 py-1 text-xs text-foreground border border-border outline-none focus:ring-1 focus:ring-primary w-56"
+                />
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm mobile-stack-table">
                 <thead><tr className="bg-muted">
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">رقم الفاتورة</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">التاريخ</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المبلغ</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المدفوع</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المتبقي</th>
+                  {([
+                    ["invoice_number","رقم الفاتورة"],
+                    ["date","التاريخ"],
+                    ["total","المبلغ"],
+                    ["paid_amount","المدفوع"],
+                    ["remaining","المتبقي"],
+                  ] as const).map(([k,label]) => {
+                    const active = invSortKey === k;
+                    return (
+                      <th key={k} className="text-right px-5 py-3 font-semibold text-muted-foreground">
+                        <button type="button" onClick={() => toggleInvSort(k as any)} className="inline-flex items-center gap-1 hover:text-foreground">
+                          {label}
+                          <span className="text-[10px] opacity-70">{active ? (invSortDir === "asc" ? "▲" : "▼") : "↕"}</span>
+                        </button>
+                      </th>
+                    );
+                  })}
                 </tr></thead>
                 <tbody>
                   {isLoading ? <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
@@ -583,6 +622,7 @@ export default function CustomerStatementPage() {
               </table>
             </div>
           </div>
+
 
           {(deletedInvoices || []).length > 0 && (
             <div data-section="deleted-invoices" data-section-label="فواتير محذوفة" className="legacy-card card-block border-destructive/30">
