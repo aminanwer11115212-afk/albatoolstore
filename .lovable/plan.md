@@ -1,107 +1,110 @@
-# خطة تحسين نظام الرصيد الدائن (customer_credit)
+# خطة مراجعة وتوحيد مفهوم الحسابات في كامل النظام
 
-هذه خطة لخمس ميزات مترابطة تلمس قاعدة البيانات، منطق الدفع، صفحات كشف الحساب، وواجهة الفواتير.
+الهدف: توحيد "مفهوم رصيد العميل" عبر كل السطوح (الفواتير، حوار الدفع، صفحة العملاء، كشف الحساب، التقارير، الطباعة) بحيث لا يظهر رقمان مختلفان لنفس العميل في أي مكان، وتكون مصادر الحقيقة واضحة ومحددة.
 
-## 1) كشف الحساب: تجميع customer_credit حسب المصدر مع فلترة
+## المشكلة الحالية (تشخيص)
 
-**الهدف:** المستخدم يرى بوضوح لماذا وُلد كل قيد رصيد دائن (فائض فاتورة / تعديل دفع / شحن يدوي / مرتجع…) ويقدر يفلتر حسب السبب.
+1. **تعدد مصادر الرقم**: بعض الصفحات تقرأ `customers.balance` مباشرة، وأخرى تحسب من `invoices`، وأخرى تستخدم `net_balance = balance − credit_balance`، وأخرى تستخدم helper `netBalanceOf`.
+2. **مفهوم "الرصيد الدائن" غير موحّد**: أحياناً يُعرض كعمود مستقل، وأحياناً مطروح من المديونية، وأحياناً كبطاقة ثالثة.
+3. **حوار الدفع (`CustomerPaymentDialog`)** يعرض المتبقي على الفاتورة فقط دون سياق رصيد العميل الكلي.
+4. **نوافذ المديونية في صفحة العملاء**: البادج/الشريط قد يعرض `balance` الخام بينما كشف الحساب يعرض `net_balance` → فرق ظاهري.
+5. **POS Isolation** مطبّق في `recompute_customer_balance` وفي بعض القوائم فقط، لكن ليس في كل بطاقات الملخص.
+6. **الطباعة** توحّدت مؤخراً على "رصيد العميل الحالي" لكن كشف الحساب المطبوع (`statementPrintTemplate`) لم يُراجَع بنفس المنهجية.
 
-**التعديلات:**
-- إضافة عمود منطقي `credit_source` مشتق في العرض فقط (بدون تعديل schema) من `transactions.allocation->>'kind'` + `description` + وجود `reference_id`:
-  - `overpay_invoice` — فائض من فاتورة (description يحوي رقم فاتورة)
-  - `manual_charge` — شحن يدوي (`allocation.kind='surplus'` من allocate_customer_charge)
-  - `payment_adjust` — تعديل دفع لاحق
-  - `return_credit` — من مرتجع
-  - `unknown` — غير محدد
-- في `CustomerStatementPage.tsx`:
-  - تجميع قابل للطي (Accordion) لصفوف customer_credit حسب المصدر مع مجموع فرعي.
-  - شريط فلترة: Checkboxes للمصادر + بحث نصي في الوصف.
-  - عمود جديد "المصدر" ببادج ملوّن.
-- helper مشترك `src/utils/creditSource.ts` يصنّف الحركة.
+## المبدأ الحاكم (Single Source of Truth)
 
-## 2) وضع "الكاش" لكشف الحساب
+```
+رصيد العميل الحالي = net_balance (محسوب في DB)
+                    = Σ(المتبقي على الفواتير غير الملغاة وغير-POS)
+                    − Σ(customer_credit للعميل)
 
-**الهدف:** المستخدم يرى فقط الحركات النقدية (customer_payment) مقابل customer_credit ويميز المرتبط بفاتورة من المستقل.
+net > 0  → "عليه X" (مدين لنا)   — أحمر
+net < 0  → "له X"  (دائن)         — أخضر
+net = 0  → "خالص"                 — رمادي
+```
 
-**التعديلات:**
-- تبويب/زر جديد في `CustomerStatementPage` باسم "وضع الكاش":
-  - يُخفي أعمدة الفاتورة (رقم/تاريخ/إجمالي).
-  - يُبقي فقط: التاريخ، النوع (دفع/رصيد دائن)، المبلغ، الحساب، وبادج "مرتبط بفاتورة #123" أو "مستقل".
-  - إجماليات في الأسفل: إجمالي المدفوع، إجمالي الفائض المستقل، إجمالي المستهلَك من الرصيد.
-- المنطق نفسه المستخدم في `computeInvoicePaymentAdjustment` لضمان توحّد الأرقام.
+كل عرض في النظام يجب أن يمر عبر `netBalanceOf()` + `computeDisplayBalance()` + `CustomerAccountSummary` من `src/utils/balanceDisplay.tsx`. ممنوع أي حساب يدوي في مكوّن جديد.
 
-## 3) أولوية استخدام الرصيد الدائن (FIFO / LIFO)
+---
 
-**الهدف:** إعداد على مستوى الشركة يحدد أي customer_credit يُستهلك أولاً عند فاتورة جديدة.
+## الخطة على 5 دفعات (Batches)
 
-**التعديلات:**
-- إضافة عمود في `company_settings`: `credit_consumption_order text default 'fifo'` (`fifo` أو `lifo`) — migration.
-- في `CustomerPaymentDialog` عند حساب `creditUse`:
-  - قراءة الإعداد.
-  - جلب صفوف `customer_credit` مرتبة `date asc` (fifo) أو `date desc` (lifo).
-  - استهلاك المبلغ عبر إدخال صفوف customer_credit سالبة مطابقة لكل قيد بترتيب الأولوية بدل قيد واحد مجمّع.
-- إعداد UI في `/settings` (قسم المحاسبة): راديو FIFO/LIFO مع شرح.
+### الدفعة 1 — تدقيق ومسح شامل (لا كود)
+- جرد كل مكان يعرض رقم رصيد/مديونية/دائن للعميل: صفحات، بطاقات، بادجات، قوائم منسدلة، حوارات دفع، طباعة، Share pages، تقارير.
+- إنتاج جدول: `[Surface | File:Line | Field used | Should be]` وتحديد الخارجين عن المعيار.
+- المخرَج: `.lovable/audit/balance-surfaces.md`.
 
-## 4) سجل التدقيق (Audit Trail) للفواتير والدفع والرصيد
+### الدفعة 2 — توحيد صفحة العملاء (`CustomersPage` + `CustomerDetailView`)
+- استبدال أي بادج/رقم مباشر بـ `CustomerAccountSummary` (3 خلايا: مدين | دائن | صافي) أو `BalanceChip` للمساحات الضيقة.
+- بطاقة "إجماليات العملاء" أعلى الصفحة تستخدم `get_customer_balance_stats` RPC فقط (موجودة).
+- فلاتر "المدينون / الدائنون / الخالصون" تعتمد على `net_balance` وليس `balance`.
+- ملف الاختبار: `src/test/customersPageBalanceParity.test.tsx`.
 
-**الهدف:** لكل فاتورة تبويب "سجل التدقيق" يُظهر: القيود المستهلكة، الفائض المتولّد، الحذف، مع أرقام القيود.
+### الدفعة 3 — توحيد حوار الدفع (`CustomerPaymentDialog`) وصفحة الفاتورة
+- إضافة رأس ملخص في الحوار: `CustomerAccountSummary` (compact) للعميل قبل بدء الدفع، لكي يرى المستخدم رصيده الحالي.
+- توضيح ثلاثة حقول منفصلة: "متبقي الفاتورة"، "رصيد دائن سيُستخدم"، "دفعة نقدية جديدة".
+- شريط ناتج مباشر في الأسفل: "بعد الحفظ سيصبح رصيد العميل: X" (محسوب لحظياً).
+- في `InvoiceViewPage`: توحيد كل ظهور للرصيد على `computeDisplayBalance` + مسمّى "رصيد العميل الحالي".
+- تحديث `InvoiceCustomerCreditBanner` ليتّسق مع نفس التسمية والألوان.
+- اختبار E2E: `e2e/payment-dialog-shows-customer-net.spec.ts`.
 
-**التعديلات:**
-- استخدام جدول `invoice_revisions` الموجود + `discount_audit_log` + `transactions` (مفلترة بـ reference_id).
-- مكوّن جديد `src/components/invoice/InvoiceAuditTab.tsx`:
-  - جدول زمني موحّد: تاريخ | فعل | تفاصيل | مرجع القيد (transaction id مختصر) | المبلغ.
-  - أفعال: إنشاء، دفع، توليد فائض، استهلاك رصيد دائن، تعديل خصم، حذف.
-  - رابط لكل قيد يفتح Dialog بتفاصيل الـ allocation JSON.
-- تبويب في `InvoiceViewPage.tsx` بجانب المعاينة/الطباعة.
+### الدفعة 4 — توحيد كشف الحساب (`CustomerStatementPage` + `PublicCustomerStatementPage`)
+- إضافة رأس موحّد في أعلى الصفحة يستخدم `CustomerAccountSummary` (كبير) بدلاً من البطاقات المخصصة الحالية.
+- الرصيد الجاري في الجدول يبدأ من 0 ويُبنى من الحركات فقط (invoice + transaction) بعد استبعاد POS و`reference_id` لفواتير POS — نفس المنطق الموجود مع ضمان مطابقته لـ `net_balance` في السطر الأخير.
+- إضافة سطر تحقق (Invariant check) في الـ dev-mode فقط: إذا اختلف `runningBalance` النهائي عن `net_balance` بأكثر من 0.01 → toast تحذيري + سجل في `financeInvariants`.
+- توحيد قالب الطباعة `statementPrintTemplate` مع `printTemplate` (نفس المسمّيات والألوان).
+- اختبار: `src/test/statementRunningVsNetParity.test.ts`.
 
-## 5) تنبيه محاسبي في صفحة الفاتورة
+### الدفعة 5 — توحيد التقارير والطباعة العامة
+- `CustomerDebtReportPage` + `TodayInvoicesPage` (تبويب العملاء) + تقارير الديون + أي مكان يعرض قوائم عملاء بمبالغ:
+  - عمود واحد للرصيد باستخدام `computeDisplayBalance`، بدل عمودَي balance/credit منفصلين إلا في وضع "تفصيلي".
+  - إضافة toggle "عرض تفصيلي (مدين | دائن | صافي)" ← يفعّل `CustomerAccountSummary`.
+- تحديث `financialReportPrintTemplate` بنفس المسمّى "رصيد العميل الحالي".
+- تحديث `InvoiceAccountingAlert` ليقرأ من نفس المصدر (بدون استعلام إضافي).
+- اختبار E2E موحّد: `e2e/balance-parity-across-surfaces.spec.ts` — يفتح 6 صفحات لنفس العميل ويؤكد أن الرقم المعروض متطابق.
 
-**الهدف:** المستخدم لا يفوته أي فرق بين المدفوع والخصم، ولا أي customer_credit يخص العميل لم يُربَط بمرجع الفاتورة الحالية.
-
-**التعديلات:**
-- مكوّن جديد `InvoiceAccountingAlert.tsx` يُعرض داخل `InvoiceViewPage` عند تحقّق أي شرط:
-  - `discount + paid != total` → "الخصم المسجل لا يوازي الفارق — راجع الدفعات".
-  - وجود صفوف `customer_credit` للعميل بدون `reference_id` → "يوجد رصيد دائن للعميل غير مرتبط بأي فاتورة (X ج.س) — يُستهلك تلقائياً في فاتورة جديدة".
-  - عرض جدول مصغّر بالقيود المعنية + رابط لسجل التدقيق (الميزة 4).
-- نمط التنبيه: `border-amber-300 bg-amber-50` مع أيقونة، RTL.
+---
 
 ## Technical Section
 
-**Migrations:**
-```
-supabase/migrations/<ts>_credit_consumption_order.sql
-  - ALTER TABLE company_settings ADD COLUMN credit_consumption_order text
-      NOT NULL DEFAULT 'fifo'
-      CHECK (credit_consumption_order IN ('fifo','lifo'));
-```
-لا نضيف أعمدة على transactions — التصنيف مشتق UI-side لتجنّب backfill معقّد.
+### مبادئ ثابتة
+1. **لا استعلام مباشر لـ `customers.balance` أو `credit_balance` منفرداً في أي مكوّن جديد** — دائماً عبر `netBalanceOf`.
+2. **لا كتابة يدوية لأعمدة الرصيد** — Triggers هي المصدر (`recompute_customer_balance`).
+3. **POS Isolation** يُطبَّق في كل استعلام يعرض حركات عميل: `.neq('source','pos')` للفواتير + استبعاد `reference_id ∈ pos_invoice_ids` للـ transactions.
+4. **React Query Keys** المتأثرة عند أي دفع/تعديل: `['customers']`, `['customer', id]`, `['customer-statement', id]`, `['invoice', id]`, `['transactions']`.
+5. **الألوان**: أحمر = `hsl(var(--destructive))`، أخضر = `hsl(142 70% 35%)` (كما هو معرّف في `balanceDisplay.tsx`)، رمادي للتسوية. لا hardcoded.
+6. **RTL + Arabic** إلزامي لكل نص جديد.
 
-**ملفات جديدة:**
-- `src/utils/creditSource.ts` — classifier + labels عربية.
-- `src/components/statement/CreditSourceFilterBar.tsx`
-- `src/components/statement/CashModeToggle.tsx`
-- `src/components/invoice/InvoiceAuditTab.tsx`
-- `src/components/invoice/InvoiceAccountingAlert.tsx`
-- `src/hooks/useCreditConsumptionOrder.ts`
-- `src/test/creditSource.test.ts` + `src/test/creditConsumptionOrder.test.ts`
-- `e2e/customer-statement-credit-grouping.spec.ts`
-- `e2e/credit-consumption-fifo-lifo.spec.ts`
+### ملفات مخطط إنشاؤها
+- `.lovable/audit/balance-surfaces.md` (الدفعة 1)
+- `src/components/statement/StatementNetBalanceHeader.tsx` (الدفعة 4)
+- `src/components/invoice/PaymentDialogCustomerContext.tsx` (الدفعة 3)
+- `src/test/customersPageBalanceParity.test.tsx` (الدفعة 2)
+- `src/test/statementRunningVsNetParity.test.ts` (الدفعة 4)
+- `e2e/payment-dialog-shows-customer-net.spec.ts` (الدفعة 3)
+- `e2e/balance-parity-across-surfaces.spec.ts` (الدفعة 5)
 
-**ملفات معدّلة:**
-- `src/pages/CustomerStatementPage.tsx` — تجميع/فلترة/وضع الكاش
-- `src/components/invoice/CustomerPaymentDialog.tsx` — منطق FIFO/LIFO عند creditUse
-- `src/pages/InvoiceViewPage.tsx` — تكامل التبويب + التنبيه
-- `src/pages/SettingsPage.tsx` (أو المكافئ) — إعداد الأولوية
+### ملفات مخطط تعديلها
+- `src/pages/CustomersPage.tsx`, `src/components/customer/CustomerDetailView.tsx` (الدفعة 2)
+- `src/components/invoice/CustomerPaymentDialog.tsx`, `src/pages/InvoiceViewPage.tsx`, `src/components/invoice/InvoiceCustomerCreditBanner.tsx` (الدفعة 3)
+- `src/pages/CustomerStatementPage.tsx`, `src/pages/PublicCustomerStatementPage.tsx`, `src/utils/statementPrintTemplate.ts` (الدفعة 4)
+- `src/pages/CustomerDebtReportPage.tsx`, `src/pages/TodayInvoicesPage.tsx`, `src/utils/financialReportPrintTemplate.ts`, `src/components/invoice/InvoiceAccountingAlert.tsx` (الدفعة 5)
 
-**اعتبارات:**
-- كل الاستعلامات تحترم عزل POS (`.neq("source","pos")` أو استبعاد reference_id لفواتير POS).
-- كل مفتاح React Query المتأثر يُبطَّل بعد أي تغيير: `["transactions"]`, `["customer-statement", id]`, `["invoice", id]`, `["customers"]`.
-- كل نص عربي RTL، وكل الألوان من design tokens (لا hardcoded).
-- التنبيه في الفاتورة لا يظهر لفواتير POS.
+### بدون تغييرات على قاعدة البيانات
+لا migrations في هذه الخطة — كل شيء يستفيد من `net_balance` المحسوب مسبقاً وTriggers الموجودة. أي تعديل schema يُؤجَّل لخطة منفصلة.
 
-**نطاق مستبعد الآن (يمكن إضافته لاحقاً):**
-- تعديل schema لإضافة `credit_source` عمود حقيقي + backfill.
-- إشعارات push/بريد عند توليد رصيد دائن.
-- تقرير شامل لجميع العملاء بالفائض المتراكم.
+### الاستبعادات (خارج النطاق الآن)
+- تغيير طريقة حساب `net_balance` في DB.
+- تعدد العملات في العرض الموحّد (يحتاج خطة منفصلة).
+- تصدير Excel/PDF للحساب الموحّد (يمكن إضافته بعد الدفعة 5).
 
-بعد الموافقة سأنفّذ الميزات الخمس دفعة واحدة مع الاختبارات.
+---
+
+## طريقة التنفيذ
+
+كل دفعة تُنفَّذ في رسالة منفصلة، وبعد كل دفعة:
+1. build/type check يمر.
+2. اختبار الدفعة أخضر.
+3. لقطة/تحقق من صفحتين على الأقل.
+
+الدفعة 1 هي المدخل (تدقيق فقط) وستحدد بدقة أي صفحات تحتاج تدخّل أكبر مما هو مذكور. ابدأ بها؟
