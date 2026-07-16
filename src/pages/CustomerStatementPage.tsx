@@ -34,6 +34,14 @@ export default function CustomerStatementPage() {
   const [delUserFilter, setDelUserFilter] = useState("");
   const [delSortKey, setDelSortKey] = useState<"deleted_at" | "date" | "invoice_number" | "user_email" | "total">("deleted_at");
   const [delSortDir, setDelSortDir] = useState<"asc" | "desc">("desc");
+  // Invoices table: search + sort
+  const [invSearch, setInvSearch] = useState("");
+  const [invSortKey, setInvSortKey] = useState<"invoice_number" | "date" | "total" | "paid_amount" | "remaining">("date");
+  const [invSortDir, setInvSortDir] = useState<"asc" | "desc">("desc");
+  // Transactions table: type filter + sort
+  const [txTypeFilter, setTxTypeFilter] = useState<"all" | "payment" | "credit" | "credit_consume" | "other">("all");
+  const [txSortKey, setTxSortKey] = useState<"date" | "amount" | "type">("date");
+  const [txSortDir, setTxSortDir] = useState<"asc" | "desc">("desc");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const matches = useMemo(() => {
