@@ -1731,7 +1731,6 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                     )}
                     {(() => {
                       // مصدر الحقيقة الموحّد: netBalanceOf (يفضّل net_balance المحسوب من DB)
-                      const { netBalanceOf } = require("@/utils/balanceDisplay") as typeof import("@/utils/balanceDisplay");
                       const net = netBalanceOf({
                         balance: Number(customerBalances?.debt || 0),
                         credit_balance: Number(customerBalances?.credit || 0),
