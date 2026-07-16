@@ -27,7 +27,7 @@ describe("parseVCard", () => {
   });
 
   it("يفكّ Line Folding في vCard", () => {
-    const v = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:اسم\r\n طويل\r\nTEL:0912\r\n999\r\nEND:VCARD";
+    const v = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:اسم\r\n طويل\r\nTEL:0912\r\n 999\r\nEND:VCARD";
     const res = parseVCard(v);
     expect(res[0].name).toBe("اسمطويل");
     expect(res[0].tel).toBe("0912999");
