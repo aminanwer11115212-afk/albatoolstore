@@ -114,6 +114,9 @@ export default function CustomerStatementPage() {
       return data;
     },
     enabled: !!selectedCustomerId,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const { data: transactions } = useQuery({
