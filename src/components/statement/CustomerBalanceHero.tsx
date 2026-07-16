@@ -1,6 +1,7 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { netBalanceOf, formatMoney } from "@/utils/balanceDisplay";
-import { TrendingUp, TrendingDown, CheckCircle2 } from "lucide-react";
+import { TrendingUp, TrendingDown, CheckCircle2, ArrowRight } from "lucide-react";
 
 /**
  * بطاقة عرض بارزة لصافي رصيد العميل — تُستخدم في أعلى صفحة كشف الحساب.
@@ -53,10 +54,27 @@ export default function CustomerBalanceHero({ customer, totalInvoices, totalPaid
       <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-center">
         {/* اليمين: اسم العميل + الرقم البارز */}
         <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs">
+            <Link
+              to="/customers/statements"
+              data-testid="hero-back-to-statements"
+              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowRight size={14} />
+              كشوفات العملاء
+            </Link>
+            <span className="text-muted-foreground/50">/</span>
+            <span className="text-muted-foreground">كشف حساب عميل</span>
+          </div>
           <div className="flex items-baseline gap-3 flex-wrap">
-            <h2 className="text-2xl md:text-3xl font-bold text-foreground leading-tight" data-testid="hero-customer-name">
+            <Link
+              to="/customers/statements"
+              data-testid="hero-customer-name"
+              title="العودة إلى قائمة كشوفات العملاء"
+              className="text-2xl md:text-3xl font-bold text-foreground leading-tight hover:text-primary transition-colors"
+            >
               {customer.name || "—"}
-            </h2>
+            </Link>
             {customer.phone && (
               <span className="text-xs text-muted-foreground tabular-nums" dir="ltr">
                 📞 {customer.phone}
