@@ -29,6 +29,8 @@ const FAMILIES: Record<string, Family> = {
       ["recent-invoices"],
       ["today-invoices"],
       ["customers"],
+      ["customer-statement"],
+      ["customer-transactions"],
     ],
   },
   invoice_items: {
