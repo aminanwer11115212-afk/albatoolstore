@@ -62,7 +62,7 @@ import type { ParsedLine } from "@/hooks/useMessageImport";
 import { ALLOWED_INVOICE_STATUSES, computeInvoiceStatusAfterPayment, isAllowedInvoiceStatus } from "@/utils/invoiceStatus";
 import { splitPayment } from "@/utils/overpayment";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
-import { CustomerInfoStrip } from "@/utils/balanceDisplay";
+import { CustomerInfoStrip, netBalanceOf } from "@/utils/balanceDisplay";
 import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
 
 import { useInvoiceKeyboardNav } from "@/hooks/document/useInvoiceKeyboardNav";
