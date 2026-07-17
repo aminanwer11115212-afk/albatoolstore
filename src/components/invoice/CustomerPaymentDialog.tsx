@@ -171,7 +171,10 @@ export default function CustomerPaymentDialog({
   const accountOptions = useMemo(() => {
     const list = (accounts || []) as any[];
     if (method === "bank") return filterAccountsForPayment(list, "bank");
-    if (method === "cash") return list.filter((a) => (a.account_type || "cash") === "cash");
+    if (method === "cash") {
+      const cashOnly = list.filter((a) => (a.account_type || "cash") === "cash");
+      return cashOnly.length > 0 ? cashOnly : list;
+    }
     return list;
   }, [accounts, method]);
 
