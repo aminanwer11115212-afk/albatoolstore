@@ -95,7 +95,7 @@ export default function CustomerPaymentDialog({
   // القيمة الابتدائية للطريقة — تُطبَّق تلقائياً إن كانت مثبَّتة
   const initialMethod = (): Method => {
     const m = readPin(PIN_METHOD_KEY) as Method;
-    return (m === "cash" || m === "bank" || m === "card" || m === "mobile") ? m : "bank";
+    return (m === "cash" || m === "bank") ? m : "bank";
   };
 
   const [amount, setAmount] = useState<string>(remaining ? String(remaining) : "");
