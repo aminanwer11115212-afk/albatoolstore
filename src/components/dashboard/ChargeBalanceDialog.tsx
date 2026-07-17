@@ -173,6 +173,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       if (method === "bank_transfer" && bankAccountId) {
         try { localStorage.setItem("lov:last-bank-account", bankAccountId); } catch {}
       }
+      try { localStorage.setItem("lov:last-method:charge", method); } catch {}
 
       const parts: string[] = [`تم شحن ${amt.toLocaleString()}`];
       if (allocatedSum > 0) parts.push(`سُدِّد ${allocatedSum.toLocaleString()} على ${allocations.length} فاتورة`);
