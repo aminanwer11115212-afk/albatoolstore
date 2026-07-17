@@ -62,10 +62,19 @@ export default function SupplierPaymentDialog({
   // reset on open
   useEffect(() => {
     if (open) {
-      setSupplierId(initialSupplierId || "");
+      const supId = initialSupplierId || "";
+      setSupplierId(supId);
       setAmount(dueAmount ? String(dueAmount) : "");
       setDate(new Date().toISOString().slice(0, 10));
-      setMethod("cash");
+      // آخر طريقة دفع لهذا المورد إن وُجدت، وإلا نقدي
+      let m: Method = "cash";
+      try {
+        if (supId) {
+          const last = localStorage.getItem(`lov:last-method:sup:${supId}`);
+          if (last === "cash" || last === "bank") m = last;
+        }
+      } catch {}
+      setMethod(m);
       setAccountId("");
       setReferenceNo("");
       setNotes("");
