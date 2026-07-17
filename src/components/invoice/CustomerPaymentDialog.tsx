@@ -474,6 +474,9 @@ export default function CustomerPaymentDialog({
       if (method === "bank" && accountId) {
         try { localStorage.setItem("lov:last-bank-account", accountId); } catch {}
       }
+      try {
+        if (customerId) localStorage.setItem(`lov:last-method:cust:${customerId}`, method);
+      } catch {}
 
       const parts: string[] = [];
       if (split.applied > 0) parts.push(`دفعة ${split.applied.toLocaleString()}`);
