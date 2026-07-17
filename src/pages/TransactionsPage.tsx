@@ -102,8 +102,6 @@ export default function TransactionsPage() {
             <select value={form.method} onChange={e => setForm({ ...form, method: e.target.value, bank_name: "", account_id: "", reference_no: "" })} className={inputCls}>
               <option value="cash">نقداً</option>
               <option value="bank">تحويل بنكي</option>
-              <option value="card">بطاقة</option>
-              <option value="mobile">محفظة</option>
             </select>
 
             {form.method === "bank" ? (
