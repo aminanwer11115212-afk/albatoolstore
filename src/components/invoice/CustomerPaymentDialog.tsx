@@ -183,17 +183,17 @@ export default function CustomerPaymentDialog({
     if (accountOptions.length === 0) return;
     const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
     if (!accountId) {
-      // 1) حساب مثبَّت من المستخدم يفوز دائماً
-      if (pinnedAccountId) {
-        const pinned = accountOptions.find((a: any) => a.id === pinnedAccountId);
-        if (pinned) { setAccountId(pinned.id); return; }
-      }
-      // 2) حساب "أولاد جابر" افتراضياً للتحويلات البنكية
+      // 1) لطريقة "تحويل بنكي" — يظهر افتراضياً حساب "أولاد جابر" إن وُجد
       const jaber = (accountOptions as any[]).find((a) => {
         const s = `${a.name || ""} ${a.bank_name || ""}`;
         return /اولاد\s*جابر|أولاد\s*جابر/.test(s);
       });
       if (method === "bank" && jaber) { setAccountId(jaber.id); return; }
+      // 2) حساب مثبَّت من المستخدم
+      if (pinnedAccountId) {
+        const pinned = accountOptions.find((a: any) => a.id === pinnedAccountId);
+        if (pinned) { setAccountId(pinned.id); return; }
+      }
       try {
         const last = localStorage.getItem(storageKey);
         const match = accountOptions.find((a: any) => a.id === last);
