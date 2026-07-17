@@ -1,115 +1,52 @@
-# خطة تحسين الهيكل الجغرافي (LocationPicker)
 
 ## الهدف
-تحويل `src/components/LocationPicker.tsx` من 4 قوائم منسدلة جافة إلى تجربة بصرية على شكل خريطة السودان مع أنيميشن سلس، مع إبقاء التعديل (إضافة/إخفاء ولاية/مدينة) سهلاً جداً بدون الحاجة لتعديل كود.
+إزالة خيار رفع الملف نهائياً، وجعل زر «استيراد جهة اتصال» يفتح دائماً **منتقي جهات الاتصال الأصلي في الجهاز** بضغطة واحدة — Android و iPhone وسطح المكتب.
 
----
+## الحقيقة التقنية (مهمة قبل الاختيار)
 
-## 1) الشكل البصري — خريطة السودان تفاعلية
+| البيئة | ما هو متاح فعلاً لفتح «جهات اتصال الجهاز» بضغطة واحدة |
+|---|---|
+| Android Chrome/Edge/Samsung + HTTPS | ✅ `navigator.contacts.select` — يفتح جهات اتصال Android الأصلية مباشرة |
+| iOS Safari (أي إصدار حتى 2026) | ❌ لا يوجد Web API — Apple لم تضفه، لا مفرّ من هذا القيد |
+| Firefox / Desktop | ❌ لا يوجد Web API |
+| **تطبيق Capacitor (Android + iOS)** | ✅ يفتح جهات الاتصال الأصلية على iPhone و Android عبر `@capacitor-community/contacts` |
 
-### التصميم
-- **لوحة رئيسية** تعرض خريطة السودان كـ SVG بمناطق (الاتجاهات الجغرافية) قابلة للنقر:
-  - شمال / جنوب / شرق / غرب / وسط — كل منطقة polygon مستقلة داخل نفس الـ SVG
-  - عند hover: تعبئة أعمق + رفع خفيف (translateY(-2px)) + ظل ملوّن
-  - عند التحديد: تلوين المنطقة بلون `--primary` مع نبضة (pulse) خفيفة، بقية المناطق تخفت (opacity 0.35)
+خلاصة: **لا توجد طريقة لفتح جهات اتصال iPhone من متصفح ويب.** الحل الوحيد للـ iPhone هو الغلاف الأصلي (Capacitor) الذي هو أصلاً متاح ومُفعَّل في المشروع.
 
-### التدفق (Drill-down)
-1. **الاتجاه** — نقر على منطقة الخريطة → المنطقة تكبر (scale in) وتتوسط
-2. **الولاية** — تظهر شبكة chips للولايات داخل هذه المنطقة (fade-in + stagger)
-3. **المدينة** — نفس نمط الـ chips (slide-in-right)
-4. **المحلية** — chips نهائية
+## الخطة
 
-كل مستوى له breadcrumb أعلى اللوحة: `الاتجاه ← الولاية ← المدينة ← المحلية` وكل عنصر قابل للنقر للرجوع (يستبدل الصفوف الأربعة الحالية).
+### 1) تنظيف الكود — إزالة رفع الملف
+- حذف: `src/utils/contactFileParser.ts`, `src/test/contactFileParser.test.ts`.
+- تبسيط `ContactPickerButton.tsx`: إزالة `<input type="file">`، ومربّع اختيار الجهات المتعددة، وكل استيرادات المحلّل.
 
-### الأنيميشن (كلها Tailwind موجودة سلفاً)
-- `animate-fade-in` لظهور مستوى جديد
-- `animate-scale-in` لتكبير المنطقة المختارة
-- `hover-scale` على الـ chips
-- pulse خفيف حول المنطقة النشطة عبر `animate-[pulse_2s_...]`
-- transitions على `fill` و`opacity` بـ 300ms
+### 2) دمج Capacitor Contacts لدعم iPhone + Android الأصلي
+- تثبيت `@capacitor-community/contacts` (لا يحتاج مفاتيح).
+- إضافة helper `pickNativeContact()` في `src/utils/phoneNormalize.ts`:
+  - إذا `Capacitor.isNativePlatform()` → استخدم `Contacts.pickContact()` (يفتح جهات iOS/Android الأصلية داخل التطبيق).
+  - وإلا إذا `navigator.contacts` متاح (Android Chrome ويب) → استخدم Contact Picker API.
+  - وإلا → toast واضح: «هذا الجهاز لا يدعم اختيار جهة الاتصال. ثبّت التطبيق من Play Store / App Store لتفعيل هذه الميزة»، ويبقى الحقل يدوياً.
+- تحديث الأذونات:
+  - Android: إضافة `<uses-permission android:name="android.permission.READ_CONTACTS"/>` في `AndroidManifest.xml` (يُضاف تلقائياً بعد `npx cap sync`).
+  - iOS: إضافة `NSContactsUsageDescription` في `Info.plist` مع نص عربي: «للسماح باستيراد أرقام العملاء من جهات الاتصال.»
 
-### وضع مبسّط (Fallback)
-- زر «عرض كقوائم» يعيد الواجهة القديمة (dropdowns) — مفيد للموبايل الضيّق أو لمن يفضّل السرعة.
-- تلقائياً على شاشات `< 480px` يستخدم القوائم بدل الخريطة.
+### 3) تجربة المستخدم الموحّدة
+- زر واحد بأيقونة 📇 في كل حقول الهاتف/واتساب — نفس السلوك في كل مكان.
+- بعد الاختيار: تعبئة تلقائية للاسم + الرقم المطبّع (`normalizePhoneInput`) + toast نجاح.
+- عند الرفض (المستخدم منع الإذن): toast يشرح كيفية تفعيل الإذن من إعدادات الجهاز.
 
----
+### 4) بعد الدمج — التعليمات للمستخدم
+- في المتصفح: يعمل مباشرة على أي Android حديث.
+- على iPhone: يجب تثبيت التطبيق كـ APK/IPA عبر Capacitor (خطوات موجودة في مذكرة `capacitor-mobile-development`).
+- سأذكر أن على المستخدم تشغيل `git pull` ثم `npx cap sync` بعد التغيير.
 
-## 2) أفكار «سهولة التعديل» (مرتّبة من الأهم للأقل)
+## ملفات ستتغيّر
+- `src/components/shared/ContactPickerButton.tsx` — تبسيط كامل، إزالة file input و dialog القائمة.
+- `src/utils/phoneNormalize.ts` — إضافة `pickNativeContact()` موحّد.
+- `src/utils/contactFileParser.ts` — حذف.
+- `src/test/contactFileParser.test.ts` — حذف.
+- `package.json` — إضافة `@capacitor-community/contacts`.
+- توثيق في README حول متطلبات الأذونات.
 
-### أ. فصل بيانات الخريطة عن الكود
-ملف واحد: `src/data/sudanMap.ts`
-```ts
-export const SUDAN_REGIONS = [
-  { id: "north",   name: "الشمالية", path: "M120 40 L…", labelXY: [180, 90] },
-  { id: "east",    name: "الشرقية",  path: "…",           labelXY: [...] },
-  // …
-];
-```
-- تعديل شكل منطقة = تعديل سطر path واحد.
-- إضافة/حذف منطقة = إضافة/حذف عنصر من المصفوفة، بدون لمس مكوّن الواجهة.
-- الربط مع جدول `regions` في قاعدة البيانات عبر عمود `slug` (نضيفه في migration خفيف) بحيث كل polygon يعرف صف قاعدة البيانات المقابل.
-
-### ب. لوحة إدارة داخل الصفحة نفسها
-- زر ⚙️ (يظهر للمشرف فقط عبر `useUserRole`) داخل مكوّن الخريطة:
-  - إضافة / إعادة تسمية / إخفاء ولاية أو مدينة بدون مغادرة الصفحة
-  - ترتيب العناصر بالسحب والإفلات (نفس نمط CustomersPage)
-  - عمود `is_hidden` جديد في `states/cities/localities` لإخفاء بدون حذف
-
-### ج. حفظ آخر اختيار للمستخدم
-- `localStorage` key: `lov:u:{uid}:location:last`
-- عند فتح المكوّن → اختيار افتراضي = آخر منطقة/ولاية استخدمها المستخدم
-- زر «استخدم موقعي السابق» chip سريع في الأعلى
-
-### د. اختصارات لوحة المفاتيح
-- أرقام `1-5` تختار الاتجاه مباشرة
-- `Backspace` يرجع خطوة
-- `/` يفتح بحث نصي فوري عبر كل المستويات (يقفز مباشرة للنتيجة)
-
-### هـ. بحث موحّد
-- شريط بحث علوي واحد يبحث في الولايات + المدن + المحليات معاً
-- عند اختيار نتيجة → الخريطة تتوسع تلقائياً لعرض المنطقة الصحيحة (animated)
-
-### و. Presets (إعدادات جاهزة)
-- chips سريعة أعلى الخريطة: «الخرطوم», «بورتسودان», «مدني» — نقرة واحدة تملأ الحقول الأربعة كلها
-- تُبنى تلقائياً من أكثر 5 مواقع استخداماً في `customers/invoices`
-
-### ز. عرض مسموع/بصري للاختيار الحالي
-- تحت الخريطة: badge كبير يقرأ الاختيار الكامل بصيغة نصية `«الشرقية › كسلا › كسلا › حي الشعبية»` مع زر نسخ.
-
----
-
-## 3) الملفات
-
-**جديدة:**
-- `src/data/sudanMap.ts` — بيانات الـ SVG paths وأسماء المناطق
-- `src/components/location/SudanMap.tsx` — SVG التفاعلي
-- `src/components/location/LocationChips.tsx` — chips الولاية/المدينة/المحلية مع الأنيميشن
-- `src/components/location/LocationBreadcrumb.tsx`
-- `src/components/location/LocationSearch.tsx` — بحث موحّد اختياري
-
-**تعديل:**
-- `src/components/LocationPicker.tsx` — يصبح غلاف يتبدّل بين وضع الخريطة ووضع القوائم القديم (نحافظ على نفس props/interface — أي مكان يستخدمه لا يحتاج تغييراً)
-- Migration خفيف: إضافة `slug` و`is_hidden` و`sort_order` لـ `regions/states/cities/localities`
-
-**ملاحظات تقنية (للجانب التقني):**
-- الخريطة SVG واحدة `viewBox="0 0 400 500"` — لا مكتبات خرائط خارجية
-- ألوان من التوكنز فقط (`hsl(var(--primary))`, `hsl(var(--muted))`)
-- RTL: النصوص العربية داخل الـ SVG عبر `<text>` مع `direction="rtl"`
-- الأنيميشن كلها CSS/Tailwind — لا `framer-motion` جديد
-- المكوّن يحافظ على نفس الـ `value/onChange` contract الحالي (توافق كامل مع كل الاستدعاءات الحالية)
-
----
-
-## 4) ترتيب التنفيذ المقترح
-1. Migration للأعمدة الجديدة (`slug`, `is_hidden`, `sort_order` إن لم يوجد)
-2. `sudanMap.ts` ببيانات مبدئية لخمس مناطق
-3. `SudanMap.tsx` (SVG + hover + click + selected state)
-4. `LocationChips.tsx` + Breadcrumb
-5. دمج داخل `LocationPicker.tsx` مع toggle خريطة/قوائم
-6. لوحة الإدارة (للمشرف) + إخفاء/إظهار
-7. البحث الموحّد + Presets + اختصارات
-8. اختبار Playwright: اختيار كامل عبر الخريطة + استعادة آخر اختيار
-
----
-
-**قل «ابدأ» لتنفيذ الخطة كلها، أو حدّد أي المراحل تريدها أولاً (مثلاً: 1-5 فقط الآن، والباقي لاحقاً).**
+## نقاط للموافقة قبل التنفيذ
+1. هل توافق على تثبيت `@capacitor-community/contacts` (المكتبة الرسمية للمجتمع، مجانية، تدعم iOS + Android)؟
+2. هل تريد إبقاء رسالة «ثبّت التطبيق من المتجر» لمستخدمي iPhone على الويب، أم إخفاء الزر كلياً هناك؟
