@@ -954,6 +954,11 @@ export default function CustomerPaymentDialog({
                     <SelectItem value="cash">نقدي{pinnedMethod === "cash" ? " 📌" : ""}</SelectItem>
                   </SelectContent>
                 </Select>
+                {method === "bank" && jaberAccount && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    يُحدَّد افتراضياً حساب «{jaberAccount.name}» ⭐
+                  </p>
+                )}
               </div>
             </div>
 
