@@ -11,7 +11,6 @@ export default function DashboardAccountBalances() {
     switch (type) {
       case "bank": return "بنكي";
       case "cash": return "نقدي";
-      case "mobile": return "محفظة";
       default: return type || "-";
     }
   };
