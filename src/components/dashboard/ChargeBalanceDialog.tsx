@@ -68,14 +68,22 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       ]);
       setCustomers((cs || []) as Customer[]);
       setBankAccounts((accs || []) as Account[]);
-      const defaultAcc = (accs || []).find((a: any) => a.is_default) || (accs || [])[0];
+      const jaber = (accs || []).find((a: any) => /اولاد\s*جابر|أولاد\s*جابر/.test(`${a.name || ""} ${a.bank_name || ""}`));
+      const defaultAcc = jaber || (accs || []).find((a: any) => a.is_default) || (accs || [])[0];
       if (defaultAcc) setAccountId((defaultAcc as any).id);
-      // استرجاع آخر حساب بنكي مستخدَم
+      // البنك الافتراضي: أولاد جابر أولاً ثم آخر حساب مستخدم
       try {
         const lastBank = localStorage.getItem("lov:last-bank-account");
-        if (lastBank && (accs || []).some((a: any) => a.id === lastBank && a.account_type === "bank")) {
+        const jaberBank = (accs || []).find((a: any) => (a.account_type === "bank") && /اولاد\s*جابر|أولاد\s*جابر/.test(`${a.name || ""} ${a.bank_name || ""}`));
+        if (jaberBank) setBankAccountId((jaberBank as any).id);
+        else if (lastBank && (accs || []).some((a: any) => a.id === lastBank && a.account_type === "bank")) {
           setBankAccountId(lastBank);
         }
+      } catch {}
+      // استرجاع آخر طريقة دفع
+      try {
+        const lastM = localStorage.getItem("lov:last-method:charge") as Method | null;
+        if (lastM === "cash" || lastM === "bank_transfer") setMethod(lastM);
       } catch {}
     })();
   }, [open]);
