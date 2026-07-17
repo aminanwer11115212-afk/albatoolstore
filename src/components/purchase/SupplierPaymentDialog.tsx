@@ -243,8 +243,6 @@ export default function SupplierPaymentDialog({
                 <SelectContent>
                   <SelectItem value="cash">نقدي</SelectItem>
                   <SelectItem value="bank">تحويل بنكي</SelectItem>
-                  <SelectItem value="mobile">محفظة</SelectItem>
-                  <SelectItem value="card">بطاقة</SelectItem>
                 </SelectContent>
               </Select>
             </div>
