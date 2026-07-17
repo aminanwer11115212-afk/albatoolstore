@@ -18,7 +18,7 @@ export default function AccountsPage() {
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
-  const typeMap: Record<string, string> = { bank: "بنكي", cash: "نقدي", mobile: "محفظة إلكترونية" };
+  const typeMap: Record<string, string> = { bank: "بنكي", cash: "نقدي" };
 
   const handleSubmit = async () => {
     if (savingRef.current) return;
