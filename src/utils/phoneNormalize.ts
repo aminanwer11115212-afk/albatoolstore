@@ -24,7 +24,7 @@ export function normalizePhoneInput(val: string | null | undefined): string {
   return hasPlus ? "+" + s : s;
 }
 
-/** هل Contact Picker API مدعوم في هذا المتصفح؟ */
+/** هل Contact Picker API (ويب Android) مدعوم في هذا المتصفح؟ */
 export function isContactPickerSupported(): boolean {
   try {
     // @ts-expect-error - navigator.contacts هو API غير قياسي بعد
@@ -37,19 +37,51 @@ export function isContactPickerSupported(): boolean {
 export type PickedContact = { name?: string; tel?: string };
 
 /**
- * يفتح منتقي جهات الاتصال (Android Chrome / Edge على HTTPS فقط).
- * يُرجع { name, tel } لأول جهة مختارة، أو null إن أُلغيت العملية.
- * يرمي Error إن كان غير مدعوم — استعمل isContactPickerSupported() أولاً.
+ * يفتح منتقي جهات الاتصال الأصلي في الجهاز:
+ *  - داخل تطبيق Capacitor (Android/iOS): يستخدم @capacitor-community/contacts.
+ *  - في متصفح Android الحديث: يستخدم navigator.contacts.select.
+ *  - غير ذلك: يرمي Error برسالة عربية واضحة.
  */
-export async function pickContactPhone(): Promise<PickedContact | null> {
-  if (!isContactPickerSupported()) {
-    throw new Error("Contact Picker غير مدعوم على هذا الجهاز/المتصفح");
+export async function pickNativeContact(): Promise<PickedContact | null> {
+  // 1) بيئة Capacitor الأصلية
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    if (Capacitor?.isNativePlatform?.()) {
+      const { Contacts } = await import("@capacitor-community/contacts");
+      const perm = await Contacts.requestPermissions();
+      if (perm.contacts !== "granted") {
+        throw new Error("تم رفض إذن جهات الاتصال — فعّله من إعدادات الجهاز");
+      }
+      const res: any = await Contacts.pickContact({
+        projection: { name: true, phones: true },
+      });
+      const c = res?.contact;
+      if (!c) return null;
+      const tel = Array.isArray(c.phones) && c.phones.length ? String(c.phones[0]?.number || "") : "";
+      const name = c.name?.display || [c.name?.given, c.name?.family].filter(Boolean).join(" ").trim();
+      return { name: name || undefined, tel: normalizePhoneInput(tel) };
+    }
+  } catch (e: any) {
+    // إذا كان الخطأ عن الأذونات، مرّره
+    if (/permission|إذن|denied|رفض/i.test(String(e?.message || ""))) throw e;
+    // وإلا تابع لمحاولة Web API
   }
-  // @ts-expect-error - navigator.contacts غير مُعرَّف في TS lib
-  const contacts = await navigator.contacts.select(["name", "tel"], { multiple: false });
-  if (!contacts || !contacts.length) return null;
-  const c = contacts[0];
-  const tel = Array.isArray(c.tel) && c.tel.length ? String(c.tel[0]) : "";
-  const name = Array.isArray(c.name) && c.name.length ? String(c.name[0]) : "";
-  return { name, tel: normalizePhoneInput(tel) };
+
+  // 2) متصفح Android يدعم Contact Picker API
+  if (isContactPickerSupported()) {
+    // @ts-expect-error - غير مُعرَّف في TS lib
+    const contacts = await navigator.contacts.select(["name", "tel"], { multiple: false });
+    if (!contacts || !contacts.length) return null;
+    const c = contacts[0];
+    const tel = Array.isArray(c.tel) && c.tel.length ? String(c.tel[0]) : "";
+    const name = Array.isArray(c.name) && c.name.length ? String(c.name[0]) : "";
+    return { name, tel: normalizePhoneInput(tel) };
+  }
+
+  // 3) غير مدعوم
+  throw new Error("هذا الجهاز لا يدعم اختيار جهة الاتصال من المتصفح — ثبّت التطبيق من المتجر لتفعيل هذه الميزة");
 }
+
+/** إبقاء الاسم القديم للتوافق مع الاستدعاءات السابقة. */
+export const pickContactPhone = pickNativeContact;
+
