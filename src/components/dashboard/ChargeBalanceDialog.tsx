@@ -26,7 +26,7 @@ type Customer = {
 };
 type Account = { id: string; name: string; bank_name: string | null; account_type: string | null };
 
-type Method = "cash" | "card" | "bank_transfer";
+type Method = "cash" | "bank_transfer";
 
 interface Props {
   open: boolean;
@@ -298,10 +298,14 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="cash">نقدي</SelectItem>
-                <SelectItem value="card">بطاقة</SelectItem>
                 <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
               </SelectContent>
             </Select>
+            {method === "bank_transfer" && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                يُحدَّد افتراضياً حساب «أولاد جابر» إن وُجد.
+              </p>
+            )}
           </div>
 
           {/* Cash/card destination account */}

@@ -1130,8 +1130,6 @@ export function methodLabel(m: string): string {
     case "cash": return "نقدي";
     case "bank":
     case "bank_transfer": return "تحويل بنكي";
-    case "card": return "بطاقة";
-    case "mobile": return "محفظة";
     case "cheque": return "شيك";
     default: return m || "—";
   }
