@@ -278,7 +278,13 @@ export default function CustomerPaymentDialog({
     if (disc > 0 && !canApplyDiscount) {
       return toast.error("ليست لديك صلاحية تطبيق خصم إضافي — تواصل مع المسؤول");
     }
-    if (n > 0 && !accountId) return toast.error("اختر الحساب");
+    if (n > 0 && !accountId) {
+      const anyAccounts = (accounts || []) as any[];
+      if (method === "cash" && !anyAccounts.some((a) => (a.account_type || "cash") === "cash")) {
+        return toast.error("لا يوجد حساب كاش. أضف حساب نقدي أو اختر «تحويل بنكي» واستخدم حساب أولاد جابر.", { duration: 6000 });
+      }
+      return toast.error("اختر الحساب");
+    }
     if (n > 0 && isBankPaymentMethod(method)) {
       const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo, requireReferenceNo: false });
       if (err) return toast.error(err);
