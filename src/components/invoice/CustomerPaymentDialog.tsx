@@ -36,7 +36,7 @@ import {
 import DiscountInput from "@/components/shared/DiscountInput";
 import { Pin, PinOff } from "lucide-react";
 
-type Method = "cash" | "bank" | "card" | "mobile";
+type Method = "cash" | "bank";
 
 interface Props {
   open: boolean;
