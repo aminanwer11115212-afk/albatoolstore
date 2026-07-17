@@ -937,8 +937,6 @@ export default function CustomerPaymentDialog({
                   <SelectContent>
                     <SelectItem value="bank">تحويل بنكي{pinnedMethod === "bank" ? " 📌" : ""}</SelectItem>
                     <SelectItem value="cash">نقدي{pinnedMethod === "cash" ? " 📌" : ""}</SelectItem>
-                    <SelectItem value="card">بطاقة{pinnedMethod === "card" ? " 📌" : ""}</SelectItem>
-                    <SelectItem value="mobile">محفظة{pinnedMethod === "mobile" ? " 📌" : ""}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
