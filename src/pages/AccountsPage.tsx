@@ -51,7 +51,6 @@ export default function AccountsPage() {
             <select value={form.account_type} onChange={e => setForm({ ...form, account_type: e.target.value })} className={inputCls}>
               <option value="bank">بنكي</option>
               <option value="cash">نقدي</option>
-              <option value="mobile">محفظة إلكترونية</option>
             </select>
             {form.account_type === "bank" && (
               <input placeholder="اسم البنك (مثال: بنك الخرطوم)" value={form.bank_name} onChange={e => setForm({ ...form, bank_name: e.target.value })} className={inputCls} />
