@@ -26,7 +26,7 @@ type Customer = {
 };
 type Account = { id: string; name: string; bank_name: string | null; account_type: string | null };
 
-type Method = "cash" | "card" | "bank_transfer";
+type Method = "cash" | "bank_transfer";
 
 interface Props {
   open: boolean;
@@ -68,14 +68,22 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       ]);
       setCustomers((cs || []) as Customer[]);
       setBankAccounts((accs || []) as Account[]);
-      const defaultAcc = (accs || []).find((a: any) => a.is_default) || (accs || [])[0];
+      const jaber = (accs || []).find((a: any) => /اولاد\s*جابر|أولاد\s*جابر/.test(`${a.name || ""} ${a.bank_name || ""}`));
+      const defaultAcc = jaber || (accs || []).find((a: any) => a.is_default) || (accs || [])[0];
       if (defaultAcc) setAccountId((defaultAcc as any).id);
-      // استرجاع آخر حساب بنكي مستخدَم
+      // البنك الافتراضي: أولاد جابر أولاً ثم آخر حساب مستخدم
       try {
         const lastBank = localStorage.getItem("lov:last-bank-account");
-        if (lastBank && (accs || []).some((a: any) => a.id === lastBank && a.account_type === "bank")) {
+        const jaberBank = (accs || []).find((a: any) => (a.account_type === "bank") && /اولاد\s*جابر|أولاد\s*جابر/.test(`${a.name || ""} ${a.bank_name || ""}`));
+        if (jaberBank) setBankAccountId((jaberBank as any).id);
+        else if (lastBank && (accs || []).some((a: any) => a.id === lastBank && a.account_type === "bank")) {
           setBankAccountId(lastBank);
         }
+      } catch {}
+      // استرجاع آخر طريقة دفع
+      try {
+        const lastM = localStorage.getItem("lov:last-method:charge") as Method | null;
+        if (lastM === "cash" || lastM === "bank_transfer") setMethod(lastM);
       } catch {}
     })();
   }, [open]);
@@ -165,6 +173,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       if (method === "bank_transfer" && bankAccountId) {
         try { localStorage.setItem("lov:last-bank-account", bankAccountId); } catch {}
       }
+      try { localStorage.setItem("lov:last-method:charge", method); } catch {}
 
       const parts: string[] = [`تم شحن ${amt.toLocaleString()}`];
       if (allocatedSum > 0) parts.push(`سُدِّد ${allocatedSum.toLocaleString()} على ${allocations.length} فاتورة`);
@@ -298,10 +307,14 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="cash">نقدي</SelectItem>
-                <SelectItem value="card">بطاقة</SelectItem>
                 <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
               </SelectContent>
             </Select>
+            {method === "bank_transfer" && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                يُحدَّد افتراضياً حساب «أولاد جابر» إن وُجد.
+              </p>
+            )}
           </div>
 
           {/* Cash/card destination account */}

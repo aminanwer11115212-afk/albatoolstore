@@ -92,8 +92,14 @@ export default function CustomerPaymentDialog({
 
   const remaining = Math.max(0, Number(total || 0) - Number(paidBefore || 0));
 
-  // القيمة الابتدائية للطريقة — تُطبَّق تلقائياً إن كانت مثبَّتة
+  // القيمة الابتدائية للطريقة — من (1) آخر طريقة لهذا العميل، (2) المثبَّت، (3) تحويل بنكي
   const initialMethod = (): Method => {
+    try {
+      if (customerId) {
+        const perCust = localStorage.getItem(`lov:last-method:cust:${customerId}`) as Method | null;
+        if (perCust === "cash" || perCust === "bank") return perCust;
+      }
+    } catch {}
     const m = readPin(PIN_METHOD_KEY) as Method;
     return (m === "cash" || m === "bank") ? m : "bank";
   };
@@ -272,7 +278,13 @@ export default function CustomerPaymentDialog({
     if (disc > 0 && !canApplyDiscount) {
       return toast.error("ليست لديك صلاحية تطبيق خصم إضافي — تواصل مع المسؤول");
     }
-    if (n > 0 && !accountId) return toast.error("اختر الحساب");
+    if (n > 0 && !accountId) {
+      const anyAccounts = (accounts || []) as any[];
+      if (method === "cash" && !anyAccounts.some((a) => (a.account_type || "cash") === "cash")) {
+        return toast.error("لا يوجد حساب كاش. أضف حساب نقدي أو اختر «تحويل بنكي» واستخدم حساب أولاد جابر.", { duration: 6000 });
+      }
+      return toast.error("اختر الحساب");
+    }
     if (n > 0 && isBankPaymentMethod(method)) {
       const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo, requireReferenceNo: false });
       if (err) return toast.error(err);
@@ -468,6 +480,9 @@ export default function CustomerPaymentDialog({
       if (method === "bank" && accountId) {
         try { localStorage.setItem("lov:last-bank-account", accountId); } catch {}
       }
+      try {
+        if (customerId) localStorage.setItem(`lov:last-method:cust:${customerId}`, method);
+      } catch {}
 
       const parts: string[] = [];
       if (split.applied > 0) parts.push(`دفعة ${split.applied.toLocaleString()}`);
@@ -939,6 +954,11 @@ export default function CustomerPaymentDialog({
                     <SelectItem value="cash">نقدي{pinnedMethod === "cash" ? " 📌" : ""}</SelectItem>
                   </SelectContent>
                 </Select>
+                {method === "bank" && jaberAccount && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    يُحدَّد افتراضياً حساب «{jaberAccount.name}» ⭐
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1130,8 +1150,6 @@ export function methodLabel(m: string): string {
     case "cash": return "نقدي";
     case "bank":
     case "bank_transfer": return "تحويل بنكي";
-    case "card": return "بطاقة";
-    case "mobile": return "محفظة";
     case "cheque": return "شيك";
     default: return m || "—";
   }

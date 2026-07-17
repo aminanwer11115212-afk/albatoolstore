@@ -242,7 +242,7 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
   }, [data, groups, customerId]);
 
   const methodLabel = (m: string | null) =>
-    m === "bank_transfer" ? "تحويل بنكي" : m === "card" ? "بطاقة" : m === "cash" ? "نقدي" : m || "—";
+    m === "bank_transfer" || m === "bank" ? "تحويل بنكي" : m === "cash" ? "نقدي" : m || "—";
 
   const fmt = (n: number) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
