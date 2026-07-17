@@ -92,8 +92,14 @@ export default function CustomerPaymentDialog({
 
   const remaining = Math.max(0, Number(total || 0) - Number(paidBefore || 0));
 
-  // القيمة الابتدائية للطريقة — تُطبَّق تلقائياً إن كانت مثبَّتة
+  // القيمة الابتدائية للطريقة — من (1) آخر طريقة لهذا العميل، (2) المثبَّت، (3) تحويل بنكي
   const initialMethod = (): Method => {
+    try {
+      if (customerId) {
+        const perCust = localStorage.getItem(`lov:last-method:cust:${customerId}`) as Method | null;
+        if (perCust === "cash" || perCust === "bank") return perCust;
+      }
+    } catch {}
     const m = readPin(PIN_METHOD_KEY) as Method;
     return (m === "cash" || m === "bank") ? m : "bank";
   };
