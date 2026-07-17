@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Method = "cash" | "bank" | "card" | "mobile";
+type Method = "cash" | "bank";
 
 interface Props {
   open: boolean;
