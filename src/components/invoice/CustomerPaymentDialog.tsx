@@ -36,7 +36,7 @@ import {
 import DiscountInput from "@/components/shared/DiscountInput";
 import { Pin, PinOff } from "lucide-react";
 
-type Method = "cash" | "bank" | "card" | "mobile";
+type Method = "cash" | "bank";
 
 interface Props {
   open: boolean;
@@ -95,7 +95,7 @@ export default function CustomerPaymentDialog({
   // القيمة الابتدائية للطريقة — تُطبَّق تلقائياً إن كانت مثبَّتة
   const initialMethod = (): Method => {
     const m = readPin(PIN_METHOD_KEY) as Method;
-    return (m === "cash" || m === "bank" || m === "card" || m === "mobile") ? m : "bank";
+    return (m === "cash" || m === "bank") ? m : "bank";
   };
 
   const [amount, setAmount] = useState<string>(remaining ? String(remaining) : "");
@@ -171,7 +171,10 @@ export default function CustomerPaymentDialog({
   const accountOptions = useMemo(() => {
     const list = (accounts || []) as any[];
     if (method === "bank") return filterAccountsForPayment(list, "bank");
-    if (method === "cash") return list.filter((a) => (a.account_type || "cash") === "cash");
+    if (method === "cash") {
+      const cashOnly = list.filter((a) => (a.account_type || "cash") === "cash");
+      return cashOnly.length > 0 ? cashOnly : list;
+    }
     return list;
   }, [accounts, method]);
 
@@ -180,17 +183,17 @@ export default function CustomerPaymentDialog({
     if (accountOptions.length === 0) return;
     const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
     if (!accountId) {
-      // 1) حساب مثبَّت من المستخدم يفوز دائماً
-      if (pinnedAccountId) {
-        const pinned = accountOptions.find((a: any) => a.id === pinnedAccountId);
-        if (pinned) { setAccountId(pinned.id); return; }
-      }
-      // 2) حساب "أولاد جابر" افتراضياً للتحويلات البنكية
+      // 1) لطريقة "تحويل بنكي" — يظهر افتراضياً حساب "أولاد جابر" إن وُجد
       const jaber = (accountOptions as any[]).find((a) => {
         const s = `${a.name || ""} ${a.bank_name || ""}`;
         return /اولاد\s*جابر|أولاد\s*جابر/.test(s);
       });
       if (method === "bank" && jaber) { setAccountId(jaber.id); return; }
+      // 2) حساب مثبَّت من المستخدم
+      if (pinnedAccountId) {
+        const pinned = accountOptions.find((a: any) => a.id === pinnedAccountId);
+        if (pinned) { setAccountId(pinned.id); return; }
+      }
       try {
         const last = localStorage.getItem(storageKey);
         const match = accountOptions.find((a: any) => a.id === last);
@@ -934,8 +937,6 @@ export default function CustomerPaymentDialog({
                   <SelectContent>
                     <SelectItem value="bank">تحويل بنكي{pinnedMethod === "bank" ? " 📌" : ""}</SelectItem>
                     <SelectItem value="cash">نقدي{pinnedMethod === "cash" ? " 📌" : ""}</SelectItem>
-                    <SelectItem value="card">بطاقة{pinnedMethod === "card" ? " 📌" : ""}</SelectItem>
-                    <SelectItem value="mobile">محفظة{pinnedMethod === "mobile" ? " 📌" : ""}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
