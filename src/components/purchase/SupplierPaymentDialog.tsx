@@ -126,7 +126,13 @@ export default function SupplierPaymentDialog({
     if (!supId) return toast.error("اختر المورد");
     const n = Number(amount);
     if (!n || n <= 0) return toast.error("أدخل مبلغ صحيح أكبر من صفر");
-    if (!accountId) return toast.error("اختر الحساب");
+    if (!accountId) {
+      const anyAccounts = (accounts || []) as any[];
+      if (method === "cash" && !anyAccounts.some((a) => (a.account_type || "cash") === "cash")) {
+        return toast.error("لا يوجد حساب كاش. أضف حساب نقدي أو اختر «تحويل بنكي» واستخدم حساب أولاد جابر.", { duration: 6000 });
+      }
+      return toast.error("اختر الحساب");
+    }
     if (isBankPaymentMethod(method)) {
       const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo });
       if (err) return toast.error(err);
@@ -172,6 +178,9 @@ export default function SupplierPaymentDialog({
       if (method === "bank" && accountId) {
         try { localStorage.setItem("lov:last-bank-account", accountId); } catch {}
       }
+      try {
+        if (supId) localStorage.setItem(`lov:last-method:sup:${supId}`, method);
+      } catch {}
 
 
 
@@ -254,6 +263,11 @@ export default function SupplierPaymentDialog({
                   <SelectItem value="bank">تحويل بنكي</SelectItem>
                 </SelectContent>
               </Select>
+              {method === "bank" && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  يُحدَّد افتراضياً حساب «أولاد جابر» إن وُجد.
+                </p>
+              )}
             </div>
             <div>
               <Label>الحساب</Label>
