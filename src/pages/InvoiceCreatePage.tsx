@@ -1177,10 +1177,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
               .select("product_id, quantity")
               .eq("invoice_id", existing.id);
             oldItems = (prev || []).map((p: any) => ({ product_id: p.product_id, quantity: p.quantity }));
-            const { error: delErr } = await supabase
-              .from("invoice_items")
-              .delete()
-              .eq("invoice_id", existing.id);
+            const { error: delErr } = await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: existing.id });
             if (delErr) throw delErr;
             invId = existing.id;
             recordExisted = true;
