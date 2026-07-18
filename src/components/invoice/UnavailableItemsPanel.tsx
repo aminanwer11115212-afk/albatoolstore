@@ -6,14 +6,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Send, MessageCircle, Printer, Link2, Trash2, RotateCcw, AlertTriangle } from "lucide-react";
+import { ChevronDown, Send, Printer, Link2, Trash2, RotateCcw, AlertTriangle, ListChecks, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  shareUnavailableItemsViaWhatsApp,
   printUnavailableItems,
   createUnavailableItemsShareLink,
   type UnavailableItemRow,
 } from "@/utils/unavailableItemsShare";
+import UnavailableItemsReviewDialog from "./UnavailableItemsReviewDialog";
 
 interface DeletedRow {
   id: string;
