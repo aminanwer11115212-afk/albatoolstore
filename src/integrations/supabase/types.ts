@@ -584,39 +584,60 @@ export type Database = {
           deleted_at: string
           deleted_by: string | null
           discount: number | null
+          discount_value: number | null
+          foreign_price: number | null
+          format_discount: string | null
+          full_data: Json | null
           id: string
           invoice_id: string
+          original_id: string | null
           product_id: string | null
           product_name: string
           quantity: number | null
           reason: string | null
+          tax_status: string | null
           total: number | null
+          unit: string | null
           unit_price: number | null
         }
         Insert: {
           deleted_at?: string
           deleted_by?: string | null
           discount?: number | null
+          discount_value?: number | null
+          foreign_price?: number | null
+          format_discount?: string | null
+          full_data?: Json | null
           id?: string
           invoice_id: string
+          original_id?: string | null
           product_id?: string | null
           product_name: string
           quantity?: number | null
           reason?: string | null
+          tax_status?: string | null
           total?: number | null
+          unit?: string | null
           unit_price?: number | null
         }
         Update: {
           deleted_at?: string
           deleted_by?: string | null
           discount?: number | null
+          discount_value?: number | null
+          foreign_price?: number | null
+          format_discount?: string | null
+          full_data?: Json | null
           id?: string
           invoice_id?: string
+          original_id?: string | null
           product_id?: string | null
           product_name?: string
           quantity?: number | null
           reason?: string | null
+          tax_status?: string | null
           total?: number | null
+          unit?: string | null
           unit_price?: number | null
         }
         Relationships: []
@@ -626,39 +647,60 @@ export type Database = {
           deleted_at: string
           deleted_by: string | null
           discount: number | null
+          discount_value: number | null
+          foreign_price: number | null
+          format_discount: string | null
+          full_data: Json | null
           id: string
+          original_id: string | null
           product_id: string | null
           product_name: string
           quantity: number | null
           quote_id: string
           reason: string | null
+          tax_status: string | null
           total: number | null
+          unit: string | null
           unit_price: number | null
         }
         Insert: {
           deleted_at?: string
           deleted_by?: string | null
           discount?: number | null
+          discount_value?: number | null
+          foreign_price?: number | null
+          format_discount?: string | null
+          full_data?: Json | null
           id?: string
+          original_id?: string | null
           product_id?: string | null
           product_name: string
           quantity?: number | null
           quote_id: string
           reason?: string | null
+          tax_status?: string | null
           total?: number | null
+          unit?: string | null
           unit_price?: number | null
         }
         Update: {
           deleted_at?: string
           deleted_by?: string | null
           discount?: number | null
+          discount_value?: number | null
+          foreign_price?: number | null
+          format_discount?: string | null
+          full_data?: Json | null
           id?: string
+          original_id?: string | null
           product_id?: string | null
           product_name?: string
           quantity?: number | null
           quote_id?: string
           reason?: string | null
+          tax_status?: string | null
           total?: number | null
+          unit?: string | null
           unit_price?: number | null
         }
         Relationships: []
@@ -2885,6 +2927,10 @@ export type Database = {
       delete_invoice_with_reconciliation: {
         Args: { _invoice_id: string }
         Returns: Json
+      }
+      delete_quote_items_silent: {
+        Args: { p_quote_id: string }
+        Returns: undefined
       }
       find_duplicate_invoice: {
         Args: {

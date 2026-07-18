@@ -94,7 +94,8 @@ export async function deleteInvoiceWithStockRestore(
   }
 
   {
-    const { error } = await supabase.from("invoice_items").delete().eq("invoice_id", invoiceId);
+    // Silent delete → skip archive trigger (this is a full invoice deletion, not a per-line removal).
+    const { error } = await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: invoiceId });
     if (error) throw new Error(`تعذّر حذف بنود الفاتورة: ${error.message}`);
   }
   {
