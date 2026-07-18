@@ -279,9 +279,10 @@ export async function convertQuoteToInvoice(
     }
   }
 
-  // 7. Delete the original quote and all its children.
+  // 7. Delete the original quote and all its children. Skip archive trigger for
+  //    quote_items because this is a conversion, not a user-intent item deletion.
+  await (supabase as any).rpc("delete_quote_items_silent", { p_quote_id: quoteId });
   await Promise.all([
-    supabase.from("quote_items").delete().eq("quote_id", quoteId),
     supabase.from("quote_transports").delete().eq("quote_id", quoteId),
     supabase.from("quotes_packaging_items").delete().eq("quote_id", quoteId),
     supabase.from("quotes_packaging").delete().eq("quote_id", quoteId),
