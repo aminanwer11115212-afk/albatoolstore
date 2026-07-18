@@ -1094,10 +1094,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           oldItems = (prev || []).map((p: any) => ({ product_id: p.product_id, quantity: p.quantity }));
           // Full sync: احذف كل البنود المرتبطة بهذه الفاتورة قبل إعادة الإدراج.
           // نستخدم DELETE مباشر مع فحص الخطأ — لو فشل الحذف كنّا سنكرِّر البنود.
-          const { error: delErr } = await supabase
-            .from("invoice_items")
-            .delete()
-            .eq("invoice_id", effectiveEditId);
+          // Bypass archive trigger for full-replace saves (not user-intent deletion).
+          const { error: delErr } = await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: effectiveEditId });
           if (delErr) throw delErr;
         }
       }
