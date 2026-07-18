@@ -1,52 +1,49 @@
+## المشكلة (من رسائل الشركة)
+على الهاتف داخل نافذة «إضافة/تعديل عميل»:
+- كتابة الاتجاه لا تُضاف («كتبت الاتجاه ما نزل معاي»).
+- تغيير المحلية/المدينة لا يتم.
+- كأن أي شيء يُكتَب لا يُحفَظ.
 
-## الهدف
-إزالة خيار رفع الملف نهائياً، وجعل زر «استيراد جهة اتصال» يفتح دائماً **منتقي جهات الاتصال الأصلي في الجهاز** بضغطة واحدة — Android و iPhone وسطح المكتب.
+## التشخيص المؤكّد (من قراءة `InlineSearchSelect.tsx` و`CustomerFormDialog.tsx`)
+القوائم الجغرافية تستخدم `InlineSearchSelect` الذي يرسم قائمة `position: fixed` صغيرة يُحسَب موقعها **مرّة واحدة عند الفتح**. على الهاتف يحدث التالي:
 
-## الحقيقة التقنية (مهمة قبل الاختيار)
+1. تُفتح القائمة → تظهر لوحة مفاتيح أندرويد → الـ viewport ينكمش → القائمة تختفي تحت الكيبورد ولا تُعاد المحاذاة.
+2. المستخدم يحاول تمرير الصفحة/إغلاق الكيبورد بالنقر خارج القائمة → `document.touchstart` يُغلق القائمة **ويلغي كل النصّ المكتوب** (`setQuery(selectedLabel)` يُعاد في المرّة القادمة).
+3. عند فتح قائمة لحقل فيه قيمة مسبقاً (تعديل عميل)، `openMenu()` يضع `query = selectedLabel`، فالكتابة على الهاتف **تُلحَق** بالنص القديم بدل استبداله → لا يظهر «+ إضافة».
+4. زر «+ إضافة» صغير جداً في popover ضيّق، وسهل النقر بجانبه فيُغلق كل شيء.
+5. `inputRef.current?.click?.()` في auto-focus بلا داعٍ ويسبب أحياناً خفقان keyboard على أندرويد.
 
-| البيئة | ما هو متاح فعلاً لفتح «جهات اتصال الجهاز» بضغطة واحدة |
-|---|---|
-| Android Chrome/Edge/Samsung + HTTPS | ✅ `navigator.contacts.select` — يفتح جهات اتصال Android الأصلية مباشرة |
-| iOS Safari (أي إصدار حتى 2026) | ❌ لا يوجد Web API — Apple لم تضفه، لا مفرّ من هذا القيد |
-| Firefox / Desktop | ❌ لا يوجد Web API |
-| **تطبيق Capacitor (Android + iOS)** | ✅ يفتح جهات الاتصال الأصلية على iPhone و Android عبر `@capacitor-community/contacts` |
+## الحل
+تحويل `InlineSearchSelect` على الشاشات ≤640px إلى **Bottom Sheet ملء الشاشة** بدل popover عائم، مع نفس API/السلوك على سطح المكتب دون تغيير.
 
-خلاصة: **لا توجد طريقة لفتح جهات اتصال iPhone من متصفح ويب.** الحل الوحيد للـ iPhone هو الغلاف الأصلي (Capacitor) الذي هو أصلاً متاح ومُفعَّل في المشروع.
+### التغييرات في `src/components/InlineSearchSelect.tsx` فقط
+1. **كشف الموبايل مرّة**: `const isMobile = window.innerWidth < 640`.
+2. **على الموبايل**: ارسم بدل الـ popover:
+   - Overlay مظلم يغطي الشاشة (`position: fixed; inset: 0; z-index: 10000; pointer-events: auto`).
+   - Sheet سفلي يرتفع من الأسفل (`bottom: 0; left: 0; right: 0; max-height: 85vh; rounded-t-2xl`).
+   - رأس ثابت: زر إغلاق (X) + عنوان (`title` من props أو placeholder) + حقل بحث كبير (`text-base`, `py-3`).
+   - محتوى قابل للتمرير: أولاً زر «＋ إضافة "…"» بارتفاع 48px (touch-friendly)، ثم القائمة بعناصر ارتفاع 48px مع أزرار حذف/تعديل ملموسة.
+   - النقر على الـ overlay يُغلق (لا يفعل شيئاً غيره). النقر داخل الـ sheet لا يُغلق أبداً (بدل الاعتماد على `document.touchstart` الحسّاس).
+3. **على سطح المكتب**: يبقى الـ popover الحالي كما هو حرفياً (لا انحدار).
+4. **إصلاحات إضافية للسلوك على كل الأجهزة**:
+   - عند فتح القائمة، لا نُعبّئ `query` بالقيمة الحالية — نتركه فارغاً ونعرض القائمة الكاملة (الحل الأبسط لمشكلة «الكتابة تُلحَق» — القيمة المختارة تظل مبرزة). القيمة الحالية تُعرض في زر الحقل نفسه.
+   - على الموبايل نُلغي استدعاء `inputRef.click()` (يكفي `focus()` — الكيبورد يظهر لأن الفتح داخل user gesture).
+   - إبطال `document.touchstart` كإغلاق — على الموبايل نعتمد على overlay click؛ على سطح المكتب يبقى `mousedown` فقط.
+5. **حماية `pointer-events`**: نتأكّد أن الـ overlay والـ sheet يضبطان `pointerEvents: "auto"` صراحةً (لأن الحوار الأب يقفل `body { pointer-events: none }`) — نفس قاعدة `radix-portal-popups`.
 
-## الخطة
+### لا تغييرات في `CustomerFormDialog.tsx`
+كل الحقول تستخدم نفس المكوّن، لذا الإصلاح يعمّ تلقائياً على الاتجاه/الولاية/المدينة/المحلية/المجموعة/الناقل/الوجهة، وينعكس على كل صفحة تستدعي CustomerFormDialog (Customers, Quotes, Invoices, POS).
 
-### 1) تنظيف الكود — إزالة رفع الملف
-- حذف: `src/utils/contactFileParser.ts`, `src/test/contactFileParser.test.ts`.
-- تبسيط `ContactPickerButton.tsx`: إزالة `<input type="file">`، ومربّع اختيار الجهات المتعددة، وكل استيرادات المحلّل.
-
-### 2) دمج Capacitor Contacts لدعم iPhone + Android الأصلي
-- تثبيت `@capacitor-community/contacts` (لا يحتاج مفاتيح).
-- إضافة helper `pickNativeContact()` في `src/utils/phoneNormalize.ts`:
-  - إذا `Capacitor.isNativePlatform()` → استخدم `Contacts.pickContact()` (يفتح جهات iOS/Android الأصلية داخل التطبيق).
-  - وإلا إذا `navigator.contacts` متاح (Android Chrome ويب) → استخدم Contact Picker API.
-  - وإلا → toast واضح: «هذا الجهاز لا يدعم اختيار جهة الاتصال. ثبّت التطبيق من Play Store / App Store لتفعيل هذه الميزة»، ويبقى الحقل يدوياً.
-- تحديث الأذونات:
-  - Android: إضافة `<uses-permission android:name="android.permission.READ_CONTACTS"/>` في `AndroidManifest.xml` (يُضاف تلقائياً بعد `npx cap sync`).
-  - iOS: إضافة `NSContactsUsageDescription` في `Info.plist` مع نص عربي: «للسماح باستيراد أرقام العملاء من جهات الاتصال.»
-
-### 3) تجربة المستخدم الموحّدة
-- زر واحد بأيقونة 📇 في كل حقول الهاتف/واتساب — نفس السلوك في كل مكان.
-- بعد الاختيار: تعبئة تلقائية للاسم + الرقم المطبّع (`normalizePhoneInput`) + toast نجاح.
-- عند الرفض (المستخدم منع الإذن): toast يشرح كيفية تفعيل الإذن من إعدادات الجهاز.
-
-### 4) بعد الدمج — التعليمات للمستخدم
-- في المتصفح: يعمل مباشرة على أي Android حديث.
-- على iPhone: يجب تثبيت التطبيق كـ APK/IPA عبر Capacitor (خطوات موجودة في مذكرة `capacitor-mobile-development`).
-- سأذكر أن على المستخدم تشغيل `git pull` ثم `npx cap sync` بعد التغيير.
+## اختبارات القبول
+1. على viewport 375×812: افتح «عميل جديد» → اضغط «الاتجاه» → يظهر Bottom Sheet ملء العرض → اكتب اسماً جديداً → يظهر زر «＋ إضافة» بحجم كبير → اضغطه → يُحفَظ ويُختار ويُغلق الـ sheet.
+2. نفس الشيء للولاية/المدينة/المحلية بالتسلسل (cascade يعمل).
+3. تعديل عميل موجود: فتح حقل فيه قيمة → البحث فارغ (لا نص قديم يعرقل) → القيمة الحالية مبرزة في القائمة → تغييرها يعمل.
+4. النقر على الـ overlay خلف الـ sheet يُغلق القائمة فقط لا الحوار الأب.
+5. الكيبورد لا يخفي حقل البحث (الرأس ثابت `sticky top-0`).
+6. على سطح المكتب (≥640px) لا شيء يتغيّر بصرياً — الاختبارات الموجودة (`inlineSearchSelect.test.tsx`, `add-customer-inline-selects.spec.ts`) تمرّ بلا تعديل.
 
 ## ملفات ستتغيّر
-- `src/components/shared/ContactPickerButton.tsx` — تبسيط كامل، إزالة file input و dialog القائمة.
-- `src/utils/phoneNormalize.ts` — إضافة `pickNativeContact()` موحّد.
-- `src/utils/contactFileParser.ts` — حذف.
-- `src/test/contactFileParser.test.ts` — حذف.
-- `package.json` — إضافة `@capacitor-community/contacts`.
-- توثيق في README حول متطلبات الأذونات.
+- `src/components/InlineSearchSelect.tsx` — إضافة فرع Bottom Sheet للموبايل + إصلاحات صغيرة.
 
-## نقاط للموافقة قبل التنفيذ
-1. هل توافق على تثبيت `@capacitor-community/contacts` (المكتبة الرسمية للمجتمع، مجانية، تدعم iOS + Android)؟
-2. هل تريد إبقاء رسالة «ثبّت التطبيق من المتجر» لمستخدمي iPhone على الويب، أم إخفاء الزر كلياً هناك؟
+## نقاط للموافقة
+- هل تفضّل Bottom Sheet (يفتح من الأسفل بارتفاع 85vh)، أم **Fullscreen Dialog** (يشغل كامل الشاشة)؟ الافتراضي في الخطة: Bottom Sheet لأنه أسرع للإغلاق بإيماءة السحب المألوفة.
