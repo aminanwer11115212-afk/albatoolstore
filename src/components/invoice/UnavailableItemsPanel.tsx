@@ -307,6 +307,22 @@ export default function UnavailableItemsPanel({
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+
+      <UnavailableItemsReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        rows={rows.map(r => ({
+          id: r.id,
+          product_name: r.product_name,
+          quantity: r.quantity,
+          unit: r.unit,
+          unit_price: r.unit_price,
+          deleted_at: r.deleted_at,
+        }))}
+        shareOpts={shareCommonOpts}
+        onRestoreSelected={handleRestoreSelected}
+        initialMode={reviewMode}
+      />
     </Card>
   );
 }
