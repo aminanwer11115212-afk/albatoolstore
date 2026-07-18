@@ -166,29 +166,45 @@ export default function UnavailableItemsPanel({
               </button>
             </CollapsibleTrigger>
             {rows.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="default" className="gap-1">
-                    <Send className="h-3.5 w-3.5" />
-                    إرسال للعميل
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[100]">
-                  <DropdownMenuItem onClick={() => shareUnavailableItemsViaWhatsApp(shareCommonOpts)}>
-                    <MessageCircle className="h-4 w-4 ml-2 text-green-600" />
-                    واتساب (نص جاهز)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleCopyLink}>
-                    <Link2 className="h-4 w-4 ml-2 text-blue-600" />
-                    نسخ رابط مشاركة
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => printUnavailableItems(shareCommonOpts)}>
-                    <Printer className="h-4 w-4 ml-2 text-purple-600" />
-                    طباعة / PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 h-8"
+                  onClick={() => { setReviewMode("restore"); setReviewOpen(true); }}
+                  disabled={bulkBusy}
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                  استرجاع الكل
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="gap-1 h-8"
+                  onClick={() => { setReviewMode("review"); setReviewOpen(true); }}
+                >
+                  <ListChecks className="h-3.5 w-3.5" />
+                  مراجعة و إرسال
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="default" className="gap-1 h-8">
+                      <Send className="h-3.5 w-3.5" />
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="z-[100]">
+                    <DropdownMenuItem onClick={handleCopyLink}>
+                      <Link2 className="h-4 w-4 ml-2 text-blue-600" />
+                      نسخ رابط مشاركة عام
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => printUnavailableItems(shareCommonOpts)}>
+                      <Printer className="h-4 w-4 ml-2 text-purple-600" />
+                      طباعة / PDF (بدون مراجعة)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             )}
           </div>
         </CardHeader>
