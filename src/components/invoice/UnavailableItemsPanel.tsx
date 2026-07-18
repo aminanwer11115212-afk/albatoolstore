@@ -149,6 +149,51 @@ export default function UnavailableItemsPanel({
     }
   };
 
+  const restoreOneRow = async (row: DeletedRow) => {
+    const targetTable = isInvoice ? "invoice_items" : "quote_items";
+    const payload: any = {
+      product_id: row.full_data?.product_id ?? null,
+      product_name: row.product_name,
+      quantity: row.quantity,
+      unit_price: row.unit_price,
+      discount: row.full_data?.discount ?? 0,
+      discount_value: row.full_data?.discount_value ?? 0,
+      format_discount: row.full_data?.format_discount ?? "percent",
+      foreign_price: row.full_data?.foreign_price ?? null,
+      unit: row.unit ?? null,
+      tax_status: row.full_data?.tax_status ?? "default",
+      total: row.total,
+    };
+    payload[fkField] = docId;
+    const { error: insErr } = await (supabase as any).from(targetTable).insert(payload);
+    if (insErr) throw insErr;
+    await (supabase as any).from(table).delete().eq("id", row.id);
+  };
+
+  const handleRestoreSelected = async (ids: string[]) => {
+    setBulkBusy(true);
+    let ok = 0, fail = 0;
+    try {
+      for (const id of ids) {
+        const row = rows.find(r => r.id === id);
+        if (!row) continue;
+        try {
+          await restoreOneRow(row);
+          ok++;
+        } catch (e: any) {
+          console.error("[restore]", e);
+          fail++;
+        }
+      }
+      if (ok > 0) toast.success(`تم استرجاع ${ok} صنف${fail ? ` (فشل ${fail})` : ""}`);
+      else if (fail > 0) toast.error(`فشل استرجاع ${fail} صنف`);
+      await load();
+      onRestored?.();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   if (!loading && rows.length === 0) return null;
 
   return (
