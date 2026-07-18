@@ -92,12 +92,32 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     setQuery(selectedLabel);
     const currentIndex = options.findIndex(o => o.value === value);
     setHighlight(currentIndex >= 0 ? currentIndex : 0);
-    // input focus حصراً عبر useEffect بعد الـ commit — setTimeout(...,0) لا يضمن
-    // أن inputRef.current صار مربوطاً (React 18 batching).
   };
 
-  // ملاحظة: لا نُحرّك الفوكس إلى input داخل القائمة (Radix FocusScope يعيده
-  // للزر). بدلاً من ذلك نتعامل مع لوحة المفاتيح على الزر مباشرة أعلاه.
+  // على الموبايل: عند فتح القائمة نُركّز حقل البحث الداخلي حتى تظهر لوحة
+  // المفاتيح فوراً ويستطيع المستخدم الكتابة/الإضافة دون نقرة ثانية.
+  useEffect(() => {
+    if (!open) return;
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+    if (!isMobile) return;
+    // rAF مزدوج لضمان أن الـ portal/menu رُسم فعلياً في الـ DOM
+    const raf1 = requestAnimationFrame(() => {
+      const raf2 = requestAnimationFrame(() => {
+        try {
+          inputRef.current?.focus({ preventScroll: true });
+          // بعض متصفحات أندرويد لا تُظهر لوحة المفاتيح إلا عند click فعلي
+          inputRef.current?.click?.();
+        } catch {}
+      });
+      (raf1 as any)._raf2 = raf2;
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      const raf2 = (raf1 as any)?._raf2;
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, [open]);
+
 
 
   const closeAndFocus = (advance = false) => {
