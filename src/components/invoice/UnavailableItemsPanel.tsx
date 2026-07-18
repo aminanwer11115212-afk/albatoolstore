@@ -48,6 +48,9 @@ export default function UnavailableItemsPanel({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewMode, setReviewMode] = useState<"review" | "restore">("review");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const table = isInvoice ? "deleted_invoice_items" : "deleted_quote_items";
   const fkField = isInvoice ? "invoice_id" : "quote_id";
