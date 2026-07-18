@@ -101,19 +101,18 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
     if (!isMobile) return;
     // rAF مزدوج لضمان أن الـ portal/menu رُسم فعلياً في الـ DOM
+    let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
-      const raf2 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
         try {
           inputRef.current?.focus({ preventScroll: true });
           // بعض متصفحات أندرويد لا تُظهر لوحة المفاتيح إلا عند click فعلي
           inputRef.current?.click?.();
         } catch {}
       });
-      (raf1 as any)._raf2 = raf2;
     });
     return () => {
       cancelAnimationFrame(raf1);
-      const raf2 = (raf1 as any)?._raf2;
       if (raf2) cancelAnimationFrame(raf2);
     };
   }, [open]);
