@@ -6,14 +6,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Send, MessageCircle, Printer, Link2, Trash2, RotateCcw, AlertTriangle } from "lucide-react";
+import { ChevronDown, Send, Printer, Link2, Trash2, RotateCcw, AlertTriangle, ListChecks, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  shareUnavailableItemsViaWhatsApp,
   printUnavailableItems,
   createUnavailableItemsShareLink,
   type UnavailableItemRow,
 } from "@/utils/unavailableItemsShare";
+import UnavailableItemsReviewDialog from "./UnavailableItemsReviewDialog";
 
 interface DeletedRow {
   id: string;
@@ -48,6 +48,9 @@ export default function UnavailableItemsPanel({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewMode, setReviewMode] = useState<"review" | "restore">("review");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const table = isInvoice ? "deleted_invoice_items" : "deleted_quote_items";
   const fkField = isInvoice ? "invoice_id" : "quote_id";
@@ -146,6 +149,51 @@ export default function UnavailableItemsPanel({
     }
   };
 
+  const restoreOneRow = async (row: DeletedRow) => {
+    const targetTable = isInvoice ? "invoice_items" : "quote_items";
+    const payload: any = {
+      product_id: row.full_data?.product_id ?? null,
+      product_name: row.product_name,
+      quantity: row.quantity,
+      unit_price: row.unit_price,
+      discount: row.full_data?.discount ?? 0,
+      discount_value: row.full_data?.discount_value ?? 0,
+      format_discount: row.full_data?.format_discount ?? "percent",
+      foreign_price: row.full_data?.foreign_price ?? null,
+      unit: row.unit ?? null,
+      tax_status: row.full_data?.tax_status ?? "default",
+      total: row.total,
+    };
+    payload[fkField] = docId;
+    const { error: insErr } = await (supabase as any).from(targetTable).insert(payload);
+    if (insErr) throw insErr;
+    await (supabase as any).from(table).delete().eq("id", row.id);
+  };
+
+  const handleRestoreSelected = async (ids: string[]) => {
+    setBulkBusy(true);
+    let ok = 0, fail = 0;
+    try {
+      for (const id of ids) {
+        const row = rows.find(r => r.id === id);
+        if (!row) continue;
+        try {
+          await restoreOneRow(row);
+          ok++;
+        } catch (e: any) {
+          console.error("[restore]", e);
+          fail++;
+        }
+      }
+      if (ok > 0) toast.success(`تم استرجاع ${ok} صنف${fail ? ` (فشل ${fail})` : ""}`);
+      else if (fail > 0) toast.error(`فشل استرجاع ${fail} صنف`);
+      await load();
+      onRestored?.();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   if (!loading && rows.length === 0) return null;
 
   return (
@@ -163,29 +211,45 @@ export default function UnavailableItemsPanel({
               </button>
             </CollapsibleTrigger>
             {rows.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="default" className="gap-1">
-                    <Send className="h-3.5 w-3.5" />
-                    إرسال للعميل
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[100]">
-                  <DropdownMenuItem onClick={() => shareUnavailableItemsViaWhatsApp(shareCommonOpts)}>
-                    <MessageCircle className="h-4 w-4 ml-2 text-green-600" />
-                    واتساب (نص جاهز)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleCopyLink}>
-                    <Link2 className="h-4 w-4 ml-2 text-blue-600" />
-                    نسخ رابط مشاركة
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => printUnavailableItems(shareCommonOpts)}>
-                    <Printer className="h-4 w-4 ml-2 text-purple-600" />
-                    طباعة / PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 h-8"
+                  onClick={() => { setReviewMode("restore"); setReviewOpen(true); }}
+                  disabled={bulkBusy}
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                  استرجاع الكل
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="gap-1 h-8"
+                  onClick={() => { setReviewMode("review"); setReviewOpen(true); }}
+                >
+                  <ListChecks className="h-3.5 w-3.5" />
+                  مراجعة و إرسال
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="default" className="gap-1 h-8">
+                      <Send className="h-3.5 w-3.5" />
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="z-[100]">
+                    <DropdownMenuItem onClick={handleCopyLink}>
+                      <Link2 className="h-4 w-4 ml-2 text-blue-600" />
+                      نسخ رابط مشاركة عام
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => printUnavailableItems(shareCommonOpts)}>
+                      <Printer className="h-4 w-4 ml-2 text-purple-600" />
+                      طباعة / PDF (بدون مراجعة)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -243,6 +307,22 @@ export default function UnavailableItemsPanel({
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+
+      <UnavailableItemsReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        rows={rows.map(r => ({
+          id: r.id,
+          product_name: r.product_name,
+          quantity: r.quantity,
+          unit: r.unit,
+          unit_price: r.unit_price,
+          deleted_at: r.deleted_at,
+        }))}
+        shareOpts={shareCommonOpts}
+        onRestoreSelected={handleRestoreSelected}
+        initialMode={reviewMode}
+      />
     </Card>
   );
 }
