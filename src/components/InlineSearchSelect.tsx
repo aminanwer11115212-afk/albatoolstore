@@ -69,15 +69,18 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
 
   useEffect(() => {
     if (!open) return;
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
     const onDoc = (e: Event) => {
       const target = e.target as Node;
-      // القائمة مرسومة عبر portal إلى body، فلا تكفي wrapRef وحدها
       if (wrapRef.current?.contains(target)) return;
       if (menuRef.current?.contains(target)) return;
       setOpen(false);
     };
+    // على الموبايل: نعتمد على النقر على overlay داخل الـ sheet لإغلاق القائمة.
+    // نتجنّب document.touchstart لأنه يُغلق بأدنى لمسة أثناء إظهار/إخفاء الكيبورد
+    // فيُلغي كل النص المكتوب. desktop يبقى بسلوكه الحالي.
     document.addEventListener("mousedown", onDoc);
-    document.addEventListener("touchstart", onDoc);
+    if (!isMobile) document.addEventListener("touchstart", onDoc);
     return () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("touchstart", onDoc);
@@ -89,33 +92,32 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
   const openMenu = () => {
     if (disabled) return;
     setOpen(true);
-    setQuery(selectedLabel);
+    // نبدأ ببحث فارغ — لا نُعبّئه بالقيمة الحالية حتى لا تلتصق الكتابة الجديدة
+    // بالنص القديم على الموبايل ويصبح «+ إضافة» غير مرئي.
+    setQuery("");
     const currentIndex = options.findIndex(o => o.value === value);
     setHighlight(currentIndex >= 0 ? currentIndex : 0);
   };
 
-  // على الموبايل: عند فتح القائمة نُركّز حقل البحث الداخلي حتى تظهر لوحة
-  // المفاتيح فوراً ويستطيع المستخدم الكتابة/الإضافة دون نقرة ثانية.
+  // عند فتح القائمة نُركّز حقل البحث الداخلي حتى تظهر لوحة المفاتيح مباشرة
+  // ويستطيع المستخدم الكتابة/الإضافة دون نقرة ثانية.
   useEffect(() => {
     if (!open) return;
-    const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
-    if (!isMobile) return;
-    // rAF مزدوج لضمان أن الـ portal/menu رُسم فعلياً في الـ DOM
-    let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
+      const raf2 = requestAnimationFrame(() => {
         try {
           inputRef.current?.focus({ preventScroll: true });
-          // بعض متصفحات أندرويد لا تُظهر لوحة المفاتيح إلا عند click فعلي
-          inputRef.current?.click?.();
-        } catch {}
+        } catch { /* ignore */ }
       });
+      (raf1 as unknown as { _r2?: number })._r2 = raf2;
     });
     return () => {
       cancelAnimationFrame(raf1);
-      if (raf2) cancelAnimationFrame(raf2);
+      const r2 = (raf1 as unknown as { _r2?: number })._r2;
+      if (r2) cancelAnimationFrame(r2);
     };
   }, [open]);
+
 
 
 
