@@ -258,37 +258,173 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
         {selectedLabel || <span className="text-muted-foreground">{placeholder}</span>}
       </button>
       {open && (() => {
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+        const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
+        const vh = typeof window !== "undefined" ? window.innerHeight : 768;
+
+        // ─── محتوى القائمة (مشترك بين الموبايل والديسكتوب) ───
+        const listBody = (
+          <>
+            {canAdd && (
+              <button
+                type="button"
+                onClick={doAdd}
+                disabled={adding}
+                onMouseEnter={() => setHighlight(0)}
+                className={`w-full text-right px-3 flex items-center gap-2 border-b border-border ${isMobile ? "py-3 text-base" : "py-2.5 text-sm"} ${highlight === 0 ? "bg-primary/15" : "hover:bg-muted"}`}
+              >
+                <span className="text-primary font-bold text-lg">＋</span>
+                <span className="truncate">{adding ? "جاري الإضافة..." : `${addLabel || "إضافة"}: "${query.trim()}"`}</span>
+              </button>
+            )}
+            {filtered.length === 0 && !canAdd && (
+              <div className="px-3 py-4 text-sm text-muted-foreground text-center">لا نتائج</div>
+            )}
+            {filtered.map((o, i) => {
+              const idx = canAdd ? i + 1 : i;
+              const canDelete = !!onDelete && (showDeleteButton || onDelete);
+              const canRename = !!onRename;
+              return (
+                <div
+                  key={o.value}
+                  className={`flex items-center ${idx === highlight ? "bg-primary/15" : "hover:bg-muted"}`}
+                  onMouseEnter={() => setHighlight(idx)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => { onChange(o.value); closeAndFocus(true); }}
+                    className={`flex-1 text-right px-3 truncate ${isMobile ? "py-3 text-base" : "py-2.5 text-sm"} ${o.value === value ? "font-semibold text-primary" : ""}`}
+                  >
+                    {o.label}
+                  </button>
+                  {canRename && onRename && (
+                    <button
+                      type="button"
+                      title="تعديل الاسم"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const next = window.prompt(`تعديل اسم "${o.label}"`, o.label);
+                        if (next == null) return;
+                        const trimmed = next.trim();
+                        if (!trimmed || trimmed === o.label) return;
+                        await onRename(o, trimmed);
+                      }}
+                      className={`px-3 text-muted-foreground hover:text-primary hover:bg-primary/10 ${isMobile ? "py-3 text-base" : "py-2.5 text-sm"}`}
+                    >
+                      ✎
+                    </button>
+                  )}
+                  {canDelete && onDelete && (
+                    <button
+                      type="button"
+                      title="حذف"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!skipDeleteConfirm) {
+                          const msg = deleteConfirm ? deleteConfirm(o) : `حذف "${o.label}"؟`;
+                          if (!window.confirm(msg)) return;
+                        }
+                        const ok = await onDelete(o);
+                        if (ok && o.value === value) onChange("");
+                      }}
+                      className={`px-3 text-destructive hover:bg-destructive/10 ${isMobile ? "py-3 text-base" : "py-2.5 text-sm"}`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        );
+
+        // ─── فرع الموبايل: Bottom Sheet ملء العرض ───
+        if (isMobile) {
+          return (
+            <>
+              {/* overlay خلفي — النقر عليه يُغلق فقط */}
+              <div
+                className="fixed inset-0 bg-black/50 animate-fade-in"
+                style={{ zIndex: 9998, pointerEvents: "auto" }}
+                onMouseDown={(e) => { e.stopPropagation(); setOpen(false); }}
+                onTouchStart={(e) => { e.stopPropagation(); setOpen(false); }}
+              />
+              <div
+                ref={menuRef}
+                dir="rtl"
+                className="fixed left-0 right-0 bottom-0 bg-popover text-popover-foreground rounded-t-2xl shadow-2xl flex flex-col animate-slide-in-right"
+                style={{
+                  zIndex: 9999,
+                  maxHeight: "85vh",
+                  pointerEvents: "auto",
+                }}
+                onKeyDown={handleMenuKey}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                {/* مقبض السحب */}
+                <div className="pt-2 pb-1 flex justify-center">
+                  <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
+                </div>
+                {/* رأس ثابت: عنوان + إغلاق */}
+                <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                  <span className="text-sm font-semibold truncate">{title || placeholder}</span>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted text-xl text-muted-foreground"
+                    aria-label="إغلاق"
+                  >
+                    ✕
+                  </button>
+                </div>
+                {/* حقل البحث */}
+                <div className="p-3 border-b border-border">
+                  <input
+                    ref={inputRef}
+                    value={query}
+                    onChange={(e) => { setQuery(e.target.value); setHighlight(0); }}
+                    placeholder="ابحث أو اكتب اسم جديد..."
+                    onKeyDown={handleMenuKey}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    inputMode="text"
+                    className="w-full bg-background border border-border rounded-lg px-3 py-3 text-base outline-none focus:ring-2 focus:ring-primary"
+                    dir="rtl"
+                  />
+                </div>
+                {/* القائمة */}
+                <div className="flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
+                  {listBody}
+                </div>
+              </div>
+            </>
+          );
+        }
+
+        // ─── فرع الديسكتوب: popover عائم بجانب الزر (كما كان) ───
         const rect = btnRef.current?.getBoundingClientRect();
         if (!rect) return null;
-        const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const desiredWidth = isMobile ? Math.min(vw - 16, 360) : Math.max(rect.width, 240);
-        // Clamp horizontally inside viewport (RTL: anchor by right edge of trigger)
+        const desiredWidth = Math.max(rect.width, 240);
         const rightEdge = vw - rect.right;
         const rightOffset = Math.max(8, Math.min(rightEdge, vw - desiredWidth - 8));
-        // Decide direction by available space (open up if not enough below)
         const spaceBelow = vh - rect.bottom;
         const spaceAbove = rect.top;
-        const menuMax = isMobile ? Math.min(vh * 0.7, 420) : 320;
+        const menuMax = 320;
         const openUp = spaceBelow < menuMax && spaceAbove > spaceBelow;
         const style: React.CSSProperties = {
           position: "fixed",
-          ...(openUp
-            ? { bottom: vh - rect.top + 4 }
-            : { top: rect.bottom + 4 }),
+          ...(openUp ? { bottom: vh - rect.top + 4 } : { top: rect.bottom + 4 }),
           right: rightOffset,
           width: desiredWidth,
           maxWidth: `calc(100vw - 16px)`,
           maxHeight: menuMax,
-          zIndex: 10000, // above Radix Dialog (z-50) and any overlay
-          // Radix Dialog sets `body { pointer-events: none }` while open and
-          // `pointer-events` IS inherited. Since this menu is portaled to
-          // <body>, we must re-enable pointer events explicitly — otherwise
-          // mouse clicks fall through to the dialog footer below.
+          zIndex: 10000,
           pointerEvents: "auto",
         };
-        const menu = (
+        return (
           <div
             ref={menuRef}
             className="bg-popover text-popover-foreground border border-border rounded-lg shadow-xl overflow-hidden flex flex-col"
@@ -313,86 +449,14 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
               dir="rtl"
             />
             <div className="flex-1 overflow-y-auto overscroll-contain">
-              {canAdd && (
-                <button
-                  type="button"
-                  onClick={doAdd}
-                  disabled={adding}
-                  onMouseEnter={() => setHighlight(0)}
-                  className={`w-full text-right px-3 py-2.5 text-sm flex items-center gap-2 border-b border-border ${highlight === 0 ? "bg-primary/15" : "hover:bg-muted"}`}
-                >
-                  <span className="text-primary font-bold text-base">＋</span>
-                  <span className="truncate">{adding ? "جاري الإضافة..." : `${addLabel || "إضافة"}: "${query.trim()}"`}</span>
-                </button>
-              )}
-              {filtered.length === 0 && !canAdd && (
-                <div className="px-3 py-3 text-sm text-muted-foreground text-center">لا نتائج</div>
-              )}
-              {filtered.map((o, i) => {
-                const idx = canAdd ? i + 1 : i;
-                const canDelete = !!onDelete && (showDeleteButton || onDelete);
-                const canRename = !!onRename;
-                return (
-                  <div
-                    key={o.value}
-                    className={`flex items-center ${idx === highlight ? "bg-primary/15" : "hover:bg-muted"}`}
-                    onMouseEnter={() => setHighlight(idx)}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => { onChange(o.value); closeAndFocus(true); }}
-                      className={`flex-1 text-right px-3 py-2.5 text-sm truncate ${o.value === value ? "font-semibold text-primary" : ""}`}
-                    >
-                      {o.label}
-                    </button>
-                    {canRename && onRename && (
-                      <button
-                        type="button"
-                        title="تعديل الاسم"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const next = window.prompt(`تعديل اسم "${o.label}"`, o.label);
-                          if (next == null) return;
-                          const trimmed = next.trim();
-                          if (!trimmed || trimmed === o.label) return;
-                          await onRename(o, trimmed);
-                        }}
-                        className="px-2 py-2.5 text-sm text-muted-foreground hover:text-primary hover:bg-primary/10"
-                      >
-                        ✎
-                      </button>
-                    )}
-                    {canDelete && onDelete && (
-                      <button
-                        type="button"
-                        title="حذف"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (!skipDeleteConfirm) {
-                            const msg = deleteConfirm ? deleteConfirm(o) : `حذف "${o.label}"؟`;
-                            if (!window.confirm(msg)) return;
-                          }
-                          const ok = await onDelete(o);
-                          if (ok && o.value === value) onChange("");
-                        }}
-                        className="px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+              {listBody}
             </div>
           </div>
         );
-        // Render inline inside the wrapper so tests and callers can find the
-        // menu via container.contains(). Uses position:fixed so it still
-        // escapes overflow ancestors visually.
-        return menu;
       })()}
     </div>
   );
+
 });
 
 export default InlineSearchSelect;
