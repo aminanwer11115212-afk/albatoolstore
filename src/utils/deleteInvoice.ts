@@ -37,6 +37,23 @@ export async function deleteInvoiceWithStockRestore(
   if (invErr) throw new Error(`تعذّر قراءة الفاتورة: ${invErr.message}`);
   if (!inv) throw new Error("الفاتورة غير موجودة");
 
+  // حارس الحذف: يُمنع الحذف فقط إذا كانت الفاتورة مدفوعة بالكامل + سير العمل «تمت»
+  // (العميل استلم الطلبية وسدّد كامل قيمتها). في كل الحالات الأخرى الحذف مسموح.
+  {
+    const st = String((inv as any).status || "").toLowerCase();
+    const wf = String((inv as any).workflow_status || "").toLowerCase();
+    const total = Number((inv as any).total || 0);
+    const paid = Number((inv as any).paid_amount || 0);
+    const fullyPaid = st === "paid" || (total > 0 && paid >= total - 0.01);
+    if (fullyPaid && wf === "done") {
+      throw new Error(
+        "لا يمكن حذف هذه الفاتورة: العميل سدّد كامل قيمتها واستلم الطلبية (تمت). " +
+        "لعكس العملية أنشئ إشعار مرتجع أو استرداد رصيد.",
+      );
+    }
+  }
+
+
   // 1) حذف دفعات الفواتير العادية بالكامل (بدون تحويلها لرصيد عميل).
   //    فواتير الكاش/POS لا تخص بطاقة عميل.
   let deletedPayments = 0;
