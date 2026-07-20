@@ -548,38 +548,49 @@ export default function CustomersPage() {
   };
 
   // إضافة سريعة لكيانات مرتبطة (تُستخدم من القائمة المنسدلة بضغطة +)
+  // نستدعي RPCs الآمنة (SECURITY DEFINER) بدلاً من INSERT المباشر — لتعمل حتى لو تغيّرت GRANTs.
+  const rpcAdd = async (fn: string, args: Record<string, any>, label: string): Promise<any | null> => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      toast.error(`تعذّر ${label}: لا يوجد اتصال بالإنترنت`);
+      return null;
+    }
+    const { data, error } = await (supabase as any).rpc(fn, args);
+    if (error) { toast.error(`تعذّر ${label}: ${error.message}`); return null; }
+    if (!data) { toast.error(`تعذّر ${label}: لم يتم إنشاء السجل`); return null; }
+    return data;
+  };
   const createRegion = async (name: string): Promise<string | null> => {
-    const { data, error } = await (supabase as any).from("regions").insert({ name }).select("id,name").single();
-    if (error) { toast.error(error.message); return null; }
-    setRegions(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    toast.success(`تمت إضافة الاتجاه: ${name}`);
+    const data = await rpcAdd("add_region", { p_name: name }, "إضافة الاتجاه");
+    if (!data) return null;
+    setRegions(prev => [...prev.filter(r => r.id !== data.id), data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    toast.success(`تمت إضافة الاتجاه: ${data.name}`);
     try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return data.id;
   };
   const createState = async (name: string, regionId: string): Promise<string | null> => {
     if (!regionId) { toast.error("اختر الاتجاه أولاً"); return null; }
-    const { data, error } = await (supabase as any).from("states").insert({ name, region_id: regionId }).select("id,name,region_id").single();
-    if (error) { toast.error(error.message); return null; }
-    setStates(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    toast.success(`تمت إضافة الولاية: ${name}`);
+    const data = await rpcAdd("add_state", { p_name: name, p_region_id: regionId }, "إضافة الولاية");
+    if (!data) return null;
+    setStates(prev => [...prev.filter(s => s.id !== data.id), data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    toast.success(`تمت إضافة الولاية: ${data.name}`);
     try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return data.id;
   };
   const createCity = async (name: string, stateId: string | null | undefined): Promise<string | null> => {
     if (!stateId) { toast.error("اختر الولاية أولاً"); return null; }
-    const { data, error } = await (supabase as any).from("cities").insert({ name, state_id: stateId }).select("id,name,state_id").single();
-    if (error) { toast.error(error.message); return null; }
-    setCities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    toast.success(`تمت إضافة المدينة: ${name}`);
+    const data = await rpcAdd("add_city", { p_name: name, p_state_id: stateId }, "إضافة المدينة");
+    if (!data) return null;
+    setCities(prev => [...prev.filter(c => c.id !== data.id), data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    toast.success(`تمت إضافة المدينة: ${data.name}`);
     try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return data.id;
   };
   const createLocality = async (name: string, cityId: string | null | undefined): Promise<string | null> => {
     if (!cityId) { toast.error("اختر المدينة أولاً"); return null; }
-    const { data, error } = await (supabase as any).from("localities").insert({ name, city_id: cityId }).select("id,name,city_id").single();
-    if (error) { toast.error(error.message); return null; }
-    setLocalities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    toast.success(`تمت إضافة المحلية: ${name}`);
+    const data = await rpcAdd("add_locality", { p_name: name, p_city_id: cityId }, "إضافة المحلية");
+    if (!data) return null;
+    setLocalities(prev => [...prev.filter(l => l.id !== data.id), data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    toast.success(`تمت إضافة المحلية: ${data.name}`);
     try { window.dispatchEvent(new CustomEvent("geo:changed")); } catch {}
     return data.id;
   };
