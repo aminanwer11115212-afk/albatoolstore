@@ -2889,7 +2889,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_orphan_credit_consumption: {
+        Row: {
+          amount: number | null
+          customer_id: string | null
+          customer_name: string | null
+          date: string | null
+          description: string | null
+          missing_invoice_id: string | null
+          transaction_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_city: {
