@@ -818,7 +818,7 @@ export default function QuoteViewPage() {
             </div>
             {isBankMethod(payMethod) && (
               <div>
-                <label className="text-sm text-muted-foreground block mb-1 text-right">رقم العملية / الإشعار البنكي (اختياري)</label>
+                <label className="text-sm text-muted-foreground block mb-1 text-right">رقم العملية (اختياري)</label>
                 <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)}
                   placeholder="مثال: 12345678"
                   className="w-full bg-muted rounded-lg px-3 py-2 text-sm border border-border" />
