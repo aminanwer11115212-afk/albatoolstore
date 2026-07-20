@@ -10,6 +10,8 @@ export const CUSTOMER_UPDATABLE_COLUMNS = new Set<string>([
   "credit_limit", "payment_terms", "is_active", "tags",
   "billing_address", "shipping_address", "preferred_transporter_id",
   "customer_type", "discount_percentage",
+  // الحقول الجغرافية للتحرير المباشر من جدول العملاء (الاتجاه/الولاية/المدينة/المحلية)
+  "region_id", "state_id", "city_id", "locality_id",
 ]);
 
 export function sanitizeCustomerPatch(patch: Record<string, any>): Record<string, any> {
