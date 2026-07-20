@@ -50,6 +50,16 @@ export default function CustomersPage() {
   const [duplicates, setDuplicates] = useState<any[]>([]);
   const [showGeo, setShowGeo] = useState(false);
   const [showLogistics, setShowLogistics] = useState(false);
+  const [grantsWarning, setGrantsWarning] = useState<string | null>(null);
+  useEffect(() => {
+    (async () => {
+      const { checkGeoGrants } = await import("@/lib/geoGrantsCheck");
+      const rep = await checkGeoGrants();
+      if (!rep.ok) {
+        setGrantsWarning(rep.error || `صلاحيات ناقصة: ${rep.missing.join("، ") || "غير محددة"}`);
+      }
+    })();
+  }, []);
   const { data: customers, isLoading, insert, update, remove } = useCustomers();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
