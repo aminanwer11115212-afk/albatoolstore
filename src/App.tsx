@@ -409,6 +409,7 @@ const App = () => {
             <Route path="/customers" element={lazyEl(<CustomersPage />, "العملاء")} />
             <Route path="/customers/create" element={lazyEl(<CustomersPage />, "إضافة عميل")} />
             <Route path="/customers/debt-report" element={lazyEl(<CustomerDebtReportPage />, "تقرير ديون العملاء")} />
+            <Route path="/customers/geo-diagnostics" element={lazyEl(<CustomersGeoDiagnosticsPage />, "تشخيص الهيكل الجغرافي")} />
             <Route path="/client-groups" element={lazyEl(<ClientGroupsPage />, "مجموعات العملاء")} />
             <Route path="/suppliers" element={lazyEl(<SuppliersPage />, "الموردين")} />
             <Route path="/suppliers/create" element={lazyEl(<SuppliersPage />, "إضافة مورد")} />
