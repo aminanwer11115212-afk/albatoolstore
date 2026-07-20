@@ -184,7 +184,12 @@ export default function CustomerPaymentDialog({
 
   // ثبّت الحساب المختار عبر إغلاق/فتح الحوار وتبديل الطريقة
   useEffect(() => {
-    if (accountOptions.length === 0) return;
+    if (accountOptions.length === 0) {
+      // لا خيارات (مثل النقدي بلا صندوق نقدي) — امسح أي حساب سابق حتى لا
+      // تُسجَّل الدفعة على حساب بنكي مُختار قبل التبديل.
+      if (accountId) setAccountId("");
+      return;
+    }
     const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
     if (!accountId) {
       // 1) لطريقة "تحويل بنكي" — يظهر افتراضياً حساب "أولاد جابر" إن وُجد
