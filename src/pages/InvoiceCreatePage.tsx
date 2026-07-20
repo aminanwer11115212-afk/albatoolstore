@@ -456,6 +456,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         const itemDiscounts = mapped.reduce((s: number, r: any) => s + ((Number(r.quantity) || 0) * (Number(r.unit_price) || 0) * (Number(r.discount) || 0) / 100), 0);
         setGeneralDiscount(Math.max(0, (Number(inv.discount) || 0) - itemDiscounts));
         setRows(mapped);
+        // اضبط معدل الصرف الافتراضي للبنود الجديدة على معدل الفاتورة نفسه
+        // (مشتقّاً من بنودها) بدل 1 — وإلا أُدرج الصنف الجديد بالسعر الأجنبي الخام.
+        const derivedRate = mapped.find((r: any) => Number(r.foreign_price) > 0 && Number(r.exchange_rate) > 0)?.exchange_rate;
+        if (derivedRate && derivedRate > 0) {
+          setDefaultRate(derivedRate);
+          setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: derivedRate, unit_price: r.foreign_price * derivedRate }));
+        }
         // احفظ بصمة البنود الأصلية لتخطّي إعادة الكتابة وعمليات المخزون لاحقاً إن لم تتغيّر
         originalItemsHashRef.current = invoiceItemsHash(mapped);
       } else {
