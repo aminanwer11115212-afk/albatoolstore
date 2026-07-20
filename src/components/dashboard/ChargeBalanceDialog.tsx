@@ -49,7 +49,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
 
   const [amount, setAmount] = useState<string>("");
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<Method>("cash");
+  const [method, setMethod] = useState<Method>("bank_transfer");
   const [accountId, setAccountId] = useState<string>("");
   const [bankAccountId, setBankAccountId] = useState<string>("");
   const [referenceNo, setReferenceNo] = useState<string>("");
@@ -80,11 +80,9 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
           setBankAccountId(lastBank);
         }
       } catch {}
-      // استرجاع آخر طريقة دفع
-      try {
-        const lastM = localStorage.getItem("lov:last-method:charge") as Method | null;
-        if (lastM === "cash" || lastM === "bank_transfer") setMethod(lastM);
-      } catch {}
+      // الافتراضي دائماً «تحويل بنكي» عند كل فتح (لا نعتمد على آخر طريقة حتى
+      // لا يتغيّر الافتراضي). زر التغيير يبقى يعمل واختيار المستخدم يتغلّب.
+      setMethod("bank_transfer");
     })();
   }, [open]);
 
@@ -108,7 +106,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
   }, [selectedCustomer, amt, date]);
 
   function reset() {
-    setCustomerId(""); setCustomerSearch(""); setAmount(""); setMethod("cash");
+    setCustomerId(""); setCustomerSearch(""); setAmount(""); setMethod("bank_transfer");
     setBankAccountId(""); setReferenceNo(""); setNotes("");
     setDate(new Date().toISOString().slice(0, 10));
   }
@@ -352,8 +350,8 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
                 </Select>
               </div>
               <div>
-                <Label>رقم الإشعار البنكي *</Label>
-                <Input value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="رقم الإشعار / المرجع" />
+                <Label>رقم العملية *</Label>
+                <Input value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="رقم العملية / المرجع" />
               </div>
             </>
           )}

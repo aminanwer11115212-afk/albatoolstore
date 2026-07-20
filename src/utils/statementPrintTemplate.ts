@@ -417,7 +417,7 @@ export function generateStatementHTML(data: StatementData): string {
     ${party.address ? `<span class="info-label">العنوان:</span><span class="info-value">${esc(party.address)}</span>` : ""}
   </div>
   <div>
-    ${typeof party.balance === "number" ? `<span class="info-label">الرصيد الحالي:</span><span class="info-value-blue">${fmt(party.balance)}</span>` : ""}
+    ${`<span class="info-label">رصيد ${kind === "customer" ? "العميل" : "المورد"} الحالي:</span><span class="info-value-blue" style="color:${Math.abs(balanceVal) < 0.01 ? "#2980b9" : balanceVal > 0 ? "#dc2626" : "#16a34a"};">${fmt(Math.abs(balanceVal))} ${Math.abs(balanceVal) < 0.01 ? "(خالص)" : balanceVal > 0 ? "(عليه)" : "(له)"}</span>`}
   </div>
 </div>
 

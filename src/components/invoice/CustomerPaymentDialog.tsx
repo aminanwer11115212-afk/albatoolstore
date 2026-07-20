@@ -5,6 +5,7 @@ import { useAccounts } from "@/hooks/useData";
 import {
   validateBankTransferPayment,
   isBankPaymentMethod,
+  isCashPaymentMethod,
   filterAccountsForPayment,
 } from "@/lib/bankTransferValidation";
 import { computeInvoicePaymentAdjustment } from "@/utils/invoicePaymentMath";
@@ -92,14 +93,10 @@ export default function CustomerPaymentDialog({
 
   const remaining = Math.max(0, Number(total || 0) - Number(paidBefore || 0));
 
-  // القيمة الابتدائية للطريقة — من (1) آخر طريقة لهذا العميل، (2) المثبَّت، (3) تحويل بنكي
+  // القيمة الابتدائية للطريقة — دائماً «تحويل بنكي» عند كل فتح، إلا إذا ثبّت
+  // المستخدم طريقة بعينها صراحةً (زر التثبيت). لا نعتمد على «آخر طريقة للعميل»
+  // حتى لا يتغيّر الافتراضي من فاتورة لأخرى. اختيار المستخدم اليدوي يتغلّب لاحقاً.
   const initialMethod = (): Method => {
-    try {
-      if (customerId) {
-        const perCust = localStorage.getItem(`lov:last-method:cust:${customerId}`) as Method | null;
-        if (perCust === "cash" || perCust === "bank") return perCust;
-      }
-    } catch {}
     const m = readPin(PIN_METHOD_KEY) as Method;
     return (m === "cash" || m === "bank") ? m : "bank";
   };
@@ -178,15 +175,21 @@ export default function CustomerPaymentDialog({
     const list = (accounts || []) as any[];
     if (method === "bank") return filterAccountsForPayment(list, "bank");
     if (method === "cash") {
-      const cashOnly = list.filter((a) => (a.account_type || "cash") === "cash");
-      return cashOnly.length > 0 ? cashOnly : list;
+      // النقدي = صندوق نقدي؛ لا نرجع للحسابات البنكية. إن لم يوجد صندوق نقدي
+      // تبقى القائمة فارغة ويُسجَّل القيد بلا حساب (account_id = null).
+      return list.filter((a) => (a.account_type || "cash") === "cash");
     }
     return list;
   }, [accounts, method]);
 
   // ثبّت الحساب المختار عبر إغلاق/فتح الحوار وتبديل الطريقة
   useEffect(() => {
-    if (accountOptions.length === 0) return;
+    if (accountOptions.length === 0) {
+      // لا خيارات (مثل النقدي بلا صندوق نقدي) — امسح أي حساب سابق حتى لا
+      // تُسجَّل الدفعة على حساب بنكي مُختار قبل التبديل.
+      if (accountId) setAccountId("");
+      return;
+    }
     const storageKey = method === "bank" ? "lov:last-bank-account" : `lov:last-account:${method}`;
     if (!accountId) {
       // 1) لطريقة "تحويل بنكي" — يظهر افتراضياً حساب "أولاد جابر" إن وُجد
@@ -278,12 +281,10 @@ export default function CustomerPaymentDialog({
     if (disc > 0 && !canApplyDiscount) {
       return toast.error("ليست لديك صلاحية تطبيق خصم إضافي — تواصل مع المسؤول");
     }
-    if (n > 0 && !accountId) {
-      const anyAccounts = (accounts || []) as any[];
-      if (method === "cash" && !anyAccounts.some((a) => (a.account_type || "cash") === "cash")) {
-        return toast.error("لا يوجد حساب كاش. أضف حساب نقدي أو اختر «تحويل بنكي» واستخدم حساب أولاد جابر.", { duration: 6000 });
-      }
-      return toast.error("اختر الحساب");
+    // النقدي: الحساب اختياري — يُسجَّل بلا حساب (صندوق نقدي) دون منع الحفظ.
+    // التحويل البنكي: الحساب إلزامي.
+    if (n > 0 && !accountId && isBankPaymentMethod(method)) {
+      return toast.error("اختر الحساب المستلم للتحويل البنكي");
     }
     if (n > 0 && isBankPaymentMethod(method)) {
       const err = validateBankTransferPayment({ method, account: selectedAccount, referenceNo, requireReferenceNo: false });
@@ -342,7 +343,7 @@ export default function CustomerPaymentDialog({
           type: "income",
           category: "customer_payment",
           customer_id: isPos ? null : customerId || null,
-          account_id: accountId,
+          account_id: accountId || null,
           amount: split.applied,
           date,
           method,
@@ -358,7 +359,7 @@ export default function CustomerPaymentDialog({
           type: "income",
           category: "customer_credit",
           customer_id: customerId,
-          account_id: accountId,
+          account_id: accountId || null,
           amount: split.overpay,
           date,
           method,
@@ -964,7 +965,9 @@ export default function CustomerPaymentDialog({
 
             <div>
               <div className="flex items-center justify-between mb-1 gap-2">
-                <Label className="text-xs">الحساب المستلم</Label>
+                <Label className="text-xs">
+                  الحساب المستلم{isCashPaymentMethod(method) ? " (اختياري للنقدي)" : ""}
+                </Label>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {accountId && (
                     <button
@@ -984,7 +987,7 @@ export default function CustomerPaymentDialog({
                       )}
                     </button>
                   )}
-                  {(accountsError || (!accountsLoading && accountOptions.length === 0)) && (
+                  {(accountsError || (!accountsLoading && accountOptions.length === 0 && !isCashPaymentMethod(method))) && (
                     <button
                       type="button"
                       data-testid="retry-load-accounts"
@@ -1003,7 +1006,7 @@ export default function CustomerPaymentDialog({
                       accountsLoading
                         ? "جارٍ التحميل…"
                         : accountOptions.length === 0
-                          ? "لا يوجد حساب — أضف حسابًا"
+                          ? (isCashPaymentMethod(method) ? "نقدًا — بلا حساب" : "لا يوجد حساب — أضف حسابًا")
                           : "اختر الحساب المستلم"
                     }
                   />

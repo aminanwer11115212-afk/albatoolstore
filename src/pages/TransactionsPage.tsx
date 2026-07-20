@@ -120,7 +120,7 @@ export default function TransactionsPage() {
                 </select>
                 <input
                   type="text"
-                  placeholder="رقم العملية / الإشعار البنكي (اختياري)"
+                  placeholder="رقم العملية (اختياري)"
                   value={form.reference_no}
                   onChange={e => setForm({ ...form, reference_no: e.target.value })}
                   className={inputCls}
