@@ -12,6 +12,7 @@ import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/u
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
+import RevisePaymentDialog, { type RevisableTx } from "@/components/statement/RevisePaymentDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 
 export default function CustomerStatementPage() {
@@ -196,6 +197,16 @@ export default function CustomerStatementPage() {
     if (t.method === "credit_balance") return "رصيد دائن";
     if (!t.account_id) return "نقدًا";
     return accountNameById.get(t.account_id) || "—";
+  };
+  // دفعة قابلة للتعديل: قيد دفع نقدي/بنكي مرتبط بفاتورة (لا استهلاك رصيد دائن)
+  const isRevisablePayment = (t: any): boolean =>
+    t.category === "customer_payment" && t.method !== "credit_balance" && !!t.reference_id;
+  const [reviseTx, setReviseTx] = useState<RevisableTx | null>(null);
+  const refreshAfterRevise = () => {
+    qc.invalidateQueries({ queryKey: ["customer-transactions", selectedCustomerId] });
+    qc.invalidateQueries({ queryKey: ["customer-fresh", selectedCustomerId] });
+    qc.invalidateQueries({ queryKey: ["customers"] });
+    try { window.dispatchEvent(new Event("transactions:changed")); } catch { /* noop */ }
   };
 
   const { data: deletedInvoices } = useDeletedInvoicesForCustomer(selectedCustomerId, fromDate, toDate);
@@ -956,6 +967,7 @@ export default function CustomerStatementPage() {
                         </button>
                       </th>
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الوصف</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground print:hidden">تعديل</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1002,6 +1014,20 @@ export default function CustomerStatementPage() {
                             {amt.toLocaleString()}
                           </td>
                           <td data-label="الوصف" className="px-5 py-3 text-muted-foreground text-xs">{t.description || "-"}</td>
+                          <td data-label="تعديل" className="px-5 py-3 print:hidden">
+                            {isRevisablePayment(t) ? (
+                              <button
+                                type="button"
+                                onClick={() => setReviseTx({ id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id, customer_id: t.customer_id, description: t.description })}
+                                className="text-xs text-primary hover:underline"
+                                title="تعديل مبلغ/خصم هذه الدفعة"
+                              >
+                                تعديل
+                              </button>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
@@ -1047,6 +1073,13 @@ export default function CustomerStatementPage() {
         );
       })()}
       </div>
+
+      <RevisePaymentDialog
+        open={!!reviseTx}
+        tx={reviseTx}
+        onClose={() => setReviseTx(null)}
+        onSaved={refreshAfterRevise}
+      />
     </div>
   );
 }
