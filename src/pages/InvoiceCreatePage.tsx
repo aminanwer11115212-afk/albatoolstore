@@ -1455,6 +1455,26 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     action(id);
   };
 
+  // طباعة مباشرة (F10 / زر الطباعة): تحفظ الفاتورة ثم تطبع عبر iframe مخفي
+  // دون الانتقال لصفحة المعاينة.
+  const printInvoiceNow = async () => {
+    await saveThen(async (id) => {
+      try {
+        await supabase.rpc("advance_invoice_workflow" as any, {
+          _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
+        });
+        invalidateWorkflowAutoCache(id);
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch { /* noop */ }
+      } catch { /* غير حرِج */ }
+      try {
+        const { printInvoiceDirect } = await import("@/utils/printInvoiceDirect");
+        await printInvoiceDirect(id);
+      } catch (e: any) {
+        toast.error(e?.message || "تعذّرت الطباعة");
+      }
+    });
+  };
+
   // ---------- POS: اختصارات لوحة المفاتيح للكاشير ----------
   // F2 = حفظ، F4 = حفظ + طباعة، F6 = تركيز حقل العميل، F3 = تركيز حقل المنتج، F8 = حفظ + جديد
   useEffect(() => {
@@ -1509,16 +1529,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       });
     },
     onPrint: async () => {
-      await saveThen(async (id) => {
-        try {
-          await supabase.rpc("advance_invoice_workflow" as any, {
-            _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
-          });
-          invalidateWorkflowAutoCache(id);
-          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
-        } catch {}
-        navigate(`/preview/invoice/${id}?autoprint=1`);
-      });
+      // طباعة مباشرة دون الرجوع لصفحة المعاينة
+      await printInvoiceNow();
     },
   });
 
@@ -2234,7 +2246,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                   id: "print",
                   group: "3-share",
                   node: (
-                    <button type="button" onClick={() => handlePrint("full", false)} style={btnStyle("#ef4444")} title="طباعة">
+                    <button type="button" onClick={() => printInvoiceNow()} style={btnStyle("#ef4444")} title="طباعة مباشرة (F10)">
                       <Printer size={14} /> طباعة
                     </button>
                   ),

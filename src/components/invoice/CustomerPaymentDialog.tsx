@@ -123,8 +123,13 @@ export default function CustomerPaymentDialog({
       setCreditUse("");
       setDiscount("");
       setDate(new Date().toISOString().slice(0, 10));
-      setMethod(initialMethod());
-      setAccountId("");
+      const m0 = initialMethod();
+      setMethod(m0);
+      // «أولاد جابر» هو الحساب الافتراضي الثابت عند كل فتح (للطريقة البنكية).
+      const jaberNow = ((accounts as any[]) || []).find((a) =>
+        /اولاد\s*جابر|أولاد\s*جابر/.test(`${a.name || ""} ${a.bank_name || ""}`),
+      );
+      setAccountId(jaberNow && m0 !== "cash" ? jaberNow.id : "");
       setReferenceNo("");
       setNotes("");
       setCustBalance(null);
@@ -354,6 +359,8 @@ export default function CustomerPaymentDialog({
       }
 
       // (b) فائض النقد → رصيد دائن جديد للعميل
+      //     نربطه بالفاتورة (reference_id + allocation.kind) حتى يُحذف تلقائياً
+      //     عند حذف الفاتورة فيرجع حساب العميل لحالته قبل الفاتورة.
       if (split.overpay > 0 && !isPos && customerId) {
         const { error: cErr } = await (supabase as any).from("transactions").insert({
           type: "income",
@@ -363,7 +370,9 @@ export default function CustomerPaymentDialog({
           amount: split.overpay,
           date,
           method,
+          reference_id: invoiceId,
           description: `فائض دفعة${invoiceNumber ? ` من الفاتورة ${invoiceNumber}` : ""} — رصيد دائن`,
+          allocation: { kind: "overpay_surplus", invoice_id: invoiceId, invoice_number: invoiceNumber || null },
         });
         if (cErr) throw cErr;
       }
