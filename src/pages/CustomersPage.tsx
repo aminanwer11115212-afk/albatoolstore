@@ -50,6 +50,16 @@ export default function CustomersPage() {
   const [duplicates, setDuplicates] = useState<any[]>([]);
   const [showGeo, setShowGeo] = useState(false);
   const [showLogistics, setShowLogistics] = useState(false);
+  const [grantsWarning, setGrantsWarning] = useState<string | null>(null);
+  useEffect(() => {
+    (async () => {
+      const { checkGeoGrants } = await import("@/lib/geoGrantsCheck");
+      const rep = await checkGeoGrants();
+      if (!rep.ok) {
+        setGrantsWarning(rep.error || `صلاحيات ناقصة: ${rep.missing.join("، ") || "غير محددة"}`);
+      }
+    })();
+  }, []);
   const { data: customers, isLoading, insert, update, remove } = useCustomers();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -850,6 +860,15 @@ export default function CustomersPage() {
 
   return (
     <div className={(isFullscreen ? "fixed inset-0 z-[100] bg-background overflow-auto p-4 " : "") + (showDashboard ? "space-y-6" : "space-y-3 flex flex-col min-h-[calc(100vh-5rem)]")}>
+      {grantsWarning && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 text-destructive text-sm px-4 py-3 flex items-start justify-between gap-3">
+          <div>
+            <b>تنبيه:</b> إضافة/تعديل العناصر الجغرافية قد لا تعمل — {grantsWarning}.{" "}
+            <a href="/customers/geo-diagnostics" className="underline font-semibold">افتح صفحة التشخيص</a>
+          </div>
+          <button onClick={() => setGrantsWarning(null)} className="text-xs opacity-70 hover:opacity-100">✕</button>
+        </div>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-foreground">عملاء</h1>
         <div className="flex items-center gap-2 flex-wrap">
@@ -908,6 +927,11 @@ export default function CustomersPage() {
             className="flex items-center gap-2 bg-muted text-foreground border border-border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors">
             🗺️ الهيكل الجغرافي
           </button>
+          <a href="/customers/geo-diagnostics"
+            className="flex items-center gap-2 bg-muted text-foreground border border-border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors"
+            title="فحص إضافة اتجاه/ولاية/مدينة/محلية">
+            🧪 تشخيص الجغرافيا
+          </a>
           <button onClick={() => setShowLogistics(true)}
             className="flex items-center gap-2 bg-muted text-foreground border border-border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors">
             🚚 اللوجستيات

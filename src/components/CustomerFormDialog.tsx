@@ -123,6 +123,41 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     setTimeout(() => refs.current[0]?.focus(), 50);
   }, [open, initial]);
 
+  // ── إعادة تحميل القوائم الجغرافية/اللوجستية عند بثّ حدث geo:changed من أي مصدر ──
+  useEffect(() => {
+    if (!open) return;
+    const reload = async () => {
+      const [r, t, g, d] = await Promise.all([
+        (supabase as any).from("regions").select("id,name,sort_order").order("sort_order"),
+        supabase.from("transporters" as any).select("id,name").order("name"),
+        supabase.from("customer_groups").select("id,name").order("name"),
+        (supabase as any).from("destinations").select("id,name").order("name"),
+      ]);
+      setRegions(r.data || []);
+      setTransporters((t.data as any[]) || []);
+      setGroups(g.data || []);
+      setDestinations((d.data as any[]) || []);
+      if (form.region_id) {
+        const { data: st } = await (supabase as any).from("states").select("id,name,region_id").eq("region_id", form.region_id).order("name");
+        setStates(st || []);
+      }
+      if (form.state_id) {
+        const { data: ct } = await (supabase as any).from("cities").select("id,name,state_id").eq("state_id", form.state_id).order("name");
+        setCities(ct || []);
+      }
+      if (form.city_id) {
+        const { data: lc } = await (supabase as any).from("localities").select("id,name,city_id").eq("city_id", form.city_id).order("name");
+        setLocalities(lc || []);
+      }
+    };
+    window.addEventListener("geo:changed", reload);
+    window.addEventListener("customer-logistics:changed", reload);
+    return () => {
+      window.removeEventListener("geo:changed", reload);
+      window.removeEventListener("customer-logistics:changed", reload);
+    };
+  }, [open, form.region_id, form.state_id, form.city_id]);
+
   useEffect(() => {
     if (!form.region_id) { setStates([]); return; }
     (async () => {
@@ -154,17 +189,32 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     try { window.dispatchEvent(new CustomEvent("customer-logistics:changed")); } catch {}
   };
 
+  // إضافة عبر RPC آمنة (SECURITY DEFINER) — لا تعتمد على GRANT المباشر.
+  // في وضع عدم الاتصال نُظهر خطأ صريحاً بدل التخزين الصامت في قائمة الأوفلاين.
+  const rpcAdd = async <T,>(fn: string, args: Record<string, any>, label: string): Promise<T | null> => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      toast.error(`تعذّر ${label}: لا يوجد اتصال بالإنترنت. جرّب لاحقاً بعد عودة الاتصال.`);
+      return null;
+    }
+    const { data, error } = await (supabase as any).rpc(fn, args);
+    if (error) {
+      const msg = error.message || String(error);
+      toast.error(`تعذّر ${label}: ${msg}`);
+      // eslint-disable-next-line no-console
+      console.error(`[geo] ${fn} failed`, error);
+      return null;
+    }
+    if (!data) {
+      toast.error(`تعذّر ${label}: لم يتم إنشاء السجل`);
+      return null;
+    }
+    return data as T;
+  };
+
   const addRegion = async (name: string): Promise<string | null> => {
-    const nextSort = (regions.reduce((m, r) => Math.max(m, r.sort_order || 0), 0) || 0) + 1;
-    const { queued, data, error } = await runOrQueue({
-      table: "regions",
-      op: "insert",
-      payload: { name: name.trim(), sort_order: nextSort },
-      label: "إضافة اتجاه",
-    });
-    if (error) { toast.error(error.message); return null; }
-    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
-    setRegions(prev => [...prev, data].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
+    const data = await rpcAdd<any>("add_region", { p_name: name.trim() }, "إضافة الاتجاه");
+    if (!data) return null;
+    setRegions(prev => [...prev.filter(r => r.id !== data.id), data].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
     setForm(f => ({ ...f, region_id: data.id, state_id: null, city_id: null, locality_id: null }));
     toast.success(`تمت إضافة الاتجاه: ${data.name}`);
     notifyGeoChanged();
@@ -208,18 +258,12 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     });
     return false; // الحوار سيتولّى؛ لا تُغلق popover
   };
-  // ── دوال إضافة (add) لكل قائمة ──
+  // ── دوال إضافة (add) لكل قائمة — عبر RPC ──
   const addState = async (name: string): Promise<string | null> => {
     if (!form.region_id) { toast.error("اختر الاتجاه أولاً"); return null; }
-    const { queued, data, error } = await runOrQueue({
-      table: "states",
-      op: "insert",
-      payload: { name: name.trim(), region_id: form.region_id },
-      label: "إضافة ولاية",
-    });
-    if (error) { toast.error(error.message); return null; }
-    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
-    setStates(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    const data = await rpcAdd<any>("add_state", { p_name: name.trim(), p_region_id: form.region_id }, "إضافة الولاية");
+    if (!data) return null;
+    setStates(prev => [...prev.filter(s => s.id !== data.id), data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, state_id: data.id, city_id: null, locality_id: null }));
     toast.success(`تمت إضافة الولاية: ${data.name}`);
     notifyGeoChanged();
@@ -227,15 +271,9 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   };
   const addCity = async (name: string): Promise<string | null> => {
     if (!form.state_id) { toast.error("اختر الولاية أولاً"); return null; }
-    const { queued, data, error } = await runOrQueue({
-      table: "cities",
-      op: "insert",
-      payload: { name: name.trim(), state_id: form.state_id },
-      label: "إضافة مدينة",
-    });
-    if (error) { toast.error(error.message); return null; }
-    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
-    setCities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    const data = await rpcAdd<any>("add_city", { p_name: name.trim(), p_state_id: form.state_id }, "إضافة المدينة");
+    if (!data) return null;
+    setCities(prev => [...prev.filter(c => c.id !== data.id), data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, city_id: data.id, locality_id: null }));
     toast.success(`تمت إضافة المدينة: ${data.name}`);
     notifyGeoChanged();
@@ -243,15 +281,9 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
   };
   const addLocality = async (name: string): Promise<string | null> => {
     if (!form.city_id) { toast.error("اختر المدينة أولاً"); return null; }
-    const { queued, data, error } = await runOrQueue({
-      table: "localities",
-      op: "insert",
-      payload: { name: name.trim(), city_id: form.city_id },
-      label: "إضافة محلية",
-    });
-    if (error) { toast.error(error.message); return null; }
-    if (queued) { toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال"); return null; }
-    setLocalities(prev => [...prev, data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+    const data = await rpcAdd<any>("add_locality", { p_name: name.trim(), p_city_id: form.city_id }, "إضافة المحلية");
+    if (!data) return null;
+    setLocalities(prev => [...prev.filter(l => l.id !== data.id), data].sort((a, b) => (a.name || "").localeCompare(b.name || "")));
     setForm(f => ({ ...f, locality_id: data.id }));
     toast.success(`تمت إضافة المحلية: ${data.name}`);
     notifyGeoChanged();

@@ -2892,6 +2892,66 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_city: {
+        Args: { p_name: string; p_state_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          name: string
+          state_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cities"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      add_locality: {
+        Args: { p_city_id: string; p_name: string }
+        Returns: {
+          city_id: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "localities"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      add_region: {
+        Args: { p_name: string }
+        Returns: {
+          created_at: string
+          id: string
+          name: string
+          sort_order: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "regions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      add_state: {
+        Args: { p_name: string; p_region_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          name: string
+          region_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "states"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_reset_stock_and_ledgers: { Args: { _scope?: Json }; Returns: Json }
       admin_reset_transactional_data: { Args: { _scope: Json }; Returns: Json }
       advance_invoice_workflow: {
@@ -2915,6 +2975,7 @@ export type Database = {
         Args: { _delta: number; _product_id: string }
         Returns: undefined
       }
+      check_geo_grants: { Args: never; Returns: Json }
       current_user_login_status: { Args: never; Returns: string }
       decrement_product_stock: {
         Args: { _product_id: string; _qty: number }
