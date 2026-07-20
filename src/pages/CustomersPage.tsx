@@ -908,6 +908,11 @@ export default function CustomersPage() {
             className="flex items-center gap-2 bg-muted text-foreground border border-border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors">
             🗺️ الهيكل الجغرافي
           </button>
+          <a href="/customers/geo-diagnostics"
+            className="flex items-center gap-2 bg-muted text-foreground border border-border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors"
+            title="فحص إضافة اتجاه/ولاية/مدينة/محلية">
+            🧪 تشخيص الجغرافيا
+          </a>
           <button onClick={() => setShowLogistics(true)}
             className="flex items-center gap-2 bg-muted text-foreground border border-border px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors">
             🚚 اللوجستيات
