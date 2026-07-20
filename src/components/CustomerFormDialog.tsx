@@ -123,6 +123,41 @@ export default function CustomerFormDialog({ open, initial, onClose, onSaved }: 
     setTimeout(() => refs.current[0]?.focus(), 50);
   }, [open, initial]);
 
+  // ── إعادة تحميل القوائم الجغرافية/اللوجستية عند بثّ حدث geo:changed من أي مصدر ──
+  useEffect(() => {
+    if (!open) return;
+    const reload = async () => {
+      const [r, t, g, d] = await Promise.all([
+        (supabase as any).from("regions").select("id,name,sort_order").order("sort_order"),
+        supabase.from("transporters" as any).select("id,name").order("name"),
+        supabase.from("customer_groups").select("id,name").order("name"),
+        (supabase as any).from("destinations").select("id,name").order("name"),
+      ]);
+      setRegions(r.data || []);
+      setTransporters((t.data as any[]) || []);
+      setGroups(g.data || []);
+      setDestinations((d.data as any[]) || []);
+      if (form.region_id) {
+        const { data: st } = await (supabase as any).from("states").select("id,name,region_id").eq("region_id", form.region_id).order("name");
+        setStates(st || []);
+      }
+      if (form.state_id) {
+        const { data: ct } = await (supabase as any).from("cities").select("id,name,state_id").eq("state_id", form.state_id).order("name");
+        setCities(ct || []);
+      }
+      if (form.city_id) {
+        const { data: lc } = await (supabase as any).from("localities").select("id,name,city_id").eq("city_id", form.city_id).order("name");
+        setLocalities(lc || []);
+      }
+    };
+    window.addEventListener("geo:changed", reload);
+    window.addEventListener("customer-logistics:changed", reload);
+    return () => {
+      window.removeEventListener("geo:changed", reload);
+      window.removeEventListener("customer-logistics:changed", reload);
+    };
+  }, [open, form.region_id, form.state_id, form.city_id]);
+
   useEffect(() => {
     if (!form.region_id) { setStates([]); return; }
     (async () => {
