@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useCompanySettings } from "@/hooks/useData";
-import { Search, X, Printer, Loader2 } from "lucide-react";
+import { Search, X, Printer, Loader2, ArrowRight } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf } from "@/utils/balanceDisplay";
@@ -428,6 +428,15 @@ export default function CustomerStatementPage() {
 
   return (
     <div className="space-y-6" dir="rtl">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => navigate("/customers")}
+          className="inline-flex items-center gap-2 bg-muted text-foreground border border-border hover:bg-muted/80 px-4 py-2 rounded-lg text-sm font-medium shadow-sm print:hidden"
+        >
+          <ArrowRight className="h-4 w-4" />
+          رجوع للعملاء
+        </button>
       {selectedCustomer && (
         <div className="flex justify-end gap-2 flex-wrap">
           <button
@@ -456,6 +465,7 @@ export default function CustomerStatementPage() {
           </button>
         </div>
       )}
+      </div>
 
       <div className="printable-statement space-y-6">
         <h1 data-section="header" data-section-label="العنوان" className="text-2xl font-bold text-foreground">كشف حساب عميل</h1>
