@@ -176,6 +176,28 @@ export default function CustomerStatementPage() {
     staleTime: 0,
   });
 
+  // خريطة الحسابات لعرض «الحساب المستلم» لكل حركة دفع (اسم الحساب/البنك أو «نقدًا»)
+  const { data: accountsList } = useQuery({
+    queryKey: ["accounts-min"],
+    queryFn: async () => {
+      const { data } = await supabase.from("accounts").select("id,name,bank_name");
+      return (data as any[]) || [];
+    },
+    staleTime: 60000,
+  });
+  const accountNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of (accountsList as any[]) || []) {
+      m.set(a.id, a.bank_name ? `${a.name} — ${a.bank_name}` : a.name);
+    }
+    return m;
+  }, [accountsList]);
+  const accountLabel = (t: any): string => {
+    if (t.method === "credit_balance") return "رصيد دائن";
+    if (!t.account_id) return "نقدًا";
+    return accountNameById.get(t.account_id) || "—";
+  };
+
   const { data: deletedInvoices } = useDeletedInvoicesForCustomer(selectedCustomerId, fromDate, toDate);
 
 
@@ -385,12 +407,14 @@ export default function CustomerStatementPage() {
           columns: [
             { key: "date", label: "التاريخ", align: "center" as const },
             { key: "type", label: "النوع", align: "center" as const },
+            { key: "account", label: "الحساب", align: "center" as const },
             { key: "amount", label: "المبلغ", numeric: true },
             { key: "description", label: "الوصف", align: "right" as const },
           ],
           rows: filteredTransactions.map((t: any) => ({
             date: t.date,
             type: t.type === "income" ? "إيراد" : t.type === "expense" ? "مصروف" : t.type || "—",
+            account: accountLabel(t),
             amount: Number(t.amount || 0),
             description: t.description || "—",
           })),
@@ -924,6 +948,7 @@ export default function CustomerStatementPage() {
                       })}
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المصدر</th>
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الارتباط</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الحساب</th>
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">
                         <button type="button" onClick={() => toggleTxSort("amount")} className="inline-flex items-center gap-1 hover:text-foreground">
                           المبلغ
@@ -969,6 +994,9 @@ export default function CustomerStatementPage() {
                             <span className={t.reference_id ? "text-foreground" : "text-muted-foreground"}>
                               {linked}
                             </span>
+                          </td>
+                          <td data-label="الحساب" className="px-5 py-3 text-xs text-muted-foreground">
+                            {accountLabel(t)}
                           </td>
                           <td data-label="المبلغ" className={`px-5 py-3 font-semibold tabular-nums ${amt < 0 ? "text-amber-700" : "text-foreground"}`}>
                             {amt.toLocaleString()}
