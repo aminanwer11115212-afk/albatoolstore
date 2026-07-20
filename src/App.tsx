@@ -47,6 +47,7 @@ import { ConfirmDeleteProvider } from "./components/common/ConfirmDeleteProvider
 
 // Lazy (يُحمَّل عند الزيارة فقط)
 const CustomersPage = lazy(() => import("./pages/CustomersPage"));
+const CustomersGeoDiagnosticsPage = lazy(() => import("./pages/CustomersGeoDiagnosticsPage"));
 const CustomerDebtReportPage = lazy(() => import("./pages/CustomerDebtReportPage"));
 const TransactionsPage = lazy(() => import("./pages/TransactionsPage"));
 const InvoicesPage = lazy(() => import("./pages/InvoicesPage"));
