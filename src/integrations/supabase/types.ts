@@ -3185,6 +3185,14 @@ export type Database = {
           total: number
         }[]
       }
+      cancel_customer_charge: {
+        Args: { _group_id: string; _reason?: string }
+        Returns: Json
+      }
+      cancel_invoice_payment: {
+        Args: { _reason?: string; _tx_id: string }
+        Returns: Json
+      }
       check_geo_grants: { Args: never; Returns: Json }
       current_user_login_status: { Args: never; Returns: string }
       decrement_product_stock: {
@@ -3247,6 +3255,32 @@ export type Database = {
       }
       restore_purchase_stock_once: { Args: { _po_id: string }; Returns: Json }
       reverse_customer_charge: { Args: { _group_id: string }; Returns: Json }
+      revise_customer_charge: {
+        Args: {
+          _group_id: string
+          _new_account_id?: string
+          _new_amount: number
+          _new_date?: string
+          _new_method?: string
+          _new_note?: string
+          _new_reference_no?: string
+          _reason?: string
+        }
+        Returns: Json
+      }
+      revise_invoice_payment: {
+        Args: {
+          _new_account_id?: string
+          _new_amount: number
+          _new_date?: string
+          _new_discount?: number
+          _new_method?: string
+          _new_note?: string
+          _new_reference_no?: string
+          _tx_id: string
+        }
+        Returns: Json
+      }
       transfer_stock_once:
         | {
             Args: {
