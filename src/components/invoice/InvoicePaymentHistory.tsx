@@ -64,7 +64,8 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0 }: Pro
           .order("created_at", { ascending: false }),
         (supabase as any)
           .from("transactions")
-          .select("id, amount, method, account_id, date, customer_id, reference_id, description, created_at")
+          .select("id, amount, method, account_id, date, customer_id, reference_id, description, created_at, allocation")
+
           .eq("reference_id", invoiceId)
           .eq("category", "customer_payment")
           .order("created_at", { ascending: false }),
