@@ -423,6 +423,7 @@ export default function StockTrackingPage() {
         "الكمية": m.qty,
         "رصيد بعد الحركة": m.balance_after ?? "",
         "المستند": m.doc_number,
+        "رقم العملية": m.doc_ref ?? "",
         "الجهة": m.party_name,
         "ملاحظات": m.reason || "",
       }));
@@ -436,43 +437,64 @@ export default function StockTrackingPage() {
     }
   };
 
+  const buildPrintPayload = () => {
+    const productName =
+      productFilter !== "all"
+        ? (productsList.find((p: any) => p.id === productFilter)?.name || null)
+        : null;
+    const warehouseName =
+      warehouseFilter !== "all"
+        ? (warehousesList.find((w: any) => w.id === warehouseFilter)?.name || null)
+        : null;
+    return {
+      from,
+      to,
+      totals,
+      filters: {
+        product: productName,
+        warehouse: warehouseName,
+        types: types.map((t) => typeLabel[t]),
+        query: q || undefined,
+      },
+      rows: rowsWithBalance.map((m) => ({
+        date: m.date,
+        created_at: m.created_at,
+        type: m.type,
+        typeLabel: typeLabel[m.type],
+        product_name: m.product_name,
+        warehouse_name: m.warehouse_name,
+        qty: m.qty,
+        balance_after: m.balance_after ?? null,
+        doc_number: m.doc_number,
+        doc_ref: m.doc_ref ?? null,
+        party_name: m.party_name,
+        reason: m.reason,
+      })),
+    };
+  };
+
   const printPage = async () => {
     try {
-      const productName =
-        productFilter !== "all"
-          ? (productsList.find((p: any) => p.id === productFilter)?.name || null)
-          : null;
-      const warehouseName =
-        warehouseFilter !== "all"
-          ? (warehousesList.find((w: any) => w.id === warehouseFilter)?.name || null)
-          : null;
-      await printStockMovements({
-        from,
-        to,
-        totals,
-        filters: {
-          product: productName,
-          warehouse: warehouseName,
-          types: types.map((t) => typeLabel[t]),
-          query: q || undefined,
-        },
-        rows: rowsWithBalance.map((m) => ({
-          date: m.date,
-          created_at: m.created_at,
-          type: m.type,
-          typeLabel: typeLabel[m.type],
-          product_name: m.product_name,
-          warehouse_name: m.warehouse_name,
-          qty: m.qty,
-          balance_after: m.balance_after ?? null,
-          doc_number: m.doc_number,
-          party_name: m.party_name,
-          reason: m.reason,
-        })),
-      });
+      await printStockMovements(buildPrintPayload());
     } catch (e: any) {
-      toast.error(e?.message || "فشل فتح نافذة الطباعة");
+      toast.error(e?.message || "فشل فتح نافذة المعاينة");
     }
+  };
+
+  const downloadPdf = async () => {
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    const t = toast.loading("جاري إنشاء ملف PDF...");
+    try {
+      await downloadStockMovementsPdf(buildPrintPayload());
+      toast.success("تم تنزيل ملف PDF", { id: t });
+    } catch (e: any) {
+      toast.error(e?.message || "فشل إنشاء ملف PDF", { id: t });
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   };
 
   const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment", "invoice_delete_restore"];
