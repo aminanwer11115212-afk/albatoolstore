@@ -66,6 +66,31 @@ type Snapshot = {
   source: string;
 };
 
+type HealthReport = {
+  ok: boolean;
+  run_at: string;
+  total: number;
+  sections: {
+    invoice_anomalies: number;
+    customer_balance_drift: number;
+    supplier_balance_drift: number;
+    account_balance_drift: number;
+    pos_leak: number;
+    stock_drift: number;
+    incomplete_returns: number;
+  };
+};
+
+const SECTION_META: Record<keyof HealthReport["sections"], { label: string; hint: string }> = {
+  invoice_anomalies:       { label: "اختلالات الفواتير",       hint: "دفعات مفقودة/مكررة/تجاوز إجمالي" },
+  customer_balance_drift:  { label: "انحراف رصيد العملاء",     hint: "customers.balance مخالف للحساب" },
+  supplier_balance_drift:  { label: "انحراف رصيد الموردين",    hint: "suppliers.balance مخالف للحساب" },
+  account_balance_drift:   { label: "انحراف رصيد الحسابات",   hint: "accounts.balance مخالف لحركات المعاملات" },
+  pos_leak:                { label: "تسرّب مبيعات الكاش",      hint: "فاتورة POS مرتبطة بعميل حقيقي" },
+  stock_drift:             { label: "انحراف كميات المخزون",    hint: "products.stock_quantity مخالف لسجل الحركات" },
+  incomplete_returns:      { label: "مرتجعات غير مكتملة",      hint: "مرتجع بدون قيد إرجاع مخزون" },
+};
+
 const ALL_KINDS = [
   { key: "missing_payment_trace", label: "دفعة مفقودة", color: "border-amber-400 bg-amber-50 text-amber-900" },
   { key: "duplicate_payment", label: "دفعة مكررة", color: "border-destructive/40 bg-destructive/5 text-destructive" },
