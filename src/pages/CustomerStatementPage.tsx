@@ -12,7 +12,7 @@ import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/u
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
-import RevisePaymentDialog, { type RevisableTx } from "@/components/statement/RevisePaymentDialog";
+import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
 import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvoiceDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 import CustomerBalanceAuditTab from "@/components/customer/CustomerBalanceAuditTab";
@@ -203,7 +203,7 @@ export default function CustomerStatementPage() {
   // دفعة قابلة للتعديل: قيد دفع نقدي/بنكي مرتبط بفاتورة (لا استهلاك رصيد دائن)
   const isRevisablePayment = (t: any): boolean =>
     t.category === "customer_payment" && t.method !== "credit_balance" && !!t.reference_id;
-  const [reviseTx, setReviseTx] = useState<RevisableTx | null>(null);
+  const [reviseTx, setReviseTx] = useState<EditablePayment | null>(null);
   const [applyCreditOpen, setApplyCreditOpen] = useState(false);
   const refreshAfterRevise = () => {
     qc.invalidateQueries({ queryKey: ["customer-transactions", selectedCustomerId] });
@@ -1033,7 +1033,7 @@ export default function CustomerStatementPage() {
                             {isRevisablePayment(t) ? (
                               <button
                                 type="button"
-                                onClick={() => setReviseTx({ id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id, customer_id: t.customer_id, description: t.description })}
+                                onClick={() => setReviseTx({ id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id, customer_id: t.customer_id, description: t.description, method: (t as any).method, account_id: (t as any).account_id, date: (t as any).date })}
                                 className="text-xs text-primary hover:underline"
                                 title="تعديل مبلغ/خصم هذه الدفعة"
                               >
@@ -1101,7 +1101,7 @@ export default function CustomerStatementPage() {
       })()}
       </div>
 
-      <RevisePaymentDialog
+      <EditPaymentDialog
         open={!!reviseTx}
         tx={reviseTx}
         onClose={() => setReviseTx(null)}

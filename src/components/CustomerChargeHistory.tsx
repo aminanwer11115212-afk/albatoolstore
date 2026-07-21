@@ -10,6 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { computeReconciliation, sortGroups, type SortKey } from "@/lib/chargeReconciliation";
 import { ReverseChargeConfirmDialog } from "@/components/customer/ReverseChargeConfirmDialog";
+import EditChargeDialog, { type EditableCharge } from "@/components/finance/EditChargeDialog";
+import { useUserRole } from "@/hooks/useUserRole";
+import { Pencil } from "lucide-react";
 
 const PAGE_SIZE = 10;
 const LS_KEY = (cid: string) => `albatool.chargeHistory.filters.${cid}`;
@@ -54,6 +57,8 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
   const [reconMsg, setReconMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [reversingGroupId, setReversingGroupId] = useState<string | null>(null);
   const [pendingReverse, setPendingReverse] = useState<ChargeGroup | null>(null);
+  const [editingCharge, setEditingCharge] = useState<EditableCharge | null>(null);
+  const { isAdmin } = useUserRole();
 
   async function executeReverse(g: ChargeGroup) {
     setReversingGroupId(g.groupId);
@@ -357,6 +362,26 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
               <div className="tabular-nums">الإجمالي: <span className="font-bold text-foreground">{fmt(g.total)}</span></div>
               {g.allocated > 0.01 && (<div className="tabular-nums text-emerald-600">سُدِّد: <span className="font-bold">{fmt(g.allocated)}</span></div>)}
               {g.surplus > 0.01 && (<div className="tabular-nums text-primary">فائض: <span className="font-bold">{fmt(g.surplus)}</span></div>)}
+              {isAdmin && !g.groupId.startsWith("orphan-") && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1"
+                  onClick={() => setEditingCharge({
+                    groupId: g.groupId,
+                    customerId,
+                    amount: g.total,
+                    method: g.method,
+                    accountId: null,
+                    date: g.date,
+                    hasConsumption: g.allocated > 0.01,
+                  })}
+                  data-testid="edit-charge-btn"
+                  title="تعديل هذه الشحنة"
+                >
+                  <Pencil size={12} /> تعديل
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -446,6 +471,18 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
         pending={reversingGroupId === pendingReverse?.groupId}
         onConfirm={() => pendingReverse && executeReverse(pendingReverse)}
         onCancel={() => setPendingReverse(null)}
+      />
+
+      <EditChargeDialog
+        open={!!editingCharge}
+        charge={editingCharge}
+        onClose={() => setEditingCharge(null)}
+        onSaved={async () => {
+          await qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
+          await qc.invalidateQueries({ queryKey: ["customers"] });
+          await qc.invalidateQueries({ queryKey: ["invoices"] });
+          await qc.invalidateQueries({ queryKey: ["transactions"] });
+        }}
       />
     </div>
   );
