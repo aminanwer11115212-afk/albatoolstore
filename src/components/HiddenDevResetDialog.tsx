@@ -31,6 +31,11 @@ export default function HiddenDevResetDialog() {
     customers: false,
     // حذف يدوي للناقلين والترحيلات
     transporters: false,
+    // سجلات النظام
+    stock_movements: false,
+    payment_logs: false,
+    statements_log: false,
+    bot_logs: false,
   });
   const [confirmText, setConfirmText] = useState("");
   const [busy, setBusy] = useState(false);
