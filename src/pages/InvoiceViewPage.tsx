@@ -699,6 +699,13 @@ export default function InvoiceViewPage() {
         >
           سجل التدقيق
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("consistency")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === "consistency" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        >
+          تحقّق من التناسق
+        </button>
       </div>
 
       {activeTab === "conversion" && invoice?.id && (
@@ -708,6 +715,12 @@ export default function InvoiceViewPage() {
       {activeTab === "audit" && invoice?.id && (
         <div className="pt-4">
           <InvoiceAuditTab invoiceId={invoice.id} customerId={invoice.customer_id} />
+        </div>
+      )}
+
+      {activeTab === "consistency" && invoice?.id && (
+        <div className="pt-4">
+          <InvoiceConsistencyCheck invoiceId={invoice.id} customerId={invoice.customer_id} />
         </div>
       )}
 
