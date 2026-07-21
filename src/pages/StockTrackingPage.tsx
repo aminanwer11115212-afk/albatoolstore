@@ -206,7 +206,9 @@ function useStockMovements(from: string, to: string) {
           qty: +Number(r.quantity || 0),
           doc_number: `TR-${String(r.id).slice(0, 6).toUpperCase()}`,
           doc_id: r.id,
+          doc_ref: r.id ? String(r.id).slice(0, 8) : null,
           doc_href: null,
+
           party_name: `من: ${whMap.get(r.from_warehouse_id) || "—"}`,
           reason: r.notes,
         });
