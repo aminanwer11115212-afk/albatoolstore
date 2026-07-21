@@ -123,6 +123,8 @@ function useStockMovements(from: string, to: string) {
           qty: -Number(r.quantity || 0),
           doc_number: r.invoices?.invoice_number || "—",
           doc_id: r.invoices?.id ?? null,
+          doc_ref: r.invoices?.id ? String(r.invoices.id).slice(0, 8) : null,
+
           doc_href: r.invoices?.id
             ? (isPos ? `/invoices/cash/edit/${r.invoices.id}` : `/invoices/view/${r.invoices.id}`)
             : null,
