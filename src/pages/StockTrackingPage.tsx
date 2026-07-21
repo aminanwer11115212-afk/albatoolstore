@@ -303,6 +303,13 @@ export default function StockTrackingPage() {
   const [productFilter, setProductFilter] = useState<string>(prefs.productFilter || "all");
   const [warehouseFilter, setWarehouseFilter] = useState<string>(prefs.warehouseFilter || "all");
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [detailMove, setDetailMove] = useState<Move | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [consistencyResult, setConsistencyResult] = useState<{
+    checked: number;
+    mismatches: Array<{ product_id: string; name: string; expected: number; actual: number; diff: number }>;
+    ok: boolean;
+  } | null>(null);
 
   // Persist filters after every change (survives reload).
   useEffect(() => {
