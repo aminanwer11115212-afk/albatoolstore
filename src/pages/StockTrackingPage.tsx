@@ -146,7 +146,9 @@ function useStockMovements(from: string, to: string) {
           qty: +Number(r.quantity || 0),
           doc_number: r.stock_returns?.return_number || "—",
           doc_id: r.stock_returns?.id ?? null,
+          doc_ref: r.stock_returns?.id ? String(r.stock_returns.id).slice(0, 8) : null,
           doc_href: r.stock_returns?.id ? `/stock-return/view/${r.stock_returns.id}` : null,
+
           party_name: r.stock_returns?.customers?.name || "—",
         });
       });
