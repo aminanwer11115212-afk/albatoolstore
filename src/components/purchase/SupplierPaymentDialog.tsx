@@ -143,7 +143,7 @@ export default function SupplierPaymentDialog({
     try {
       // 1) إنشاء حركة مصروف (دفعة مورد)
       const baseNote = notes || (purchaseOrderNumber ? `دفعة على أمر الشراء ${purchaseOrderNumber}` : "دفعة للمورد");
-      const description = referenceNo ? `${baseNote} — مرجع: ${referenceNo}` : baseNote;
+      const description = referenceNo ? `${baseNote} — رقم العملية: ${referenceNo}` : baseNote;
       const txPayload: any = {
         type: "expense",
         category: "supplier_payment",
