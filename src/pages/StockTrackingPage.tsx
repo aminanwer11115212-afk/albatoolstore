@@ -236,7 +236,9 @@ function useStockMovements(from: string, to: string) {
             ? (invNo || `DEL-${String(r.reference_id || r.id).slice(0, 6).toUpperCase()}`)
             : `ADJ-${String(r.id).slice(0, 6).toUpperCase()}`,
           doc_id: r.id,
+          doc_ref: String(r.reference_id || r.id).slice(0, 8),
           doc_href: null,
+
           party_name: isInvoiceDelete ? "فاتورة محذوفة" : (r.source || "manual"),
           reason: r.reason,
         });
