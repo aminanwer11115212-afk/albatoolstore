@@ -3115,6 +3115,10 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_exchange_rate_bulk: {
+        Args: { _currency_code: string; _new_rate: number }
+        Returns: Json
+      }
       apply_stock_delta: {
         Args: { _delta: number; _product_id: string }
         Returns: undefined

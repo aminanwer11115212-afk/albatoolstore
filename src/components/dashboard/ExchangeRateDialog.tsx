@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { runOrQueue } from "@/lib/offlineQueue";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,12 +23,15 @@ interface Props {
 }
 
 export default function ExchangeRateDialog({ open, onOpenChange, onSaved }: Props) {
+  const qc = useQueryClient();
   const [baseCode, setBaseCode] = useState<string>("");
   const [foreignCode, setForeignCode] = useState<string>("USD");
   const [currentRate, setCurrentRate] = useState<number>(1);
   const [newRate, setNewRate] = useState<string>("");
   const [products, setProducts] = useState<Product[]>([]);
   const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const savingRef = useRef(false);
   const { dlgRef, dlgStyle } = useDialogSize("exchange_rate_dialog", open, { w: "min(760px, 96vw)", h: "85vh" });
 
   useEffect(() => {
@@ -50,7 +57,6 @@ export default function ExchangeRateDialog({ open, onOpenChange, onSaved }: Prop
       setCurrentRate(rate);
       setNewRate(String(rate));
 
-      // Load ALL products with foreign_price (paginate past the 1000 row default cap)
       const all: Product[] = [];
       const pageSize = 1000;
       let from = 0;
@@ -71,183 +77,152 @@ export default function ExchangeRateDialog({ open, onOpenChange, onSaved }: Prop
   }, [open]);
 
   const newRateNum = Number(newRate) || 0;
+  const rateChanged = newRateNum > 0 && Math.abs(newRateNum - currentRate) > 1e-9;
+  const changePct = currentRate > 0 ? ((newRateNum - currentRate) / currentRate) * 100 : 0;
 
   const preview = useMemo(() => products.map(p => ({
     ...p,
     newPrice: Number(p.foreign_price || 0) * newRateNum,
   })), [products, newRateNum]);
 
-  const updatePrices = async () => {
+  const requestUpdate = () => {
     if (!newRateNum || newRateNum <= 0) { toast.error("أدخل معدل صحيح"); return; }
+    if (!rateChanged) { toast.info("لم يتغيّر المعدل"); return; }
+    setConfirmOpen(true);
+  };
+
+  const doUpdate = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
+    setConfirmOpen(false);
+    try {
+      const { data, error } = await (supabase as any).rpc("apply_exchange_rate_bulk", {
+        _currency_code: foreignCode,
+        _new_rate: newRateNum,
+      });
+      if (error) throw error;
 
-    // Save new rate
-    const { queued: erQueued, error: erErr } = await runOrQueue({
-      table: "exchange_rates",
-      op: "insert",
-      payload: {
-        currency_code: foreignCode,
-        rate_to_base: newRateNum,
-        effective_date: new Date().toISOString().slice(0, 10),
-      },
-      label: "حفظ سعر الصرف",
-    });
-    if (erErr) { setSaving(false); toast.error("فشل حفظ المعدل: " + erErr.message); return; }
-    if (erQueued) toast.info("تم الحفظ محلياً — سيُرفع تلقائياً عند عودة الاتصال");
+      // Invalidate every cache that depends on prices/rates
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["products-with-details"] }),
+        qc.invalidateQueries({ queryKey: ["products"] }),
+        qc.invalidateQueries({ queryKey: ["invoices-with-customers"] }),
+        qc.invalidateQueries({ queryKey: ["invoices-full"] }),
+        qc.invalidateQueries({ queryKey: ["quotes-with-customers"] }),
+        qc.invalidateQueries({ queryKey: ["dashboard-stats"] }),
+        qc.invalidateQueries({ queryKey: ["exchange_rates"] }),
+        qc.invalidateQueries({ queryKey: ["latest-exchange-rates"] }),
+        qc.invalidateQueries({ queryKey: ["activity_log"] }),
+      ]);
 
-    // Update all product sale_price = foreign_price * newRate (parallel batches of 25)
-    let updated = 0;
-    const batchSize = 25;
-    for (let i = 0; i < products.length; i += batchSize) {
-      const batch = products.slice(i, i + batchSize);
-      const results = await Promise.all(batch.map((p) => {
-        const fp = Number(p.foreign_price || 0);
-        if (!fp) return Promise.resolve({ error: null, skip: true } as any);
-        return runOrQueue({ table: "products", op: "update", payload: { sale_price: fp * newRateNum }, match: { id: p.id }, label: "تحديث سعر منتج" });
-      }));
-      updated += results.filter((r: any) => !r.error && !r.skip).length;
+      setCurrentRate(newRateNum);
+      const r = data || {};
+      toast.success(
+        `تم التحديث بنجاح — ${r.products_updated ?? 0} منتج، ${r.quotes_updated ?? 0} عرض، ${r.invoices_updated ?? 0} فاتورة`
+      );
+      onSaved?.();
+    } catch (e: any) {
+      toast.error("فشل تحديث الأسعار: " + (e?.message || "خطأ غير معروف"));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-
-    // Update DRAFT quotes (status='draft') with same currency
-    let quotesCount = 0;
-    const { data: draftQuotes } = await supabase
-      .from("quotes")
-      .select("id, discount")
-      .eq("status", "draft")
-      .eq("currency_code", foreignCode);
-    for (const q of draftQuotes || []) {
-      const { data: items } = await supabase
-        .from("quote_items")
-        .select("id, foreign_price, quantity, discount, format_discount")
-        .eq("quote_id", q.id);
-      let subtotal = 0;
-      for (const it of items || []) {
-        const fp = Number(it.foreign_price || 0);
-        if (!fp) continue;
-        const unitPrice = fp * newRateNum;
-        const qty = Number(it.quantity || 0);
-        const disc = Number(it.discount || 0);
-        const discValue = it.format_discount === "amount" ? disc : (unitPrice * qty * disc / 100);
-        const total = (unitPrice * qty) - discValue;
-        subtotal += total;
-        await supabase.from("quote_items")
-          .update({ unit_price: unitPrice, discount_value: discValue, total })
-          .eq("id", it.id);
-      }
-      await supabase.from("quotes")
-        .update({ exchange_rate_to_base: newRateNum, subtotal, total: subtotal - Number(q.discount || 0) })
-        .eq("id", q.id);
-      quotesCount++;
-    }
-
-    // Update DRAFT/preparing invoices with same currency
-    let invoicesCount = 0;
-    const { data: draftInvoices } = await supabase
-      .from("invoices")
-      .select("id, discount, shipping, paid_amount")
-      .or("workflow_status.eq.quote,workflow_status.eq.preparing,status.eq.draft")
-      .eq("currency_code", foreignCode);
-    for (const inv of draftInvoices || []) {
-      const { data: items } = await supabase
-        .from("invoice_items")
-        .select("id, foreign_price, quantity, discount, format_discount")
-        .eq("invoice_id", inv.id);
-      let subtotal = 0;
-      for (const it of items || []) {
-        const fp = Number(it.foreign_price || 0);
-        if (!fp) continue;
-        const unitPrice = fp * newRateNum;
-        const qty = Number(it.quantity || 0);
-        const disc = Number(it.discount || 0);
-        const discValue = it.format_discount === "amount" ? disc : (unitPrice * qty * disc / 100);
-        const total = (unitPrice * qty) - discValue;
-        subtotal += total;
-        await supabase.from("invoice_items")
-          .update({ unit_price: unitPrice, discount_value: discValue, total })
-          .eq("id", it.id);
-      }
-      const total = subtotal - Number(inv.discount || 0) + Number(inv.shipping || 0);
-      const paid = Number((inv as any).paid_amount || 0);
-      const due = Math.max(0, total - paid);
-      await supabase.from("invoices")
-        .update({ exchange_rate_to_base: newRateNum, subtotal, total, due_amount: due })
-        .eq("id", inv.id);
-
-      invoicesCount++;
-    }
-
-    setSaving(false);
-    setCurrentRate(newRateNum);
-    toast.success(`تم التحديث: ${updated} منتج، ${quotesCount} عرض، ${invoicesCount} فاتورة`);
-    onSaved?.();
   };
 
   const fmt = (n: number) => `${baseCode || "SDG"} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent ref={dlgRef} style={{ ...dlgStyle, overflowY: "auto", padding: 0 }} dir="rtl">
-        <DialogHeader className="bg-primary text-primary-foreground px-5 py-3 rounded-t-lg">
-          <DialogTitle className="text-base">تحديث معدل التحويل</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={(v) => { if (!saving) onOpenChange(v); }}>
+        <DialogContent ref={dlgRef} style={{ ...dlgStyle, overflowY: "auto", padding: 0 }} dir="rtl">
+          <DialogHeader className="bg-primary text-primary-foreground px-5 py-3 rounded-t-lg">
+            <DialogTitle className="text-base">تحديث معدل التحويل</DialogTitle>
+          </DialogHeader>
 
-        <div className="p-5 space-y-4">
-          <div className="text-sm">
-            معدل التحويل الحالي: <span className="font-semibold">{currentRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-            <span className="text-muted-foreground mr-2">({foreignCode} → {baseCode})</span>
-          </div>
+          <div className="p-5 space-y-4">
+            <div className="text-sm">
+              معدل التحويل الحالي: <span className="font-semibold">{currentRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <span className="text-muted-foreground mr-2">({foreignCode} → {baseCode})</span>
+            </div>
 
-          <div className="space-y-1">
-            <Label className="text-sm">المعدل الجديد</Label>
-            <Input
-              type="number"
-              step="0.0001"
-              value={newRate}
-              onChange={e => setNewRate(e.target.value)}
-              className="text-left"
-            />
-            <p className="text-xs text-muted-foreground">أدخل المعدل الجديد للتحويل (مثال: 1.00)</p>
-          </div>
+            <div className="space-y-1">
+              <Label className="text-sm">المعدل الجديد</Label>
+              <Input
+                type="number"
+                step="0.0001"
+                value={newRate}
+                onChange={e => setNewRate(e.target.value)}
+                className="text-left"
+                disabled={saving}
+              />
+              <p className="text-xs text-muted-foreground">
+                أدخل المعدل الجديد للتحويل (مثال: 1.00)
+                {rateChanged && (
+                  <span className={`mr-2 font-semibold ${changePct >= 0 ? "text-warning" : "text-destructive"}`}>
+                    ({changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%)
+                  </span>
+                )}
+              </p>
+            </div>
 
-          <Button onClick={updatePrices} disabled={saving} className="gap-2">
-            <RefreshCw size={16} className={saving ? "animate-spin" : ""} />
-            {saving ? "جاري التحديث..." : "تحديث الأسعار"}
-          </Button>
+            <Button onClick={requestUpdate} disabled={saving || !rateChanged} className="gap-2">
+              <RefreshCw size={16} className={saving ? "animate-spin" : ""} />
+              {saving ? "جاري التحديث..." : "تحديث الأسعار"}
+            </Button>
 
-          <div className="pt-2">
-            <h3 className="text-sm font-semibold mb-2">معاينة تأثير المعدل الجديد على الأسعار</h3>
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/60">
-                  <tr>
-                    <th className="px-3 py-2 text-right font-semibold">اسم المنتج</th>
-                    <th className="px-3 py-2 text-right font-semibold">السعر الأجنبي</th>
-                    <th className="px-3 py-2 text-right font-semibold">السعر الحالي</th>
-                    <th className="px-3 py-2 text-right font-semibold">السعر الجديد</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.length === 0 && (
-                    <tr><td colSpan={4} className="text-center text-muted-foreground py-6">لا توجد منتجات بسعر أجنبي</td></tr>
-                  )}
-                  {preview.map(p => (
-                    <tr key={p.id} className="border-t hover:bg-muted/30">
-                      <td className="px-3 py-2">{p.name}</td>
-                      <td className="px-3 py-2 font-mono">{Number(p.foreign_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2 font-mono">{fmt(Number(p.sale_price || 0))}</td>
-                      <td className="px-3 py-2 font-mono font-semibold text-primary">{fmt(p.newPrice)}</td>
+            <div className="pt-2">
+              <h3 className="text-sm font-semibold mb-2">معاينة تأثير المعدل الجديد على الأسعار</h3>
+              <div className="border rounded-md overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/60">
+                    <tr>
+                      <th className="px-3 py-2 text-right font-semibold">اسم المنتج</th>
+                      <th className="px-3 py-2 text-right font-semibold">السعر الأجنبي</th>
+                      <th className="px-3 py-2 text-right font-semibold">السعر الحالي</th>
+                      <th className="px-3 py-2 text-right font-semibold">السعر الجديد</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {preview.length === 0 && (
+                      <tr><td colSpan={4} className="text-center text-muted-foreground py-6">لا توجد منتجات بسعر أجنبي</td></tr>
+                    )}
+                    {preview.map(p => (
+                      <tr key={p.id} className="border-t hover:bg-muted/30">
+                        <td className="px-3 py-2">{p.name}</td>
+                        <td className="px-3 py-2 font-mono">{Number(p.foreign_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2 font-mono">{fmt(Number(p.sale_price || 0))}</td>
+                        <td className="px-3 py-2 font-mono font-semibold text-primary">{fmt(p.newPrice)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex justify-start pt-2">
+              <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={saving}>إغلاق</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          <div className="flex justify-start pt-2">
-            <Button variant="secondary" onClick={() => onOpenChange(false)}>إغلاق</Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد تحديث معدل التحويل</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <div>سيتم تغيير المعدل من <b>{currentRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}</b> إلى <b>{newRateNum.toLocaleString(undefined, { minimumFractionDigits: 2 })}</b> ({foreignCode} → {baseCode}).</div>
+              <div>سيؤثر ذلك على <b>{products.length}</b> منتج، بالإضافة إلى مسودات العروض والفواتير بنفس العملة.</div>
+              <div className="text-destructive">الفواتير المؤكدة/المكتملة لن تتأثر. لا يمكن التراجع تلقائياً.</div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={doUpdate}>تأكيد وتطبيق</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

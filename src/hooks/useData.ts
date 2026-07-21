@@ -274,6 +274,33 @@ export function useDeletedQuoteItems() { return useTable("deleted_quote_items");
 export function useCurrencies() { return useTable("currencies"); }
 export function useExchangeRates() { return useTable("exchange_rates"); }
 
+/**
+ * Hook موحّد يُرجع أحدث سعر صرف لكل عملة (بديل عن استعلامات مكرّرة في اللوحة/الفواتير/العروض).
+ * ملاحظة: يتم إبطال المفتاح "latest-exchange-rates" تلقائياً من ExchangeRateDialog بعد أي تحديث.
+ */
+export function useLatestExchangeRates() {
+  return useQuery({
+    queryKey: ["latest-exchange-rates"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("currency_code, rate_to_base, effective_date")
+        .order("effective_date", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      const seen = new Set<string>();
+      const latest: { code: string; rate: number; date: string }[] = [];
+      for (const r of (data || [])) {
+        if (seen.has(r.currency_code)) continue;
+        seen.add(r.currency_code);
+        latest.push({ code: r.currency_code, rate: Number(r.rate_to_base), date: r.effective_date });
+      }
+      return latest;
+    },
+  });
+}
+
 // Specialized queries
 /**
  * جلب الفواتير مع بيانات العميل.
@@ -436,7 +463,9 @@ export function useDashboardStats() {
         supabase.from("transactions").select("type, amount"),
       ]);
 
-      const invRows = (invoices.data || []) as any[];
+      // استبعاد الفواتير الملغاة من كل حسابات المبيعات لكي تطابق تقارير الدخل
+      const invRows = ((invoices.data || []) as any[])
+        .filter((r) => (r.status || "").toLowerCase() !== "cancelled");
       const isPos = (r: any) => (r.source || "regular") === "pos";
       const yearStart = `${new Date().getFullYear()}-01-01`;
       const inThisYear = (r: any) => !!r.date && String(r.date) >= yearStart;
