@@ -389,11 +389,11 @@ export default function StockTrackingPage() {
     try {
       const productName =
         productFilter !== "all"
-          ? (products.find((p: any) => p.id === productFilter)?.name || null)
+          ? (productsList.find((p: any) => p.id === productFilter)?.name || null)
           : null;
       const warehouseName =
         warehouseFilter !== "all"
-          ? (warehouses.find((w: any) => w.id === warehouseFilter)?.name || null)
+          ? (warehousesList.find((w: any) => w.id === warehouseFilter)?.name || null)
           : null;
       await printStockMovements({
         from,
