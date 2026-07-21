@@ -96,7 +96,7 @@ export function validateBankTransferPayment(opts: {
   const requireRef = opts.requireReferenceNo !== false;
   if (requireRef) {
     const ref = typeof opts.referenceNo === "string" ? opts.referenceNo.trim() : "";
-    if (!ref) return "أدخل رقم العملية (مرجع التحويل)";
+    if (!ref) return "أدخل رقم العملية";
   }
   return null;
 }

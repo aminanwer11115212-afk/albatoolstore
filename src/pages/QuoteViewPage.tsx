@@ -513,7 +513,7 @@ export default function QuoteViewPage() {
             <h2 className="text-2xl font-bold text-foreground">عرض سعر</h2>
             <p className="text-muted-foreground text-sm">QT #{quote.quote_number}{quote.tid ? ` · رقم متسلسل: ${quote.tid}` : ""}</p>
             {quote.converted_to_invoice_id && <span className="inline-block mt-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs">تم التحويل إلى فاتورة</span>}
-            <p className="text-muted-foreground text-sm mt-2">مرجع:</p>
+            <p className="text-muted-foreground text-sm mt-2">رقم العملية:</p>
             <div className="mt-4">
               <p className="text-muted-foreground text-sm">المبلغ الإجمالي</p>
               <p className="text-2xl font-bold text-foreground">{currency} {Number(quote.total || 0).toLocaleString("en", { minimumFractionDigits: 2 })}</p>

@@ -850,7 +850,7 @@ export default function CustomerPaymentDialog({
                 <div className="text-[10px] text-muted-foreground rounded-md border border-dashed p-2 leading-relaxed space-y-0.5">
                   <div>⌨︎ <b>Enter</b>: التالي · <b>Ctrl+Enter</b> / <b>Alt+S</b>: حفظ · <b>Esc</b>: إغلاق</div>
                   <div><b>Alt+B</b>: بنكي · <b>Alt+N</b>: نقدي · <b>Alt+K</b>: استخدم كل الرصيد الدائن</div>
-                  <div><b>Alt+1..5</b>: قفزات مبلغ/خصم/رصيد/تاريخ/مرجع · <b>Ctrl+↑/↓</b>: تنقّل</div>
+                  <div><b>Alt+1..5</b>: قفزات مبلغ/خصم/رصيد/تاريخ/رقم العملية · <b>Ctrl+↑/↓</b>: تنقّل</div>
                 </div>
 
                 {!isPos && recentInvoices.length > 0 && (
