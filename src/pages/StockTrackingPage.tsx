@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,11 +15,22 @@ import {
 import { startsWithMatch } from "@/utils/searchMatch";
 import {
   Search, TrendingDown, TrendingUp, RotateCcw, Package, ArrowLeftRight,
-  Sliders, Printer, Download, Warehouse,
+  Sliders, Printer, Download, Warehouse, FileText,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { printStockMovements } from "@/utils/stockMovementsPrint";
+import { printStockMovements, downloadStockMovementsPdf } from "@/utils/stockMovementsPrint";
+
+const PREFS_KEY = "lov:stock-tracking:filters:v1";
+type StoredPrefs = {
+  from?: string; to?: string; types?: string[]; q?: string;
+  productFilter?: string; warehouseFilter?: string;
+};
+const loadPrefs = (): StoredPrefs => {
+  try { return JSON.parse(localStorage.getItem(PREFS_KEY) || "{}") || {}; }
+  catch { return {}; }
+};
+
 
 type MoveType = "sale" | "return" | "purchase" | "transfer_in" | "transfer_out" | "manual_adjustment" | "invoice_delete_restore";
 
@@ -36,10 +47,12 @@ interface Move {
   doc_number: string;
   doc_id: string | null;
   doc_href?: string | null;
+  doc_ref?: string | null; // short reference/operation id
   party_name: string;
   is_pos?: boolean;
   reason?: string | null;
 }
+
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const daysAgoISO = (n: number) => {
@@ -121,6 +134,8 @@ function useStockMovements(from: string, to: string) {
           qty: -Number(r.quantity || 0),
           doc_number: r.invoices?.invoice_number || "—",
           doc_id: r.invoices?.id ?? null,
+          doc_ref: r.invoices?.id ? String(r.invoices.id).slice(0, 8) : null,
+
           doc_href: r.invoices?.id
             ? (isPos ? `/invoices/cash/edit/${r.invoices.id}` : `/invoices/view/${r.invoices.id}`)
             : null,
@@ -142,7 +157,9 @@ function useStockMovements(from: string, to: string) {
           qty: +Number(r.quantity || 0),
           doc_number: r.stock_returns?.return_number || "—",
           doc_id: r.stock_returns?.id ?? null,
+          doc_ref: r.stock_returns?.id ? String(r.stock_returns.id).slice(0, 8) : null,
           doc_href: r.stock_returns?.id ? `/stock-return/view/${r.stock_returns.id}` : null,
+
           party_name: r.stock_returns?.customers?.name || "—",
         });
       });
@@ -160,7 +177,9 @@ function useStockMovements(from: string, to: string) {
           qty: +Number(r.quantity || 0),
           doc_number: r.purchase_orders?.order_number || "—",
           doc_id: r.purchase_orders?.id ?? null,
+          doc_ref: r.purchase_orders?.id ? String(r.purchase_orders.id).slice(0, 8) : null,
           doc_href: r.purchase_orders?.id ? `/purchase/edit/${r.purchase_orders.id}` : null,
+
           party_name: r.purchase_orders?.suppliers?.name || "—",
         });
       });
@@ -180,7 +199,9 @@ function useStockMovements(from: string, to: string) {
           qty: -Number(r.quantity || 0),
           doc_number: `TR-${String(r.id).slice(0, 6).toUpperCase()}`,
           doc_id: r.id,
+          doc_ref: r.id ? String(r.id).slice(0, 8) : null,
           doc_href: null,
+
           party_name: `إلى: ${whMap.get(r.to_warehouse_id) || "—"}`,
           reason: r.notes,
         });
@@ -196,7 +217,9 @@ function useStockMovements(from: string, to: string) {
           qty: +Number(r.quantity || 0),
           doc_number: `TR-${String(r.id).slice(0, 6).toUpperCase()}`,
           doc_id: r.id,
+          doc_ref: r.id ? String(r.id).slice(0, 8) : null,
           doc_href: null,
+
           party_name: `من: ${whMap.get(r.from_warehouse_id) || "—"}`,
           reason: r.notes,
         });
@@ -224,7 +247,9 @@ function useStockMovements(from: string, to: string) {
             ? (invNo || `DEL-${String(r.reference_id || r.id).slice(0, 6).toUpperCase()}`)
             : `ADJ-${String(r.id).slice(0, 6).toUpperCase()}`,
           doc_id: r.id,
+          doc_ref: String(r.reference_id || r.id).slice(0, 8),
           doc_href: null,
+
           party_name: isInvoiceDelete ? "فاتورة محذوفة" : (r.source || "manual"),
           reason: r.reason,
         });
@@ -265,12 +290,26 @@ const typeBadgeCls: Record<MoveType, string> = {
 
 
 export default function StockTrackingPage() {
-  const [from, setFrom] = useState(daysAgoISO(6));
-  const [to, setTo] = useState(todayISO());
-  const [types, setTypes] = useState<MoveType[]>([]);
-  const [q, setQ] = useState("");
-  const [productFilter, setProductFilter] = useState<string>("all");
-  const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
+  const prefs = loadPrefs();
+  const [from, setFrom] = useState(prefs.from || daysAgoISO(6));
+  const [to, setTo] = useState(prefs.to || todayISO());
+  const [types, setTypes] = useState<MoveType[]>((prefs.types as MoveType[]) || []);
+  const [q, setQ] = useState(prefs.q || "");
+  const [productFilter, setProductFilter] = useState<string>(prefs.productFilter || "all");
+  const [warehouseFilter, setWarehouseFilter] = useState<string>(prefs.warehouseFilter || "all");
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  // Persist filters after every change (survives reload).
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        PREFS_KEY,
+        JSON.stringify({ from, to, types, q, productFilter, warehouseFilter }),
+      );
+    } catch { /* ignore quota */ }
+  }, [from, to, types, q, productFilter, warehouseFilter]);
+
+
 
   const { data, isLoading } = useStockMovements(from, to);
   const moves = data?.moves || [];
@@ -384,6 +423,7 @@ export default function StockTrackingPage() {
         "الكمية": m.qty,
         "رصيد بعد الحركة": m.balance_after ?? "",
         "المستند": m.doc_number,
+        "رقم العملية": m.doc_ref ?? "",
         "الجهة": m.party_name,
         "ملاحظات": m.reason || "",
       }));
@@ -397,44 +437,65 @@ export default function StockTrackingPage() {
     }
   };
 
+  const buildPrintPayload = () => {
+    const productName =
+      productFilter !== "all"
+        ? (productsList.find((p: any) => p.id === productFilter)?.name || null)
+        : null;
+    const warehouseName =
+      warehouseFilter !== "all"
+        ? (warehousesList.find((w: any) => w.id === warehouseFilter)?.name || null)
+        : null;
+    return {
+      from,
+      to,
+      totals,
+      filters: {
+        product: productName,
+        warehouse: warehouseName,
+        types: types.map((t) => typeLabel[t]),
+        query: q || undefined,
+      },
+      rows: rowsWithBalance.map((m) => ({
+        date: m.date,
+        created_at: m.created_at,
+        type: m.type,
+        typeLabel: typeLabel[m.type],
+        product_name: m.product_name,
+        warehouse_name: m.warehouse_name,
+        qty: m.qty,
+        balance_after: m.balance_after ?? null,
+        doc_number: m.doc_number,
+        doc_ref: m.doc_ref ?? null,
+        party_name: m.party_name,
+        reason: m.reason,
+      })),
+    };
+  };
+
   const printPage = async () => {
     try {
-      const productName =
-        productFilter !== "all"
-          ? (productsList.find((p: any) => p.id === productFilter)?.name || null)
-          : null;
-      const warehouseName =
-        warehouseFilter !== "all"
-          ? (warehousesList.find((w: any) => w.id === warehouseFilter)?.name || null)
-          : null;
-      await printStockMovements({
-        from,
-        to,
-        totals,
-        filters: {
-          product: productName,
-          warehouse: warehouseName,
-          types: types.map((t) => typeLabel[t]),
-          query: q || undefined,
-        },
-        rows: rowsWithBalance.map((m) => ({
-          date: m.date,
-          created_at: m.created_at,
-          type: m.type,
-          typeLabel: typeLabel[m.type],
-          product_name: m.product_name,
-          warehouse_name: m.warehouse_name,
-          qty: m.qty,
-          balance_after: m.balance_after ?? null,
-          doc_number: m.doc_number,
-          party_name: m.party_name,
-          reason: m.reason,
-        })),
-      });
+      await printStockMovements(buildPrintPayload());
     } catch (e: any) {
-      toast.error(e?.message || "فشل فتح نافذة الطباعة");
+      toast.error(e?.message || "فشل فتح نافذة المعاينة");
     }
   };
+
+  const downloadPdf = async () => {
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    const t = toast.loading("جاري إنشاء ملف PDF...");
+    try {
+      await downloadStockMovementsPdf(buildPrintPayload());
+      toast.success("تم تنزيل ملف PDF", { id: t });
+    } catch (e: any) {
+      toast.error(e?.message || "فشل إنشاء ملف PDF", { id: t });
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+
 
   const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment", "invoice_delete_restore"];
 
@@ -451,10 +512,20 @@ export default function StockTrackingPage() {
           <Button variant="outline" size="sm" className="gap-2 min-h-[40px]" onClick={exportExcel}>
             <Download className="h-4 w-4" /> Excel
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 min-h-[40px]"
+            onClick={downloadPdf}
+            disabled={pdfLoading}
+          >
+            <FileText className="h-4 w-4" /> {pdfLoading ? "جاري..." : "PDF"}
+          </Button>
           <Button variant="outline" size="sm" className="gap-2 min-h-[40px]" onClick={printPage}>
-            <Printer className="h-4 w-4" /> طباعة
+            <Printer className="h-4 w-4" /> معاينة وطباعة
           </Button>
         </div>
+
       </div>
 
       {/* بطاقات الإحصاء */}
@@ -620,17 +691,34 @@ export default function StockTrackingPage() {
                     {m.balance_after ?? "—"}
                   </TableCell>
                   <TableCell data-label="المستند">
-                    {m.doc_href ? (
-                      <Link to={m.doc_href} className="text-primary hover:underline">{m.doc_number}</Link>
-                    ) : (
-                      <span className="text-muted-foreground">{m.doc_number}</span>
-                    )}
-                    {m.is_pos && (
-                      <span className="ms-2 inline-block px-1.5 py-0.5 text-[10px] rounded border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold">
-                        كاش
-                      </span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {m.doc_href ? (
+                        <Link to={m.doc_href} className="text-primary hover:underline font-semibold">{m.doc_number}</Link>
+                      ) : (
+                        <span className="text-foreground font-semibold">{m.doc_number}</span>
+                      )}
+                      {m.is_pos && (
+                        <span className="inline-block px-1.5 py-0.5 text-[10px] rounded border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold">
+                          كاش
+                        </span>
+                      )}
+                    </div>
+                    {m.doc_ref && (
+                      <div
+                        className="text-[10px] text-muted-foreground font-mono cursor-pointer hover:text-foreground"
+                        title="اضغط لنسخ رقم العملية"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(m.doc_ref!).then(
+                            () => toast.success("تم نسخ رقم العملية"),
+                            () => {},
+                          );
+                        }}
+                      >
+                        #{m.doc_ref}
+                      </div>
                     )}
                   </TableCell>
+
                   <TableCell data-label="الجهة">
                     <div>{m.party_name}</div>
                     {m.reason && <div className="text-[11px] text-muted-foreground">{m.reason}</div>}

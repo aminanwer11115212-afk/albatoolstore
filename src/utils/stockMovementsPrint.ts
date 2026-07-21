@@ -10,6 +10,7 @@ export interface PrintMove {
   qty: number;
   balance_after: number | null;
   doc_number: string;
+  doc_ref?: string | null;
   party_name: string;
   reason?: string | null;
 }
@@ -36,8 +37,8 @@ const fmt = (n: number | null | undefined) =>
 const arDate = (iso: string) =>
   new Intl.DateTimeFormat("ar-EG-u-nu-latn", { dateStyle: "medium" }).format(new Date(iso));
 
-/** يبني ويطبع تقرير حركات المخزون في نافذة منبثقة بتنسيق A4 RTL. */
-export async function printStockMovements(opts: StockPrintOptions): Promise<void> {
+/** Builds the A4 landscape HTML document (used by both print preview and PDF export). */
+export async function renderStockMovementsHTML(opts: StockPrintOptions, includeToolbar = false): Promise<string> {
   const { data: companyArr } = await (supabase as any)
     .from("company_settings").select("name, logo_url, phone, address").limit(1);
   const company = Array.isArray(companyArr) ? companyArr[0] : null;
@@ -50,6 +51,7 @@ export async function printStockMovements(opts: StockPrintOptions): Promise<void
 
   const rowsHtml = opts.rows.map((m, i) => {
     const isIn = m.qty > 0;
+    const refBit = m.doc_ref ? `<div class="small mono">#${esc(m.doc_ref)}</div>` : "";
     return `
       <tr>
         <td class="c">${i + 1}</td>
@@ -59,13 +61,20 @@ export async function printStockMovements(opts: StockPrintOptions): Promise<void
         <td>${esc(m.warehouse_name)}</td>
         <td class="c num ${isIn ? "pos" : "neg"}">${isIn ? "+" : ""}${fmt(m.qty)}</td>
         <td class="c num">${fmt(m.balance_after)}</td>
-        <td class="nowrap">${esc(m.doc_number)}</td>
+        <td class="nowrap"><div>${esc(m.doc_number)}</div>${refBit}</td>
         <td>${esc(m.party_name)}</td>
         <td class="small">${esc(m.reason || "")}</td>
       </tr>`;
   }).join("");
 
-  const html = `<!doctype html>
+  const toolbar = includeToolbar ? `
+    <div class="toolbar noprint">
+      <button onclick="window.print()" class="tb-btn primary">🖨️ طباعة</button>
+      <button onclick="window.close()" class="tb-btn">إغلاق</button>
+      <span class="tb-hint">معاينة قبل الطباعة — راجع التقرير ثم اضغط طباعة</span>
+    </div>` : "";
+
+  return `<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
 <meta charset="utf-8" />
@@ -73,7 +82,13 @@ export async function printStockMovements(opts: StockPrintOptions): Promise<void
 <style>
   @page { size: A4 landscape; margin: 10mm; }
   * { box-sizing: border-box; }
-  body { font-family: "Cairo", "Tajawal", Arial, sans-serif; font-weight: 600; color: #0f172a; margin: 0; padding: 12px; font-size: 12px; }
+  body { font-family: "Cairo", "Tajawal", Arial, sans-serif; font-weight: 600; color: #0f172a; margin: 0; padding: 12px; font-size: 12px; background:#f8fafc; }
+  .sheet { background:#fff; max-width: 297mm; margin: 0 auto; padding: 10mm; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .toolbar { position: sticky; top: 0; z-index: 50; background:#0f172a; color:#fff; padding:8px 12px; display:flex; align-items:center; gap:10px; margin: -12px -12px 12px; }
+  .tb-btn { background:#fff; color:#0f172a; border:1px solid #cbd5e1; border-radius:6px; padding:6px 12px; font-family:inherit; font-weight:700; cursor:pointer; font-size:12px; }
+  .tb-btn.primary { background:#059669; color:#fff; border-color:#047857; }
+  .tb-btn:hover { opacity:.9; }
+  .tb-hint { color:#cbd5e1; font-size:11px; margin-inline-start:auto; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 10px; }
   .header .co { display: flex; align-items: center; gap: 10px; }
   .header img { height: 48px; }
@@ -97,19 +112,24 @@ export async function printStockMovements(opts: StockPrintOptions): Promise<void
   .pos { color: #059669; }
   .neg { color: #dc2626; }
   .small { font-size: 10px; color: #475569; }
+  .mono { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: -0.3px; }
   .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; border: 1px solid; }
   .badge.in { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
   .badge.out { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
   .footer { margin-top: 10px; padding-top: 6px; border-top: 1px dashed #cbd5e1; font-size: 10px; color: #64748b; display: flex; justify-content: space-between; }
   .empty { text-align: center; padding: 30px; color: #64748b; font-size: 13px; }
   @media print {
-    .noprint { display: none; }
+    body { background:#fff; padding:0; }
+    .sheet { box-shadow:none; padding:0; max-width:none; }
+    .noprint { display: none !important; }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
   }
 </style>
 </head>
 <body>
+${toolbar}
+<div class="sheet">
   <div class="header">
     <div class="co">
       ${company?.logo_url ? `<img src="${esc(company.logo_url)}" alt="logo" />` : ""}
@@ -145,7 +165,7 @@ export async function printStockMovements(opts: StockPrintOptions): Promise<void
         <th style="width:110px">المستودع</th>
         <th style="width:70px">الكمية</th>
         <th style="width:80px">الرصيد بعد</th>
-        <th style="width:110px">المستند</th>
+        <th style="width:130px">المستند / المرجع</th>
         <th style="width:130px">الجهة</th>
         <th style="width:130px">ملاحظات</th>
       </tr>
@@ -164,20 +184,61 @@ export async function printStockMovements(opts: StockPrintOptions): Promise<void
     <span>عدد الحركات: ${fmt(opts.rows.length)}</span>
     <span>${esc(company?.name || "")}</span>
   </div>
-
-  <script>
-    window.addEventListener("load", () => {
-      setTimeout(() => { window.focus(); window.print(); }, 250);
-    });
-  </script>
+</div>
 </body>
 </html>`;
+}
 
+/** Opens a print preview window with a toolbar — user clicks طباعة to trigger print. */
+export async function printStockMovements(opts: StockPrintOptions): Promise<void> {
+  const html = await renderStockMovementsHTML(opts, true);
   const w = window.open("", "_blank", "width=1100,height=800");
-  if (!w) {
-    throw new Error("تعذّر فتح نافذة الطباعة — تحقق من إعدادات المتصفح");
-  }
+  if (!w) throw new Error("تعذّر فتح نافذة المعاينة — تحقق من إعدادات المتصفح");
   w.document.open();
   w.document.write(html);
   w.document.close();
+}
+
+/** Downloads the same report as a PDF (A4 landscape) using html2pdf. */
+export async function downloadStockMovementsPdf(opts: StockPrintOptions): Promise<void> {
+  const html = await renderStockMovementsHTML(opts, false);
+  // Build an offscreen iframe so styles apply cleanly.
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = "1200px";
+  iframe.style.height = "800px";
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentDocument!;
+  idoc.open(); idoc.write(html); idoc.close();
+  // Wait for images (logo) to load.
+  await new Promise<void>((resolve) => {
+    const imgs = Array.from(idoc.images);
+    if (imgs.length === 0) return resolve();
+    let left = imgs.length;
+    const done = () => { if (--left <= 0) resolve(); };
+    imgs.forEach((img) => {
+      if (img.complete) done();
+      else { img.onload = done; img.onerror = done; }
+    });
+    setTimeout(resolve, 1500);
+  });
+  try {
+    const html2pdf = (await import("html2pdf.js")).default as any;
+    const target = idoc.body.querySelector(".sheet") as HTMLElement || idoc.body;
+    await html2pdf()
+      .from(target)
+      .set({
+        margin: 5,
+        filename: `stock-movements-${opts.from}_${opts.to}.pdf`,
+        image: { type: "jpeg", quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+        jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+        pagebreak: { mode: ["css", "legacy"] },
+      })
+      .save();
+  } finally {
+    iframe.remove();
+  }
 }
