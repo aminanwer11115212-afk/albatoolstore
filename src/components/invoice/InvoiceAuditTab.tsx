@@ -16,9 +16,20 @@ type TimelineItem = {
   detail: string;
   amount?: number | null;
   refId?: string;
+  opNo?: string | null;
   icon: "create" | "payment" | "credit" | "delete" | "edit";
   colorClass: string;
 };
+
+/**
+ * استخراج "رقم العملية" من وصف القيد.
+ * يدعم الصيغة الحالية "رقم العملية: X" والصيغة القديمة "مرجع: X" لضمان توافق البيانات السابقة.
+ */
+export function extractOperationNo(description?: string | null): string | null {
+  if (!description) return null;
+  const m = String(description).match(/(?:رقم العملية|مرجع|إشعار)\s*[:：]\s*(\S+)/);
+  return m ? m[1] : null;
+}
 
 const ICONS = {
   create: FileText,
