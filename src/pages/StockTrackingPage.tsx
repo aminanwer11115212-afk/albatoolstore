@@ -795,11 +795,24 @@ export default function StockTrackingPage() {
                     )}
                   </TableCell>
                   <TableCell data-label="النوع">
-                    <Badge variant="outline" className={typeBadgeCls[m.type]}>
-                      {(m.type === "transfer_in" || m.type === "transfer_out") && <ArrowLeftRight className="h-3 w-3 me-1" />}
-                      {typeLabel[m.type]}
-                    </Badge>
+                    {m.type === "invoice_delete_restore" ? (
+                      <button
+                        type="button"
+                        onClick={() => setDetailMove(m)}
+                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold hover:brightness-110 ${typeBadgeCls[m.type]}`}
+                        title="عرض تفاصيل الاسترجاع"
+                      >
+                        <Info className="h-3 w-3" />
+                        {typeLabel[m.type]}
+                      </button>
+                    ) : (
+                      <Badge variant="outline" className={typeBadgeCls[m.type]}>
+                        {(m.type === "transfer_in" || m.type === "transfer_out") && <ArrowLeftRight className="h-3 w-3 me-1" />}
+                        {typeLabel[m.type]}
+                      </Badge>
+                    )}
                   </TableCell>
+
                   <TableCell data-label="المنتج" className="font-medium">
                     <button
                       className="text-primary hover:underline text-right"
