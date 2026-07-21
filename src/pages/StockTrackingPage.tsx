@@ -12,14 +12,19 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { startsWithMatch } from "@/utils/searchMatch";
 import {
   Search, TrendingDown, TrendingUp, RotateCcw, Package, ArrowLeftRight,
-  Sliders, Printer, Download, Warehouse, FileText,
+  Sliders, Printer, Download, Warehouse, FileText, ShieldCheck, AlertTriangle,
+  CheckCircle2, Info,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { printStockMovements, downloadStockMovementsPdf } from "@/utils/stockMovementsPrint";
+
 
 const PREFS_KEY = "lov:stock-tracking:filters:v1";
 type StoredPrefs = {
