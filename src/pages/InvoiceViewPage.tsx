@@ -1040,6 +1040,17 @@ export default function InvoiceViewPage() {
       {(showWhatsappMenu || showPrintMenu || showAdditionalMenu) && (
         <div className="fixed inset-0 z-40" onClick={() => { setShowWhatsappMenu(false); setShowPrintMenu(false); setShowAdditionalMenu(false); }} />
       )}
+
+      <DeleteInvoiceConfirmDialog
+        open={deleteDialogOpen}
+        invoiceId={invoice?.id || null}
+        confirming={deleting}
+        onCancel={() => { if (!deleting) setDeleteDialogOpen(false); }}
+        onConfirm={async () => {
+          await performDelete();
+          setDeleteDialogOpen(false);
+        }}
+      />
     </div>
   );
 }
