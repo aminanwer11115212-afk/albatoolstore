@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { printStockMovements } from "@/utils/stockMovementsPrint";
 
 type MoveType = "sale" | "return" | "purchase" | "transfer_in" | "transfer_out" | "manual_adjustment";
 
@@ -384,8 +385,43 @@ export default function StockTrackingPage() {
     }
   };
 
-  const printPage = () => {
-    window.print();
+  const printPage = async () => {
+    try {
+      const productName =
+        productFilter !== "all"
+          ? (products.find((p: any) => p.id === productFilter)?.name || null)
+          : null;
+      const warehouseName =
+        warehouseFilter !== "all"
+          ? (warehouses.find((w: any) => w.id === warehouseFilter)?.name || null)
+          : null;
+      await printStockMovements({
+        from,
+        to,
+        totals,
+        filters: {
+          product: productName,
+          warehouse: warehouseName,
+          types: types.map((t) => typeLabel[t]),
+          query: q || undefined,
+        },
+        rows: rowsWithBalance.map((m) => ({
+          date: m.date,
+          created_at: m.created_at,
+          type: m.type,
+          typeLabel: typeLabel[m.type],
+          product_name: m.product_name,
+          warehouse_name: m.warehouse_name,
+          qty: m.qty,
+          balance_after: m.balance_after ?? null,
+          doc_number: m.doc_number,
+          party_name: m.party_name,
+          reason: m.reason,
+        })),
+      });
+    } catch (e: any) {
+      toast.error(e?.message || "فشل فتح نافذة الطباعة");
+    }
   };
 
   const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment"];
