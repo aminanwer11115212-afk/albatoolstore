@@ -239,7 +239,6 @@ export default function CustomerPaymentDialog({
   }, [accountOptions]);
 
   // — تحكم كامل بالكيبورد داخل الحوار —
-  const discountRef = useRef<HTMLInputElement | null>(null);
   const creditUseRef = useRef<HTMLInputElement | null>(null);
   const dateRef = useRef<HTMLInputElement | null>(null);
   const referenceRef = useRef<HTMLInputElement | null>(null);
