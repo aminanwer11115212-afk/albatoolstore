@@ -1000,7 +1000,7 @@ export default function CustomerPaymentDialog({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">التاريخ</Label>
-                <Input data-pay-field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <Input ref={dateRef} data-pay-field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
