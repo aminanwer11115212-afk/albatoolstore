@@ -472,6 +472,18 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
         onConfirm={() => pendingReverse && executeReverse(pendingReverse)}
         onCancel={() => setPendingReverse(null)}
       />
+
+      <EditChargeDialog
+        open={!!editingCharge}
+        charge={editingCharge}
+        onClose={() => setEditingCharge(null)}
+        onSaved={async () => {
+          await qc.invalidateQueries({ queryKey: ["customer-charge-history", customerId] });
+          await qc.invalidateQueries({ queryKey: ["customers"] });
+          await qc.invalidateQueries({ queryKey: ["invoices"] });
+          await qc.invalidateQueries({ queryKey: ["transactions"] });
+        }}
+      />
     </div>
   );
 }
