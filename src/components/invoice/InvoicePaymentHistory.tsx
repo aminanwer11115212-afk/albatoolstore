@@ -32,7 +32,9 @@ interface LiveTx {
   reference_id: string | null;
   description: string | null;
   created_at: string;
+  allocation: any;
 }
+
 
 /**
  * سجل تدقيق دفعات الفاتورة — snapshots + الدفعات النشطة القابلة للتعديل.
