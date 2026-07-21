@@ -131,22 +131,77 @@ export default function AccountsSafetyBotPage() {
     kinds: kinds.length ? kinds : null,
   }), [dateFrom, dateTo, kinds]);
 
+  // Health v3
+  const [health, setHealth] = useState<HealthReport | null>(null);
+  const [autoRepairEnabled, setAutoRepairEnabled] = useState(false);
+  const [savingAutoFlag, setSavingAutoFlag] = useState(false);
+  const [repairingHealth, setRepairingHealth] = useState(false);
+
   const runScan = useCallback(async () => {
     setScanning(true);
     try {
-      const [scanRes, invRes, snapRes] = await Promise.all([
+      const [scanRes, invRes, snapRes, healthRes, cs] = await Promise.all([
         (supabase as any).rpc("bot_scan_invoice_anomalies_v2", {
           _from: filters.from, _to: filters.to, _kinds: filters.kinds,
         }),
         runAllInvariants(),
         (supabase as any).from("bot_scan_snapshots").select("*").order("run_at", { ascending: false }).limit(1).maybeSingle(),
+        (supabase as any).rpc("bot_scan_health_v3"),
+        (supabase as any).from("company_settings").select("bot_auto_repair_enabled").limit(1).maybeSingle(),
       ]);
       if (scanRes.error) throw scanRes.error;
       setAnomalies((scanRes.data || []) as Anomaly[]);
       setInvariants(invRes);
       setLastSnapshot((snapRes.data as Snapshot) || null);
+      setHealth((healthRes.data as HealthReport) || null);
+      setAutoRepairEnabled(!!cs.data?.bot_auto_repair_enabled);
       setLastRunAt(new Date().toLocaleString("ar"));
       setPreviews({});
+    } catch (e: any) {
+      toast.error(`فشل الفحص: ${e?.message || e}`);
+    } finally {
+      setScanning(false);
+    }
+  }, [filters.from, filters.to, filters.kinds]);
+
+  const toggleAutoRepair = async (next: boolean) => {
+    if (!isAdmin) { toast.error("الإصلاح الذاتي مقتصر على admin."); return; }
+    setSavingAutoFlag(true);
+    try {
+      const { data: row } = await (supabase as any).from("company_settings").select("id").limit(1).maybeSingle();
+      if (!row?.id) throw new Error("company_settings not found");
+      const { error } = await (supabase as any).from("company_settings")
+        .update({ bot_auto_repair_enabled: next }).eq("id", row.id);
+      if (error) throw error;
+      setAutoRepairEnabled(next);
+      toast.success(next ? "تم تفعيل الإصلاح الذاتي (كل 6 ساعات)" : "تم إيقاف الإصلاح الذاتي");
+    } catch (e: any) {
+      toast.error(`فشل: ${e?.message || e}`);
+    } finally {
+      setSavingAutoFlag(false);
+    }
+  };
+
+  const repairHealth = async (dry = false) => {
+    if (!isAdmin) { toast.error("مقتصر على admin."); return; }
+    if (!dry && !confirm("تنفيذ الإصلاح الشامل على كل الأقسام؟")) return;
+    setRepairingHealth(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("bot_repair_health_v3", {
+        _dry_run: dry, _sections: null, _note: null,
+      });
+      if (error) throw error;
+      if (dry) toast.info("محاكاة الفحص الشامل انتهت — راجع سجل التدقيق");
+      else toast.success(`تم الإصلاح الشامل — ${data?.details ? Object.keys(data.details).length : 0} قسم`);
+      invalidateAll();
+      await runScan();
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      toast.error(msg.includes("unauthorized_admin_only") ? "مرفوض — يحتاج admin" : `فشل: ${msg}`);
+    } finally {
+      setRepairingHealth(false);
+    }
+  };
     } catch (e: any) {
       toast.error(`فشل الفحص: ${e?.message || e}`);
     } finally {
