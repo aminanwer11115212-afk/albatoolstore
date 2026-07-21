@@ -295,6 +295,9 @@ export default function QuoteViewPage() {
         }
       }
       toast.success("تم نسخ عرض السعر بنجاح");
+      qc.invalidateQueries({ queryKey: ["quotes"] });
+      qc.invalidateQueries({ queryKey: ["quotes-full"] });
+      qc.invalidateQueries({ queryKey: ["quotes-with-customers"] });
       navigate(`/quotes/view/${newQ.id}`);
     } catch (e: any) { toast.error(e.message); }
     setShowAdditionalMenu(false);

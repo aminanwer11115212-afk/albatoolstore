@@ -116,6 +116,11 @@ function useTable<T extends keyof Tables<any>>(table: string) {
         window.dispatchEvent(new Event("customers:changed"));
         window.dispatchEvent(new Event("suppliers:changed"));
         window.dispatchEvent(new Event("accounts:changed"));
+      } else if (table === "accounts") {
+        queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["transactions-with-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
+        window.dispatchEvent(new Event("accounts:changed"));
       } else if (table === "invoices") {
         queryClient.invalidateQueries({ queryKey: ["customers"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
@@ -194,6 +199,11 @@ function useTable<T extends keyof Tables<any>>(table: string) {
         queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
         window.dispatchEvent(new Event("customers:changed"));
         window.dispatchEvent(new Event("suppliers:changed"));
+        window.dispatchEvent(new Event("accounts:changed"));
+      } else if (table === "accounts") {
+        queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["transactions-with-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
         window.dispatchEvent(new Event("accounts:changed"));
       } else if (table === "invoices") {
         queryClient.invalidateQueries({ queryKey: ["customers"] });

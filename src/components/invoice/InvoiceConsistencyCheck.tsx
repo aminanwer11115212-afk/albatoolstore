@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { CheckCircle2, AlertTriangle, Loader2, RefreshCw, Clock, ArrowLeftRight } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { CheckCircle2, AlertTriangle, Loader2, RefreshCw, Clock, ArrowLeftRight, Wrench } from "lucide-react";
 
 interface Props {
   invoiceId: string;
@@ -19,11 +21,34 @@ type Tx = {
  *  - يبني Timeline: total → دفعات وفائض → paid/partial/paid → استهلاك الفائض
  */
 export default function InvoiceConsistencyCheck({ invoiceId, customerId }: Props) {
+  const qc = useQueryClient();
   const [inv, setInv] = useState<any>(null);
   const [txs, setTxs] = useState<Tx[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [repairing, setRepairing] = useState(false);
+
+  const repair = async () => {
+    if (repairing) return;
+    if (!confirm("تشغيل الإصلاح التلقائي؟ سيتم حذف الدفعات المكررة أو إضافة قيود مفقودة، ثم إعادة احتساب رصيد العميل.")) return;
+    setRepairing(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("bot_repair_invoice", { _invoice_id: invoiceId });
+      if (error) throw error;
+      toast.success("تم الإصلاح", {
+        description: `حُذف ${data?.deleted_duplicates || 0} مكرر — أُضيف ${data?.inserted_backfills || 0} قيد.`,
+      });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      setRefreshKey((k) => k + 1);
+    } catch (e: any) {
+      toast.error(`فشل الإصلاح: ${e?.message || e}`);
+    } finally {
+      setRepairing(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -143,13 +168,26 @@ export default function InvoiceConsistencyCheck({ invoiceId, customerId }: Props
               {ok ? "الفاتورة متناسقة ✓" : "يوجد فارق في التناسق"}
             </h3>
           </div>
-          <button
-            type="button"
-            onClick={() => setRefreshKey((k) => k + 1)}
-            className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-background hover:bg-muted"
-          >
-            <RefreshCw className="h-3 w-3" /> إعادة الفحص
-          </button>
+          <div className="flex items-center gap-2">
+            {!ok && (
+              <button
+                type="button"
+                onClick={repair}
+                disabled={repairing}
+                className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded bg-destructive text-destructive-foreground hover:opacity-90 disabled:opacity-60 font-bold"
+              >
+                {repairing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wrench className="h-3 w-3" />}
+                إصلاح تلقائي
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setRefreshKey((k) => k + 1)}
+              className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-background hover:bg-muted"
+            >
+              <RefreshCw className="h-3 w-3" /> إعادة الفحص
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-xs">
           <StatCell label="الإجمالي" value={analysis.total.toLocaleString()} />
