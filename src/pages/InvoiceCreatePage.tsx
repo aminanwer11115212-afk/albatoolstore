@@ -1610,6 +1610,65 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           /* ارتفاع ثابت لجدول البنود على الجوال حتى تظهر صفوف TableFiller الفارغة دائماً قبل الأزرار */
           .neo-quote-scope .items-table-wrap { height: 55vh !important; min-height: 360px !important; max-height: 60vh !important; flex: 0 0 auto !important; }
           .neo-quote-scope .items-scroll { height: 100% !important; min-height: 0 !important; max-height: none !important; }
+
+          /* === Header bar محسّن للجوال: صفّان — اسم العميل+زر إضافة، ثم المستودع+تفاصيل العميل === */
+          .neo-quote-scope .header-bar {
+            display: grid !important;
+            grid-template-columns: 1fr auto !important;
+            grid-auto-rows: auto !important;
+            gap: 6px 6px !important;
+            padding: 8px !important;
+          }
+          .neo-quote-scope .header-bar > .field { flex: unset !important; width: 100% !important; min-width: 0 !important; }
+          /* حقل العميل (walk-in / بحث) في العمود الأول من الصف الأول */
+          .neo-quote-scope .header-bar > .field:nth-of-type(1) { grid-column: 1 / 2; }
+          /* زر إضافة العميل الأخضر بجانبه */
+          .neo-quote-scope .header-bar > .field:nth-of-type(2) { grid-column: 2 / 3; width: 40px !important; }
+          .neo-quote-scope .header-bar > .field:nth-of-type(2) button { width: 40px !important; min-width: 40px !important; height: 32px !important; font-size: 20px !important; border-radius: 6px !important; }
+          /* المستودع وتفاصيل العميل في صف كامل بعمودين متساويين */
+          .neo-quote-scope .header-bar > .field:nth-of-type(3),
+          .neo-quote-scope .header-bar > .field:nth-of-type(4) {
+            grid-column: span 1 !important;
+            grid-row: 2 !important;
+          }
+          .neo-quote-scope .header-bar > .field:nth-of-type(3) { grid-column: 1 / 2 !important; }
+          .neo-quote-scope .header-bar > .field:nth-of-type(4) { grid-column: 2 / 3 !important; }
+          .neo-quote-scope .header-bar .field .form-control { height: 34px !important; font-size: 13px !important; padding: 4px 8px !important; }
+          .neo-quote-scope .header-bar .field label { font-size: 11px !important; margin-bottom: 3px !important; font-weight: 600; color: hsl(var(--foreground)); }
+          /* إخفاء مقابض توسيع الأعمدة على الجوال */
+          .neo-quote-scope .header-bar [data-expand-handle],
+          .neo-quote-scope .quick-add-row [data-expand-handle] { display: none !important; }
+
+          /* === Quick-add row: اجعل حقل المنتج وزر + في صف مستقل، ثم بقية الحقول في شبكة === */
+          .neo-quote-scope .quick-add-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 6px !important;
+            padding: 6px !important;
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: 6px;
+          }
+          .neo-quote-scope .quick-add-row .quick-add-field:nth-of-type(1) { grid-column: 1 / -1; }
+          .neo-quote-scope .quick-add-row > button:last-child {
+            grid-column: 1 / -1;
+            height: 40px !important;
+            font-size: 14px !important;
+            font-weight: 700;
+            border-radius: 6px !important;
+          }
+          .neo-quote-scope .quick-add-row .form-control { height: 36px !important; font-size: 13px !important; }
+
+          /* === شريط الأزرار السفلي: توحيد الأحجام ومسافات نظيفة === */
+          .neo-quote-scope .toolbar-item button,
+          .neo-quote-scope [data-toolbar] button,
+          .neo-quote-scope [data-toolbar-item] button {
+            min-height: 40px !important;
+            min-width: 72px !important;
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+            border-radius: 6px !important;
+          }
         }
         /* .items-scroll layout موحّد في ItemsScroll */
       `}</style>
