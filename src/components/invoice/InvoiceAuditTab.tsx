@@ -176,7 +176,7 @@ export default function InvoiceAuditTab({ invoiceId, customerId }: Props) {
               <th className="px-3 py-2 text-right font-semibold text-xs w-32">النوع</th>
               <th className="px-3 py-2 text-right font-semibold text-xs">التفاصيل</th>
               <th className="px-3 py-2 text-left font-semibold text-xs w-28">المبلغ</th>
-              <th className="px-3 py-2 text-left font-semibold text-xs w-24">مرجع القيد</th>
+              <th className="px-3 py-2 text-left font-semibold text-xs w-24">رقم العملية</th>
             </tr>
           </thead>
           <tbody>

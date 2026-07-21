@@ -809,7 +809,7 @@ export default function InvoiceViewPage() {
             <p className="text-muted-foreground text-sm">SRN #{invoice.invoice_number}{invoice.tid ? ` · رقم متسلسل: ${invoice.tid}` : ""}</p>
             {invoice.is_proforma && <span className="inline-block mt-1 px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs">فاتورة أولية (Proforma)</span>}
             {invoice.parent_invoice_id && <span className="inline-block mt-1 mr-2 px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs">نسخة من فاتورة أصلية</span>}
-            <p className="text-muted-foreground text-sm mt-2">مرجع:</p>
+            <p className="text-muted-foreground text-sm mt-2">رقم العملية:</p>
             <div className="mt-4">
               <p className="text-muted-foreground text-sm">المبلغ الإجمالي</p>
               <p className="text-2xl font-bold text-foreground">{invoice.currency_code || company?.currency || "SDG"} {Number(invoice.total || 0).toLocaleString("en", { minimumFractionDigits: 2 })}</p>

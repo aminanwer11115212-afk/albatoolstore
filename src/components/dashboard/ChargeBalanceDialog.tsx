@@ -351,7 +351,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
               </div>
               <div>
                 <Label>رقم العملية *</Label>
-                <Input value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="رقم العملية / المرجع" />
+                <Input value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="رقم العملية" />
               </div>
             </>
           )}
