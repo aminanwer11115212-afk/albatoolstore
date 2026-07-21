@@ -1,6 +1,6 @@
 import {
   useDashboardStats, useInvoicesWithCustomers, useLowStockProducts,
-  useRecentTransactions, useQuotesWithCustomers
+  useRecentTransactions, useQuotesWithCustomers, useLatestExchangeRates
 } from "@/hooks/useData";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
