@@ -68,6 +68,7 @@ const ProductsPage = lazy(() => import("./pages/ProductsPage"));
 const FieldsPlaygroundPage = lazy(() => import("./pages/FieldsPlaygroundPage"));
 const SuppliersPage = lazy(() => import("./pages/SuppliersPage"));
 const AccountsPage = lazy(() => import("./pages/AccountsPage"));
+const AccountsSafetyBotPage = lazy(() => import("./pages/AccountsSafetyBotPage"));
 const BalanceSheetPage = lazy(() => import("./pages/BalanceSheetPage"));
 const TransferPage = lazy(() => import("./pages/TransferPage"));
 const AccountStatementPage = lazy(() => import("./pages/AccountStatementPage"));
@@ -421,6 +422,7 @@ const App = () => {
             <Route path="/accounts" element={lazyEl(<AccountsPage />, "الحسابات")} />
             <Route path="/accounts/add" element={lazyEl(<AccountsPage />, "إضافة حساب")} />
             <Route path="/accounts/balance-sheet" element={lazyEl(<BalanceSheetPage />, "الميزانية العمومية")} />
+            <Route path="/accounts/safety-bot" element={lazyEl(<AccountsSafetyBotPage />, "بوت تأمين الحسابات")} />
             <Route path="/transactions" element={lazyEl(<TransactionsPage />, "المعاملات")} />
             <Route path="/transactions/add" element={lazyEl(<TransactionsPage />, "إضافة معاملة")} />
             <Route path="/transactions/transfer" element={lazyEl(<TransferPage />, "تحويل بين الحسابات")} />
