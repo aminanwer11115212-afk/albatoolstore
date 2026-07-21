@@ -274,6 +274,33 @@ export function useDeletedQuoteItems() { return useTable("deleted_quote_items");
 export function useCurrencies() { return useTable("currencies"); }
 export function useExchangeRates() { return useTable("exchange_rates"); }
 
+/**
+ * Hook موحّد يُرجع أحدث سعر صرف لكل عملة (بديل عن استعلامات مكرّرة في اللوحة/الفواتير/العروض).
+ * ملاحظة: يتم إبطال المفتاح "latest-exchange-rates" تلقائياً من ExchangeRateDialog بعد أي تحديث.
+ */
+export function useLatestExchangeRates() {
+  return useQuery({
+    queryKey: ["latest-exchange-rates"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("currency_code, rate_to_base, effective_date")
+        .order("effective_date", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      const seen = new Set<string>();
+      const latest: { code: string; rate: number; date: string }[] = [];
+      for (const r of (data || [])) {
+        if (seen.has(r.currency_code)) continue;
+        seen.add(r.currency_code);
+        latest.push({ code: r.currency_code, rate: Number(r.rate_to_base), date: r.effective_date });
+      }
+      return latest;
+    },
+  });
+}
+
 // Specialized queries
 /**
  * جلب الفواتير مع بيانات العميل.
