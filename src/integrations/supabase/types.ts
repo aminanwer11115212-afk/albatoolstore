@@ -134,6 +134,75 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_audit_log: {
+        Row: {
+          action: string
+          actor_role: string | null
+          actor_uid: string | null
+          after_state: Json | null
+          before_state: Json | null
+          created_at: string
+          details: Json | null
+          dry_run: boolean
+          filters: Json | null
+          id: string
+          invoice_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_role?: string | null
+          actor_uid?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          details?: Json | null
+          dry_run?: boolean
+          filters?: Json | null
+          id?: string
+          invoice_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_role?: string | null
+          actor_uid?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          details?: Json | null
+          dry_run?: boolean
+          filters?: Json | null
+          id?: string
+          invoice_id?: string | null
+        }
+        Relationships: []
+      }
+      bot_scan_snapshots: {
+        Row: {
+          anomalies_count: number
+          by_kind: Json
+          id: string
+          results: Json
+          run_at: string
+          source: string
+        }
+        Insert: {
+          anomalies_count?: number
+          by_kind?: Json
+          id?: string
+          results?: Json
+          run_at?: string
+          source?: string
+        }
+        Update: {
+          anomalies_count?: number
+          by_kind?: Json
+          id?: string
+          results?: Json
+          run_at?: string
+          source?: string
+        }
+        Relationships: []
+      }
       cities: {
         Row: {
           created_at: string
@@ -3008,12 +3077,45 @@ export type Database = {
         Returns: undefined
       }
       bot_repair_all: { Args: never; Returns: Json }
+      bot_repair_all_v2: {
+        Args: {
+          _dry_run?: boolean
+          _from?: string
+          _kinds?: string[]
+          _note?: string
+          _to?: string
+        }
+        Returns: Json
+      }
       bot_repair_invoice: { Args: { _invoice_id: string }; Returns: Json }
+      bot_repair_invoice_preview: {
+        Args: { _invoice_id: string }
+        Returns: Json
+      }
+      bot_repair_invoice_v2: {
+        Args: { _dry_run?: boolean; _invoice_id: string; _note?: string }
+        Returns: Json
+      }
+      bot_run_snapshot: { Args: { _source?: string }; Returns: Json }
       bot_scan_invoice_anomalies: {
         Args: never
         Returns: {
           customer_id: string
           delta: number
+          invoice_id: string
+          invoice_number: string
+          kind: string
+          paid_amount: number
+          sum_payments: number
+          total: number
+        }[]
+      }
+      bot_scan_invoice_anomalies_v2: {
+        Args: { _from?: string; _kinds?: string[]; _to?: string }
+        Returns: {
+          customer_id: string
+          delta: number
+          invoice_date: string
           invoice_id: string
           invoice_number: string
           kind: string
