@@ -2990,8 +2990,21 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_customer_credit_to_invoice: {
+        Args: {
+          _amount: number
+          _customer_id: string
+          _date?: string
+          _invoice_id: string
+        }
+        Returns: Json
+      }
       apply_stock_delta: {
         Args: { _delta: number; _product_id: string }
+        Returns: undefined
+      }
+      assert_invoice_payment_consistency: {
+        Args: { _invoice_id: string }
         Returns: undefined
       }
       check_geo_grants: { Args: never; Returns: Json }

@@ -13,6 +13,7 @@ import CreditConsumptionOrderControl from "@/components/statement/CreditConsumpt
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
 import RevisePaymentDialog, { type RevisableTx } from "@/components/statement/RevisePaymentDialog";
+import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvoiceDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 import CustomerBalanceAuditTab from "@/components/customer/CustomerBalanceAuditTab";
 
@@ -203,6 +204,7 @@ export default function CustomerStatementPage() {
   const isRevisablePayment = (t: any): boolean =>
     t.category === "customer_payment" && t.method !== "credit_balance" && !!t.reference_id;
   const [reviseTx, setReviseTx] = useState<RevisableTx | null>(null);
+  const [applyCreditOpen, setApplyCreditOpen] = useState(false);
   const refreshAfterRevise = () => {
     qc.invalidateQueries({ queryKey: ["customer-transactions", selectedCustomerId] });
     qc.invalidateQueries({ queryKey: ["customer-fresh", selectedCustomerId] });
@@ -645,9 +647,20 @@ export default function CustomerStatementPage() {
               <p className="text-sm text-muted-foreground">المتبقي</p>
               <p className="text-lg font-bold text-destructive tabular-nums">{(totalInvoices - totalPaid).toLocaleString()}</p>
             </div>
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-              <p className="text-sm text-muted-foreground">الرصيد الحالي ({balanceLabel})</p>
-              <p className={`text-lg font-bold tabular-nums ${balanceColor}`}>{balanceDisplay}</p>
+            <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-col justify-between gap-2">
+              <div>
+                <p className="text-sm text-muted-foreground">الرصيد الحالي ({balanceLabel})</p>
+                <p className={`text-lg font-bold tabular-nums ${balanceColor}`}>{balanceDisplay}</p>
+              </div>
+              {Number((selectedCustomer as any)?.credit_balance || 0) > 0.01 && (
+                <button
+                  type="button"
+                  onClick={() => setApplyCreditOpen(true)}
+                  className="text-xs font-semibold text-primary hover:underline text-right"
+                >
+                  تطبيق الرصيد الدائن على فاتورة ←
+                </button>
+              )}
             </div>
           </div>
 
@@ -1093,6 +1106,15 @@ export default function CustomerStatementPage() {
         tx={reviseTx}
         onClose={() => setReviseTx(null)}
         onSaved={refreshAfterRevise}
+      />
+
+      <ApplyCreditToInvoiceDialog
+        open={applyCreditOpen}
+        customerId={selectedCustomerId || null}
+        customerName={selectedCustomer?.name || null}
+        availableCredit={Number((selectedCustomer as any)?.credit_balance || 0)}
+        onClose={() => setApplyCreditOpen(false)}
+        onApplied={refreshAfterRevise}
       />
     </div>
   );
