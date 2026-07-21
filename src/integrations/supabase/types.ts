@@ -237,6 +237,7 @@ export type Database = {
           address: string | null
           bank_account: string | null
           bank_name: string | null
+          bot_auto_repair_enabled: boolean
           city: string | null
           company_name: string
           country: string | null
@@ -273,6 +274,7 @@ export type Database = {
           address?: string | null
           bank_account?: string | null
           bank_name?: string | null
+          bot_auto_repair_enabled?: boolean
           city?: string | null
           company_name?: string
           country?: string | null
@@ -309,6 +311,7 @@ export type Database = {
           address?: string | null
           bank_account?: string | null
           bank_name?: string | null
+          bot_auto_repair_enabled?: boolean
           city?: string | null
           company_name?: string
           country?: string | null
@@ -3137,6 +3140,7 @@ export type Database = {
         Args: { _invoice_id: string }
         Returns: undefined
       }
+      bot_auto_maintenance: { Args: never; Returns: Json }
       bot_repair_all: { Args: never; Returns: Json }
       bot_repair_all_v2: {
         Args: {
@@ -3146,6 +3150,10 @@ export type Database = {
           _note?: string
           _to?: string
         }
+        Returns: Json
+      }
+      bot_repair_health_v3: {
+        Args: { _dry_run?: boolean; _note?: string; _sections?: string[] }
         Returns: Json
       }
       bot_repair_invoice: { Args: { _invoice_id: string }; Returns: Json }
@@ -3158,6 +3166,36 @@ export type Database = {
         Returns: Json
       }
       bot_run_snapshot: { Args: { _source?: string }; Returns: Json }
+      bot_scan_account_balance_drift: {
+        Args: never
+        Returns: {
+          account_id: string
+          account_name: string
+          delta: number
+          expected_balance: number
+          stored_balance: number
+        }[]
+      }
+      bot_scan_customer_balance_drift: {
+        Args: never
+        Returns: {
+          customer_id: string
+          customer_name: string
+          delta: number
+          expected_balance: number
+          stored_balance: number
+        }[]
+      }
+      bot_scan_health_v3: { Args: never; Returns: Json }
+      bot_scan_incomplete_returns: {
+        Args: never
+        Returns: {
+          items_count: number
+          return_date: string
+          return_id: string
+          return_number: string
+        }[]
+      }
       bot_scan_invoice_anomalies: {
         Args: never
         Returns: {
@@ -3183,6 +3221,35 @@ export type Database = {
           paid_amount: number
           sum_payments: number
           total: number
+        }[]
+      }
+      bot_scan_pos_leak: {
+        Args: never
+        Returns: {
+          customer_id: string
+          customer_name: string
+          leaked_invoices: number
+          leaked_transactions: number
+        }[]
+      }
+      bot_scan_stock_drift: {
+        Args: never
+        Returns: {
+          delta: number
+          expected_qty: number
+          product_id: string
+          product_name: string
+          stored_qty: number
+        }[]
+      }
+      bot_scan_supplier_balance_drift: {
+        Args: never
+        Returns: {
+          delta: number
+          expected_balance: number
+          stored_balance: number
+          supplier_id: string
+          supplier_name: string
         }[]
       }
       cancel_customer_charge: {
