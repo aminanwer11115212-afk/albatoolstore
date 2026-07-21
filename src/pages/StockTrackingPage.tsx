@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,11 +15,22 @@ import {
 import { startsWithMatch } from "@/utils/searchMatch";
 import {
   Search, TrendingDown, TrendingUp, RotateCcw, Package, ArrowLeftRight,
-  Sliders, Printer, Download, Warehouse,
+  Sliders, Printer, Download, Warehouse, FileText,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { printStockMovements } from "@/utils/stockMovementsPrint";
+import { printStockMovements, downloadStockMovementsPdf } from "@/utils/stockMovementsPrint";
+
+const PREFS_KEY = "lov:stock-tracking:filters:v1";
+type StoredPrefs = {
+  from?: string; to?: string; types?: string[]; q?: string;
+  productFilter?: string; warehouseFilter?: string;
+};
+const loadPrefs = (): StoredPrefs => {
+  try { return JSON.parse(localStorage.getItem(PREFS_KEY) || "{}") || {}; }
+  catch { return {}; }
+};
+
 
 type MoveType = "sale" | "return" | "purchase" | "transfer_in" | "transfer_out" | "manual_adjustment" | "invoice_delete_restore";
 
