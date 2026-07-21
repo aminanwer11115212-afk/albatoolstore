@@ -691,17 +691,34 @@ export default function StockTrackingPage() {
                     {m.balance_after ?? "—"}
                   </TableCell>
                   <TableCell data-label="المستند">
-                    {m.doc_href ? (
-                      <Link to={m.doc_href} className="text-primary hover:underline">{m.doc_number}</Link>
-                    ) : (
-                      <span className="text-muted-foreground">{m.doc_number}</span>
-                    )}
-                    {m.is_pos && (
-                      <span className="ms-2 inline-block px-1.5 py-0.5 text-[10px] rounded border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold">
-                        كاش
-                      </span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {m.doc_href ? (
+                        <Link to={m.doc_href} className="text-primary hover:underline font-semibold">{m.doc_number}</Link>
+                      ) : (
+                        <span className="text-foreground font-semibold">{m.doc_number}</span>
+                      )}
+                      {m.is_pos && (
+                        <span className="inline-block px-1.5 py-0.5 text-[10px] rounded border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold">
+                          كاش
+                        </span>
+                      )}
+                    </div>
+                    {m.doc_ref && (
+                      <div
+                        className="text-[10px] text-muted-foreground font-mono cursor-pointer hover:text-foreground"
+                        title="اضغط لنسخ رقم العملية"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(m.doc_ref!).then(
+                            () => toast.success("تم نسخ رقم العملية"),
+                            () => {},
+                          );
+                        }}
+                      >
+                        #{m.doc_ref}
+                      </div>
                     )}
                   </TableCell>
+
                   <TableCell data-label="الجهة">
                     <div>{m.party_name}</div>
                     {m.reason && <div className="text-[11px] text-muted-foreground">{m.reason}</div>}
