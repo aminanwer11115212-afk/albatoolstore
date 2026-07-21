@@ -13,6 +13,7 @@ import CreditConsumptionOrderControl from "@/components/statement/CreditConsumpt
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
 import RevisePaymentDialog, { type RevisableTx } from "@/components/statement/RevisePaymentDialog";
+import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvoiceDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 import CustomerBalanceAuditTab from "@/components/customer/CustomerBalanceAuditTab";
 
