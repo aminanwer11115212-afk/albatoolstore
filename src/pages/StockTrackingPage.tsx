@@ -290,12 +290,26 @@ const typeBadgeCls: Record<MoveType, string> = {
 
 
 export default function StockTrackingPage() {
-  const [from, setFrom] = useState(daysAgoISO(6));
-  const [to, setTo] = useState(todayISO());
-  const [types, setTypes] = useState<MoveType[]>([]);
-  const [q, setQ] = useState("");
-  const [productFilter, setProductFilter] = useState<string>("all");
-  const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
+  const prefs = loadPrefs();
+  const [from, setFrom] = useState(prefs.from || daysAgoISO(6));
+  const [to, setTo] = useState(prefs.to || todayISO());
+  const [types, setTypes] = useState<MoveType[]>((prefs.types as MoveType[]) || []);
+  const [q, setQ] = useState(prefs.q || "");
+  const [productFilter, setProductFilter] = useState<string>(prefs.productFilter || "all");
+  const [warehouseFilter, setWarehouseFilter] = useState<string>(prefs.warehouseFilter || "all");
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  // Persist filters after every change (survives reload).
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        PREFS_KEY,
+        JSON.stringify({ from, to, types, q, productFilter, warehouseFilter }),
+      );
+    } catch { /* ignore quota */ }
+  }, [from, to, types, q, productFilter, warehouseFilter]);
+
+
 
   const { data, isLoading } = useStockMovements(from, to);
   const moves = data?.moves || [];
