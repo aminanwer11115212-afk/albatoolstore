@@ -159,6 +159,38 @@ export default function HiddenDevResetDialog() {
         collected.transporters = { ok: true };
       }
 
+      // 4) سجلات النظام — إعادة من الصفر
+      const wipeTable = async (t: string) => {
+        const { error } = await supabase.from(t as any).delete().not("id", "is", null as any);
+        if (error && !/id.*does not exist/i.test(error.message)) {
+          const { error: e2 } = await supabase.from(t as any).delete().gte("created_at" as any, "1900-01-01");
+          if (e2) throw e2;
+        }
+      };
+
+      if (scope.stock_movements) {
+        for (const t of ["stock_return_items", "stock_returns", "stock_transfers", "stock_adjustments_log"]) {
+          await wipeTable(t);
+        }
+        collected.stock_movements = { ok: true };
+      }
+      if (scope.payment_logs) {
+        for (const t of ["invoice_revisions", "discount_audit_log"]) {
+          await wipeTable(t);
+        }
+        collected.payment_logs = { ok: true };
+      }
+      if (scope.statements_log) {
+        await wipeTable("activity_log");
+        collected.statements_log = { ok: true };
+      }
+      if (scope.bot_logs) {
+        for (const t of ["bot_audit_log", "bot_scan_snapshots"]) {
+          await wipeTable(t);
+        }
+        collected.bot_logs = { ok: true };
+      }
+
       setResult(collected);
       [
         "products", "products-full", "product",
@@ -171,6 +203,8 @@ export default function HiddenDevResetDialog() {
         "transporters", "customer_transporters", "customer_preferred_transporter",
         "destination_transporters", "destinations",
         "invoice_transports", "quote_transports",
+        "stock-movements", "stock-adjustments", "stock-transfers", "stock-returns",
+        "invoice-revisions", "discount-audit", "bot-audit-log", "bot-snapshots",
       ].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
 
       window.dispatchEvent(new Event("customers:changed"));
@@ -184,6 +218,7 @@ export default function HiddenDevResetDialog() {
         stock: false, ledger: false,
         invoices: false, quotes: false, purchases: false, bank: false, customers: false,
         transporters: false,
+        stock_movements: false, payment_logs: false, statements_log: false, bot_logs: false,
       });
     } catch (e: any) {
       toast.error(e?.message || "تعذّر التنفيذ — يلزم صلاحية admin");
