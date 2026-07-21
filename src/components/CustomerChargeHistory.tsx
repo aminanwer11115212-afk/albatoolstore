@@ -362,6 +362,26 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
               <div className="tabular-nums">الإجمالي: <span className="font-bold text-foreground">{fmt(g.total)}</span></div>
               {g.allocated > 0.01 && (<div className="tabular-nums text-emerald-600">سُدِّد: <span className="font-bold">{fmt(g.allocated)}</span></div>)}
               {g.surplus > 0.01 && (<div className="tabular-nums text-primary">فائض: <span className="font-bold">{fmt(g.surplus)}</span></div>)}
+              {isAdmin && !g.groupId.startsWith("orphan-") && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1"
+                  onClick={() => setEditingCharge({
+                    groupId: g.groupId,
+                    customerId,
+                    amount: g.total,
+                    method: g.method,
+                    accountId: null,
+                    date: g.date,
+                    hasConsumption: g.allocated > 0.01,
+                  })}
+                  data-testid="edit-charge-btn"
+                  title="تعديل هذه الشحنة"
+                >
+                  <Pencil size={12} /> تعديل
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
