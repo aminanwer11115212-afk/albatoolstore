@@ -202,12 +202,6 @@ export default function AccountsSafetyBotPage() {
       setRepairingHealth(false);
     }
   };
-    } catch (e: any) {
-      toast.error(`فشل الفحص: ${e?.message || e}`);
-    } finally {
-      setScanning(false);
-    }
-  }, [filters.from, filters.to, filters.kinds]);
 
   const loadAudit = useCallback(async () => {
     const { data, error } = await (supabase as any)
