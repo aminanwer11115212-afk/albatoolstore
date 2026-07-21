@@ -166,7 +166,9 @@ function useStockMovements(from: string, to: string) {
           qty: +Number(r.quantity || 0),
           doc_number: r.purchase_orders?.order_number || "—",
           doc_id: r.purchase_orders?.id ?? null,
+          doc_ref: r.purchase_orders?.id ? String(r.purchase_orders.id).slice(0, 8) : null,
           doc_href: r.purchase_orders?.id ? `/purchase/edit/${r.purchase_orders.id}` : null,
+
           party_name: r.purchase_orders?.suppliers?.name || "—",
         });
       });
