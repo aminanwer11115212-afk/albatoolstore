@@ -250,6 +250,7 @@ const typeLabel: Record<MoveType, string> = {
   transfer_in: "تحويل وارد",
   transfer_out: "تحويل صادر",
   manual_adjustment: "تعديل يدوي",
+  invoice_delete_restore: "استرجاع حذف فاتورة",
 };
 
 const typeBadgeCls: Record<MoveType, string> = {
@@ -259,7 +260,9 @@ const typeBadgeCls: Record<MoveType, string> = {
   transfer_in: "bg-primary/15 text-primary border-primary/30",
   transfer_out: "bg-primary/10 text-primary border-primary/30",
   manual_adjustment: "bg-muted text-foreground border-border",
+  invoice_delete_restore: "bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30",
 };
+
 
 export default function StockTrackingPage() {
   const [from, setFrom] = useState(daysAgoISO(6));
