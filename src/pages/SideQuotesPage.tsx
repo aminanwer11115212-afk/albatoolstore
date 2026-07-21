@@ -376,7 +376,7 @@ export default function SideQuotesPage() {
                   <>
                     <button className="btn-xs btn-warning" onClick={() => navigate(`/quotes/side/edit/${q.id}`)}>✎ تعديل</button>
                     <button className="btn-xs btn-info" onClick={() => handlePrintSide(q)}>🖨 طباعة</button>
-                    <button className="btn-xs btn-primary" onClick={() => handleConvert(q)}>→ فاتورة</button>
+                    <button className="btn-xs btn-primary" onClick={() => handleConvert(q)} disabled={convertingIds.has(q.id)}>{convertingIds.has(q.id) ? "…" : "→ فاتورة"}</button>
                     <button className="btn-xs btn-danger" onClick={() => handleDelete(q.id)}>🗑 حذف</button>
                   </>
                 }
