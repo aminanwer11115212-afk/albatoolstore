@@ -16,6 +16,8 @@ export default function TransactionsPage() {
   const [perPage, setPerPage] = useState(10);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const [editingPayment, setEditingPayment] = useState<EditablePayment | null>(null);
+  const { isAdmin } = useUserRole();
 
   const { data: transactions, isLoading } = useTransactionsWithAccounts();
   const { data: accounts } = useAccounts();
