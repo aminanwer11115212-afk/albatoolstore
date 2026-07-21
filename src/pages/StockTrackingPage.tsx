@@ -1015,3 +1015,12 @@ function SummaryCard({
     </Card>
   );
 }
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-border/50 pb-2">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-sm text-foreground font-semibold text-left">{value}</div>
+    </div>
+  );
+}
