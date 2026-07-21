@@ -1071,6 +1071,18 @@ export default function CustomerStatementPage() {
               )}
             </div>
           )}
+
+          {selectedCustomerId && (
+            <div data-section="audit" data-section-label="تدقيق الرصيد" className={`legacy-card card-block ${tab === "audit" ? "" : "hidden"}`}>
+              <div className="px-5 py-4">
+                <CustomerBalanceAuditTab
+                  customerId={selectedCustomerId}
+                  storedBalance={Number((selectedCustomer as any)?.balance || 0)}
+                  storedCredit={Number((selectedCustomer as any)?.credit_balance || 0)}
+                />
+              </div>
+            </div>
+          )}
         </>
         );
       })()}
