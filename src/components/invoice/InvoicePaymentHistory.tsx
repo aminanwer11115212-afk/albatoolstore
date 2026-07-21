@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronDown, ChevronUp, History, Loader2, Pencil } from "lucide-react";
+import { ChevronDown, ChevronUp, History, Loader2, Pencil, Wallet } from "lucide-react";
 import { methodLabel } from "./CustomerPaymentDialog";
 import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
+import EditChargeDialog, { type EditableCharge } from "@/components/finance/EditChargeDialog";
 import { useUserRole } from "@/hooks/useUserRole";
+
 
 interface Props {
   invoiceId: string;
