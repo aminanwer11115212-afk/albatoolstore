@@ -56,6 +56,7 @@ export default function QuoteViewPage() {
   const [showAdditionalMenu, setShowAdditionalMenu] = useState(false);
   const [packagingDialogOpen, setPackagingDialogOpen] = useState(false);
   const [transportDialogOpen, setTransportDialogOpen] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [activeTab, setActiveTab] = useState<"document" | "conversion">("document");
   const [editingCell, setEditingCell] = useState<{ index: number; field: string } | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -201,10 +202,14 @@ export default function QuoteViewPage() {
   };
 
   const handleConvertToInvoice = async () => {
-    if (!quote || !confirm("تحويل عرض السعر إلى فاتورة؟ سيتم الإبقاء على عرض السعر بحالة \"مقبول\".")) return;
+    if (!quote || converting) return;
+    if (!confirm("تحويل عرض السعر إلى فاتورة؟ سيتم الإبقاء على عرض السعر بحالة \"مقبول\".")) return;
+    setConverting(true);
     try {
       const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
-      const { invoiceId, invoiceNumber, stockDeducted, deductedLineCount } = await convertQuoteToInvoice(quote.id);
+      const { withQuoteConvertLock } = await import("@/utils/convertQuoteLock");
+      const { invoiceId, invoiceNumber, stockDeducted, deductedLineCount } =
+        await withQuoteConvertLock(quote.id, () => convertQuoteToInvoice(quote.id));
       const stockMsg = stockDeducted ? ` · ✅ تم خصم المخزون تلقائيًا (${deductedLineCount} صنف)` : "";
       toast.success(`تم تحويل العرض إلى فاتورة ${invoiceNumber} — العرض محفوظ كمقبول${stockMsg}`);
       qc.invalidateQueries({ queryKey: ["quotes-full"] });
@@ -220,6 +225,8 @@ export default function QuoteViewPage() {
         context: `QuoteViewPage.handleConvertToInvoice(quote=${quote?.quote_number || quote?.id})`,
         fallbackMessage: "تعذّر إتمام التحويل — راجع البنود والاتصال ثم أعد المحاولة",
       });
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -400,8 +407,8 @@ export default function QuoteViewPage() {
             </Button>
           )},
           { id: "convert", node: (
-            <Button onClick={handleConvertToInvoice} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs h-9">
-              <ArrowRight size={14} /> تحويل إلى فاتورة
+            <Button onClick={handleConvertToInvoice} disabled={converting} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs h-9">
+              <ArrowRight size={14} /> {converting ? "…جارٍ التحويل" : "تحويل إلى فاتورة"}
             </Button>
           )},
           { id: "transport", node: (
