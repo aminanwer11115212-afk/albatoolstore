@@ -85,6 +85,15 @@ export default function HiddenDevResetDialog() {
         { key: "transporters", label: "حذف كل الناقلين وسجلات الترحيل وربطهم بالعملاء", hint: "يمسح جداول الترحيل والربط + جدول الناقلين نفسه." },
       ],
     },
+    {
+      title: "سجلات النظام — إعادة من الصفر",
+      items: [
+        { key: "stock_movements", label: "سجل حركات المخزون (تعديلات + تحويلات + مرتجعات)", hint: "يحذف stock_adjustments_log و stock_transfers و stock_returns/items — سجل تتبّع المخزون يرجع فارغًا." },
+        { key: "payment_logs", label: "سجل الدفعات والمراجعات وتدقيق الخصومات", hint: "يحذف invoice_revisions و discount_audit_log — الفواتير تبقى، فقط سجلات التعديلات تُمسح." },
+        { key: "statements_log", label: "سجل نشاط كشوفات الحسابات (activity_log)", hint: "يفرّغ activity_log بالكامل." },
+        { key: "bot_logs", label: "سجل بوت الحسابات والتقاطات الفحص", hint: "يحذف bot_audit_log و bot_scan_snapshots — البوت يبدأ فحصه من الصفر." },
+      ],
+    },
   ];
 
   const run = async () => {
