@@ -290,7 +290,7 @@ export default function SideQuotesPage() {
                         <button className="btn-xs btn-success" onClick={() => navigate(`/quotes/side/${q.id}`)}>عرض</button>
                         <button className="btn-xs btn-warning" onClick={() => navigate(`/quotes/side/edit/${q.id}`)}>تعديل</button>
                         <button className="btn-xs btn-info" onClick={() => handlePrintSide(q)}>طباعة</button>
-                        <button className="btn-xs btn-primary" onClick={() => handleConvert(q)}>→ فاتورة</button>
+                        <button className="btn-xs btn-primary" onClick={() => handleConvert(q)} disabled={convertingIds.has(q.id)}>{convertingIds.has(q.id) ? "…" : "→ فاتورة"}</button>
                         <button className="btn-xs" style={{ background:"#8b5cf6", color:"#fff" }} onClick={() => { setTransferringId(q.id); setTransferTarget(""); setTransferNote(""); }}>نقل ملكية</button>
                         <button className="btn-xs" style={{ background:"#0ea5e9", color:"#fff" }} onClick={() => setHistoryOpenId(historyOpenId === q.id ? null : q.id)}>سجل النقل</button>
                         <button className="btn-xs btn-danger" onClick={() => handleDelete(q.id)}>🗑</button>
