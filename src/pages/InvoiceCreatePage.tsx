@@ -1636,8 +1636,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           .neo-quote-scope .header-bar .field .form-control { height: 34px !important; font-size: 13px !important; padding: 4px 8px !important; }
           .neo-quote-scope .header-bar .field label { font-size: 11px !important; margin-bottom: 3px !important; font-weight: 600; color: hsl(var(--foreground)); }
           /* إخفاء مقابض توسيع الأعمدة على الجوال */
-          .neo-quote-scope .header-bar [data-expand-handle],
-          .neo-quote-scope .quick-add-row [data-expand-handle] { display: none !important; }
+          .neo-quote-scope .header-bar .field-expand-btn,
+          .neo-quote-scope .quick-add-row .field-expand-btn { display: none !important; }
 
           /* === Quick-add row: اجعل حقل المنتج وزر + في صف مستقل، ثم بقية الحقول في شبكة === */
           .neo-quote-scope .quick-add-row {
