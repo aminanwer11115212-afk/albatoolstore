@@ -31,6 +31,8 @@ import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 import InvoiceCustomerCreditBanner from "@/components/invoice/InvoiceCustomerCreditBanner";
 import InvoiceAccountingAlert from "@/components/invoice/InvoiceAccountingAlert";
 import InvoiceAuditTab from "@/components/invoice/InvoiceAuditTab";
+import InvoiceConsistencyCheck from "@/components/invoice/InvoiceConsistencyCheck";
+import DeleteInvoiceConfirmDialog from "@/components/invoice/DeleteInvoiceConfirmDialog";
 import { recordInvoiceRevision, diffRows } from "@/utils/invoiceRevisions";
 import { WORKFLOW_STATUSES, type WorkflowStatus, getWorkflowStatus, invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
@@ -62,7 +64,8 @@ export default function InvoiceViewPage() {
   const [statusSaving, setStatusSaving] = useState(false);
   const [convertSaving, setConvertSaving] = useState(false);
   const [editingCell, setEditingCell] = useState<{ index: number; field: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<"document" | "conversion" | "audit">("document");
+  const [activeTab, setActiveTab] = useState<"document" | "conversion" | "audit" | "consistency">("document");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editValue, setEditValue] = useState("");
 
   // Payment form
@@ -310,9 +313,11 @@ export default function InvoiceViewPage() {
   const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => {
     if (!invoice || deleting) return;
-    const label = invoice.invoice_number ? `«${invoice.invoice_number}»` : "";
-    const when = invoice.date ? ` بتاريخ ${invoice.date}` : "";
-    if (!confirm(`هل أنت متأكد من حذف الفاتورة ${label}${when}؟ سيتم إرجاع الكميات إلى المخزون. لا يمكن التراجع.`)) return;
+    // فتح حوار التأكيد الذكي الذي يعرض معاينة الأثر قبل الحذف.
+    setDeleteDialogOpen(true);
+  };
+  const performDelete = async () => {
+    if (!invoice || deleting) return;
     setDeleting(true);
     try {
       const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
