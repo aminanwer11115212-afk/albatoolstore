@@ -647,9 +647,20 @@ export default function CustomerStatementPage() {
               <p className="text-sm text-muted-foreground">المتبقي</p>
               <p className="text-lg font-bold text-destructive tabular-nums">{(totalInvoices - totalPaid).toLocaleString()}</p>
             </div>
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-              <p className="text-sm text-muted-foreground">الرصيد الحالي ({balanceLabel})</p>
-              <p className={`text-lg font-bold tabular-nums ${balanceColor}`}>{balanceDisplay}</p>
+            <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-col justify-between gap-2">
+              <div>
+                <p className="text-sm text-muted-foreground">الرصيد الحالي ({balanceLabel})</p>
+                <p className={`text-lg font-bold tabular-nums ${balanceColor}`}>{balanceDisplay}</p>
+              </div>
+              {Number((selectedCustomer as any)?.credit_balance || 0) > 0.01 && (
+                <button
+                  type="button"
+                  onClick={() => setApplyCreditOpen(true)}
+                  className="text-xs font-semibold text-primary hover:underline text-right"
+                >
+                  تطبيق الرصيد الدائن على فاتورة ←
+                </button>
+              )}
             </div>
           </div>
 
