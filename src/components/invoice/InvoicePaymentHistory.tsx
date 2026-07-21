@@ -45,8 +45,10 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0 }: Pro
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(true);
   const [editing, setEditing] = useState<EditablePayment | null>(null);
+  const [editingCharge, setEditingCharge] = useState<EditableCharge | null>(null);
   const [bump, setBump] = useState(0);
   const { isAdmin } = useUserRole();
+
 
   useEffect(() => {
     let cancelled = false;
