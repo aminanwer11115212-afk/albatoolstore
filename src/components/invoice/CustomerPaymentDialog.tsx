@@ -969,6 +969,7 @@ export default function CustomerPaymentDialog({
                   </button>
                 </div>
                 <Input
+                  ref={creditUseRef}
                   data-pay-field
                   type="number"
                   inputMode="decimal"
