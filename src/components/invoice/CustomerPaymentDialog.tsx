@@ -402,7 +402,7 @@ export default function CustomerPaymentDialog({
       // (a) دفعة نقدية على الفاتورة
       if (split.applied > 0) {
         const baseNote = notes || (invoiceNumber ? `دفعة على الفاتورة ${invoiceNumber}` : "دفعة من العميل");
-        const description = referenceNo ? `${baseNote} — مرجع: ${referenceNo}` : baseNote;
+        const description = referenceNo ? `${baseNote} — رقم العملية: ${referenceNo}` : baseNote;
         const { error: txErr } = await (supabase as any).from("transactions").insert({
           type: "income",
           category: "customer_payment",
@@ -598,7 +598,7 @@ export default function CustomerPaymentDialog({
             (notes ? `${notes} — ` : "") +
             `دفعة ${n.toLocaleString()} (${methodLabel(method)})` +
             (creditApplied > 0 ? ` + رصيد دائن ${creditApplied.toLocaleString()}` : "") +
-            (referenceNo ? ` — مرجع ${referenceNo}` : "") +
+            (referenceNo ? ` — رقم العملية ${referenceNo}` : "") +
             (disc > 0 ? ` — خصم ${disc.toLocaleString()}` : ""),
         });
       } catch (e) {

@@ -96,7 +96,7 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0 }: Pro
                 const disc = Number(s.discount || 0);
                 const acc = s.account_name || "—";
                 const bank = s.bank_name ? ` — ${s.bank_name}` : "";
-                const ref = s.reference_no ? ` — مرجع ${s.reference_no}` : "";
+                const ref = s.reference_no ? ` — رقم العملية ${s.reference_no}` : "";
                 const when = new Date(r.created_at).toLocaleString("ar-EG");
                 return (
                   <li key={r.id} className="p-2 space-y-0.5">
