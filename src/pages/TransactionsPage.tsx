@@ -261,6 +261,12 @@ export default function TransactionsPage() {
           </div>
         </div>
       </div>
+      <EditPaymentDialog
+        open={!!editingPayment}
+        tx={editingPayment}
+        onClose={() => setEditingPayment(null)}
+        onSaved={() => window.dispatchEvent(new Event("invoice-payments:changed"))}
+      />
     </div>
   );
 }
