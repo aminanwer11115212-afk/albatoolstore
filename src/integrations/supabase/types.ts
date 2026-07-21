@@ -3050,6 +3050,10 @@ export type Database = {
         Args: { _supplier_id: string }
         Returns: undefined
       }
+      refund_payment_to_customer_credit: {
+        Args: { _note?: string; _refund_amount: number; _tx_id: string }
+        Returns: Json
+      }
       restore_purchase_stock_once: { Args: { _po_id: string }; Returns: Json }
       reverse_customer_charge: { Args: { _group_id: string }; Returns: Json }
       workflow_rank: { Args: { _s: string }; Returns: number }
