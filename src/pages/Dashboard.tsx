@@ -2,8 +2,7 @@ import {
   useDashboardStats, useInvoicesWithCustomers, useLowStockProducts,
   useRecentTransactions, useQuotesWithCustomers, useLatestExchangeRates
 } from "@/hooks/useData";
-import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Plus, CreditCard, Percent, FileText, Users, Package,
   DollarSign, AlertTriangle
@@ -11,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { supabase } from "@/integrations/supabase/client";
 import DashboardStockAlert from "@/components/dashboard/DashboardStockAlert";
 import DashboardRecentInvoices from "@/components/dashboard/DashboardRecentInvoices";
 import DashboardRecentQuotes from "@/components/dashboard/DashboardRecentQuotes";
@@ -31,42 +29,9 @@ export default function Dashboard() {
   const { data: quotes, isLoading: quotesLoading } = useQuotesWithCustomers();
   const [chargeOpen, setChargeOpen] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
-  const [ratesRefresh, setRatesRefresh] = useState(0);
 
-  // Latest exchange rates applied across the system
-  const [rates, setRates] = useState<{ code: string; rate: number; date: string }[]>([]);
-  useEffect(() => {
-    (async () => {
-      // First try the dedicated exchange_rates table (latest per currency)
-      const { data: er } = await supabase
-        .from("exchange_rates")
-        .select("currency_code, rate_to_base, effective_date")
-        .order("effective_date", { ascending: false })
-        .limit(20);
-      if (er && er.length) {
-        const seen = new Set<string>();
-        const latest: { code: string; rate: number; date: string }[] = [];
-        for (const r of er) {
-          if (seen.has(r.currency_code)) continue;
-          seen.add(r.currency_code);
-          latest.push({ code: r.currency_code, rate: Number(r.rate_to_base), date: r.effective_date });
-        }
-        setRates(latest);
-        return;
-      }
-      // Fallback: most recent invoice with a foreign exchange rate
-      const { data: inv } = await supabase
-        .from("invoices")
-        .select("currency_code, exchange_rate_to_base, date")
-        .not("exchange_rate_to_base", "is", null)
-        .order("date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (inv && inv.exchange_rate_to_base) {
-        setRates([{ code: inv.currency_code || "USD", rate: Number(inv.exchange_rate_to_base), date: inv.date }]);
-      }
-    })();
-  }, [ratesRefresh]);
+  // أحدث أسعار الصرف — hook موحّد يبطل تلقائياً بعد أي تحديث من ExchangeRateDialog
+  const { data: rates = [] } = useLatestExchangeRates();
 
   return (
     <div className="space-y-4" dir="rtl">
