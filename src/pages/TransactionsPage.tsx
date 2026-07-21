@@ -211,10 +211,25 @@ export default function TransactionsPage() {
                     <td className="px-4 py-3 text-foreground">{methodMap[t.method] || t.method || "-"}</td>
                     <td className="px-4 py-3 print:hidden">
                       <div className="flex items-center gap-1">
+                        {isAdmin && t.category === "customer_payment" && (
+                          <button
+                            onClick={() => setEditingPayment({
+                              id: t.id,
+                              amount: Number(t.amount || 0),
+                              reference_id: t.reference_id,
+                              customer_id: t.customer_id,
+                              description: t.description,
+                              method: t.method,
+                              account_id: t.account_id,
+                              date: t.date,
+                            })}
+                            className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 inline-flex items-center gap-1 min-h-[40px]"
+                            title="تعديل هذه الدفعة"
+                          >
+                            <Pencil size={12} /> تعديل
+                          </button>
+                        )}
                         <button onClick={async () => {
-                          // منع الحذف الخام لمعاملات مرتبطة بفواتير/شحن رصيد لتفادي تشويش الأرصدة.
-                          // القاعدة: دفعات/رصيد العملاء تُلغى من صفحة تفاصيل العميل (زر «إلغاء الشحنة»)
-                          // أو بحذف الفاتورة نفسها (التي تحوّل الدفعة إلى رصيد دائن تلقائياً).
                           if (t.category === "customer_payment" || t.category === "customer_credit") {
                             toast.error("لا يمكن حذف دفعة/شحن رصيد من هنا. استخدم «إلغاء الشحنة» في تفاصيل العميل، أو احذف الفاتورة المرتبطة.", { duration: 6000 });
                             return;
