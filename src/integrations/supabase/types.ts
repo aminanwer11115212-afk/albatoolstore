@@ -3091,7 +3091,7 @@ export type Database = {
       admin_reset_transactional_data: { Args: { _scope: Json }; Returns: Json }
       advance_invoice_workflow: {
         Args: { _invoice_id: string; _reason: string; _target: string }
-        Returns: undefined
+        Returns: Json
       }
       advance_invoke_safe: { Args: { _id: string }; Returns: undefined }
       allocate_customer_charge: {
