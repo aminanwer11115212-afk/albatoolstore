@@ -507,6 +507,105 @@ export default function StockTrackingPage() {
     }
   };
 
+  const exportCsv = () => {
+    try {
+      const headers = ["التاريخ","الوقت","النوع","المنتج","المستودع","الكمية","رصيد بعد","المستند","رقم العملية","الجهة","ملاحظات"];
+      const escapeCell = (v: any) => {
+        const s = String(v ?? "").replace(/"/g, '""');
+        return /[",\n]/.test(s) ? `"${s}"` : s;
+      };
+      const lines = [headers.join(",")];
+      rowsWithBalance.forEach((m) => {
+        lines.push([
+          m.date,
+          m.created_at ? new Date(m.created_at).toLocaleTimeString("ar-EG") : "",
+          typeLabel[m.type],
+          m.product_name,
+          m.warehouse_name,
+          m.qty,
+          m.balance_after ?? "",
+          m.doc_number,
+          m.doc_ref ?? "",
+          m.party_name,
+          m.reason || "",
+        ].map(escapeCell).join(","));
+      });
+      // UTF-8 BOM so Excel opens Arabic correctly
+      const csv = "\uFEFF" + lines.join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `stock-movements-${from}_${to}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("تم تصدير CSV");
+    } catch (e: any) {
+      toast.error(e?.message || "فشل تصدير CSV");
+    }
+  };
+
+  /**
+   * فحص تناسق الأرصدة: يحسب الرصيد المتوقع لكل منتج من مجموع كل حركاته منذ البداية
+   * ويقارنه بـ products.stock_quantity الفعلي، ويعرض الفوارق.
+   */
+  const runConsistencyCheck = async () => {
+    if (checking) return;
+    setChecking(true);
+    const tId = toast.loading("جاري فحص تناسق الأرصدة...");
+    try {
+      const [inv, ret, pur, trn, adj, prods] = await Promise.all([
+        supabase.from("invoice_items")
+          .select("product_id, quantity, invoices!inner(status)")
+          .neq("invoices.status", "cancelled"),
+        supabase.from("stock_return_items").select("product_id, quantity"),
+        supabase.from("purchase_order_items")
+          .select("product_id, quantity, purchase_orders!inner(status)")
+          .neq("purchase_orders.status", "cancelled"),
+        supabase.from("stock_transfers").select("product_id, quantity, from_warehouse_id, to_warehouse_id"),
+        supabase.from("stock_adjustments_log").select("product_id, delta"),
+        supabase.from("products").select("id, name, stock_quantity"),
+      ]);
+      for (const r of [inv, ret, pur, trn, adj, prods]) {
+        if ((r as any).error) throw (r as any).error;
+      }
+      const expected = new Map<string, number>();
+      const bump = (pid: string | null, delta: number) => {
+        if (!pid) return;
+        expected.set(pid, (expected.get(pid) || 0) + delta);
+      };
+      (inv.data || []).forEach((r: any) => bump(r.product_id, -Number(r.quantity || 0)));
+      (ret.data || []).forEach((r: any) => bump(r.product_id, +Number(r.quantity || 0)));
+      (pur.data || []).forEach((r: any) => bump(r.product_id, +Number(r.quantity || 0)));
+      // التحويلات لا تغيّر إجمالي الرصيد على مستوى المنتج (صادر+وارد=0)، لذلك تُتجاهل هنا.
+      (adj.data || []).forEach((r: any) => bump(r.product_id, Number(r.delta || 0)));
+
+      const mismatches: Array<{ product_id: string; name: string; expected: number; actual: number; diff: number }> = [];
+      let checkedCount = 0;
+      (prods.data || []).forEach((p: any) => {
+        checkedCount++;
+        const exp = expected.get(p.id) || 0;
+        const actual = Number(p.stock_quantity || 0);
+        const diff = actual - exp;
+        if (Math.abs(diff) > 0.0001) {
+          mismatches.push({ product_id: p.id, name: p.name || "—", expected: exp, actual, diff });
+        }
+      });
+      const ok = mismatches.length === 0;
+      setConsistencyResult({ checked: checkedCount, mismatches, ok });
+      if (ok) toast.success("الأرصدة متطابقة", { id: tId });
+      else toast.warning(`تم رصد ${mismatches.length} فارقاً`, { id: tId });
+    } catch (e: any) {
+      toast.error(e?.message || "فشل الفحص", { id: tId });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+
+
 
 
   const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment", "invoice_delete_restore"];
