@@ -1115,7 +1115,7 @@ export default function CustomerPaymentDialog({
 
       {/* نافذة تأكيد قبل الحفظ */}
       <Dialog open={confirmOpen} onOpenChange={(v) => !saving && setConfirmOpen(v)}>
-        <DialogContent className="max-w-sm" dir="rtl">
+        <DialogContent className="max-w-sm" dir="rtl" onKeyDown={onConfirmKeyDown}>
           <DialogHeader>
             <DialogTitle>تأكيد تسجيل الدفعة</DialogTitle>
           </DialogHeader>
