@@ -66,6 +66,31 @@ type Snapshot = {
   source: string;
 };
 
+type HealthReport = {
+  ok: boolean;
+  run_at: string;
+  total: number;
+  sections: {
+    invoice_anomalies: number;
+    customer_balance_drift: number;
+    supplier_balance_drift: number;
+    account_balance_drift: number;
+    pos_leak: number;
+    stock_drift: number;
+    incomplete_returns: number;
+  };
+};
+
+const SECTION_META: Record<keyof HealthReport["sections"], { label: string; hint: string }> = {
+  invoice_anomalies:       { label: "اختلالات الفواتير",       hint: "دفعات مفقودة/مكررة/تجاوز إجمالي" },
+  customer_balance_drift:  { label: "انحراف رصيد العملاء",     hint: "customers.balance مخالف للحساب" },
+  supplier_balance_drift:  { label: "انحراف رصيد الموردين",    hint: "suppliers.balance مخالف للحساب" },
+  account_balance_drift:   { label: "انحراف رصيد الحسابات",   hint: "accounts.balance مخالف لحركات المعاملات" },
+  pos_leak:                { label: "تسرّب مبيعات الكاش",      hint: "فاتورة POS مرتبطة بعميل حقيقي" },
+  stock_drift:             { label: "انحراف كميات المخزون",    hint: "products.stock_quantity مخالف لسجل الحركات" },
+  incomplete_returns:      { label: "مرتجعات غير مكتملة",      hint: "مرتجع بدون قيد إرجاع مخزون" },
+};
+
 const ALL_KINDS = [
   { key: "missing_payment_trace", label: "دفعة مفقودة", color: "border-amber-400 bg-amber-50 text-amber-900" },
   { key: "duplicate_payment", label: "دفعة مكررة", color: "border-destructive/40 bg-destructive/5 text-destructive" },
@@ -106,20 +131,30 @@ export default function AccountsSafetyBotPage() {
     kinds: kinds.length ? kinds : null,
   }), [dateFrom, dateTo, kinds]);
 
+  // Health v3
+  const [health, setHealth] = useState<HealthReport | null>(null);
+  const [autoRepairEnabled, setAutoRepairEnabled] = useState(false);
+  const [savingAutoFlag, setSavingAutoFlag] = useState(false);
+  const [repairingHealth, setRepairingHealth] = useState(false);
+
   const runScan = useCallback(async () => {
     setScanning(true);
     try {
-      const [scanRes, invRes, snapRes] = await Promise.all([
+      const [scanRes, invRes, snapRes, healthRes, cs] = await Promise.all([
         (supabase as any).rpc("bot_scan_invoice_anomalies_v2", {
           _from: filters.from, _to: filters.to, _kinds: filters.kinds,
         }),
         runAllInvariants(),
         (supabase as any).from("bot_scan_snapshots").select("*").order("run_at", { ascending: false }).limit(1).maybeSingle(),
+        (supabase as any).rpc("bot_scan_health_v3"),
+        (supabase as any).from("company_settings").select("bot_auto_repair_enabled").limit(1).maybeSingle(),
       ]);
       if (scanRes.error) throw scanRes.error;
       setAnomalies((scanRes.data || []) as Anomaly[]);
       setInvariants(invRes);
       setLastSnapshot((snapRes.data as Snapshot) || null);
+      setHealth((healthRes.data as HealthReport) || null);
+      setAutoRepairEnabled(!!cs.data?.bot_auto_repair_enabled);
       setLastRunAt(new Date().toLocaleString("ar"));
       setPreviews({});
     } catch (e: any) {
@@ -128,6 +163,45 @@ export default function AccountsSafetyBotPage() {
       setScanning(false);
     }
   }, [filters.from, filters.to, filters.kinds]);
+
+  const toggleAutoRepair = async (next: boolean) => {
+    if (!isAdmin) { toast.error("الإصلاح الذاتي مقتصر على admin."); return; }
+    setSavingAutoFlag(true);
+    try {
+      const { data: row } = await (supabase as any).from("company_settings").select("id").limit(1).maybeSingle();
+      if (!row?.id) throw new Error("company_settings not found");
+      const { error } = await (supabase as any).from("company_settings")
+        .update({ bot_auto_repair_enabled: next }).eq("id", row.id);
+      if (error) throw error;
+      setAutoRepairEnabled(next);
+      toast.success(next ? "تم تفعيل الإصلاح الذاتي (كل 6 ساعات)" : "تم إيقاف الإصلاح الذاتي");
+    } catch (e: any) {
+      toast.error(`فشل: ${e?.message || e}`);
+    } finally {
+      setSavingAutoFlag(false);
+    }
+  };
+
+  const repairHealth = async (dry = false) => {
+    if (!isAdmin) { toast.error("مقتصر على admin."); return; }
+    if (!dry && !confirm("تنفيذ الإصلاح الشامل على كل الأقسام؟")) return;
+    setRepairingHealth(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("bot_repair_health_v3", {
+        _dry_run: dry, _sections: null, _note: null,
+      });
+      if (error) throw error;
+      if (dry) toast.info("محاكاة الفحص الشامل انتهت — راجع سجل التدقيق");
+      else toast.success(`تم الإصلاح الشامل — ${data?.details ? Object.keys(data.details).length : 0} قسم`);
+      invalidateAll();
+      await runScan();
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      toast.error(msg.includes("unauthorized_admin_only") ? "مرفوض — يحتاج admin" : `فشل: ${msg}`);
+    } finally {
+      setRepairingHealth(false);
+    }
+  };
 
   const loadAudit = useCallback(async () => {
     const { data, error } = await (supabase as any)
@@ -345,6 +419,56 @@ export default function AccountsSafetyBotPage() {
                   {!isAdmin && <Lock className="h-3 w-3" />}
                 </button>
               </div>
+            </div>
+          </section>
+
+          {/* Health v3 — الفحص الشامل للنظام */}
+          <section className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent overflow-hidden">
+            <header className="px-4 py-3 border-b border-border flex items-center gap-2 justify-between flex-wrap">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className={`h-4 w-4 ${health?.ok ? "text-emerald-600" : "text-destructive"}`} />
+                <h2 className="font-bold text-sm">
+                  الفحص الشامل للنظام {health && <span className="text-muted-foreground">— إجمالي {health.total} اختلال</span>}
+                </h2>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className={`inline-flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded border ${autoRepairEnabled ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-border bg-background"} ${isAdmin ? "cursor-pointer" : "opacity-60 cursor-not-allowed"}`}>
+                  <input type="checkbox" className="h-4 w-4 accent-emerald-600"
+                    disabled={!isAdmin || savingAutoFlag}
+                    checked={autoRepairEnabled}
+                    onChange={e => toggleAutoRepair(e.target.checked)} />
+                  الإصلاح الذاتي التلقائي كل 6 ساعات
+                  {!isAdmin && <Lock className="h-3 w-3" />}
+                </label>
+                <button onClick={() => repairHealth(true)} disabled={repairingHealth || !isAdmin}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-border bg-background hover:bg-muted text-xs font-bold disabled:opacity-60">
+                  {repairingHealth ? <Loader2 className="h-3 w-3 animate-spin" /> : <PlayCircle className="h-3 w-3" />}
+                  محاكاة الإصلاح الشامل
+                </button>
+                <button onClick={() => repairHealth(false)} disabled={repairingHealth || !isAdmin || (health?.total || 0) === 0}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-destructive text-destructive-foreground hover:opacity-90 text-xs font-bold disabled:opacity-60">
+                  {repairingHealth ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wrench className="h-3 w-3" />}
+                  إصلاح شامل الآن
+                  {!isAdmin && <Lock className="h-3 w-3" />}
+                </button>
+              </div>
+            </header>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-3">
+              {health && (Object.keys(SECTION_META) as Array<keyof HealthReport["sections"]>).map(key => {
+                const meta = SECTION_META[key];
+                const count = health.sections[key] || 0;
+                const bad = count > 0;
+                return (
+                  <div key={key} className={`rounded-lg border p-3 ${bad ? "border-destructive/40 bg-destructive/5" : "border-emerald-300 bg-emerald-50"}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground">{meta.label}</span>
+                      {bad ? <AlertTriangle className="h-4 w-4 text-destructive" /> : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                    </div>
+                    <div className={`text-2xl font-extrabold tabular-nums mt-1 ${bad ? "text-destructive" : "text-emerald-700"}`}>{count}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{meta.hint}</div>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
