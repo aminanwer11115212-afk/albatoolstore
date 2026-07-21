@@ -113,32 +113,77 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0 }: Pro
                 <div className="border-b border-border/70 bg-muted/20 p-2 space-y-1">
                   <div className="text-[10px] font-semibold text-muted-foreground">الدفعات النشطة (قابلة للتعديل)</div>
                   <ul className="divide-y divide-border/60">
-                    {live.map((t) => (
-                      <li key={t.id} className="flex items-center justify-between gap-2 py-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <span className="font-bold tabular-nums text-primary">{Number(t.amount || 0).toLocaleString()}</span>
-                          <span className="text-[11px] text-muted-foreground">{methodLabel(t.method || "")}</span>
-                          <span className="text-[10px] text-muted-foreground">{t.date || ""}</span>
-                        </div>
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] hover:bg-primary/10 hover:border-primary/40"
-                          onClick={() => setEditing({
-                            id: t.id,
-                            amount: Number(t.amount || 0),
-                            reference_id: t.reference_id,
-                            customer_id: t.customer_id,
-                            description: t.description,
-                            method: t.method,
-                            account_id: t.account_id,
-                            date: t.date,
-                          })}
-                          data-testid="edit-invoice-payment-btn"
-                        >
-                          <Pencil size={11} /> تعديل
-                        </button>
-                      </li>
-                    ))}
+                    {live.map((t) => {
+                      const alloc = t.allocation || {};
+                      const groupId: string | null = alloc.group_id || null;
+                      const isCharge = !!groupId;
+                      return (
+                        <li key={t.id} className="flex items-center justify-between gap-2 py-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="font-bold tabular-nums text-primary">{Number(t.amount || 0).toLocaleString()}</span>
+                            <span className="text-[11px] text-muted-foreground">{methodLabel(t.method || "")}</span>
+                            <span className="text-[10px] text-muted-foreground">{t.date || ""}</span>
+                            {isCharge && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                من شحن رصيد
+                              </span>
+                            )}
+                          </div>
+                          {isCharge ? (
+                            <button
+                              type="button"
+                              className="flex items-center gap-1 rounded-md border border-emerald-400/60 px-2 py-0.5 text-[11px] hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                              onClick={async () => {
+                                if (!groupId || !t.customer_id) return;
+                                // اجلب كل بنود المجموعة لتحديد الاستهلاك على فواتير أخرى
+                                const { data: groupRows } = await (supabase as any)
+                                  .from("transactions")
+                                  .select("amount, allocation, method, account_id, date")
+                                  .eq("customer_id", t.customer_id)
+                                  .contains("allocation", { group_id: groupId });
+                                const rows = (groupRows as any[]) || [];
+                                const totalAmount = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
+                                const otherInvoiceItems = rows.filter((r) => {
+                                  const a = r.allocation || {};
+                                  return a.kind !== "surplus" && a.invoice_id && a.invoice_id !== invoiceId;
+                                });
+                                setEditingCharge({
+                                  groupId,
+                                  customerId: t.customer_id,
+                                  amount: totalAmount || Number(t.amount || 0),
+                                  method: t.method,
+                                  accountId: t.account_id,
+                                  date: t.date,
+                                  hasConsumption: otherInvoiceItems.length > 0,
+                                });
+                              }}
+                              data-testid="edit-invoice-charge-btn"
+                            >
+                              <Wallet size={11} /> تعديل شحن الرصيد
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] hover:bg-primary/10 hover:border-primary/40"
+                              onClick={() => setEditing({
+                                id: t.id,
+                                amount: Number(t.amount || 0),
+                                reference_id: t.reference_id,
+                                customer_id: t.customer_id,
+                                description: t.description,
+                                method: t.method,
+                                account_id: t.account_id,
+                                date: t.date,
+                              })}
+                              data-testid="edit-invoice-payment-btn"
+                            >
+                              <Pencil size={11} /> تعديل
+                            </button>
+                          )}
+                        </li>
+                      );
+                    })}
+
                   </ul>
                 </div>
               )}
