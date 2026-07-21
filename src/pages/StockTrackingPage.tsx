@@ -868,6 +868,116 @@ export default function StockTrackingPage() {
         </CardContent>
       </Card>
 
+      {/* تفاصيل استرجاع حذف فاتورة */}
+      <Dialog open={!!detailMove} onOpenChange={(o) => !o && setDetailMove(null)}>
+        <DialogContent dir="rtl" className="font-cairo">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-sky-600" />
+              تفاصيل استرجاع مخزون
+            </DialogTitle>
+            <DialogDescription>
+              تم إرجاع الكمية إلى المخزون عند حذف الفاتورة الأصلية.
+            </DialogDescription>
+          </DialogHeader>
+          {detailMove && (
+            <div className="space-y-3 text-sm">
+              <DetailRow label="رقم الفاتورة المحذوفة" value={detailMove.doc_number} />
+              <DetailRow label="المنتج" value={detailMove.product_name} />
+              <DetailRow label="المستودع" value={detailMove.warehouse_name} />
+              <DetailRow
+                label="الكمية المُعادة"
+                value={
+                  <span className="font-bold text-emerald-600">
+                    +{detailMove.qty.toLocaleString("ar-EG-u-nu-latn")}
+                  </span>
+                }
+              />
+              <DetailRow
+                label="تاريخ الحذف"
+                value={
+                  detailMove.created_at
+                    ? new Date(detailMove.created_at).toLocaleString("ar-EG-u-nu-latn")
+                    : arDate(detailMove.date)
+                }
+              />
+              {detailMove.doc_ref && (
+                <DetailRow
+                  label="رقم العملية"
+                  value={<span className="font-mono text-xs">#{detailMove.doc_ref}</span>}
+                />
+              )}
+              {detailMove.reason && (
+                <div className="border-t pt-2">
+                  <div className="text-xs text-muted-foreground mb-1">السبب / الملاحظة</div>
+                  <div className="text-foreground">{detailMove.reason}</div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailMove(null)}>إغلاق</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* نتيجة فحص تناسق الأرصدة */}
+      <Dialog open={!!consistencyResult} onOpenChange={(o) => !o && setConsistencyResult(null)}>
+        <DialogContent dir="rtl" className="font-cairo max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {consistencyResult?.ok ? (
+                <><CheckCircle2 className="h-5 w-5 text-emerald-600" /> الأرصدة متطابقة</>
+              ) : (
+                <><AlertTriangle className="h-5 w-5 text-amber-600" /> فوارق في الأرصدة</>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              تمّت مقارنة رصيد كل منتج بمجموع كل حركاته (بيع/شراء/إرجاع/تعديل) منذ البداية.
+              فُحص {consistencyResult?.checked ?? 0} منتج.
+            </DialogDescription>
+          </DialogHeader>
+          {consistencyResult && !consistencyResult.ok && (
+            <div className="max-h-[400px] overflow-y-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">المنتج</TableHead>
+                    <TableHead className="text-right">المتوقع</TableHead>
+                    <TableHead className="text-right">الفعلي</TableHead>
+                    <TableHead className="text-right">الفارق</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {consistencyResult.mismatches.map((m) => (
+                    <TableRow key={m.product_id}>
+                      <TableCell className="font-medium">{m.name}</TableCell>
+                      <TableCell className="tabular-nums">{m.expected.toLocaleString("ar-EG-u-nu-latn")}</TableCell>
+                      <TableCell className="tabular-nums">{m.actual.toLocaleString("ar-EG-u-nu-latn")}</TableCell>
+                      <TableCell className={`tabular-nums font-bold ${m.diff > 0 ? "text-emerald-600" : "text-destructive"}`}>
+                        {m.diff > 0 ? "+" : ""}{m.diff.toLocaleString("ar-EG-u-nu-latn")}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          {consistencyResult?.ok && (
+            <div className="py-4 text-center text-emerald-700 dark:text-emerald-400">
+              كل الأرصدة متطابقة مع سجل الحركات الكامل.
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConsistencyResult(null)}>إغلاق</Button>
+            <Button onClick={runConsistencyCheck} disabled={checking}>
+              {checking ? "جاري..." : "إعادة الفحص"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       <style>{`
         @media print {
           .no-print { display: none !important; }
