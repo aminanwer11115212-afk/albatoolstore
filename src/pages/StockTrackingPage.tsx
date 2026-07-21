@@ -495,7 +495,7 @@ export default function StockTrackingPage() {
     }
   };
 
-  };
+
 
   const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment", "invoice_delete_restore"];
 
