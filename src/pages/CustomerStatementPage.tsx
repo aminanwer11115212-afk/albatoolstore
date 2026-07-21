@@ -203,7 +203,7 @@ export default function CustomerStatementPage() {
   // دفعة قابلة للتعديل: قيد دفع نقدي/بنكي مرتبط بفاتورة (لا استهلاك رصيد دائن)
   const isRevisablePayment = (t: any): boolean =>
     t.category === "customer_payment" && t.method !== "credit_balance" && !!t.reference_id;
-  const [reviseTx, setReviseTx] = useState<RevisableTx | null>(null);
+  const [reviseTx, setReviseTx] = useState<EditablePayment | null>(null);
   const [applyCreditOpen, setApplyCreditOpen] = useState(false);
   const refreshAfterRevise = () => {
     qc.invalidateQueries({ queryKey: ["customer-transactions", selectedCustomerId] });
