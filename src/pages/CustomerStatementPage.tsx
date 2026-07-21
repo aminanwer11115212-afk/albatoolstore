@@ -1033,7 +1033,7 @@ export default function CustomerStatementPage() {
                             {isRevisablePayment(t) ? (
                               <button
                                 type="button"
-                                onClick={() => setReviseTx({ id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id, customer_id: t.customer_id, description: t.description })}
+                                onClick={() => setReviseTx({ id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id, customer_id: t.customer_id, description: t.description, method: (t as any).method, account_id: (t as any).account_id, date: (t as any).date })}
                                 className="text-xs text-primary hover:underline"
                                 title="تعديل مبلغ/خصم هذه الدفعة"
                               >
