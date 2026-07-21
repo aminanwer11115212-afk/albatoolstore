@@ -3243,18 +3243,29 @@ export type Database = {
       }
       restore_purchase_stock_once: { Args: { _po_id: string }; Returns: Json }
       reverse_customer_charge: { Args: { _group_id: string }; Returns: Json }
-      transfer_stock_once: {
-        Args: {
-          _date?: string
-          _from_warehouse: string
-          _notes?: string
-          _product_id: string
-          _quantity: number
-          _to_warehouse: string
-          _transfer_id?: string
-        }
-        Returns: Json
-      }
+      transfer_stock_once:
+        | {
+            Args: {
+              _date?: string
+              _from_warehouse: string
+              _notes?: string
+              _product_id: string
+              _quantity: number
+              _to_warehouse: string
+              _transfer_id?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _from_warehouse: string
+              _notes?: string
+              _product_id: string
+              _quantity: number
+              _to_warehouse: string
+            }
+            Returns: Json
+          }
       workflow_rank: { Args: { _s: string }; Returns: number }
     }
     Enums: {
