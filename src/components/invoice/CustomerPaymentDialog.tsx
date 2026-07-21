@@ -287,7 +287,7 @@ export default function CustomerPaymentDialog({
       if (k === "n") { e.preventDefault(); setMethod("cash"); return; }
       if (k === "k" && (custBalance?.credit || 0) > 0.01) { e.preventDefault(); applyAllCredit(); return; }
       if (k === "1") { e.preventDefault(); focusByRef(amountRef); return; }
-      if (k === "2") { e.preventDefault(); focusByRef(discountRef); return; }
+      if (k === "2") { e.preventDefault(); const el = document.querySelector<HTMLElement>('[data-pay-scope] [data-pay-anchor="discount"] input'); el?.focus(); (el as any)?.select?.(); return; }
       if (k === "3") { e.preventDefault(); focusByRef(creditUseRef); return; }
       if (k === "4") { e.preventDefault(); focusByRef(dateRef); return; }
       if (k === "5") { e.preventDefault(); focusByRef(referenceRef); return; }
