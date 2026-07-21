@@ -21,7 +21,7 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { printStockMovements } from "@/utils/stockMovementsPrint";
 
-type MoveType = "sale" | "return" | "purchase" | "transfer_in" | "transfer_out" | "manual_adjustment";
+type MoveType = "sale" | "return" | "purchase" | "transfer_in" | "transfer_out" | "manual_adjustment" | "invoice_delete_restore";
 
 interface Move {
   id: string;
@@ -204,23 +204,32 @@ function useStockMovements(from: string, to: string) {
 
       (adj.data || []).forEach((r: any) => {
         const productName = productMap.get(r.product_id)?.name || "—";
+        const isInvoiceDelete = String(r.source || "") === "invoice_delete";
+        // Try to extract invoice number from reason text: "...حذف الفاتورة INV-XXXX"
+        const invMatch = isInvoiceDelete && r.reason
+          ? String(r.reason).match(/الفاتورة\s+(\S+)/)
+          : null;
+        const invNo = invMatch?.[1] || null;
         moves.push({
           id: `adj-${r.id}`,
           date: (r.created_at || "").slice(0, 10),
           created_at: r.created_at,
-          type: "manual_adjustment",
+          type: isInvoiceDelete ? "invoice_delete_restore" : "manual_adjustment",
           product_id: r.product_id,
           product_name: productName,
           warehouse_id: null,
           warehouse_name: productWhName(r.product_id),
           qty: Number(r.delta || 0),
-          doc_number: `ADJ-${String(r.id).slice(0, 6).toUpperCase()}`,
+          doc_number: isInvoiceDelete
+            ? (invNo || `DEL-${String(r.reference_id || r.id).slice(0, 6).toUpperCase()}`)
+            : `ADJ-${String(r.id).slice(0, 6).toUpperCase()}`,
           doc_id: r.id,
           doc_href: null,
-          party_name: r.source || "manual",
+          party_name: isInvoiceDelete ? "فاتورة محذوفة" : (r.source || "manual"),
           reason: r.reason,
         });
       });
+
 
       // ترتيب زمني تنازلي (الأحدث أولاً)
       moves.sort((a, b) => {
@@ -241,6 +250,7 @@ const typeLabel: Record<MoveType, string> = {
   transfer_in: "تحويل وارد",
   transfer_out: "تحويل صادر",
   manual_adjustment: "تعديل يدوي",
+  invoice_delete_restore: "استرجاع حذف فاتورة",
 };
 
 const typeBadgeCls: Record<MoveType, string> = {
@@ -250,7 +260,9 @@ const typeBadgeCls: Record<MoveType, string> = {
   transfer_in: "bg-primary/15 text-primary border-primary/30",
   transfer_out: "bg-primary/10 text-primary border-primary/30",
   manual_adjustment: "bg-muted text-foreground border-border",
+  invoice_delete_restore: "bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30",
 };
+
 
 export default function StockTrackingPage() {
   const [from, setFrom] = useState(daysAgoISO(6));
@@ -424,7 +436,7 @@ export default function StockTrackingPage() {
     }
   };
 
-  const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment"];
+  const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment", "invoice_delete_restore"];
 
   return (
     <div dir="rtl" className="p-3 sm:p-6 space-y-4 font-cairo">
