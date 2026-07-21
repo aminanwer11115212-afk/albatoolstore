@@ -36,10 +36,12 @@ interface Move {
   doc_number: string;
   doc_id: string | null;
   doc_href?: string | null;
+  doc_ref?: string | null; // short reference/operation id
   party_name: string;
   is_pos?: boolean;
   reason?: string | null;
 }
+
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const daysAgoISO = (n: number) => {
