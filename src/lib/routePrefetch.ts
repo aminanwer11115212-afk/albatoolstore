@@ -58,6 +58,7 @@ const map: Record<string, Importer> = {
   "/accounts": () => import("@/pages/AccountsPage"),
   "/accounts/add": () => import("@/pages/AccountsPage"),
   "/accounts/balance-sheet": () => import("@/pages/BalanceSheetPage"),
+  "/accounts/safety-bot": () => import("@/pages/AccountsSafetyBotPage"),
   "/transactions": () => import("@/pages/TransactionsPage"),
   "/transactions/add": () => import("@/pages/TransactionsPage"),
   "/transactions/transfer": () => import("@/pages/TransferPage"),
