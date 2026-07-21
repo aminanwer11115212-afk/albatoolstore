@@ -3007,6 +3007,21 @@ export type Database = {
         Args: { _invoice_id: string }
         Returns: undefined
       }
+      bot_repair_all: { Args: never; Returns: Json }
+      bot_repair_invoice: { Args: { _invoice_id: string }; Returns: Json }
+      bot_scan_invoice_anomalies: {
+        Args: never
+        Returns: {
+          customer_id: string
+          delta: number
+          invoice_id: string
+          invoice_number: string
+          kind: string
+          paid_amount: number
+          sum_payments: number
+          total: number
+        }[]
+      }
       check_geo_grants: { Args: never; Returns: Json }
       current_user_login_status: { Args: never; Returns: string }
       decrement_product_stock: {
