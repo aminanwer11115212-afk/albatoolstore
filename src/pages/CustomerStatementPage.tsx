@@ -204,6 +204,7 @@ export default function CustomerStatementPage() {
   const isRevisablePayment = (t: any): boolean =>
     t.category === "customer_payment" && t.method !== "credit_balance" && !!t.reference_id;
   const [reviseTx, setReviseTx] = useState<RevisableTx | null>(null);
+  const [applyCreditOpen, setApplyCreditOpen] = useState(false);
   const refreshAfterRevise = () => {
     qc.invalidateQueries({ queryKey: ["customer-transactions", selectedCustomerId] });
     qc.invalidateQueries({ queryKey: ["customer-fresh", selectedCustomerId] });
