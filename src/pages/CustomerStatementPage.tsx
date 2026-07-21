@@ -1101,7 +1101,7 @@ export default function CustomerStatementPage() {
       })()}
       </div>
 
-      <RevisePaymentDialog
+      <EditPaymentDialog
         open={!!reviseTx}
         tx={reviseTx}
         onClose={() => setReviseTx(null)}
