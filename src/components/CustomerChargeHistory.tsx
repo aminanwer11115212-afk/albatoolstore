@@ -57,6 +57,8 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
   const [reconMsg, setReconMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [reversingGroupId, setReversingGroupId] = useState<string | null>(null);
   const [pendingReverse, setPendingReverse] = useState<ChargeGroup | null>(null);
+  const [editingCharge, setEditingCharge] = useState<EditableCharge | null>(null);
+  const { isAdmin } = useUserRole();
 
   async function executeReverse(g: ChargeGroup) {
     setReversingGroupId(g.groupId);
