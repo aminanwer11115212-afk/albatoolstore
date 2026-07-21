@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
-import { Search, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Trash2, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { useTransactionsWithAccounts, useAccounts, useTransactions, useCustomers, useSuppliers } from "@/hooks/useData";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank } from "@/lib/bankTransferValidation";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
+import { useUserRole } from "@/hooks/useUserRole";
 export default function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -14,6 +16,8 @@ export default function TransactionsPage() {
   const [perPage, setPerPage] = useState(10);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const [editingPayment, setEditingPayment] = useState<EditablePayment | null>(null);
+  const { isAdmin } = useUserRole();
 
   const { data: transactions, isLoading } = useTransactionsWithAccounts();
   const { data: accounts } = useAccounts();
@@ -207,10 +211,25 @@ export default function TransactionsPage() {
                     <td className="px-4 py-3 text-foreground">{methodMap[t.method] || t.method || "-"}</td>
                     <td className="px-4 py-3 print:hidden">
                       <div className="flex items-center gap-1">
+                        {isAdmin && t.category === "customer_payment" && (
+                          <button
+                            onClick={() => setEditingPayment({
+                              id: t.id,
+                              amount: Number(t.amount || 0),
+                              reference_id: t.reference_id,
+                              customer_id: t.customer_id,
+                              description: t.description,
+                              method: t.method,
+                              account_id: t.account_id,
+                              date: t.date,
+                            })}
+                            className="px-2 py-1 bg-primary/10 text-primary rounded text-xs hover:bg-primary/20 inline-flex items-center gap-1 min-h-[40px]"
+                            title="تعديل هذه الدفعة"
+                          >
+                            <Pencil size={12} /> تعديل
+                          </button>
+                        )}
                         <button onClick={async () => {
-                          // منع الحذف الخام لمعاملات مرتبطة بفواتير/شحن رصيد لتفادي تشويش الأرصدة.
-                          // القاعدة: دفعات/رصيد العملاء تُلغى من صفحة تفاصيل العميل (زر «إلغاء الشحنة»)
-                          // أو بحذف الفاتورة نفسها (التي تحوّل الدفعة إلى رصيد دائن تلقائياً).
                           if (t.category === "customer_payment" || t.category === "customer_credit") {
                             toast.error("لا يمكن حذف دفعة/شحن رصيد من هنا. استخدم «إلغاء الشحنة» في تفاصيل العميل، أو احذف الفاتورة المرتبطة.", { duration: 6000 });
                             return;
@@ -242,6 +261,12 @@ export default function TransactionsPage() {
           </div>
         </div>
       </div>
+      <EditPaymentDialog
+        open={!!editingPayment}
+        tx={editingPayment}
+        onClose={() => setEditingPayment(null)}
+        onSaved={() => window.dispatchEvent(new Event("invoice-payments:changed"))}
+      />
     </div>
   );
 }
