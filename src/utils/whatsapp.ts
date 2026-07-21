@@ -189,7 +189,7 @@ export function generateWhatsAppMessage(type: WhatsAppMessageType, invoice: Invo
         `مرحباً ${name} 👋`,
         ``,
         `🔄 *تم إنشاء استرداد*`,
-        `📄 مرجع الفاتورة: ${invoice.invoice_number}`,
+        `📄 رقم الفاتورة: ${invoice.invoice_number}`,
         `💰 المبلغ: ${total} ${currency}`,
         ``,
         `تم إنشاء طلب استرداد لفاتورتكم. سيتم معالجته في أقرب وقت.`,
