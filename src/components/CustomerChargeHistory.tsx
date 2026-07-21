@@ -10,6 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { computeReconciliation, sortGroups, type SortKey } from "@/lib/chargeReconciliation";
 import { ReverseChargeConfirmDialog } from "@/components/customer/ReverseChargeConfirmDialog";
+import EditChargeDialog, { type EditableCharge } from "@/components/finance/EditChargeDialog";
+import { useUserRole } from "@/hooks/useUserRole";
+import { Pencil } from "lucide-react";
 
 const PAGE_SIZE = 10;
 const LS_KEY = (cid: string) => `albatool.chargeHistory.filters.${cid}`;
