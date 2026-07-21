@@ -3,6 +3,7 @@ import {
   useRecentTransactions, useQuotesWithCustomers, useLatestExchangeRates
 } from "@/hooks/useData";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus, CreditCard, Percent, FileText, Users, Package,
   DollarSign, AlertTriangle
