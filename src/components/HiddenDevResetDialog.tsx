@@ -375,31 +375,29 @@ export default function HiddenDevResetDialog() {
             الوصول عبر <b>Ctrl+Shift+9</b> فقط، ومخصصة لمستخدمي admin. كل تنفيذ يُوثَّق في <b>سجل التدقيق</b>. <b>لا يمكن التراجع.</b>
           </div>
 
-          <ScrollArea className="max-h-[45vh] pr-1">
-            <div className="space-y-4">
-              {groups.map((g) => (
-                <div key={g.title} className="space-y-2">
-                  <div className="text-xs font-bold text-muted-foreground">{g.title}</div>
-                  {g.items.map((it) => (
-                    <label
-                      key={it.key}
-                      className="flex items-start gap-3 p-2.5 rounded-lg border border-border hover:border-destructive/40 cursor-pointer transition-colors"
-                    >
-                      <Checkbox
-                        checked={scope[it.key]}
-                        onCheckedChange={() => toggle(it.key)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <div className="text-sm font-semibold text-foreground">{it.label}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{it.hint}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
+          <div className="space-y-4">
+            {groups.map((g) => (
+              <div key={g.title} className="space-y-2">
+                <div className="text-xs font-bold text-muted-foreground">{g.title}</div>
+                {g.items.map((it) => (
+                  <label
+                    key={it.key}
+                    className="flex items-start gap-3 p-2.5 rounded-lg border border-border hover:border-destructive/40 cursor-pointer transition-colors"
+                  >
+                    <Checkbox
+                      checked={scope[it.key]}
+                      onCheckedChange={() => toggle(it.key)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-foreground">{it.label}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{it.hint}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
 
           {/* معاينة الجداول المتأثرة */}
           {anySelected && (
