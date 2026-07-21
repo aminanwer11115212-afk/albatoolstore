@@ -1774,7 +1774,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
 
             <div className="field" style={{ width: HEADER_FIELD_BASES[1] + (hdrExtras[1] || 0) }}>
               <label>المستودع</label>
-              <select className="form-control" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} style={{ minWidth: 0, width: "100%" }}>
+              <select
+                className="form-control"
+                value={warehouseId}
+                onChange={(e) => setWarehouseId(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickProductRef.current?.focus(); } }}
+                style={{ minWidth: 0, width: "100%" }}
+              >
                 <option value="">— اختر مستودع —</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>{w.name}</option>
