@@ -14,6 +14,7 @@ import CustomerStatementErrorState from "@/components/statement/CustomerStatemen
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
 import RevisePaymentDialog, { type RevisableTx } from "@/components/statement/RevisePaymentDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
+import CustomerBalanceAuditTab from "@/components/customer/CustomerBalanceAuditTab";
 
 export default function CustomerStatementPage() {
   const { data: customers, isLoading: customersLoading, isError: customersError } = useCustomers();
@@ -49,7 +50,7 @@ export default function CustomerStatementPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   // تبويبات صفحة كشف الحساب: الفواتير / محذوفة / حركات مالية.
   // الرصيد وصناديق الملخص وتحقّق الرصيد تظل مرئية دائماً فوق التبويبات.
-  const [tab, setTab] = useState<"invoices" | "deleted" | "transactions">("invoices");
+  const [tab, setTab] = useState<"invoices" | "deleted" | "transactions" | "audit">("invoices");
   const [exportingPdf, setExportingPdf] = useState(false);
   // مؤشر تصدير PDF: نستمع للحدث الذي يبعثه FinancialReportPreviewPage
   useEffect(() => {
@@ -699,6 +700,7 @@ export default function CustomerStatementPage() {
               ["invoices", `الفواتير (${filteredInvoices.length})`],
               ["deleted", `الفواتير المحذوفة (${(deletedInvoices || []).length})`],
               ["transactions", `الحركات المالية (${filteredTransactions.length})`],
+              ["audit", "تدقيق الرصيد"],
             ] as const).map(([key, label]) => (
               <button
                 key={key}
@@ -1067,6 +1069,18 @@ export default function CustomerStatementPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {selectedCustomerId && (
+            <div data-section="audit" data-section-label="تدقيق الرصيد" className={`legacy-card card-block ${tab === "audit" ? "" : "hidden"}`}>
+              <div className="px-5 py-4">
+                <CustomerBalanceAuditTab
+                  customerId={selectedCustomerId}
+                  storedBalance={Number((selectedCustomer as any)?.balance || 0)}
+                  storedCredit={Number((selectedCustomer as any)?.credit_balance || 0)}
+                />
+              </div>
             </div>
           )}
         </>
