@@ -422,6 +422,56 @@ export default function AccountsSafetyBotPage() {
             </div>
           </section>
 
+          {/* Health v3 — الفحص الشامل للنظام */}
+          <section className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent overflow-hidden">
+            <header className="px-4 py-3 border-b border-border flex items-center gap-2 justify-between flex-wrap">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className={`h-4 w-4 ${health?.ok ? "text-emerald-600" : "text-destructive"}`} />
+                <h2 className="font-bold text-sm">
+                  الفحص الشامل للنظام {health && <span className="text-muted-foreground">— إجمالي {health.total} اختلال</span>}
+                </h2>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className={`inline-flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded border ${autoRepairEnabled ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-border bg-background"} ${isAdmin ? "cursor-pointer" : "opacity-60 cursor-not-allowed"}`}>
+                  <input type="checkbox" className="h-4 w-4 accent-emerald-600"
+                    disabled={!isAdmin || savingAutoFlag}
+                    checked={autoRepairEnabled}
+                    onChange={e => toggleAutoRepair(e.target.checked)} />
+                  الإصلاح الذاتي التلقائي كل 6 ساعات
+                  {!isAdmin && <Lock className="h-3 w-3" />}
+                </label>
+                <button onClick={() => repairHealth(true)} disabled={repairingHealth || !isAdmin}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-border bg-background hover:bg-muted text-xs font-bold disabled:opacity-60">
+                  {repairingHealth ? <Loader2 className="h-3 w-3 animate-spin" /> : <PlayCircle className="h-3 w-3" />}
+                  محاكاة الإصلاح الشامل
+                </button>
+                <button onClick={() => repairHealth(false)} disabled={repairingHealth || !isAdmin || (health?.total || 0) === 0}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-destructive text-destructive-foreground hover:opacity-90 text-xs font-bold disabled:opacity-60">
+                  {repairingHealth ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wrench className="h-3 w-3" />}
+                  إصلاح شامل الآن
+                  {!isAdmin && <Lock className="h-3 w-3" />}
+                </button>
+              </div>
+            </header>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-3">
+              {health && (Object.keys(SECTION_META) as Array<keyof HealthReport["sections"]>).map(key => {
+                const meta = SECTION_META[key];
+                const count = health.sections[key] || 0;
+                const bad = count > 0;
+                return (
+                  <div key={key} className={`rounded-lg border p-3 ${bad ? "border-destructive/40 bg-destructive/5" : "border-emerald-300 bg-emerald-50"}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground">{meta.label}</span>
+                      {bad ? <AlertTriangle className="h-4 w-4 text-destructive" /> : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                    </div>
+                    <div className={`text-2xl font-extrabold tabular-nums mt-1 ${bad ? "text-destructive" : "text-emerald-700"}`}>{count}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{meta.hint}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
           {/* Anomalies */}
           <section className="rounded-xl border border-border bg-card overflow-hidden">
             <header className="px-4 py-3 border-b border-border flex items-center gap-2">
