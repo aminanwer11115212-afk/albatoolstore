@@ -479,6 +479,7 @@ export default function HiddenDevResetDialog() {
             </pre>
           )}
         </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
