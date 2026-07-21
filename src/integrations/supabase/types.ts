@@ -2494,6 +2494,53 @@ export type Database = {
           },
         ]
       }
+      stock_adjustments_log: {
+        Row: {
+          actor_uid: string | null
+          after_qty: number | null
+          before_qty: number | null
+          created_at: string
+          delta: number
+          id: string
+          product_id: string | null
+          reason: string | null
+          reference_id: string | null
+          source: string
+        }
+        Insert: {
+          actor_uid?: string | null
+          after_qty?: number | null
+          before_qty?: number | null
+          created_at?: string
+          delta: number
+          id?: string
+          product_id?: string | null
+          reason?: string | null
+          reference_id?: string | null
+          source?: string
+        }
+        Update: {
+          actor_uid?: string | null
+          after_qty?: number | null
+          before_qty?: number | null
+          created_at?: string
+          delta?: number
+          id?: string
+          product_id?: string | null
+          reason?: string | null
+          reference_id?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_adjustments_log_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_return_items: {
         Row: {
           created_at: string
@@ -3072,6 +3119,16 @@ export type Database = {
         Args: { _delta: number; _product_id: string }
         Returns: undefined
       }
+      apply_stock_delta_logged: {
+        Args: {
+          _delta: number
+          _product_id: string
+          _reason?: string
+          _reference_id?: string
+          _source?: string
+        }
+        Returns: Json
+      }
       assert_invoice_payment_consistency: {
         Args: { _invoice_id: string }
         Returns: undefined
@@ -3186,6 +3243,18 @@ export type Database = {
       }
       restore_purchase_stock_once: { Args: { _po_id: string }; Returns: Json }
       reverse_customer_charge: { Args: { _group_id: string }; Returns: Json }
+      transfer_stock_once: {
+        Args: {
+          _date?: string
+          _from_warehouse: string
+          _notes?: string
+          _product_id: string
+          _quantity: number
+          _to_warehouse: string
+          _transfer_id?: string
+        }
+        Returns: Json
+      }
       workflow_rank: { Args: { _s: string }; Returns: number }
     }
     Enums: {
