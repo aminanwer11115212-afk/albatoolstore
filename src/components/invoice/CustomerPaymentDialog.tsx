@@ -916,7 +916,7 @@ export default function CustomerPaymentDialog({
                   </div>
                 )}
               </div>
-              <div>
+              <div data-pay-anchor="discount">
                 {canApplyDiscount ? (
                   <DiscountInput
                     label="خصم على الدفعة"
