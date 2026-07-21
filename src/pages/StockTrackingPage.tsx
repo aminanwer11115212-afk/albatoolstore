@@ -619,7 +619,20 @@ export default function StockTrackingPage() {
             كل الحركات: بيع · شراء · إرجاع · تحويلات · تعديلات يدوية — {arDate(from)} ← {arDate(to)}
           </p>
         </div>
-        <div className="flex items-center gap-2 no-print">
+        <div className="flex items-center gap-2 no-print flex-wrap justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 min-h-[40px]"
+            onClick={runConsistencyCheck}
+            disabled={checking}
+            title="فحص تطابق أرصدة المنتجات مع مجموع كل الحركات"
+          >
+            <ShieldCheck className="h-4 w-4" /> {checking ? "جاري الفحص..." : "تحقق من الأرصدة"}
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2 min-h-[40px]" onClick={exportCsv}>
+            <Download className="h-4 w-4" /> CSV
+          </Button>
           <Button variant="outline" size="sm" className="gap-2 min-h-[40px]" onClick={exportExcel}>
             <Download className="h-4 w-4" /> Excel
           </Button>
@@ -636,6 +649,7 @@ export default function StockTrackingPage() {
             <Printer className="h-4 w-4" /> معاينة وطباعة
           </Button>
         </div>
+
 
       </div>
 
