@@ -523,7 +523,12 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                             const v = prompt("ملاحظة:", note);
                             if (v === null) return;
                             supabase.from("invoices").update({ user_note: v }).eq("id", inv.id)
-                              .then(({ error }) => error ? toast.error(error.message) : toast.success("تم الحفظ"));
+                              .then(({ error }) => {
+                                if (error) { toast.error(error.message); return; }
+                                toast.success("تم الحفظ");
+                                qc.invalidateQueries({ queryKey: ["invoices"] });
+                                qc.invalidateQueries({ queryKey: ["invoicesWithCustomers"] });
+                              });
                           }}
                         >
                           {note ? "✎" : "+"}
