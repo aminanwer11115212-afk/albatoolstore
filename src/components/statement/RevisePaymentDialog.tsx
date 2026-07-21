@@ -157,9 +157,8 @@ export default function RevisePaymentDialog({ open, tx, onClose, onSaved }: Prop
             action: "payment",
             changedBy,
             changes: {
-              refund_to_credit: { amount: refundNum, tx_id: tx.id },
               payment_amount: { before: data.payment_amount_before, after: data.payment_amount_after },
-            },
+            } as any,
             snapshot: { tx_id: tx.id, refund_group: data.refund_group },
             note: `استرجاع ${refundNum.toLocaleString()} من الدفعة إلى الرصيد الدائن`,
           });
