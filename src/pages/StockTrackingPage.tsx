@@ -512,10 +512,20 @@ export default function StockTrackingPage() {
           <Button variant="outline" size="sm" className="gap-2 min-h-[40px]" onClick={exportExcel}>
             <Download className="h-4 w-4" /> Excel
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 min-h-[40px]"
+            onClick={downloadPdf}
+            disabled={pdfLoading}
+          >
+            <FileText className="h-4 w-4" /> {pdfLoading ? "جاري..." : "PDF"}
+          </Button>
           <Button variant="outline" size="sm" className="gap-2 min-h-[40px]" onClick={printPage}>
-            <Printer className="h-4 w-4" /> طباعة
+            <Printer className="h-4 w-4" /> معاينة وطباعة
           </Button>
         </div>
+
       </div>
 
       {/* بطاقات الإحصاء */}
