@@ -87,7 +87,31 @@ export async function deleteInvoiceWithStockRestore(
   if (linesToRestore.length > 0) {
     await applyStockDeltaForLines(linesToRestore as any[], []);
     restoredStock = true;
+
+    // Log restore entries into stock_adjustments_log so they appear in Stock Tracking.
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id || null;
+      const invNo = (inv as any).invoice_number || invoiceId;
+      const rows = linesToRestore.map((it: any) => ({
+        product_id: it.product_id,
+        delta: Number(it.quantity || 0), // positive: returned to stock
+        source: "invoice_delete",
+        reference_id: invoiceId,
+        reason: `إرجاع مخزون بعد حذف الفاتورة ${invNo}`,
+        actor_uid: uid,
+      }));
+      if (rows.length) {
+        const { error: logErr } = await (supabase as any)
+          .from("stock_adjustments_log")
+          .insert(rows);
+        if (logErr) console.warn("[deleteInvoice] stock log insert failed (non-fatal)", logErr);
+      }
+    } catch (logEx) {
+      console.warn("[deleteInvoice] stock log insert threw (non-fatal)", logEx);
+    }
   }
+
 
   // 4) حذف توابع الفاتورة بالترتيب الآمن — فحص كل خطوة لمنع البيانات اليتيمة الصامتة.
   const { data: pkgs, error: pkgQErr } = await supabase
