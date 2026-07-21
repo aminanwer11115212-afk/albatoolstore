@@ -12,14 +12,19 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { startsWithMatch } from "@/utils/searchMatch";
 import {
   Search, TrendingDown, TrendingUp, RotateCcw, Package, ArrowLeftRight,
-  Sliders, Printer, Download, Warehouse, FileText,
+  Sliders, Printer, Download, Warehouse, FileText, ShieldCheck, AlertTriangle,
+  CheckCircle2, Info,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { printStockMovements, downloadStockMovementsPdf } from "@/utils/stockMovementsPrint";
+
 
 const PREFS_KEY = "lov:stock-tracking:filters:v1";
 type StoredPrefs = {
@@ -298,6 +303,13 @@ export default function StockTrackingPage() {
   const [productFilter, setProductFilter] = useState<string>(prefs.productFilter || "all");
   const [warehouseFilter, setWarehouseFilter] = useState<string>(prefs.warehouseFilter || "all");
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [detailMove, setDetailMove] = useState<Move | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [consistencyResult, setConsistencyResult] = useState<{
+    checked: number;
+    mismatches: Array<{ product_id: string; name: string; expected: number; actual: number; diff: number }>;
+    ok: boolean;
+  } | null>(null);
 
   // Persist filters after every change (survives reload).
   useEffect(() => {
@@ -495,6 +507,105 @@ export default function StockTrackingPage() {
     }
   };
 
+  const exportCsv = () => {
+    try {
+      const headers = ["التاريخ","الوقت","النوع","المنتج","المستودع","الكمية","رصيد بعد","المستند","رقم العملية","الجهة","ملاحظات"];
+      const escapeCell = (v: any) => {
+        const s = String(v ?? "").replace(/"/g, '""');
+        return /[",\n]/.test(s) ? `"${s}"` : s;
+      };
+      const lines = [headers.join(",")];
+      rowsWithBalance.forEach((m) => {
+        lines.push([
+          m.date,
+          m.created_at ? new Date(m.created_at).toLocaleTimeString("ar-EG") : "",
+          typeLabel[m.type],
+          m.product_name,
+          m.warehouse_name,
+          m.qty,
+          m.balance_after ?? "",
+          m.doc_number,
+          m.doc_ref ?? "",
+          m.party_name,
+          m.reason || "",
+        ].map(escapeCell).join(","));
+      });
+      // UTF-8 BOM so Excel opens Arabic correctly
+      const csv = "\uFEFF" + lines.join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `stock-movements-${from}_${to}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("تم تصدير CSV");
+    } catch (e: any) {
+      toast.error(e?.message || "فشل تصدير CSV");
+    }
+  };
+
+  /**
+   * فحص تناسق الأرصدة: يحسب الرصيد المتوقع لكل منتج من مجموع كل حركاته منذ البداية
+   * ويقارنه بـ products.stock_quantity الفعلي، ويعرض الفوارق.
+   */
+  const runConsistencyCheck = async () => {
+    if (checking) return;
+    setChecking(true);
+    const tId = toast.loading("جاري فحص تناسق الأرصدة...");
+    try {
+      const [inv, ret, pur, trn, adj, prods] = await Promise.all([
+        supabase.from("invoice_items")
+          .select("product_id, quantity, invoices!inner(status)")
+          .neq("invoices.status", "cancelled"),
+        supabase.from("stock_return_items").select("product_id, quantity"),
+        supabase.from("purchase_order_items")
+          .select("product_id, quantity, purchase_orders!inner(status)")
+          .neq("purchase_orders.status", "cancelled"),
+        supabase.from("stock_transfers").select("product_id, quantity, from_warehouse_id, to_warehouse_id"),
+        supabase.from("stock_adjustments_log").select("product_id, delta"),
+        supabase.from("products").select("id, name, stock_quantity"),
+      ]);
+      for (const r of [inv, ret, pur, trn, adj, prods]) {
+        if ((r as any).error) throw (r as any).error;
+      }
+      const expected = new Map<string, number>();
+      const bump = (pid: string | null, delta: number) => {
+        if (!pid) return;
+        expected.set(pid, (expected.get(pid) || 0) + delta);
+      };
+      (inv.data || []).forEach((r: any) => bump(r.product_id, -Number(r.quantity || 0)));
+      (ret.data || []).forEach((r: any) => bump(r.product_id, +Number(r.quantity || 0)));
+      (pur.data || []).forEach((r: any) => bump(r.product_id, +Number(r.quantity || 0)));
+      // التحويلات لا تغيّر إجمالي الرصيد على مستوى المنتج (صادر+وارد=0)، لذلك تُتجاهل هنا.
+      (adj.data || []).forEach((r: any) => bump(r.product_id, Number(r.delta || 0)));
+
+      const mismatches: Array<{ product_id: string; name: string; expected: number; actual: number; diff: number }> = [];
+      let checkedCount = 0;
+      (prods.data || []).forEach((p: any) => {
+        checkedCount++;
+        const exp = expected.get(p.id) || 0;
+        const actual = Number(p.stock_quantity || 0);
+        const diff = actual - exp;
+        if (Math.abs(diff) > 0.0001) {
+          mismatches.push({ product_id: p.id, name: p.name || "—", expected: exp, actual, diff });
+        }
+      });
+      const ok = mismatches.length === 0;
+      setConsistencyResult({ checked: checkedCount, mismatches, ok });
+      if (ok) toast.success("الأرصدة متطابقة", { id: tId });
+      else toast.warning(`تم رصد ${mismatches.length} فارقاً`, { id: tId });
+    } catch (e: any) {
+      toast.error(e?.message || "فشل الفحص", { id: tId });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+
+
 
 
   const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment", "invoice_delete_restore"];
@@ -508,7 +619,20 @@ export default function StockTrackingPage() {
             كل الحركات: بيع · شراء · إرجاع · تحويلات · تعديلات يدوية — {arDate(from)} ← {arDate(to)}
           </p>
         </div>
-        <div className="flex items-center gap-2 no-print">
+        <div className="flex items-center gap-2 no-print flex-wrap justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 min-h-[40px]"
+            onClick={runConsistencyCheck}
+            disabled={checking}
+            title="فحص تطابق أرصدة المنتجات مع مجموع كل الحركات"
+          >
+            <ShieldCheck className="h-4 w-4" /> {checking ? "جاري الفحص..." : "تحقق من الأرصدة"}
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2 min-h-[40px]" onClick={exportCsv}>
+            <Download className="h-4 w-4" /> CSV
+          </Button>
           <Button variant="outline" size="sm" className="gap-2 min-h-[40px]" onClick={exportExcel}>
             <Download className="h-4 w-4" /> Excel
           </Button>
@@ -525,6 +649,7 @@ export default function StockTrackingPage() {
             <Printer className="h-4 w-4" /> معاينة وطباعة
           </Button>
         </div>
+
 
       </div>
 
@@ -670,11 +795,24 @@ export default function StockTrackingPage() {
                     )}
                   </TableCell>
                   <TableCell data-label="النوع">
-                    <Badge variant="outline" className={typeBadgeCls[m.type]}>
-                      {(m.type === "transfer_in" || m.type === "transfer_out") && <ArrowLeftRight className="h-3 w-3 me-1" />}
-                      {typeLabel[m.type]}
-                    </Badge>
+                    {m.type === "invoice_delete_restore" ? (
+                      <button
+                        type="button"
+                        onClick={() => setDetailMove(m)}
+                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold hover:brightness-110 ${typeBadgeCls[m.type]}`}
+                        title="عرض تفاصيل الاسترجاع"
+                      >
+                        <Info className="h-3 w-3" />
+                        {typeLabel[m.type]}
+                      </button>
+                    ) : (
+                      <Badge variant="outline" className={typeBadgeCls[m.type]}>
+                        {(m.type === "transfer_in" || m.type === "transfer_out") && <ArrowLeftRight className="h-3 w-3 me-1" />}
+                        {typeLabel[m.type]}
+                      </Badge>
+                    )}
                   </TableCell>
+
                   <TableCell data-label="المنتج" className="font-medium">
                     <button
                       className="text-primary hover:underline text-right"
@@ -730,6 +868,116 @@ export default function StockTrackingPage() {
         </CardContent>
       </Card>
 
+      {/* تفاصيل استرجاع حذف فاتورة */}
+      <Dialog open={!!detailMove} onOpenChange={(o) => !o && setDetailMove(null)}>
+        <DialogContent dir="rtl" className="font-cairo">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-sky-600" />
+              تفاصيل استرجاع مخزون
+            </DialogTitle>
+            <DialogDescription>
+              تم إرجاع الكمية إلى المخزون عند حذف الفاتورة الأصلية.
+            </DialogDescription>
+          </DialogHeader>
+          {detailMove && (
+            <div className="space-y-3 text-sm">
+              <DetailRow label="رقم الفاتورة المحذوفة" value={detailMove.doc_number} />
+              <DetailRow label="المنتج" value={detailMove.product_name} />
+              <DetailRow label="المستودع" value={detailMove.warehouse_name} />
+              <DetailRow
+                label="الكمية المُعادة"
+                value={
+                  <span className="font-bold text-emerald-600">
+                    +{detailMove.qty.toLocaleString("ar-EG-u-nu-latn")}
+                  </span>
+                }
+              />
+              <DetailRow
+                label="تاريخ الحذف"
+                value={
+                  detailMove.created_at
+                    ? new Date(detailMove.created_at).toLocaleString("ar-EG-u-nu-latn")
+                    : arDate(detailMove.date)
+                }
+              />
+              {detailMove.doc_ref && (
+                <DetailRow
+                  label="رقم العملية"
+                  value={<span className="font-mono text-xs">#{detailMove.doc_ref}</span>}
+                />
+              )}
+              {detailMove.reason && (
+                <div className="border-t pt-2">
+                  <div className="text-xs text-muted-foreground mb-1">السبب / الملاحظة</div>
+                  <div className="text-foreground">{detailMove.reason}</div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailMove(null)}>إغلاق</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* نتيجة فحص تناسق الأرصدة */}
+      <Dialog open={!!consistencyResult} onOpenChange={(o) => !o && setConsistencyResult(null)}>
+        <DialogContent dir="rtl" className="font-cairo max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {consistencyResult?.ok ? (
+                <><CheckCircle2 className="h-5 w-5 text-emerald-600" /> الأرصدة متطابقة</>
+              ) : (
+                <><AlertTriangle className="h-5 w-5 text-amber-600" /> فوارق في الأرصدة</>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              تمّت مقارنة رصيد كل منتج بمجموع كل حركاته (بيع/شراء/إرجاع/تعديل) منذ البداية.
+              فُحص {consistencyResult?.checked ?? 0} منتج.
+            </DialogDescription>
+          </DialogHeader>
+          {consistencyResult && !consistencyResult.ok && (
+            <div className="max-h-[400px] overflow-y-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">المنتج</TableHead>
+                    <TableHead className="text-right">المتوقع</TableHead>
+                    <TableHead className="text-right">الفعلي</TableHead>
+                    <TableHead className="text-right">الفارق</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {consistencyResult.mismatches.map((m) => (
+                    <TableRow key={m.product_id}>
+                      <TableCell className="font-medium">{m.name}</TableCell>
+                      <TableCell className="tabular-nums">{m.expected.toLocaleString("ar-EG-u-nu-latn")}</TableCell>
+                      <TableCell className="tabular-nums">{m.actual.toLocaleString("ar-EG-u-nu-latn")}</TableCell>
+                      <TableCell className={`tabular-nums font-bold ${m.diff > 0 ? "text-emerald-600" : "text-destructive"}`}>
+                        {m.diff > 0 ? "+" : ""}{m.diff.toLocaleString("ar-EG-u-nu-latn")}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          {consistencyResult?.ok && (
+            <div className="py-4 text-center text-emerald-700 dark:text-emerald-400">
+              كل الأرصدة متطابقة مع سجل الحركات الكامل.
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConsistencyResult(null)}>إغلاق</Button>
+            <Button onClick={runConsistencyCheck} disabled={checking}>
+              {checking ? "جاري..." : "إعادة الفحص"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       <style>{`
         @media print {
           .no-print { display: none !important; }
@@ -765,5 +1013,14 @@ function SummaryCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-border/50 pb-2">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-sm text-foreground font-semibold text-left">{value}</div>
+    </div>
   );
 }
