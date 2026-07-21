@@ -247,6 +247,17 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0 }: Pro
           window.dispatchEvent(new Event("invoice-payments:changed"));
         }}
       />
+
+      <EditChargeDialog
+        open={!!editingCharge}
+        charge={editingCharge}
+        onClose={() => setEditingCharge(null)}
+        onSaved={() => {
+          setBump((b) => b + 1);
+          window.dispatchEvent(new Event("invoice-payments:changed"));
+        }}
+      />
     </div>
+
   );
 }
