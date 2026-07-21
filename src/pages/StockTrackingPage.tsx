@@ -436,7 +436,7 @@ export default function StockTrackingPage() {
     }
   };
 
-  const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment"];
+  const allTypes: MoveType[] = ["sale", "return", "purchase", "transfer_in", "transfer_out", "manual_adjustment", "invoice_delete_restore"];
 
   return (
     <div dir="rtl" className="p-3 sm:p-6 space-y-4 font-cairo">
