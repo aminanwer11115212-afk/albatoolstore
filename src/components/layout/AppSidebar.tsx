@@ -134,6 +134,7 @@ const menuSections: MenuSection[] = [
           { label: "إدارة الحسابات", path: "/accounts" },
           { label: "حساب جديد", path: "/accounts/add" },
           { label: "الميزانية العامة", path: "/accounts/balance-sheet" },
+          { label: "🛡️ بوت تأمين الحسابات", path: "/accounts/safety-bot" },
         ],
       },
       {
