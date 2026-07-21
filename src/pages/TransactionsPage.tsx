@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
-import { Search, Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Trash2, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { useTransactionsWithAccounts, useAccounts, useTransactions, useCustomers, useSuppliers } from "@/hooks/useData";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank } from "@/lib/bankTransferValidation";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
+import { useUserRole } from "@/hooks/useUserRole";
 export default function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
