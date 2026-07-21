@@ -75,7 +75,7 @@ export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber,
         <Wallet size={14} />
         <span>رصيد دائن للعميل</span>
         <span className="text-[10px] font-normal text-emerald-700 dark:text-emerald-300">
-          (لا يُربط بمرجع الفاتورة القديمة)
+          (لا يُربط برقم الفاتورة القديمة)
         </span>
       </div>
       <div className="mt-1 space-y-0.5 leading-relaxed">

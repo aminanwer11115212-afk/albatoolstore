@@ -26,7 +26,7 @@ interface UnlinkedCredit {
 /**
  * تنبيه محاسبي داخل صفحة الفاتورة:
  *  - يظهر إذا كان (المدفوع + الخصم) لا يوازي إجمالي الفاتورة (فرق غير مبرر).
- *  - يظهر إذا كان للعميل customer_credit إيجابي غير مربوط بمرجع الفاتورة الحالية.
+ *  - يظهر إذا كان للعميل customer_credit إيجابي غير مربوط برقم الفاتورة الحالية.
  */
 export default function InvoiceAccountingAlert({
   invoiceId,

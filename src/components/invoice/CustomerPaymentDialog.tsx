@@ -989,7 +989,7 @@ export default function CustomerPaymentDialog({
                   المتاح: {(custBalance?.credit || 0).toLocaleString()} — يُخصم من رصيد العميل ويُضاف كدفعة على الفاتورة
                 </div>
                 <div className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 leading-relaxed bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded px-2 py-1">
-                  ملاحظة محاسبية: أي دفعة تزيد عن قيمة الفاتورة تُسجَّل تلقائياً كـ <b>رصيد دائن للعميل</b> (customer_credit) ولا تُربط بمرجع الفاتورة القديمة. الفائض يظهر في كشف الحساب ويُستخدم من هنا على الفاتورة الجديدة.
+                  ملاحظة محاسبية: أي دفعة تزيد عن قيمة الفاتورة تُسجَّل تلقائياً كـ <b>رصيد دائن للعميل</b> (customer_credit) ولا تُربط برقم الفاتورة القديمة. الفائض يظهر في كشف الحساب ويُستخدم من هنا على الفاتورة الجديدة.
                 </div>
               </div>
             )}
