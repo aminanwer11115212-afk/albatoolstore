@@ -1098,7 +1098,7 @@ export default function CustomerPaymentDialog({
             {isBankPaymentMethod(method) && (
               <div>
                 <Label className="text-xs">رقم العملية (اختياري)</Label>
-                <Input data-pay-field value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="مثلاً TRX-1234" />
+                <Input ref={referenceRef} data-pay-field value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="مثلاً TRX-1234" />
               </div>
             )}
 
