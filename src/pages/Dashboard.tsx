@@ -109,7 +109,7 @@ export default function Dashboard() {
       </div>
 
       <ChargeBalanceDialog open={chargeOpen} onOpenChange={setChargeOpen} />
-      <ExchangeRateDialog open={rateOpen} onOpenChange={setRateOpen} onSaved={() => setRatesRefresh(x => x + 1)} />
+      <ExchangeRateDialog open={rateOpen} onOpenChange={setRateOpen} />
     </div>
   );
 }
