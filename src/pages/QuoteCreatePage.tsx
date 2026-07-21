@@ -388,6 +388,8 @@ export default function QuoteCreatePage() {
   // يُرفع عند حذف العرض من قاعدة البيانات أو تحويله إلى فاتورة أثناء الجلسة الحالية،
   // لإيقاف أي حفظ خلفي/autosave لاحق يعيد إنشاء العرض.
   const quoteGoneRef = useRef(false);
+  const convertingRef = useRef(false);
+  const [converting, setConverting] = useState(false);
   useContainerFit(itemsScrollRef, clampWidthsToContainer, { locked: colsLocked });
   const prevRowsLen = useRef(1);
   useEffect(() => {
@@ -1989,12 +1991,13 @@ export default function QuoteCreatePage() {
                     <button
                       type="button"
                       data-toolbar-id="convert-to-invoice"
-                      disabled={!editId}
+                      disabled={!editId || converting}
                       onClick={async (e) => {
                         if (!editId) {
                           toast.error("احفظ عرض السعر أولاً ثم اضغط على \"تحويل لفاتورة\"");
                           return;
                         }
+                        if (convertingRef.current) return;
                         // حارس التراكب: تحقّق أن مركز هذا الزر هو فعلاً
                         // أعلى عنصر قابل للنقر، وإلا فهو متراكب مع زر آخر
                         const btn = e.currentTarget as HTMLElement;
@@ -2022,25 +2025,32 @@ export default function QuoteCreatePage() {
                         }
 
                         if (!confirm(`تحويل العرض ${quoteNumber} إلى فاتورة؟ سيتم حذف عرض السعر من القائمة بعد التحويل.`)) return;
-                        const ok = await saveQuote("draft", { skipNavigate: true, silent: true });
-                        if (!ok) return;
+                        convertingRef.current = true;
+                        setConverting(true);
                         try {
+                          const ok = await saveQuote("draft", { skipNavigate: true, silent: true });
+                          if (!ok) return;
                           const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
-                          const { invoiceId, invoiceNumber, alreadyConverted, stockDeducted, deductedLineCount } = await convertQuoteToInvoice(editId);
+                          const { withQuoteConvertLock } = await import("@/utils/convertQuoteLock");
+                          const { invoiceId, invoiceNumber, alreadyConverted, stockDeducted, deductedLineCount } =
+                            await withQuoteConvertLock(editId, () => convertQuoteToInvoice(editId));
                           quoteGoneRef.current = true;
                           showConverted({ invoiceId, invoiceNumber, alreadyConverted, quoteId: editId, stockDeducted, deductedLineCount });
                         } catch (e: any) {
                           toast.error(e.message || "فشل تحويل العرض إلى فاتورة");
+                        } finally {
+                          convertingRef.current = false;
+                          setConverting(false);
                         }
                       }}
-                      title={editId ? "تحويل عرض السعر إلى فاتورة" : "احفظ عرض السعر أولاً لتفعيل التحويل"}
+                      title={!editId ? "احفظ عرض السعر أولاً لتفعيل التحويل" : (converting ? "جارٍ التحويل..." : "تحويل عرض السعر إلى فاتورة")}
                       style={{
                         ...btnStyle("#7c3aed"),
-                        opacity: editId ? 1 : 0.5,
-                        cursor: editId ? "pointer" : "not-allowed",
+                        opacity: (!editId || converting) ? 0.5 : 1,
+                        cursor: (!editId || converting) ? "not-allowed" : "pointer",
                       }}
                     >
-                      <FileText size={14} /> تحويل لفاتورة
+                      <FileText size={14} /> {converting ? "…جارٍ التحويل" : "تحويل لفاتورة"}
                     </button>
                   ),
                 },

@@ -48,6 +48,7 @@ export default function QuotesPage() {
   const [search, setSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [convertingIds, setConvertingIds] = useState<Set<string>>(() => new Set());
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [minAmount, setMinAmount] = useState<string>("");
@@ -103,10 +104,14 @@ export default function QuotesPage() {
   };
 
   const handleConvertToInvoice = async (q: any) => {
+    if (convertingIds.has(q.id)) return;
     if (!confirm(`تحويل العرض ${q.quote_number} إلى فاتورة؟ سيتم حذف عرض السعر من القائمة بعد التحويل.`)) return;
+    setConvertingIds((prev) => { const n = new Set(prev); n.add(q.id); return n; });
     try {
       const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
-      const { invoiceId, invoiceNumber, stockDeducted, deductedLineCount } = await convertQuoteToInvoice(q.id);
+      const { withQuoteConvertLock } = await import("@/utils/convertQuoteLock");
+      const { invoiceId, invoiceNumber, stockDeducted, deductedLineCount } =
+        await withQuoteConvertLock(q.id, () => convertQuoteToInvoice(q.id));
       const stockMsg = stockDeducted
         ? ` · ✅ تم خصم المخزون تلقائيًا (${deductedLineCount} صنف)`
         : "";
@@ -125,6 +130,8 @@ export default function QuotesPage() {
         context: `QuotesPage.handleConvertToInvoice(quote=${q?.quote_number || q?.id})`,
         fallbackMessage: "تعذّر إتمام التحويل — راجع البنود والاتصال ثم أعد المحاولة",
       });
+    } finally {
+      setConvertingIds((prev) => { const n = new Set(prev); n.delete(q.id); return n; });
     }
   };
 
@@ -336,9 +343,10 @@ export default function QuotesPage() {
                           type="button"
                           className="btn-xs btn-primary"
                           onClick={() => handleConvertToInvoice(q)}
-                          title="تحويل لفاتورة"
+                          disabled={convertingIds.has(q.id)}
+                          title={convertingIds.has(q.id) ? "جارٍ التحويل..." : "تحويل لفاتورة"}
                         >
-                          → فاتورة
+                          {convertingIds.has(q.id) ? "…جارٍ التحويل" : "→ فاتورة"}
                         </button>
                         <details className="legacy-send-menu" style={{ position: "relative", display: "inline-block" }}>
                           <summary className="btn-xs btn-info" style={{ cursor: "pointer", listStyle: "none" }} title="إرسال">

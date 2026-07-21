@@ -53,6 +53,7 @@ export default function SideQuotesPage() {
   const [transferTarget, setTransferTarget] = useState<string>("");
   const [transferNote, setTransferNote] = useState<string>("");
   const [historyOpenId, setHistoryOpenId] = useState<string | null>(null);
+  const [convertingIds, setConvertingIds] = useState<Set<string>>(() => new Set());
 
   const { data: history } = useQuery({
     queryKey: ["quote-transfers", historyOpenId],
@@ -117,10 +118,14 @@ export default function SideQuotesPage() {
 
 
   const handleConvert = async (q: any) => {
+    if (convertingIds.has(q.id)) return;
     if (!confirm(`تحويل العرض الجانبي ${q.quote_number} إلى فاتورة؟ سيتم حذف عرض السعر من القائمة بعد التحويل.`)) return;
+    setConvertingIds((prev) => { const n = new Set(prev); n.add(q.id); return n; });
     try {
       const { convertQuoteToInvoice } = await import("@/utils/quoteToInvoice");
-      const { invoiceId, invoiceNumber, stockDeducted, deductedLineCount } = await convertQuoteToInvoice(q.id);
+      const { withQuoteConvertLock } = await import("@/utils/convertQuoteLock");
+      const { invoiceId, invoiceNumber, stockDeducted, deductedLineCount } =
+        await withQuoteConvertLock(q.id, () => convertQuoteToInvoice(q.id));
       const stockMsg = stockDeducted ? ` · ✅ تم خصم المخزون تلقائيًا (${deductedLineCount} صنف)` : "";
       toast.success(`تم التحويل إلى فاتورة ${invoiceNumber} — تم حذف عرض السعر${stockMsg}`);
       qc.invalidateQueries({ queryKey: ["side-quotes"] });
@@ -136,6 +141,8 @@ export default function SideQuotesPage() {
         context: `SideQuotesPage.handleConvert(quote=${q?.quote_number || q?.id})`,
         fallbackMessage: "تعذّر إتمام التحويل — راجع البنود والاتصال ثم أعد المحاولة",
       });
+    } finally {
+      setConvertingIds((prev) => { const n = new Set(prev); n.delete(q.id); return n; });
     }
   };
 
@@ -283,7 +290,7 @@ export default function SideQuotesPage() {
                         <button className="btn-xs btn-success" onClick={() => navigate(`/quotes/side/${q.id}`)}>عرض</button>
                         <button className="btn-xs btn-warning" onClick={() => navigate(`/quotes/side/edit/${q.id}`)}>تعديل</button>
                         <button className="btn-xs btn-info" onClick={() => handlePrintSide(q)}>طباعة</button>
-                        <button className="btn-xs btn-primary" onClick={() => handleConvert(q)}>→ فاتورة</button>
+                        <button className="btn-xs btn-primary" onClick={() => handleConvert(q)} disabled={convertingIds.has(q.id)}>{convertingIds.has(q.id) ? "…" : "→ فاتورة"}</button>
                         <button className="btn-xs" style={{ background:"#8b5cf6", color:"#fff" }} onClick={() => { setTransferringId(q.id); setTransferTarget(""); setTransferNote(""); }}>نقل ملكية</button>
                         <button className="btn-xs" style={{ background:"#0ea5e9", color:"#fff" }} onClick={() => setHistoryOpenId(historyOpenId === q.id ? null : q.id)}>سجل النقل</button>
                         <button className="btn-xs btn-danger" onClick={() => handleDelete(q.id)}>🗑</button>
@@ -369,7 +376,7 @@ export default function SideQuotesPage() {
                   <>
                     <button className="btn-xs btn-warning" onClick={() => navigate(`/quotes/side/edit/${q.id}`)}>✎ تعديل</button>
                     <button className="btn-xs btn-info" onClick={() => handlePrintSide(q)}>🖨 طباعة</button>
-                    <button className="btn-xs btn-primary" onClick={() => handleConvert(q)}>→ فاتورة</button>
+                    <button className="btn-xs btn-primary" onClick={() => handleConvert(q)} disabled={convertingIds.has(q.id)}>{convertingIds.has(q.id) ? "…" : "→ فاتورة"}</button>
                     <button className="btn-xs btn-danger" onClick={() => handleDelete(q.id)}>🗑 حذف</button>
                   </>
                 }
