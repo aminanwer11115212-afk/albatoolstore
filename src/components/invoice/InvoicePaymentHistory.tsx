@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronDown, ChevronUp, History, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, History, Loader2, Pencil } from "lucide-react";
 import { methodLabel } from "./CustomerPaymentDialog";
+import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface Props {
   invoiceId: string;
@@ -18,48 +20,62 @@ interface Revision {
   changes: any;
 }
 
+interface LiveTx {
+  id: string;
+  amount: number;
+  method: string | null;
+  account_id: string | null;
+  date: string | null;
+  customer_id: string | null;
+  reference_id: string | null;
+  description: string | null;
+  created_at: string;
+}
+
 /**
- * سجل تدقيق دفعات الفاتورة — يقرأ من invoice_revisions حيث action='payment'.
- * يعرض من قام بالتسجيل، الوقت، القيمة، وطريقة الدفع.
+ * سجل تدقيق دفعات الفاتورة — snapshots + الدفعات النشطة القابلة للتعديل.
  */
 export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0 }: Props) {
   const [rows, setRows] = useState<Revision[]>([]);
+  const [live, setLive] = useState<LiveTx[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(true);
+  const [editing, setEditing] = useState<EditablePayment | null>(null);
+  const [bump, setBump] = useState(0);
+  const { isAdmin } = useUserRole();
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       if (!invoiceId) return;
       setLoading(true);
-      const { data } = await (supabase as any)
-        .from("invoice_revisions")
-        .select("id, created_at, action, changed_by, note, snapshot, changes")
-        .eq("invoice_id", invoiceId)
-        .eq("action", "payment")
-        .order("created_at", { ascending: false });
-      if (cancelled) return;
-      setRows((data as Revision[]) || []);
-      setLoading(false);
-    })();
-    const onChange = () => {
-      // إعادة التحميل عند إشعار تغيير الدفعات
-      (async () => {
-        const { data } = await (supabase as any)
+      const [{ data: revs }, { data: txs }] = await Promise.all([
+        (supabase as any)
           .from("invoice_revisions")
           .select("id, created_at, action, changed_by, note, snapshot, changes")
           .eq("invoice_id", invoiceId)
           .eq("action", "payment")
-          .order("created_at", { ascending: false });
-        setRows((data as Revision[]) || []);
-      })();
+          .order("created_at", { ascending: false }),
+        (supabase as any)
+          .from("transactions")
+          .select("id, amount, method, account_id, date, customer_id, reference_id, description, created_at")
+          .eq("reference_id", invoiceId)
+          .eq("category", "customer_payment")
+          .order("created_at", { ascending: false }),
+      ]);
+      if (cancelled) return;
+      setRows((revs as Revision[]) || []);
+      setLive((txs as LiveTx[]) || []);
+      setLoading(false);
     };
+    load();
+    const onChange = () => load();
     window.addEventListener("invoice-payments:changed", onChange);
     return () => {
       cancelled = true;
       window.removeEventListener("invoice-payments:changed", onChange);
     };
-  }, [invoiceId, refreshKey]);
+  }, [invoiceId, refreshKey, bump]);
 
   if (!invoiceId) return null;
 
@@ -84,54 +100,101 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0 }: Pro
             <div className="flex items-center gap-1 p-3 text-muted-foreground">
               <Loader2 size={14} className="animate-spin" /> جارٍ التحميل…
             </div>
-          ) : rows.length === 0 ? (
-            <div className="p-3 text-muted-foreground text-center">لا توجد دفعات مسجّلة بعد</div>
           ) : (
-            <ul className="divide-y divide-border max-h-64 overflow-auto">
-              {rows.map((r) => {
-                const s = r.snapshot || {};
-                const amount = Number(s.amount || 0);
-                const applied = Number(s.applied || 0);
-                const overpay = Number(s.overpay || 0);
-                const disc = Number(s.discount || 0);
-                const acc = s.account_name || "—";
-                const bank = s.bank_name ? ` — ${s.bank_name}` : "";
-                const ref = s.reference_no ? ` — رقم العملية ${s.reference_no}` : "";
-                const when = new Date(r.created_at).toLocaleString("ar-EG");
-                return (
-                  <li key={r.id} className="p-2 space-y-0.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold tabular-nums text-primary">
-                        {amount.toLocaleString()}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">{when}</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-                      <span>الطريقة: <b className="text-foreground">{methodLabel(s.method || "")}</b></span>
-                      <span>الحساب: <b className="text-foreground">{acc}{bank}</b></span>
-                      {applied > 0 && applied !== amount && (
-                        <span>مُطبَّق: <b className="text-foreground">{applied.toLocaleString()}</b></span>
-                      )}
-                      {overpay > 0 && (
-                        <span className="text-emerald-700 dark:text-emerald-300">
-                          فائض: <b>{overpay.toLocaleString()}</b>
-                        </span>
-                      )}
-                      {disc > 0 && <span>خصم: <b className="text-foreground">{disc.toLocaleString()}</b></span>}
-                      {ref && <span>{ref}</span>}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      بواسطة: <b>{r.changed_by || "—"}</b>
-                      {s.status && <> — الحالة بعد الحفظ: <b>{s.status}</b></>}
-                    </div>
-                    {r.note && <div className="text-[10px] text-muted-foreground/80">{r.note}</div>}
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              {isAdmin && live.length > 0 && (
+                <div className="border-b border-border/70 bg-muted/20 p-2 space-y-1">
+                  <div className="text-[10px] font-semibold text-muted-foreground">الدفعات النشطة (قابلة للتعديل)</div>
+                  <ul className="divide-y divide-border/60">
+                    {live.map((t) => (
+                      <li key={t.id} className="flex items-center justify-between gap-2 py-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="font-bold tabular-nums text-primary">{Number(t.amount || 0).toLocaleString()}</span>
+                          <span className="text-[11px] text-muted-foreground">{methodLabel(t.method || "")}</span>
+                          <span className="text-[10px] text-muted-foreground">{t.date || ""}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] hover:bg-primary/10 hover:border-primary/40"
+                          onClick={() => setEditing({
+                            id: t.id,
+                            amount: Number(t.amount || 0),
+                            reference_id: t.reference_id,
+                            customer_id: t.customer_id,
+                            description: t.description,
+                            method: t.method,
+                            account_id: t.account_id,
+                            date: t.date,
+                          })}
+                          data-testid="edit-invoice-payment-btn"
+                        >
+                          <Pencil size={11} /> تعديل
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {rows.length === 0 ? (
+                <div className="p-3 text-muted-foreground text-center">لا توجد دفعات مسجّلة بعد</div>
+              ) : (
+                <ul className="divide-y divide-border max-h-64 overflow-auto">
+                  {rows.map((r) => {
+                    const s = r.snapshot || {};
+                    const amount = Number(s.amount || 0);
+                    const applied = Number(s.applied || 0);
+                    const overpay = Number(s.overpay || 0);
+                    const disc = Number(s.discount || 0);
+                    const acc = s.account_name || "—";
+                    const bank = s.bank_name ? ` — ${s.bank_name}` : "";
+                    const ref = s.reference_no ? ` — رقم العملية ${s.reference_no}` : "";
+                    const when = new Date(r.created_at).toLocaleString("ar-EG");
+                    return (
+                      <li key={r.id} className="p-2 space-y-0.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold tabular-nums text-primary">
+                            {amount.toLocaleString()}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">{when}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                          <span>الطريقة: <b className="text-foreground">{methodLabel(s.method || "")}</b></span>
+                          <span>الحساب: <b className="text-foreground">{acc}{bank}</b></span>
+                          {applied > 0 && applied !== amount && (
+                            <span>مُطبَّق: <b className="text-foreground">{applied.toLocaleString()}</b></span>
+                          )}
+                          {overpay > 0 && (
+                            <span className="text-emerald-700 dark:text-emerald-300">
+                              فائض: <b>{overpay.toLocaleString()}</b>
+                            </span>
+                          )}
+                          {disc > 0 && <span>خصم: <b className="text-foreground">{disc.toLocaleString()}</b></span>}
+                          {ref && <span>{ref}</span>}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          بواسطة: <b>{r.changed_by || "—"}</b>
+                          {s.status && <> — الحالة بعد الحفظ: <b>{s.status}</b></>}
+                        </div>
+                        {r.note && <div className="text-[10px] text-muted-foreground/80">{r.note}</div>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </>
           )}
         </div>
       )}
+
+      <EditPaymentDialog
+        open={!!editing}
+        tx={editing}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setBump((b) => b + 1);
+          window.dispatchEvent(new Event("invoice-payments:changed"));
+        }}
+      />
     </div>
   );
 }
