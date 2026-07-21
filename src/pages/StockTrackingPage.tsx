@@ -21,7 +21,7 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { printStockMovements } from "@/utils/stockMovementsPrint";
 
-type MoveType = "sale" | "return" | "purchase" | "transfer_in" | "transfer_out" | "manual_adjustment";
+type MoveType = "sale" | "return" | "purchase" | "transfer_in" | "transfer_out" | "manual_adjustment" | "invoice_delete_restore";
 
 interface Move {
   id: string;
