@@ -74,16 +74,18 @@ export async function deleteInvoiceWithStockRestore(
     .eq("invoice_id", invoiceId);
   if (itErr) throw new Error(`تعذّر قراءة بنود الفاتورة: ${itErr.message}`);
 
-  // 3) إرجاع المخزون إن كانت الفاتورة قد خُصمت — إما عبر الحارس الحديث
-  //    (stock_deduction_id / stock_deducted_at) أو ضمنياً لأن سير العمل
-  //    تجاوز حالة "جديد" (الفواتير القديمة قبل إدخال الحارس).
+  // 3) إرجاع المخزون: أي فاتورة محفوظة تعتبر مُخصومة من المخزون فعلياً
+  //    (مسار الإنشاء يستدعي deductStockForInvoiceOnce قبل إظهار البنود، ومسار
+  //    التعديل يطبّق الفرق فوراً). لذا إذا وُجدت بنود ⇒ يجب إرجاعها كي لا
+  //    يبقى المخزون سالباً. الحارس القديم المعتمد على stock_deduction_id
+  //    كان يفشل مع الفواتير المُنشأة قبل إدخال العَلَم أو حين يتعطّل الكتابة
+  //    عليه، مما أنتج مخزوناً سالباً بعد الحذف.
   let restoredStock = false;
-  const wasDeducted =
-    !!(inv as any).stock_deduction_id ||
-    !!(inv as any).stock_deducted_at ||
-    ((inv as any).workflow_status && (inv as any).workflow_status !== "new");
-  if (wasDeducted && items && items.length > 0) {
-    await applyStockDeltaForLines(items as any[], []);
+  const linesToRestore = (items || []).filter(
+    (it: any) => it && it.product_id && Number(it.quantity || 0) > 0,
+  );
+  if (linesToRestore.length > 0) {
+    await applyStockDeltaForLines(linesToRestore as any[], []);
     restoredStock = true;
   }
 
