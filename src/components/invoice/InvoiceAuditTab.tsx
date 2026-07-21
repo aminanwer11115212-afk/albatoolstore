@@ -83,6 +83,7 @@ export default function InvoiceAuditTab({ invoiceId, customerId }: Props) {
 
       for (const t of (txRes.data || []) as any[]) {
         const info = classifyCreditRow(t);
+        const opNo = extractOperationNo(t.description);
         if (t.category === "customer_payment") {
           list.push({
             id: `tx-${t.id}`,
@@ -92,6 +93,7 @@ export default function InvoiceAuditTab({ invoiceId, customerId }: Props) {
             detail: t.description || "-",
             amount: Number(t.amount),
             refId: t.id,
+            opNo,
             icon: "payment",
             colorClass: "text-emerald-700 bg-emerald-50 border-emerald-200",
           });
@@ -105,6 +107,7 @@ export default function InvoiceAuditTab({ invoiceId, customerId }: Props) {
             detail: t.description || info.label,
             amount: Number(t.amount),
             refId: t.id,
+            opNo,
             icon: "credit",
             colorClass: isConsumption
               ? "text-amber-800 bg-amber-50 border-amber-200"
@@ -211,9 +214,20 @@ export default function InvoiceAuditTab({ invoiceId, customerId }: Props) {
                       : "—"}
                   </td>
                   <td className="px-3 py-2 text-left">
-                    <code className="text-[10px] text-muted-foreground font-mono">
-                      {it.refId ? String(it.refId).slice(0, 8) : "—"}
-                    </code>
+                    {it.opNo ? (
+                      <span className="inline-flex flex-col items-start gap-0.5">
+                        <span className="font-mono text-[11px] font-semibold text-foreground" title="رقم العملية">
+                          {it.opNo}
+                        </span>
+                        <code className="text-[9px] text-muted-foreground font-mono" title="معرّف القيد">
+                          {it.refId ? String(it.refId).slice(0, 8) : ""}
+                        </code>
+                      </span>
+                    ) : (
+                      <code className="text-[10px] text-muted-foreground font-mono" title="معرّف القيد">
+                        {it.refId ? String(it.refId).slice(0, 8) : "—"}
+                      </code>
+                    )}
                   </td>
                 </tr>
               );
