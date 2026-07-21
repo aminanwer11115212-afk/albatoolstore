@@ -12,7 +12,7 @@ import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/u
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
-import RevisePaymentDialog, { type RevisableTx } from "@/components/statement/RevisePaymentDialog";
+import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
 import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvoiceDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 import CustomerBalanceAuditTab from "@/components/customer/CustomerBalanceAuditTab";
