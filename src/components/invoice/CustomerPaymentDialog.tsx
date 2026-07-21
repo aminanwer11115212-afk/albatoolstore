@@ -239,36 +239,95 @@ export default function CustomerPaymentDialog({
   }, [accountOptions]);
 
   // — تحكم كامل بالكيبورد داخل الحوار —
-  const focusNextField = useCallback((current: HTMLElement) => {
+  const creditUseRef = useRef<HTMLInputElement | null>(null);
+  const dateRef = useRef<HTMLInputElement | null>(null);
+  const referenceRef = useRef<HTMLInputElement | null>(null);
+
+  const focusNextField = useCallback((current: HTMLElement, backward = false) => {
     const scope = current.closest('[data-pay-scope]');
     if (!scope) return;
     const nodes = Array.from(
       scope.querySelectorAll<HTMLElement>('[data-pay-field]:not([disabled]):not([aria-hidden="true"])')
     ).filter((el) => el.offsetParent !== null);
     const idx = nodes.indexOf(current);
-    const next = nodes[idx + 1];
+    const next = backward ? nodes[idx - 1] : nodes[idx + 1];
     if (next) { next.focus(); (next as any).select?.(); }
   }, []);
 
+  const focusByRef = (ref: React.MutableRefObject<any>) => {
+    setTimeout(() => { try { ref.current?.focus(); ref.current?.select?.(); } catch {} }, 0);
+  };
+
+  const applyAllCredit = useCallback(() => {
+    const avail = custBalance?.credit || 0;
+    const rem = Math.max(0, remaining - (Number(discount) || 0));
+    const use = Math.min(avail, rem);
+    setCreditUse(String(use));
+    setAmount(String(Math.max(0, rem - use)));
+    if (use > 0) toast.success(`تم استخدام ${use.toLocaleString()} من الرصيد الدائن`);
+  }, [custBalance, remaining, discount]);
+
   const onDialogKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (saving) return;
-    // Ctrl/⌘+Enter → فتح تأكيد الحفظ
+    const t = e.target as HTMLElement;
+    const inTextarea = t.tagName === "TEXTAREA";
+
+    // Ctrl/⌘+Enter → فتح تأكيد الحفظ من أي مكان
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation();
       requestSave();
       return;
     }
-    // Enter داخل حقل نصي (ما عدا Textarea) → الحقل التالي
-    if (e.key === "Enter") {
-      const t = e.target as HTMLElement;
-      if (t.tagName === "TEXTAREA") return;
-      if (t.hasAttribute("data-pay-field")) {
+    // اختصارات Alt
+    if (e.altKey && !e.ctrlKey && !e.metaKey) {
+      const k = e.key.toLowerCase();
+      if (k === "s") { e.preventDefault(); requestSave(); return; }
+      if (k === "b") { e.preventDefault(); setMethod("bank"); return; }
+      if (k === "n") { e.preventDefault(); setMethod("cash"); return; }
+      if (k === "k" && (custBalance?.credit || 0) > 0.01) { e.preventDefault(); applyAllCredit(); return; }
+      if (k === "1") { e.preventDefault(); focusByRef(amountRef); return; }
+      if (k === "2") { e.preventDefault(); const el = document.querySelector<HTMLElement>('[data-pay-scope] [data-pay-anchor="discount"] input'); el?.focus(); (el as any)?.select?.(); return; }
+      if (k === "3") { e.preventDefault(); focusByRef(creditUseRef); return; }
+      if (k === "4") { e.preventDefault(); focusByRef(dateRef); return; }
+      if (k === "5") { e.preventDefault(); focusByRef(referenceRef); return; }
+    }
+    // Enter → الحقل التالي (باستثناء Textarea والقوائم المفتوحة/الأزرار)
+    if (e.key === "Enter" && !inTextarea) {
+      if (t.hasAttribute("data-pay-field") && t.getAttribute("aria-expanded") !== "true") {
+        const role = t.getAttribute("role");
+        // زر Select (combobox) — اترك Enter يفتح القائمة افتراضياً
+        if (role === "combobox") return;
         e.preventDefault();
         focusNextField(t);
       }
+      return;
+    }
+    // Ctrl+↑/↓ → تنقّل يدوي بين الحقول
+    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && e.ctrlKey) {
+      if (t.hasAttribute("data-pay-field")) {
+        e.preventDefault();
+        focusNextField(t, e.key === "ArrowUp");
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saving, focusNextField]);
+  }, [saving, focusNextField, custBalance, applyAllCredit]);
+
+  // اختصارات نافذة التأكيد
+  const onConfirmKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (saving) return;
+    if (e.key === "Enter" && !(e.target as HTMLElement).closest('textarea')) {
+      const disc = Math.max(0, Number(discount) || 0);
+      const cu = Math.max(0, Number(creditUse) || 0);
+      const needsAck = disc > 0 || cu > 0;
+      if (needsAck && !ackAdjustments) {
+        toast.info("أكّد التسويات أولاً بالضغط على المربع (Space)");
+        return;
+      }
+      e.preventDefault();
+      handleSave();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saving, ackAdjustments, discount, creditUse]);
 
   function requestSave() {
     const n = Number(amount) || 0;
@@ -788,8 +847,10 @@ export default function CustomerPaymentDialog({
 
 
                 {/* تلميح لوحة المفاتيح */}
-                <div className="text-[10px] text-muted-foreground rounded-md border border-dashed p-2 leading-relaxed">
-                  ⌨︎ <b>Enter</b>: التالي · <b>Ctrl+Enter</b>: حفظ · <b>Esc</b>: إغلاق
+                <div className="text-[10px] text-muted-foreground rounded-md border border-dashed p-2 leading-relaxed space-y-0.5">
+                  <div>⌨︎ <b>Enter</b>: التالي · <b>Ctrl+Enter</b> / <b>Alt+S</b>: حفظ · <b>Esc</b>: إغلاق</div>
+                  <div><b>Alt+B</b>: بنكي · <b>Alt+N</b>: نقدي · <b>Alt+K</b>: استخدم كل الرصيد الدائن</div>
+                  <div><b>Alt+1..5</b>: قفزات مبلغ/خصم/رصيد/تاريخ/مرجع · <b>Ctrl+↑/↓</b>: تنقّل</div>
                 </div>
 
                 {!isPos && recentInvoices.length > 0 && (
@@ -854,7 +915,7 @@ export default function CustomerPaymentDialog({
                   </div>
                 )}
               </div>
-              <div>
+              <div data-pay-anchor="discount">
                 {canApplyDiscount ? (
                   <DiscountInput
                     label="خصم على الدفعة"
@@ -907,6 +968,7 @@ export default function CustomerPaymentDialog({
                   </button>
                 </div>
                 <Input
+                  ref={creditUseRef}
                   data-pay-field
                   type="number"
                   inputMode="decimal"
@@ -937,7 +999,7 @@ export default function CustomerPaymentDialog({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">التاريخ</Label>
-                <Input data-pay-field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <Input ref={dateRef} data-pay-field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -1035,7 +1097,7 @@ export default function CustomerPaymentDialog({
             {isBankPaymentMethod(method) && (
               <div>
                 <Label className="text-xs">رقم العملية (اختياري)</Label>
-                <Input data-pay-field value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="مثلاً TRX-1234" />
+                <Input ref={referenceRef} data-pay-field value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="مثلاً TRX-1234" />
               </div>
             )}
 
@@ -1052,7 +1114,7 @@ export default function CustomerPaymentDialog({
 
       {/* نافذة تأكيد قبل الحفظ */}
       <Dialog open={confirmOpen} onOpenChange={(v) => !saving && setConfirmOpen(v)}>
-        <DialogContent className="max-w-sm" dir="rtl">
+        <DialogContent className="max-w-sm" dir="rtl" onKeyDown={onConfirmKeyDown}>
           <DialogHeader>
             <DialogTitle>تأكيد تسجيل الدفعة</DialogTitle>
           </DialogHeader>
