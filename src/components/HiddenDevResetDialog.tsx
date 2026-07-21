@@ -362,13 +362,14 @@ export default function HiddenDevResetDialog() {
         if (!v) { setConfirmText(""); setResult(null); setScope(INITIAL_SCOPE); }
       }}
     >
-      <DialogContent className="max-w-2xl" dir="rtl">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0" dir="rtl">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle size={18} /> أداة مطوّر مخفية — منطقة الخطر
           </DialogTitle>
         </DialogHeader>
 
+        <ScrollArea className="flex-1 px-6 pb-6">
         <div className="space-y-4 text-sm">
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive leading-relaxed">
             الوصول عبر <b>Ctrl+Shift+9</b> فقط، ومخصصة لمستخدمي admin. كل تنفيذ يُوثَّق في <b>سجل التدقيق</b>. <b>لا يمكن التراجع.</b>
