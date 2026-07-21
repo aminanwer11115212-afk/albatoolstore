@@ -436,7 +436,9 @@ export function useDashboardStats() {
         supabase.from("transactions").select("type, amount"),
       ]);
 
-      const invRows = (invoices.data || []) as any[];
+      // استبعاد الفواتير الملغاة من كل حسابات المبيعات لكي تطابق تقارير الدخل
+      const invRows = ((invoices.data || []) as any[])
+        .filter((r) => (r.status || "").toLowerCase() !== "cancelled");
       const isPos = (r: any) => (r.source || "regular") === "pos";
       const yearStart = `${new Date().getFullYear()}-01-01`;
       const inThisYear = (r: any) => !!r.date && String(r.date) >= yearStart;
