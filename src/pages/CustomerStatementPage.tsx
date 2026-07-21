@@ -1107,6 +1107,15 @@ export default function CustomerStatementPage() {
         onClose={() => setReviseTx(null)}
         onSaved={refreshAfterRevise}
       />
+
+      <ApplyCreditToInvoiceDialog
+        open={applyCreditOpen}
+        customerId={selectedCustomerId || null}
+        customerName={selectedCustomer?.name || null}
+        availableCredit={Number((selectedCustomer as any)?.credit_balance || 0)}
+        onClose={() => setApplyCreditOpen(false)}
+        onApplied={refreshAfterRevise}
+      />
     </div>
   );
 }
