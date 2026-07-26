@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, FilePlus, List, CreditCard, Settings, ChevronLeft, ChevronRight, Calculator, Users, Package, BarChart3, Wallet, ArrowLeftRight } from "lucide-react";
-import { useQuotesWithCustomers, useInvoicesWithCustomers, useAccounts } from "@/hooks/useData";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAccounts } from "@/hooks/useData";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -54,12 +56,54 @@ export default function FloatingSideTools() {
   const [calcOp, setCalcOp] = useState<{ val: number; op: string } | null>(null);
   const [calcNew, setCalcNew] = useState(true);
 
-  const { data: quotes } = useQuotesWithCustomers();
-  const { data: invoices } = useInvoicesWithCustomers();
+  // هذا الشريط مركَّب في AppLayout أي في كل صفحة — كان يحمّل جدولي الفواتير
+  // وعروض الأسعار كاملين (بـ join عملاء) لمجرد عدّادين ونافذتي «آخر 15».
+  // الآن: العدّادات عبر count فقط (بلا صفوف)، والقوائم تُجلب عند فتح النافذة.
+  const { data: counts } = useQuery({
+    queryKey: ["floating-counts"],
+    queryFn: async () => {
+      const [inv, qt] = await Promise.all([
+        supabase.from("invoices").select("id", { count: "exact", head: true }),
+        supabase.from("quotes").select("id", { count: "exact", head: true })
+          .or("is_side.is.null,is_side.eq.false"),
+      ]);
+      return { invoices: inv.count || 0, quotes: qt.count || 0 };
+    },
+    staleTime: 60_000,
+  });
+  const { data: quotes } = useQuery({
+    queryKey: ["floating-quotes-recent"],
+    enabled: showQuotes,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("quotes")
+        .select("id, quote_number, date, total, status, customers(name)")
+        .or("is_side.is.null,is_side.eq.false")
+        .order("created_at", { ascending: false })
+        .limit(15);
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: invoices } = useQuery({
+    queryKey: ["floating-invoices-recent"],
+    enabled: showInvoices,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoices")
+        .select("id, invoice_number, date, total, workflow_status, customers(name)")
+        .order("created_at", { ascending: false })
+        .limit(15);
+      if (error) throw error;
+      return data;
+    },
+  });
   const { data: accounts } = useAccounts();
 
-  const quotesCount = quotes?.length || 0;
-  const invoicesCount = invoices?.length || 0;
+  const quotesCount = counts?.quotes || 0;
+  const invoicesCount = counts?.invoices || 0;
   const totalBalance = (accounts || []).reduce((sum: number, a: any) => sum + Number(a.balance || 0), 0);
 
   const { dlgRef: quotesRef, dlgStyle: quotesStyle } = useDialogSize("floating_quotes_dialog", showQuotes, { w: "min(680px, 96vw)", h: "80vh" });

@@ -3134,6 +3134,7 @@ export type Database = {
         Args: { _customer_id: string; _date?: string; _items: Json }
         Returns: Json
       }
+      get_dashboard_stats: { Args: never; Returns: Json }
       apply_exchange_rate_bulk: {
         Args: { _currency_code: string; _new_rate: number }
         Returns: Json

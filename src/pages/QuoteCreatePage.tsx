@@ -5,7 +5,7 @@ import { checkDuplicateBeforeInsert } from "@/utils/duplicateSaveToast";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { fetchAllProducts, fetchAllProductsCoalesced } from "@/lib/fetchAllProducts";
 import { startsWithAny } from "@/utils/searchMatch";
 import { toast } from "sonner";
 import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck } from "lucide-react";
@@ -469,7 +469,7 @@ export default function QuoteCreatePage() {
     // returns to this tab, so the picker always shows the latest data.
     const refetchProducts = async () => {
       setProductsLoading(true);
-      const ps = await fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,category_id,warehouse_id,is_frozen");
+      const ps = await fetchAllProductsCoalesced<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,category_id,warehouse_id,is_frozen");
       setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
       setProductsLoading(false);
     };

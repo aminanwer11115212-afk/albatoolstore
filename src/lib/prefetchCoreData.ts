@@ -31,13 +31,10 @@ export async function prefetchCoreData(qc: QueryClient): Promise<void> {
       if (error) throw error;
       return data;
     }),
-    safePrefetch(qc, ["products-with-details"], async () => {
-      const { data, error } = await (supabase as any)
-        .from("products")
-        .select("*, product_category_links(*), product_brand_links(*)");
-      if (error) throw error;
-      return data;
-    }),
+    // ملاحظة: لا نجلب ["products-with-details"] هنا عمداً — الهوك
+    // useProductsWithDetails يبني شكلاً معالَجاً (خرائط فئات/مستودعات/شركات)
+    // وكتابة الصفوف الخام على نفس المفتاح كانت تُفسد الشكل كل 5 دقائق.
+    // كاش المنتجات تتكفل به مسارات fetchAllProducts/ProductsCacheSync.
     safePrefetch(qc, ["accounts"], async () => {
       const { data, error } = await supabase.from("accounts").select("*");
       if (error) throw error;

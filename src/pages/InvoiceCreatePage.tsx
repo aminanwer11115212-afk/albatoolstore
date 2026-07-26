@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { fetchAllProducts, fetchAllProductsCoalesced } from "@/lib/fetchAllProducts";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
@@ -282,7 +282,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     // invoice creation/edit) or when the user returns to this tab.
     const refetchProducts = async () => {
       setProductsLoading(true);
-      const ps = await fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id");
+      const ps = await fetchAllProductsCoalesced<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id");
       setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
       setProductsLoading(false);
     };

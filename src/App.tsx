@@ -266,15 +266,10 @@ const App = () => {
     }
     void prefetchCoreData(queryClient);
 
-    // إعادة تحميل البيانات الأساسية دورياً كل 5 دقائق (فقط عند وجود اتصال)
-    // لإبقاء نسخة الأوفلاين محدَّثة بدون انتظار زيارة المستخدم للصفحات.
-    const intervalId = setInterval(() => {
-      if (navigator.onLine) {
-        void prefetchCoreData(queryClient);
-      }
-    }, 5 * 60_000);
-
-    return () => clearInterval(intervalId);
+    // الجلب المسبق مرة واحدة عند الإقلاع فقط. التكرار كل 5 دقائق أُزيل عمداً:
+    // كان يعيد تنزيل 16 جدولاً (منها select * كاملة) حتى مع خمول المستخدم،
+    // بينما Realtime (realtimeSync) يُبطل المفاتيح فور أي تغيير فعلي،
+    // وrefetchOnReconnect يعيد الجلب عند عودة الاتصال — فلا حاجة للتكرار الأعمى.
   }, []);
 
   useEffect(() => {

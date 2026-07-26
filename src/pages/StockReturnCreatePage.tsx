@@ -3,7 +3,7 @@ import { notifyDuplicateItem } from "@/utils/duplicateItemToast";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { fetchAllProducts, fetchAllProductsCoalesced } from "@/lib/fetchAllProducts";
 import { toast } from "sonner";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { applyStockDeltaForLines } from "@/utils/stockDeduction";
@@ -347,7 +347,7 @@ export default function StockReturnCreatePage() {
     // Refetch products when stock changes elsewhere (purchase receipt,
     // invoice creation/edit, product edits) or when the user returns to this tab.
     const refetchProducts = async () => {
-      const ps = await fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id");
+      const ps = await fetchAllProductsCoalesced<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id");
       setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
     };
     // Refetch customers when they change elsewhere or when user returns to this tab.

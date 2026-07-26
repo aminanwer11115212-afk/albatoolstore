@@ -456,6 +456,16 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
+      // المسار الأساسي: مجاميع SQL في استدعاء واحد خفيف (get_dashboard_stats)
+      // بدل تنزيل جدولي الفواتير والمعاملات كاملين وجمعهما في المتصفح —
+      // وأيضاً يتجاوز قصّ Supabase الصامت عند 1000 صف الذي كان سيُخطئ المجاميع.
+      try {
+        const { data, error } = await (supabase as any).rpc("get_dashboard_stats");
+        if (!error && data && typeof data === "object") return data as any;
+      } catch { /* سقوط للمسار القديم أدناه */ }
+
+      // fallback دفاعي: لو الدالة غير مطبَّقة على القاعدة (انجراف مخطط) نحسب
+      // بالطريقة القديمة كي لا تتعطل اللوحة.
       const [customers, products, invoices, transactions] = await Promise.all([
         supabase.from("customers").select("id", { count: "exact", head: true }),
         supabase.from("products").select("id", { count: "exact", head: true }),
