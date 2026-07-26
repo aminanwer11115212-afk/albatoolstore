@@ -200,8 +200,13 @@ async function checkNoOverpaidInvoices(): Promise<InvariantResult> {
 // -----------------------------------------------------------------------------
 async function checkNoNegativeTx(): Promise<InvariantResult> {
   const { v, ms } = await timed(async () => {
+    // قيود استهلاك الرصيد الدائن (customer_credit) تُدرَج بمبلغ سالب عمداً
+    // (apply_customer_credit_to_invoice) ويعتمد عليها recompute_customer_balance
+    // لخصم الرصيد — فهي ليست خطأً ويجب استثناؤها من فحص «لا مبالغ سالبة».
     const { data } = await supabase
-      .from("transactions").select("id,date,type,amount,description").lt("amount", 0);
+      .from("transactions").select("id,date,type,amount,description,category")
+      .lt("amount", 0)
+      .neq("category", "customer_credit");
     return (data || []).map((t: any) => ({ date: t.date, type: t.type, amount: t.amount, description: t.description }));
   });
   return {
@@ -212,7 +217,7 @@ async function checkNoNegativeTx(): Promise<InvariantResult> {
     pass: v.length === 0,
     summary: v.length === 0 ? "OK" : `${v.length} معاملة بمبلغ سالب`,
     offenders: v.slice(0, 10),
-    fixHint: "الإشارة تُحدد من النوع (income/expense) لا من إشارة المبلغ.",
+    fixHint: "الإشارة تُحدد من النوع (income/expense) لا من إشارة المبلغ (باستثناء استهلاك الرصيد الدائن).",
     ms,
   };
 }
