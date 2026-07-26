@@ -29,6 +29,7 @@ vi.mock("@/hooks/useUserRole", () => ({
 }));
 
 // حسابات جاهزة تحتوي "أولاد جابر"
+const emptyQuery = { data: [], isLoading: false, isError: false, refetch: () => {} };
 vi.mock("@/hooks/useData", () => ({
   useAccounts: () => ({
     data: [
@@ -39,17 +40,40 @@ vi.mock("@/hooks/useData", () => ({
     isError: false,
     refetch: () => {},
   }),
+  // خطّافات قد يستخدمها أي مكوّن ابن في شجرة الحوار — stubs آمنة بلا نداءات supabase.
+  useCompanySettings: () => ({ ...emptyQuery, data: [{ id: "co-1", name: "شركة", currency: "SDG" }] }),
+  useCustomers: () => emptyQuery,
+  useProducts: () => emptyQuery,
 }));
 
 // supabase — نتحكم بقراءة الرصيد
 const custRow = { balance: 0, credit_balance: 0 };
 vi.mock("@/integrations/supabase/client", () => {
-  const chain = (row: any) => ({
+  const chain = (row: any): any => ({
+    // فلاتر/ترتيب سلسلية — كلها تُعيد نفس السلسلة
     select: () => chain(row),
     eq: () => chain(row),
+    neq: () => chain(row),
+    not: () => chain(row),
+    in: () => chain(row),
+    gt: () => chain(row),
+    gte: () => chain(row),
+    lt: () => chain(row),
+    lte: () => chain(row),
+    is: () => chain(row),
+    ilike: () => chain(row),
+    or: () => chain(row),
+    order: () => chain(row),
+    limit: () => chain(row),
+    range: () => chain(row),
+    // منهيات
     maybeSingle: async () => ({ data: row, error: null }),
+    single: async () => ({ data: row, error: null }),
     update: () => chain(row),
     insert: async () => ({ error: null }),
+    delete: () => chain(row),
+    // اجعل السلسلة نفسها قابلة للـ await (استعلامات تُرجع مصفوفة)
+    then: (resolve: any) => resolve({ data: Array.isArray(row) ? row : [row], error: null }),
   });
   return {
     supabase: {
@@ -160,6 +184,7 @@ describe("CustomerPaymentDialog — تدفق الدفعة", () => {
 
   it("يبرز حساب «أولاد جابر» عند توفره", async () => {
     renderDlg();
-    await waitFor(() => expect(screen.getByText(/أولاد جابر/)).toBeTruthy());
+    // يظهر الاسم في مكانين: تلميح الافتراضي + عنصر القائمة — نتحقق من وجود واحد على الأقل.
+    await waitFor(() => expect(screen.getAllByText(/أولاد جابر/).length).toBeGreaterThan(0));
   });
 });

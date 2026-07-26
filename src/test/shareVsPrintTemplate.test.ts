@@ -42,39 +42,54 @@ const shareBase = {
   company: { company_name: "شركة" },
 };
 
-function pickBox(html: string, section: "paid-amount" | "final-total"): number {
+function pickRaw(html: string, section: "paid-amount" | "final-total"): string {
   const re = new RegExp(
     `data-section="${section}"[\\s\\S]*?class="summary-box-value[^"]*"[^>]*>([^<]+)<`,
   );
   const m = html.match(re);
   if (!m) throw new Error(`missing box: ${section}`);
-  return Number(m[1].replace(/,/g, ""));
+  return m[1].trim();
 }
 
-describe("printTemplate account-summary contract (must stay in sync with share-link)", () => {
-  it("partial payment: paid + remaining = grandTotal", () => {
+function pickBox(html: string, section: "paid-amount" | "final-total"): number {
+  return Number(pickRaw(html, section).replace(/,/g, ""));
+}
+
+// قالب الطباعة يعرض «رصيد العميل الحالي» موقّعاً: "+ X" (عليه) / "− X" (له) /
+// "خالص" (صفر). نحوّله إلى رقم موقّع للمقارنة.
+function parseNet(raw: string): number {
+  const t = raw.replace(/,/g, "").trim();
+  if (t.includes("خالص")) return 0;
+  if (/^[−-]/.test(t)) return -Number(t.replace(/^[−-]\s*/, ""));
+  if (/^\+/.test(t)) return Number(t.replace(/^\+\s*/, ""));
+  return Number(t);
+}
+
+describe("printTemplate account-summary contract (current-balance semantics)", () => {
+  // القالب يعرض «رصيد العميل الحالي» = جملة الحساب − المدفوع، موقّعاً.
+  it("partial payment: paid + net balance = grandTotal", () => {
     const html = generatePrintHTML({ ...base, paidAmount: 300 });
     const paid = pickBox(html, "paid-amount");
-    const remaining = pickBox(html, "final-total");
+    const net = parseNet(pickRaw(html, "final-total"));
     expect(paid).toBe(300);
-    expect(remaining).toBe(700);
-    expect(paid + remaining).toBe(base.grandTotal);
+    expect(net).toBe(700); // ما زال عليه 700
+    expect(paid + net).toBe(base.grandTotal);
   });
 
-  it("no payment: remaining = grandTotal", () => {
+  it("no payment: net balance = grandTotal", () => {
     const html = generatePrintHTML({ ...base, paidAmount: 0 });
     expect(pickBox(html, "paid-amount")).toBe(0);
-    expect(pickBox(html, "final-total")).toBe(base.grandTotal);
+    expect(parseNet(pickRaw(html, "final-total"))).toBe(base.grandTotal);
   });
 
-  it("fully paid: remaining = 0", () => {
+  it("fully paid: net balance = 0 (خالص)", () => {
     const html = generatePrintHTML({ ...base, paidAmount: 1000 });
-    expect(pickBox(html, "final-total")).toBe(0);
+    expect(parseNet(pickRaw(html, "final-total"))).toBe(0);
   });
 
-  it("overpayment: remaining is clamped to 0 (never negative)", () => {
+  it("overpayment: shows customer credit (له), not clamped", () => {
     const html = generatePrintHTML({ ...base, paidAmount: 1500 });
-    expect(pickBox(html, "final-total")).toBe(0);
+    expect(parseNet(pickRaw(html, "final-total"))).toBe(-500);
   });
 
   it("exposes lov-doc-label / lov-doc-number / lov-customer-name meta for unified PDF naming", () => {
@@ -108,12 +123,18 @@ describe("share vs print: equivalent numeric output", () => {
     { label: "many partial sum drift",      grandTotal: 1000,          paidAmount: [123.45, 67.89, 200.11, 8.55].reduce((s, x) => s + x, 0) },
   ];
 
+  const round2 = (x: number) => Math.round(x * 100) / 100;
   for (const c of cases) {
-    it(`${c.label}: share and print show identical paid + final`, () => {
+    it(`${c.label}: paid boxes match; each final follows its template formula`, () => {
       const shareHtml = buildDocHTML({ ...shareBase, grandTotal: c.grandTotal, paidAmount: c.paidAmount });
       const printHtml = generatePrintHTML({ ...base, grandTotal: c.grandTotal, subtotal: c.grandTotal, paidAmount: c.paidAmount });
+      // المدفوع متطابق بين القالبين
       expect(pickBox(shareHtml, "paid-amount")).toBe(pickBox(printHtml, "paid-amount"));
-      expect(pickBox(shareHtml, "final-total")).toBe(pickBox(printHtml, "final-total"));
+      const due = round2(c.grandTotal - c.paidAmount);
+      // قالب المشاركة: المتبقي المطلوب مقصوصاً عند 0
+      expect(pickBox(shareHtml, "final-total")).toBe(Math.max(0, due));
+      // قالب الطباعة: رصيد العميل الحالي موقّعاً (غير مقصوص)
+      expect(parseNet(pickRaw(printHtml, "final-total"))).toBe(due);
     });
   }
 

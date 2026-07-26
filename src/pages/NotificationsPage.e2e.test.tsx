@@ -52,12 +52,27 @@ function makeQueryBuilder(table: string) {
       : table === "activity_log"
       ? []
       : [];
+  const result = { data, error: null };
   const builder: any = {
     select: () => builder,
+    eq: () => builder,
+    neq: () => builder,
+    not: () => builder,
+    in: () => builder,
+    is: () => builder,
+    or: () => builder,
     gte: () => builder,
     gt: () => builder,
+    lte: () => builder,
+    lt: () => builder,
+    ilike: () => builder,
     order: () => builder,
-    limit: () => Promise.resolve({ data, error: null }),
+    range: () => builder,
+    limit: () => Promise.resolve(result),
+    maybeSingle: () => Promise.resolve({ data: data[0] ?? null, error: null }),
+    single: () => Promise.resolve({ data: data[0] ?? null, error: null }),
+    // اجعل السلسلة قابلة للـ await مباشرةً (استعلامات تنتهي بـ order دون limit)
+    then: (resolve: any) => resolve(result),
   };
   return builder;
 }
@@ -72,6 +87,15 @@ vi.mock("@/integrations/supabase/client", () => ({
       },
     },
     from: (table: string) => makeQueryBuilder(table),
+    channel: () => {
+      const ch: any = {
+        on: () => ch,
+        subscribe: () => ch,
+        unsubscribe: () => Promise.resolve("ok"),
+      };
+      return ch;
+    },
+    removeChannel: () => Promise.resolve("ok"),
   },
 }));
 
