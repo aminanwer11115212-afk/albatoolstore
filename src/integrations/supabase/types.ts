@@ -3118,6 +3118,18 @@ export type Database = {
         }
         Returns: Json
       }
+      record_customer_charge: {
+        Args: {
+          _account_id: string
+          _amount: number
+          _customer_id: string
+          _date: string
+          _method: string
+          _notes: string
+          _reference_no: string
+        }
+        Returns: Json
+      }
       apply_exchange_rate_bulk: {
         Args: { _currency_code: string; _new_rate: number }
         Returns: Json

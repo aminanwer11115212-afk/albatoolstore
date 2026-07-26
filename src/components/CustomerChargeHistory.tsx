@@ -63,9 +63,20 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
   async function executeReverse(g: ChargeGroup) {
     setReversingGroupId(g.groupId);
     try {
-      const { data, error } = await (supabase as any).rpc("reverse_customer_charge", { _group_id: g.groupId });
+      // إلغاء الشحنة عملية مالية هدّامة → عبر الغلاف الأدمني cancel_customer_charge
+      // (يفرض has_role admin + يسجّل السبب) بدل استدعاء reverse_customer_charge مباشرةً.
+      const { data, error } = await (supabase as any).rpc("cancel_customer_charge", {
+        _group_id: g.groupId,
+        _reason: "manual_reverse_from_customer_detail",
+      });
       if (error) throw new Error(error.message);
-      if (!data?.ok) throw new Error(data?.reason || "فشل إلغاء الشحنة");
+      if (!data?.ok) {
+        throw new Error(
+          data?.reason === "unauthorized_admin_only"
+            ? "غير مصرّح — إلغاء الشحنة متاح للمدير فقط"
+            : data?.reason || "فشل إلغاء الشحنة",
+        );
+      }
 
       // Audit log — record who reversed, invoice numbers, group_id, when, and reason.
       try {
@@ -382,18 +393,20 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
                   <Pencil size={12} /> تعديل
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
-                onClick={() => setPendingReverse(g)}
-                disabled={reversingGroupId === g.groupId}
-                data-testid="reverse-charge-btn"
-                title="إلغاء هذه الشحنة وإعادة الأرصدة"
-              >
-                {reversingGroupId === g.groupId ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
-                إلغاء الشحنة
-              </Button>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                  onClick={() => setPendingReverse(g)}
+                  disabled={reversingGroupId === g.groupId}
+                  data-testid="reverse-charge-btn"
+                  title="إلغاء هذه الشحنة وإعادة الأرصدة (للمدير فقط)"
+                >
+                  {reversingGroupId === g.groupId ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                  إلغاء الشحنة
+                </Button>
+              )}
             </div>
           </div>
 

@@ -130,8 +130,9 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       let surplus = 0;
 
       if (online) {
-        // RPC: يوزّع الشحن على الفواتير غير المسددة FIFO ويُحدّث حالتها ذرّياً
-        const { data, error } = await (supabase as any).rpc("allocate_customer_charge", {
+        // RPC: يخزّن الشحن كرصيد دائن كامل للعميل — لا يُوزَّع على أي فاتورة.
+        // تسوية المتبقي تتم يدوياً من كشف الحساب (apply_customer_credit_to_invoice).
+        const { data, error } = await (supabase as any).rpc("record_customer_charge", {
           _customer_id: customerId,
           _amount: amt,
           _date: date,
@@ -141,12 +142,12 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
           _notes: notes || null,
         });
         if (error) throw error;
-        if (data && data.ok === false) throw new Error(data.reason || "تعذّر توزيع الشحن");
+        if (data && data.ok === false) throw new Error(data.reason || "تعذّر حفظ الشحن");
         allocations = (data?.allocations || []) as any[];
         allocatedSum = Number(data?.allocated || 0);
-        surplus = Number(data?.surplus || 0);
+        surplus = Number(data?.surplus ?? data?.credited ?? amt);
       } else {
-        // أوفلاين: احفظ حركة رصيد عامة، سيُعاد توزيعها فور عودة الاتصال (fallback)
+        // أوفلاين: احفظ الشحن كرصيد دائن كامل (نفس سلوك الأونلاين — بلا توزيع).
         const { queued, error: txErr } = await runOrQueue({
           table: "transactions",
           op: "insert",
@@ -159,12 +160,12 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
             date,
             customer_id: customerId,
             account_id: targetAccountId,
-            description: `شحن رصيد (سيُوزَّع عند الاتصال)${notes ? ` - ${notes}` : ""}`,
+            description: `شحن رصيد${notes ? ` - ${notes}` : ""}`,
           },
           label: "شحن رصيد عميل (أوفلاين)",
         });
         if (txErr) throw txErr;
-        if (queued) toast.info("تم الحفظ محلياً — سيُوزَّع تلقائياً عند عودة الاتصال");
+        if (queued) toast.info("تم الحفظ محلياً كرصيد دائن — سيُزامَن عند عودة الاتصال");
         surplus = amt;
       }
 
@@ -174,8 +175,10 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       try { localStorage.setItem("lov:last-method:charge", method); } catch {}
 
       const parts: string[] = [`تم شحن ${amt.toLocaleString()}`];
+      // في الخطة الجديدة لا يُوزَّع الشحن على الفواتير — يُخزَّن كاملاً كرصيد دائن.
       if (allocatedSum > 0) parts.push(`سُدِّد ${allocatedSum.toLocaleString()} على ${allocations.length} فاتورة`);
-      if (surplus > 0.01) parts.push(`فائض ${surplus.toLocaleString()} أُضيف كرصيد للعميل`);
+      const credited = surplus > 0.01 ? surplus : amt;
+      parts.push(`أُضيف ${credited.toLocaleString()} كرصيد دائن للعميل — سدِّد المتبقي يدوياً من كشف الحساب`);
       toast.success(parts.join(" • "));
 
       if (sendWhatsApp) {

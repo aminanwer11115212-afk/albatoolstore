@@ -106,6 +106,9 @@ describe("deleteInvoiceWithStockRestore — integration", () => {
       id: "inv-1",
       invoice_number: "INV-001",
       date: "2026-07-14",
+      // عميل عادي (غير POS) كي تعمل مصالحة الدفعات RPC أولاً قبل الحذف.
+      customer_id: "cust-1",
+      source: "regular",
       stock_deduction_id: "sd-1",
       workflow_status: "preparing",
       paid_amount: 0,
@@ -149,7 +152,30 @@ describe("deleteInvoiceWithStockRestore — integration", () => {
     expect(state.deletedInvoices).toEqual(["inv-legacy"]);
   });
 
-  it("draft-new invoice (workflow=new, no deduction) → deletes without touching stock", async () => {
+  it("invoice with no line items → deletes without touching stock", async () => {
+    // المسار الوحيد الذي لا يُرجع مخزوناً هو غياب البنود؛ أي فاتورة محفوظة ببنود
+    // تُعتبر مخصومة من المخزون (مسار الإنشاء/التعديل يخصم فوراً) فتُرجَع عند الحذف
+    // منعاً للمخزون السالب.
+    state.invoiceRow = {
+      id: "inv-empty",
+      invoice_number: "INV-E",
+      date: "2026-07-14",
+      stock_deduction_id: null,
+      stock_deducted_at: null,
+      workflow_status: "new",
+      paid_amount: 0,
+    };
+    state.items = [];
+
+    const res = await deleteInvoiceWithStockRestore("inv-empty");
+
+    expect(res.restoredStock).toBe(false);
+    expect(res.restoredItems).toEqual([]);
+    expect(stockApplied.length).toBe(0);
+    expect(state.deletedInvoices).toEqual(["inv-empty"]);
+  });
+
+  it("draft-new invoice (workflow=new) WITH items → still restores stock (prevents negative stock)", async () => {
     state.invoiceRow = {
       id: "inv-new",
       invoice_number: "INV-N",
@@ -163,9 +189,9 @@ describe("deleteInvoiceWithStockRestore — integration", () => {
 
     const res = await deleteInvoiceWithStockRestore("inv-new");
 
-    expect(res.restoredStock).toBe(false);
-    expect(res.restoredItems).toEqual([]);
-    expect(stockApplied.length).toBe(0);
+    expect(res.restoredStock).toBe(true);
+    expect(res.restoredItems).toEqual([{ product_id: "p1", quantity: 1 }]);
+    expect(stockApplied.length).toBe(1);
     expect(state.deletedInvoices).toEqual(["inv-new"]);
   });
 });

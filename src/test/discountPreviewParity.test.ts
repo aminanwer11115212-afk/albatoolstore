@@ -103,7 +103,8 @@ describe("Discount / paid_amount / remaining / status — parity across preview 
     expect(html).toContain("25,200");
     expect(html).toContain("25,000");
     expect(html).toContain("− 200");
-    expect(html).toContain("مسددة بالكامل");
+    // القالب يعرض حالة السداد الكامل كرصيد عميل «خالص» (صافي الحساب = 0).
+    expect(html).toContain("خالص");
   });
 
   it("فواتير الكاش عند خصم لاحق تقلل total وpaid_amount معاً حتى لا يظهر فرق", () => {
