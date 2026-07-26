@@ -10,8 +10,11 @@
 -- DEFINER يعملان بصلاحية المالك) وعبر service_role. الواجهة تستدعي الآن
 -- cancel_customer_charge (الأدمني)، وزر «إلغاء الشحنة» مخفيّ لغير الأدمن.
 -- ============================================================
-REVOKE EXECUTE ON FUNCTION public.reverse_customer_charge(uuid) FROM authenticated;
--- (service_role يحتفظ بالصلاحية للمسارات الخلفية؛ الأغلفة الأدمنية تستدعيها ذرّياً)
+-- السحب من PUBLIC ضروري: الدوال في Postgres تُمنح EXECUTE لـ PUBLIC افتراضياً،
+-- وسحبها من authenticated وحده لا يغلق الباب (تبقى قابلة للتنفيذ عبر PUBLIC).
+REVOKE ALL ON FUNCTION public.reverse_customer_charge(uuid) FROM PUBLIC, authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.reverse_customer_charge(uuid) TO service_role;
+-- (الأغلفة الأدمنية SECURITY DEFINER تعمل بصلاحية المالك فتستدعيها بلا منح مباشر)
 
 -- ============================================================
 -- [منخفض] delete_invoice_with_reconciliation: إرجاع مبلغ الدفعات المحوّلة (لا العدد فقط)

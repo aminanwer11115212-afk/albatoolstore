@@ -3130,6 +3130,10 @@ export type Database = {
         }
         Returns: Json
       }
+      settle_invoices_from_credit: {
+        Args: { _customer_id: string; _date?: string; _items: Json }
+        Returns: Json
+      }
       apply_exchange_rate_bulk: {
         Args: { _currency_code: string; _new_rate: number }
         Returns: Json

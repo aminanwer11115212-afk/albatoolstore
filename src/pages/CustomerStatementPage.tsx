@@ -14,6 +14,7 @@ import CustomerStatementErrorState from "@/components/statement/CustomerStatemen
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
 import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
 import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvoiceDialog";
+import SettleInvoicesFromCreditDialog from "@/components/statement/SettleInvoicesFromCreditDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 import CustomerBalanceAuditTab from "@/components/customer/CustomerBalanceAuditTab";
 
@@ -205,6 +206,7 @@ export default function CustomerStatementPage() {
     t.category === "customer_payment" && t.method !== "credit_balance" && !!t.reference_id;
   const [reviseTx, setReviseTx] = useState<EditablePayment | null>(null);
   const [applyCreditOpen, setApplyCreditOpen] = useState(false);
+  const [settleFromCreditOpen, setSettleFromCreditOpen] = useState(false);
   const refreshAfterRevise = () => {
     qc.invalidateQueries({ queryKey: ["customer-transactions", selectedCustomerId] });
     qc.invalidateQueries({ queryKey: ["customer-fresh", selectedCustomerId] });
@@ -477,6 +479,17 @@ export default function CustomerStatementPage() {
         </button>
       {selectedCustomer && (
         <div className="flex justify-end gap-2 flex-wrap">
+          {Number((selectedCustomer as any)?.credit_balance || 0) > 0.01 && (
+            <button
+              type="button"
+              onClick={() => setSettleFromCreditOpen(true)}
+              data-testid="settle-from-credit-btn"
+              className="inline-flex items-center gap-2 bg-emerald-600 text-white hover:opacity-90 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
+              title="سداد المتبقي على الفواتير من الرصيد الدائن المخزَّن للعميل — دفعة ذرّية لا تغيّر صافي الحساب"
+            >
+              💳 سداد فواتير من رصيد العميل
+            </button>
+          )}
           <button
             type="button"
             onClick={handleOpenPrint}
@@ -653,13 +666,22 @@ export default function CustomerStatementPage() {
                 <p className={`text-lg font-bold tabular-nums ${balanceColor}`}>{balanceDisplay}</p>
               </div>
               {Number((selectedCustomer as any)?.credit_balance || 0) > 0.01 && (
-                <button
-                  type="button"
-                  onClick={() => setApplyCreditOpen(true)}
-                  className="text-xs font-semibold text-primary hover:underline text-right"
-                >
-                  تطبيق الرصيد الدائن على فاتورة ←
-                </button>
+                <div className="flex flex-col gap-1 items-end">
+                  <button
+                    type="button"
+                    onClick={() => setSettleFromCreditOpen(true)}
+                    className="text-xs font-bold text-emerald-700 hover:underline text-right"
+                  >
+                    💳 سداد فواتير من رصيد العميل ←
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApplyCreditOpen(true)}
+                    className="text-xs font-semibold text-primary hover:underline text-right"
+                  >
+                    تطبيق الرصيد على فاتورة واحدة ←
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -1114,6 +1136,16 @@ export default function CustomerStatementPage() {
         customerName={selectedCustomer?.name || null}
         availableCredit={Number((selectedCustomer as any)?.credit_balance || 0)}
         onClose={() => setApplyCreditOpen(false)}
+        onApplied={refreshAfterRevise}
+      />
+
+      <SettleInvoicesFromCreditDialog
+        open={settleFromCreditOpen}
+        customerId={selectedCustomerId || null}
+        customerName={selectedCustomer?.name || null}
+        availableCredit={Number((selectedCustomer as any)?.credit_balance || 0)}
+        storedBalance={Number((selectedCustomer as any)?.balance || 0)}
+        onClose={() => setSettleFromCreditOpen(false)}
         onApplied={refreshAfterRevise}
       />
     </div>
