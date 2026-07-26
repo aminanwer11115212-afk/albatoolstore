@@ -5,7 +5,9 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  // .agents: قوالب scaffolding مرجعية تحتوي صيغة placeholder غير صالحة كـ TSX
+  // (ليست كود تطبيق) — تُستثنى من اللينت.
+  { ignores: ["dist", ".agents/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
