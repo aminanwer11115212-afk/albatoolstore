@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useCompanySettings } from "@/hooks/useData";
 import { useAppearance, type ThemeColor, type FontSize } from "@/hooks/useAppearance";
 import { toast } from "sonner";
@@ -15,7 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import ImageCropDialog from "@/components/shared/ImageCropDialog";
+// كسول: chunk القصّ يُحمَّل عند فتح نافذة قصّ الشعار فقط.
+const ImageCropDialog = lazy(() => import("@/components/shared/ImageCropDialog"));
 import { Separator } from "@/components/ui/separator";
 
 
@@ -565,6 +566,8 @@ export default function CompanySettingsPage() {
       {/* «منطقة الخطر» أُزيلت — الوصول عبر Ctrl+Shift+9 */}
 
 
+      {logoCropOpen && (
+      <Suspense fallback={null}>
       <ImageCropDialog
         open={logoCropOpen}
         file={logoCropFile}
@@ -573,6 +576,8 @@ export default function CompanySettingsPage() {
         defaultAspect="1:1"
         title="قص شعار الشركة"
       />
+      </Suspense>
+      )}
     </div>
   );
 }

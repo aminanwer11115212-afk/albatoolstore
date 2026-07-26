@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import * as xlsx from "xlsx";
+// xlsx (~425KB) يُحمَّل ديناميكياً عند الضغط على زر التصدير فقط.
 
 async function fetchAll(table: string, select = "*"): Promise<any[]> {
   const PAGE = 1000;
@@ -23,7 +23,8 @@ async function fetchAll(table: string, select = "*"): Promise<any[]> {
   return all;
 }
 
-function downloadXLSX(filename: string, sheets: Record<string, any[]>) {
+async function downloadXLSX(filename: string, sheets: Record<string, any[]>) {
+  const xlsx = await import("xlsx");
   const wb = xlsx.utils.book_new();
   for (const [name, rows] of Object.entries(sheets)) {
     const ws = xlsx.utils.json_to_sheet(rows.length ? rows : [{}]);
@@ -66,7 +67,7 @@ export default function ExportPage() {
         sheets[t] = await fetchAll(t);
       }
       const ts = new Date().toISOString().slice(0, 10);
-      downloadXLSX(`${key}_${ts}.xlsx`, sheets);
+      await downloadXLSX(`${key}_${ts}.xlsx`, sheets);
       const total = Object.values(sheets).reduce((s, r) => s + r.length, 0);
       toast.success(`تم تصدير ${title}: ${total} سجل`);
     } catch (e: any) {
@@ -90,7 +91,7 @@ export default function ExportPage() {
         }
       }
       const ts = new Date().toISOString().slice(0, 10);
-      downloadXLSX(`full_backup_${ts}.xlsx`, sheets);
+      await downloadXLSX(`full_backup_${ts}.xlsx`, sheets);
       toast.success("اكتمل النسخ الاحتياطي الكامل");
     } catch (e: any) {
       toast.error(`خطأ: ${e.message}`);

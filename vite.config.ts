@@ -75,15 +75,31 @@ export default defineConfig(({ mode }) => ({
         assetFileNames: "assets/[name]-[hash].[ext]",
         // تجميع المكتبات الكبيرة في chunks منفصلة قابلة للـ cache طويل المدى.
         // كل مجموعة تتغيّر نادراً وبشكل مستقل عن كود التطبيق.
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-query": ["@tanstack/react-query"],
-          "vendor-supabase": ["@supabase/supabase-js"],
-          "vendor-charts": ["recharts"],
-          "vendor-pdf": ["html2pdf.js", "html2canvas"],
-          "vendor-forms": ["react-hook-form", "@hookform/resolvers", "zod"],
-          "vendor-dates": ["date-fns", "react-day-picker"],
-          "vendor-icons": ["lucide-react"],
+        // صيغة الدالة (لا الكائن) عمداً: الصيغة الكائنية تسحب اعتماديات الحزمة
+        // المشتركة إلى نفس الـ chunk، ما جعل مدخل التطبيق يستورد vendor-charts
+        // (422KB) بالكامل من أجل دالة مساعدة واحدة مشتركة — فتُحمَّل الرسوم
+        // البيانية في المسار الحرج رغم أن كل صفحاتها lazy. الدالة تُثبّت ملفات
+        // الحزمة نفسها فقط وتترك المشترك للتقسيم الافتراضي.
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          // clsx تستخدمها cn() في كل التطبيق وrecharts معاً — بدون تثبيتها في
+          // chunk خاص صغير كان Rollup يضعها داخل vendor-charts فيستوردها مدخل
+          // التطبيق ويجرّ 422KB في المسار الحرج. يجب أن تسبق قاعدة recharts.
+          if (id.includes("node_modules/clsx") || id.includes("node_modules/tailwind-merge") || id.includes("node_modules/class-variance-authority") || id.includes("node_modules/react-is/") || id.includes("node_modules/prop-types/")) return "vendor-ui-utils";
+          // recharts بلا تثبيت متعمَّد: تثبيته كان يمتص اعتمادياته المشتركة
+          // (lodash/clsx/react-is…) داخل chunk واحد يضطر مدخل التطبيق لاستيراده.
+          // التقسيم الافتراضي يضعه في chunk مشترك بين صفحات الرسوم الثلاث فقط.
+          // html2pdf/html2canvas بلا تثبيت أيضاً — نفس مرض الامتصاص: التثبيت جعل
+          // المدخل يستوردهما مبكراً (960KB). كل استدعاءاتهما dynamic فيقسمهما
+          // Rollup تلقائياً إلى chunk كسول عند الطلب.
+          if (id.includes("node_modules/react-router")) return "vendor-react";
+          if (id.includes("node_modules/react-dom/") || id.includes("node_modules/react/")) return "vendor-react";
+          if (id.includes("node_modules/@tanstack/react-query")) return "vendor-query";
+          if (id.includes("node_modules/@supabase/")) return "vendor-supabase";
+          if (id.includes("node_modules/react-hook-form") || id.includes("node_modules/@hookform/") || id.includes("node_modules/zod")) return "vendor-forms";
+          if (id.includes("node_modules/date-fns") || id.includes("node_modules/react-day-picker")) return "vendor-dates";
+          if (id.includes("node_modules/lucide-react")) return "vendor-icons";
+          return undefined;
         },
       },
     },

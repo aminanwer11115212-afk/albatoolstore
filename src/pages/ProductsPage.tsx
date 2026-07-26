@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useState, useRef, useEffect, useMemo, lazy, Suspense, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { Search, Plus, Edit, Trash2, Package as PackageIcon, Boxes, AlertTriangle, CheckCircle2, BarChart3, DollarSign, Upload, X, FileDown, Snowflake, Scissors } from "lucide-react";
 import { useProductsWithDetails, useProducts, useProductCategories, useWarehouses, useSuppliers } from "@/hooks/useData";
@@ -9,7 +9,8 @@ import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import ImageCropDialog from "@/components/shared/ImageCropDialog";
+// كسول: chunk القصّ (~75KB مع cropper) يُحمَّل عند فتح نافذة القصّ فقط.
+const ImageCropDialog = lazy(() => import("@/components/shared/ImageCropDialog"));
 import ConfirmUnlinkDeleteDialog from "@/components/shared/ConfirmUnlinkDeleteDialog";
 
 import EditableCell from "@/components/EditableCell";
@@ -2959,6 +2960,8 @@ export default function ProductsPage() {
         </div>
       </article>
 
+      {cropOpen && (
+      <Suspense fallback={null}>
       <ImageCropDialog
         open={cropOpen}
         file={cropFile}
@@ -2972,6 +2975,8 @@ export default function ProductsPage() {
         }}
         title="قص صورة المنتج"
       />
+      </Suspense>
+      )}
 
       {unlinkDialog && (
         <ConfirmUnlinkDeleteDialog

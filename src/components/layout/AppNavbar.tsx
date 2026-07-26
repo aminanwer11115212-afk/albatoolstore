@@ -286,11 +286,13 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
   }, [readIds]);
 
   const loadLog = useCallback(async () => {
+    // قائمة إشعارات منسدلة — 100 صف حديث تكفي بدل 5000 كانت تُسحب كل دقيقة
+    // في كل الصفحات (الـ navbar مركَّب دائماً). السجل الكامل في /activity-log.
     const { data } = await (supabase as any)
       .from("activity_log")
       .select("id, table_name, action, record_id, created_at, changed_by")
       .order("created_at", { ascending: false })
-      .limit(5000);
+      .limit(100);
 
     const tableLabels: Record<string, string> = {
       invoices: "فاتورة",

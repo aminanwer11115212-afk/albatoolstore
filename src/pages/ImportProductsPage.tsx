@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import * as xlsx from "xlsx";
+// xlsx (~425KB) يُحمَّل ديناميكياً عند قراءة الملف فقط — لا مع فتح الصفحة.
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -105,7 +105,8 @@ const toNumber = (v: any): number => {
  * Skips "junk" header rows where every cell is the same value (e.g. "Products" × N),
  * which can appear when the source exported with a merged banner row.
  */
-function readRowsWithSmartHeader(buf: ArrayBuffer): any[] {
+async function readRowsWithSmartHeader(buf: ArrayBuffer): Promise<any[]> {
+  const xlsx = await import("xlsx");
   const wb = xlsx.read(buf, { type: "array" });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const aoa: any[][] = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
@@ -199,7 +200,7 @@ export default function ImportProductsPage() {
     categoryCache.clear();
     try {
       const buf = await file.arrayBuffer();
-      const rows = readRowsWithSmartHeader(buf);
+      const rows = await readRowsWithSmartHeader(buf);
       addLog(`عدد الصفوف المقروءة: ${rows.length}`);
       if (rows.length === 0) throw new Error("الملف فارغ");
 
