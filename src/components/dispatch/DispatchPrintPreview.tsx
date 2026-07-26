@@ -12,6 +12,7 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Printer, Eye, Loader2 } from "lucide-react";
 import {
   loadDispatchDoc,
@@ -54,13 +55,7 @@ export default function DispatchPrintPreview({ selectedIds, company, liveOverlay
     const win = window.open("", "_blank", "width=900,height=1000");
     if (!win) {
       // popup-block: لو فشل الفتح بدون toast، المستخدم يظن أن الزر لا يعمل.
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { toast } = require("sonner");
-        toast.error("تعذّر فتح نافذة الطباعة — تحقق من سماح النوافذ المنبثقة في المتصفح");
-      } catch {
-        alert("تعذّر فتح نافذة الطباعة — تحقق من سماح النوافذ المنبثقة");
-      }
+      toast.error("تعذّر فتح نافذة الطباعة — تحقق من سماح النوافذ المنبثقة في المتصفح");
       return;
     }
     try {

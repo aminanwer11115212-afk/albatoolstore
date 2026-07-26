@@ -45,6 +45,8 @@ export default function SideQuotesPage() {
   const { data: quotes, isLoading } = useSideQuotes();
   const { data: companyArr } = useCompanySettings();
   const { data: employees } = useEmployeesWithAccount();
+  // يجب استدعاء الخطّافات قبل أي return مبكّر (rules-of-hooks).
+  const confirmDelete = useConfirmDelete();
   const company = companyArr?.[0] || null;
   const currency = company?.currency || "SDG";
   const [search, setSearch] = useState("");
@@ -98,7 +100,6 @@ export default function SideQuotesPage() {
   const fmtMoney = (n: any) =>
     Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const confirmDelete = useConfirmDelete();
   const handleDelete = (id: string) => {
     confirmDelete({
       title: "حذف عرض السعر الجانبي",

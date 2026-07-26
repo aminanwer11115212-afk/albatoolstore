@@ -7,7 +7,7 @@ export type DeleteInvoiceResult = {
   convertedToCredit: number;
   /** Total quantity summed across restored items (0 when none). */
   totalRestoredQty: number;
-  /** Amount of payments removed from transactions ledger for this invoice. */
+  /** Amount of payments converted to customer credit when this invoice was deleted. */
   deletedPayments: number;
   restoredItems: Array<{ product_id: string | null; quantity: number }>;
   customerId: string | null;
@@ -17,11 +17,12 @@ export type DeleteInvoiceResult = {
 
 /**
  * يحذف فاتورة بالكامل (مع كل توابعها) ويُرجع كميات بنودها إلى المخزون
- * إن كانت خُصمت سابقاً. عند الحذف تُحذف أيضاً **الدفعات المسجّلة على الفاتورة
- * كلياً** (لأن المبلغ دُفع مقابل هذه الفاتورة تحديداً، وحذفها يُلغي كامل
- * الأثر المالي) — ولا تُضاف كرصيد دائن للعميل. رصيد العميل لا يتأثّر إلا
- * بالأرصدة المتراكمة/الشحن السابق (recompute_customer_balance يعيد الحساب
- * من بقية الحركات). يسجّل العملية في `activity_log`.
+ * إن كانت خُصمت سابقاً. عند الحذف تُحوَّل الدفعات المسجّلة على الفاتورة (لعميل
+ * غير POS) إلى **رصيد دائن للعميل** عبر `delete_invoice_with_reconciliation`
+ * (تُحفظ نفس الحركة مع تغيير الفئة إلى customer_credit وفكّ الربط بالفاتورة)،
+ * حفاظاً على تدفّق النقد في الحسابات والأثر التدقيقي. ثم يعيد
+ * `recompute_customer_balance` حساب الرصيد من بقية الحركات. يسجّل العملية في
+ * `activity_log`.
  */
 export async function deleteInvoiceWithStockRestore(
   invoiceId: string,
@@ -64,7 +65,8 @@ export async function deleteInvoiceWithStockRestore(
       { _invoice_id: invoiceId },
     );
     if (reconErr) throw new Error(`تعذّر إلغاء الدفعات: ${reconErr.message}`);
-    deletedPayments = Number(reconc?.deleted_payments || 0);
+    // converted_amount = مجموع الدفعات المحوّلة لرصيد دائن (المبلغ، لا العدد).
+    deletedPayments = Number(reconc?.converted_amount ?? reconc?.deleted_payments ?? 0);
   }
 
   // 2) قراءة بنود الفاتورة
