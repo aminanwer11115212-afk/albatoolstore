@@ -470,7 +470,11 @@ export function useDashboardStats() {
         supabase.from("customers").select("id", { count: "exact", head: true }),
         supabase.from("products").select("id", { count: "exact", head: true }),
         supabase.from("invoices").select("total, paid_amount, status, source, date"),
-        supabase.from("transactions").select("type, amount"),
+        // استثناء قيود method='credit_balance' الداخلية (زوج دفعة/استهلاك متقابل
+        // بلا تدفق نقدي عند السداد من الرصيد الدائن) — نفس قاعدة get_dashboard_stats.
+        // أي صرف نقدي فعلي للعميل من رصيده يُسجَّل بطريقة حقيقية فيُحسب طبيعياً.
+        // (or بدل neq: صفوف method=NULL يجب أن تبقى — NULL<>x تُقيَّم NULL فتُستبعد خطأً)
+        supabase.from("transactions").select("type, amount").or("method.is.null,method.neq.credit_balance"),
       ]);
 
       // استبعاد الفواتير الملغاة من كل حسابات المبيعات لكي تطابق تقارير الدخل

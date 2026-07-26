@@ -35,10 +35,15 @@ AS $$
     FROM inv
   ),
   tx AS (
+    -- قيود method='credit_balance' داخلية بلا أي تدفق نقدي (زوج متقابل:
+    -- دفعة موجبة + استهلاك رصيد سالب عند السداد من الرصيد الدائن) — تُستثنى
+    -- من الإيرادات والمصروفات معاً. أي صرف نقدي فعلي للعميل من رصيده
+    -- (استرداد كاش/بنكي) يُسجَّل بطريقة دفع حقيقية فيُحسب ضمن المصروفات طبيعياً.
     SELECT
       COALESCE(sum(amount) FILTER (WHERE type = 'income'), 0)  AS total_income,
       COALESCE(sum(amount) FILTER (WHERE type = 'expense'), 0) AS total_expenses
     FROM public.transactions
+    WHERE COALESCE(method, '') <> 'credit_balance'
   )
   SELECT jsonb_build_object(
     'customersCount',        (SELECT count(*)::int FROM public.customers),
