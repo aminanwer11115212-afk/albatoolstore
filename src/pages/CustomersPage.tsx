@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, X, Maximize2, Minimize2 } from "lucide-react";
 import { netBalanceOf, CustomerAccountSummary } from "@/utils/balanceDisplay";
@@ -265,9 +265,11 @@ export default function CustomersPage() {
     return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
   };
 
+  // useDeferredValue: الكتابة فورية والفلترة الثقيلة على القيمة المؤجَّلة.
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => (customers || []).filter((c: any) => {
-    if (search) {
-      if (!startsWithAny([c.name, c.phone, c.city, c.address], search)) return false;
+    if (deferredSearch) {
+      if (!startsWithAny([c.name, c.phone, c.city, c.address], deferredSearch)) return false;
     }
     if (filterCity && c.city_id !== filterCity) return false;
     if (filterRegion && c.region_id !== filterRegion) return false;
@@ -299,7 +301,7 @@ export default function CustomersPage() {
       if (filterActivity === "with_credit" && !(netBalanceOf(c) < 0)) return false;
     }
     return true;
-  }), [customers, search, filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterWaValid, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity, customerTransporter, customerDestination, lastActivity]);
+  }), [customers, deferredSearch, filterCity, filterRegion, filterState, filterLocality, filterName, filterPhone, filterWaValid, filterAddress, filterGroup, filterTransporter, filterDestination, filterActivity, customerTransporter, customerDestination, lastActivity]);
 
   const sortedFiltered = useMemo(() => {
     const arr = [...filtered];
@@ -394,7 +396,10 @@ export default function CustomersPage() {
   };
 
   const totalPages = Math.ceil(sortedFiltered.length / perPage);
-  const paginated = sortedFiltered.slice((page - 1) * perPage, page * perPage);
+  const paginated = useMemo(
+    () => sortedFiltered.slice((page - 1) * perPage, page * perPage),
+    [sortedFiltered, page, perPage],
+  );
 
   const handleSubmit = async () => {
     if (!form.name) { toast.error("الاسم مطلوب"); return; }

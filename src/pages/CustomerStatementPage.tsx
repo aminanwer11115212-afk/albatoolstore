@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useDeferredValue } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -53,6 +53,12 @@ export default function CustomerStatementPage() {
   // تبويبات صفحة كشف الحساب: الفواتير / محذوفة / حركات مالية.
   // الرصيد وصناديق الملخص وتحقّق الرصيد تظل مرئية دائماً فوق التبويبات.
   const [tab, setTab] = useState<"invoices" | "deleted" | "transactions" | "audit">("invoices");
+  // عرض تدريجي للجداول الكبيرة: نرسم أول دفعة فقط في DOM (الطباعة/التصدير
+  // يستخدمان القوائم الكاملة). تُعاد للبداية عند تغيّر العميل.
+  const TABLE_CHUNK = 150;
+  const [invVisible, setInvVisible] = useState(TABLE_CHUNK);
+  const [txVisible, setTxVisible] = useState(TABLE_CHUNK);
+  useEffect(() => { setInvVisible(TABLE_CHUNK); setTxVisible(TABLE_CHUNK); }, [selectedCustomerId]);
   const [exportingPdf, setExportingPdf] = useState(false);
   // مؤشر تصدير PDF: نستمع للحدث الذي يبعثه FinancialReportPreviewPage
   useEffect(() => {
@@ -219,8 +225,10 @@ export default function CustomerStatementPage() {
 
 
 
+  // الكتابة في البحث فورية والفلترة/الفرز على القيمة المؤجَّلة.
+  const deferredInvSearch = useDeferredValue(invSearch);
   const filteredInvoices = useMemo(() => {
-    const q = invSearch.trim().toLowerCase();
+    const q = deferredInvSearch.trim().toLowerCase();
     let rows = (invoices || []).filter((inv: any) => {
       if (fromDate && inv.date < fromDate) return false;
       if (toDate && inv.date > toDate) return false;
@@ -249,7 +257,7 @@ export default function CustomerStatementPage() {
       return String(av).localeCompare(String(bv), "ar", { numeric: true }) * dir;
     });
     return rows;
-  }, [invoices, fromDate, toDate, minAmount, maxAmount, paymentStatus, invSearch, invSortKey, invSortDir]);
+  }, [invoices, fromDate, toDate, minAmount, maxAmount, paymentStatus, deferredInvSearch, invSortKey, invSortDir]);
 
   const toggleInvSort = (k: typeof invSortKey) => {
     if (invSortKey === k) setInvSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -792,7 +800,7 @@ export default function CustomerStatementPage() {
                 <tbody>
                   {isLoading ? <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
                   : !filteredInvoices.length ? <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد فواتير مطابقة</td></tr>
-                  : filteredInvoices.map((inv: any) => (
+                  : filteredInvoices.slice(0, invVisible).map((inv: any) => (
                     <tr key={inv.id} className="border-b border-border hover:bg-muted/50">
                       <td data-label="رقم الفاتورة" className="px-5 py-3 text-foreground">{inv.invoice_number}</td>
                       <td data-label="التاريخ" className="px-5 py-3 text-foreground">{inv.date}</td>
@@ -803,6 +811,14 @@ export default function CustomerStatementPage() {
                   ))}
                 </tbody>
               </table>
+              {filteredInvoices.length > invVisible && (
+                <div className="flex justify-center py-3 border-t border-border">
+                  <button type="button" onClick={() => setInvVisible((v) => v + TABLE_CHUNK)}
+                    className="text-sm text-primary hover:underline font-semibold">
+                    عرض المزيد ({filteredInvoices.length - invVisible} فاتورة متبقية)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1008,7 +1024,7 @@ export default function CustomerStatementPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(cashMode ? cashRows : filteredTransactions).map((t: any) => {
+                    {(cashMode ? cashRows : filteredTransactions).slice(0, txVisible).map((t: any) => {
                       const isCredit = t.category === "customer_credit";
                       const isPayment = t.category === "customer_payment";
                       const info = isCredit ? classifyCreditRow(t) : null;
@@ -1070,6 +1086,14 @@ export default function CustomerStatementPage() {
                     })}
                   </tbody>
                 </table>
+                {(cashMode ? cashRows : filteredTransactions).length > txVisible && (
+                  <div className="flex justify-center py-3 border-t border-border">
+                    <button type="button" onClick={() => setTxVisible((v) => v + TABLE_CHUNK)}
+                      className="text-sm text-primary hover:underline font-semibold">
+                      عرض المزيد ({(cashMode ? cashRows : filteredTransactions).length - txVisible} حركة متبقية)
+                    </button>
+                  </div>
+                )}
               </div>
 
               {cashMode && (

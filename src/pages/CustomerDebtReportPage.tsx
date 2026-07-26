@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -20,6 +20,9 @@ type DebtorRow = {
 export default function CustomerDebtReportPage() {
   const qc = useQueryClient();
   const [recalculating, setRecalculating] = useState(false);
+  // عرض تدريجي: كل العملاء المدينين كانوا يُرسمون دفعة واحدة.
+  const DEBTORS_CHUNK = 200;
+  const [debtorsVisible, setDebtorsVisible] = useState(DEBTORS_CHUNK);
 
   const { data: debtors, isLoading } = useQuery<DebtorRow[]>({
     queryKey: ["customer-debt-report"],
@@ -157,7 +160,7 @@ export default function CustomerDebtReportPage() {
               ) : (debtors || []).length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد مبالغ مستحقة</td></tr>
               ) : (
-                (debtors || []).map((c, i) => {
+                (debtors || []).slice(0, debtorsVisible).map((c, i) => {
                   const mismatch = Math.abs(c.balance - c.computed_due) > 0.01;
                   return (
                     <tr key={c.id} className="border-b border-border hover:bg-muted/50">
@@ -191,6 +194,14 @@ export default function CustomerDebtReportPage() {
               )}
             </tbody>
           </table>
+          {(debtors || []).length > debtorsVisible && (
+            <div className="flex justify-center py-3 border-t border-border print:hidden">
+              <button type="button" onClick={() => setDebtorsVisible((v) => v + DEBTORS_CHUNK)}
+                className="text-sm text-primary hover:underline font-semibold">
+                عرض المزيد ({(debtors || []).length - debtorsVisible} عميل متبقٍ)
+              </button>
+            </div>
+          )}
         </div>
       </div>
       </div>

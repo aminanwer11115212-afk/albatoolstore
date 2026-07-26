@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState, useDeferredValue } from "react";
 import { Search, Plus, Trash2, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { useTransactionsWithAccounts, useAccounts, useTransactions, useCustomers, useSuppliers } from "@/hooks/useData";
 import { toast } from "sonner";
@@ -25,18 +25,34 @@ export default function TransactionsPage() {
   const { data: suppliers } = useSuppliers();
   const { insert, remove } = useTransactions();
 
-  const filtered = (transactions || []).filter((t: any) => {
-    return !search || startsWithAny([t.description, t.category, t.accounts?.name], search);
-  });
+  // useDeferredValue: الكتابة في البحث تبقى فورية والفلترة الثقيلة تجري على
+  // القيمة المؤجَّلة؛ وuseMemo يمنع إعادة الفلترة/الترقيم مع كل keystroke في
+  // نموذج الإضافة (14 حقلاً controlled في نفس المكوّن كانت تعيد كل الحسابات).
+  const deferredSearch = useDeferredValue(search);
+  const filtered = useMemo(
+    () => (transactions || []).filter(
+      (t: any) => !deferredSearch || startsWithAny([t.description, t.category, t.accounts?.name], deferredSearch),
+    ),
+    [transactions, deferredSearch],
+  );
 
   const totalPages = Math.ceil(filtered.length / perPage);
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * perPage, page * perPage),
+    [filtered, page, perPage],
+  );
 
   const methodMap: Record<string, string> = { cash: "نقداً", bank: "تحويل بنكي" };
 
   // Bank accounts grouped by bank_name (for "تحويل بنكي" mode)
-  const bankAccounts = (accounts || []).filter((a: any) => a.account_type === "bank" && isAllowedBank(a));
-  const bankNames = Array.from(new Set(bankAccounts.map((a: any) => a.bank_name).filter(Boolean))) as string[];
+  const bankAccounts = useMemo(
+    () => (accounts || []).filter((a: any) => a.account_type === "bank" && isAllowedBank(a)),
+    [accounts],
+  );
+  const bankNames = useMemo(
+    () => Array.from(new Set(bankAccounts.map((a: any) => a.bank_name).filter(Boolean))) as string[],
+    [bankAccounts],
+  );
   const accountsForSelectedBank = form.bank_name
     ? bankAccounts.filter((a: any) => a.bank_name === form.bank_name)
     : bankAccounts;

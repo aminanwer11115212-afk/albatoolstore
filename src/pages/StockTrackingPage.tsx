@@ -361,6 +361,10 @@ export default function StockTrackingPage() {
 
   // Running balance (رصيد بعد الحركة) — يُحسب لكل منتج كرصيد تاريخي بالتراجع من الرصيد الحالي.
   // الرصيد الحالي = مجموع كل الحركات منذ بداية الوجود. رصيد "بعد" حركة معيّنة = الرصيد الحالي - Σ الحركات الأحدث منها.
+  // عرض تدريجي: نرسم أول دفعة في DOM فقط — القائمة قد تصل 15 ألف حركة
+  // (5 مصادر × limit 3000) والتصدير/الطباعة يستخدمان القائمة الكاملة.
+  const ROWS_CHUNK = 300;
+  const [rowsVisible, setRowsVisible] = useState(ROWS_CHUNK);
   const rowsWithBalance = useMemo(() => {
     // نجمع كل الحركات (بلا فلترة) لكل product_id لحساب صافي "الأحدث من هذه الحركة"
     const byProduct = new Map<string, Move[]>();
@@ -785,7 +789,7 @@ export default function StockTrackingPage() {
               {!isLoading && rowsWithBalance.length === 0 && (
                 <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">لا توجد حركات في هذه الفترة</TableCell></TableRow>
               )}
-              {rowsWithBalance.map((m) => (
+              {rowsWithBalance.slice(0, rowsVisible).map((m) => (
                 <TableRow key={m.id} className="hover:bg-muted/40">
                   <TableCell data-label="التاريخ" className="whitespace-nowrap text-xs">
                     <div>{arDate(m.date)}</div>
@@ -866,6 +870,13 @@ export default function StockTrackingPage() {
               ))}
             </TableBody>
           </Table>
+          {rowsWithBalance.length > rowsVisible && (
+            <div className="flex justify-center py-3 border-t border-border">
+              <Button variant="outline" size="sm" onClick={() => setRowsVisible((v) => v + ROWS_CHUNK)}>
+                عرض المزيد ({rowsWithBalance.length - rowsVisible} حركة متبقية)
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

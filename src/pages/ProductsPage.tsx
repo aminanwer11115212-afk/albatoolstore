@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, lazy, Suspense, KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useState, useRef, useEffect, useMemo, lazy, Suspense, useDeferredValue, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { Search, Plus, Edit, Trash2, Package as PackageIcon, Boxes, AlertTriangle, CheckCircle2, BarChart3, DollarSign, Upload, X, FileDown, Snowflake, Scissors } from "lucide-react";
 import { useProductsWithDetails, useProducts, useProductCategories, useWarehouses, useSuppliers } from "@/hooks/useData";
@@ -304,8 +304,11 @@ export default function ProductsPage() {
   }), [allProducts, isOutOfStockPage, isInStockPage, stockFilter]);
 
   // Apply dropdown filters + per-column header filters — memoized
+  // useDeferredValue: الكتابة فورية والفلترة متعددة الحقول (8 حقول × كل المنتجات)
+  // تجري على القيمة المؤجَّلة بدل كل keystroke في مكوّن ضخم.
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => {
-    const term = search.trim();
+    const term = deferredSearch.trim();
     return pageProducts.filter((p: any) => {
       if (filterWarehouse && p.warehouse_id !== filterWarehouse) return false;
       if (filterCategory) {
@@ -333,7 +336,7 @@ export default function ProductsPage() {
         term,
       );
     });
-  }, [pageProducts, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, showFrozen, onlyFrozen, search]);
+  }, [pageProducts, filterWarehouse, filterCategory, filterCompany, filterSupplier, filterName, filterSku, showFrozen, onlyFrozen, deferredSearch]);
 
   // تطبيق الترتيب الأبجدي على القائمة المفلترة (بدون تعديل الأصل)
   const sortedFiltered = useMemo(() => {

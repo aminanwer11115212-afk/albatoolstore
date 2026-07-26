@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useDeferredValue } from "react";
 import { pickCustomerWhatsApp } from "@/utils/whatsapp";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useInvoicesWithCustomers, useInvoices, useCompanySettings } from "@/hooks/useData";
@@ -32,6 +32,9 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
+  // useDeferredValue: الكتابة فورية والفلترة (على كل الفواتير) تجري على القيمة المؤجَّلة.
+  const deferredSearch = useDeferredValue(search);
+  const deferredCustomerSearch = useDeferredValue(customerSearch);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
@@ -228,9 +231,9 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
     if (workflowFilter !== "all" && (inv.workflow_status || "new") !== workflowFilter) return false;
     if (paymentFilter !== "all" && getPaymentStatus(inv) !== paymentFilter) return false;
     if (sourceFilter !== "all" && (inv.source || "regular") !== sourceFilter) return false;
-    if (customerSearch.trim()) {
+    if (deferredCustomerSearch.trim()) {
       const partyName = inv.customers?.name || inv.walk_in_customer_name || "";
-      if (!startsWithMatch(partyName, customerSearch)) return false;
+      if (!startsWithMatch(partyName, deferredCustomerSearch)) return false;
     }
     if (dateFrom && (inv.date || "") < dateFrom) return false;
     if (dateTo && (inv.date || "") > dateTo) return false;
@@ -238,9 +241,9 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
       const min = Number(minAmount) || 0;
       if (Number(inv.total || 0) < min) return false;
     }
-    if (!search) return true;
-    return startsWithAny([inv.invoice_number, inv.customers?.name, inv.walk_in_customer_name], search);
-  }), [invoices, workflowFilter, paymentFilter, sourceFilter, customerSearch, dateFrom, dateTo, minAmount, search, getPaymentStatus]);
+    if (!deferredSearch) return true;
+    return startsWithAny([inv.invoice_number, inv.customers?.name, inv.walk_in_customer_name], deferredSearch);
+  }), [invoices, workflowFilter, paymentFilter, sourceFilter, deferredCustomerSearch, dateFrom, dateTo, minAmount, deferredSearch, getPaymentStatus]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   // بعد الحذف: إن أصبحت الصفحة الحالية خارج النطاق، اقفز للصفحة الأخيرة المتاحة
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages, page]);
