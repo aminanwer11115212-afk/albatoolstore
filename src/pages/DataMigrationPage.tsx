@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, Loader2, Circle } from "lucide-react";
-import * as xlsx from "xlsx";
+// xlsx (~425KB) يُحمَّل ديناميكياً داخل دوال القراءة فقط — لا مع فتح الصفحة.
 
 // ترتيب الحذف: من children إلى parents لتفادي قيود FK
 const DELETE_ORDER: string[] = [
@@ -84,6 +84,7 @@ async function preflightFile(
     const res = await fetch(url);
     if (!res.ok) return { ...empty, error: `تعذّر تحميل ${url} (HTTP ${res.status})` };
     const buf = await res.arrayBuffer();
+    const xlsx = await import("xlsx");
     const wb = xlsx.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
@@ -259,6 +260,7 @@ export default function DataMigrationPage() {
     const res = await fetch("/import/customers.xlsx");
     if (!res.ok) throw new Error("تعذّر تحميل /import/customers.xlsx");
     const buf = await res.arrayBuffer();
+    const xlsx = await import("xlsx");
     const wb = xlsx.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });
@@ -293,6 +295,7 @@ export default function DataMigrationPage() {
     const res = await fetch("/import/products.xlsx");
     if (!res.ok) throw new Error("تعذّر تحميل /import/products.xlsx");
     const buf = await res.arrayBuffer();
+    const xlsx = await import("xlsx");
     const wb = xlsx.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = xlsx.utils.sheet_to_json<any[]>(sheet, { header: 1 });

@@ -21,7 +21,7 @@ import {
   Sliders, Printer, Download, Warehouse, FileText, ShieldCheck, AlertTriangle,
   CheckCircle2, Info,
 } from "lucide-react";
-import * as XLSX from "xlsx";
+// xlsx (~425KB) يُحمَّل ديناميكياً عند زر التصدير فقط — الصفحة تصفّحية أساساً.
 import { toast } from "sonner";
 import { printStockMovements, downloadStockMovementsPdf } from "@/utils/stockMovementsPrint";
 
@@ -424,8 +424,9 @@ export default function StockTrackingPage() {
     setTypes((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
   };
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
     try {
+      const XLSX = await import("xlsx");
       const rows = rowsWithBalance.map((m) => ({
         "التاريخ": m.date,
         "الوقت": m.created_at ? new Date(m.created_at).toLocaleTimeString("ar-EG") : "",
