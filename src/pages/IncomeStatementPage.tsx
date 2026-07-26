@@ -19,7 +19,9 @@ export default function IncomeStatementPage() {
     setLoading(true);
     const base = await getBaseCurrency();
     setBaseSymbol(base?.symbol || base?.code || "");
-    const { data: tx } = await (supabase as any).from("transactions").select("type, amount, category, date, currency_code, exchange_rate_to_base").gte("date", from).lte("date", to);
+    // «أساس نقدي»: استثناء قيود method='credit_balance' الداخلية بلا تدفق نقدي
+    // (or وليس neq حتى لا تُستبعد صفوف method=NULL).
+    const { data: tx } = await (supabase as any).from("transactions").select("type, amount, category, date, currency_code, exchange_rate_to_base").gte("date", from).lte("date", to).or("method.is.null,method.neq.credit_balance");
     const list = tx || [];
     const needed = Array.from(new Set(list.filter((t: any) => t.currency_code && !t.exchange_rate_to_base).map((t: any) => t.currency_code)));
     const rateCache: Record<string, number> = {};

@@ -28,6 +28,8 @@ interface ChargeGroup {
   groupId: string; date: string; created_at: string; method: string | null;
   accountName?: string; bankName?: string; description?: string;
   items: ChargeItem[]; surplus: number; allocated: number; total: number;
+  /** مجموعة استهلاك (سداد فواتير من الرصيد عبر settle/apply) — ليست شحنة */
+  isConsumption?: boolean;
 }
 
 function readInitial(customerId: string, sp: URLSearchParams) {
@@ -192,7 +194,10 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
     let orphanIdx = 0;
     for (const row of data || []) {
       const alloc: any = (row as any).allocation || {};
-      const gid = alloc.group_id || `orphan-${(row as any).id || orphanIdx++}`;
+      // زوجا «السداد من الرصيد» (settle_group من settle_invoices_from_credit،
+      // apply_group من apply_customer_credit_to_invoice) يُجمَعان في بطاقة واحدة
+      // بدل الظهور كصفوف يتيمة متناقضة (+X و −X منفصلين).
+      const gid = alloc.group_id || alloc.settle_group || alloc.apply_group || `orphan-${(row as any).id || orphanIdx++}`;
       if (!map.has(gid)) {
         map.set(gid, {
           groupId: gid, date: (row as any).date, created_at: (row as any).created_at,
@@ -200,6 +205,7 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
           accountName: (row as any).accounts?.name, bankName: (row as any).accounts?.bank_name,
           description: (row as any).description,
           items: [], surplus: 0, allocated: 0, total: 0,
+          isConsumption: !alloc.group_id && !!(alloc.settle_group || alloc.apply_group),
         });
       }
       const g = map.get(gid)!;
@@ -364,16 +370,18 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
       {paged.map((g) => (
         <div key={g.groupId} className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-muted/40 border-b border-border">
-            <div className="flex items-center gap-2 text-primary font-bold"><Wallet size={16} /> شحن رصيد</div>
+            <div className={`flex items-center gap-2 font-bold ${g.isConsumption ? "text-amber-700" : "text-primary"}`}>
+              <Wallet size={16} /> {g.isConsumption ? "سداد من الرصيد الدائن" : "شحن رصيد"}
+            </div>
             <div className="text-xs text-muted-foreground">{g.date}</div>
             <div className="text-xs text-muted-foreground">•</div>
-            <div className="text-xs text-muted-foreground">{methodLabel(g.method)}</div>
+            <div className="text-xs text-muted-foreground">{g.isConsumption ? "من الرصيد المخزَّن" : methodLabel(g.method)}</div>
             {g.accountName && <><div className="text-xs text-muted-foreground">•</div><div className="text-xs text-muted-foreground">{g.bankName ? `${g.bankName} - ${g.accountName}` : g.accountName}</div></>}
             <div className="mr-auto flex items-center gap-3 text-sm">
-              <div className="tabular-nums">الإجمالي: <span className="font-bold text-foreground">{fmt(g.total)}</span></div>
+              <div className="tabular-nums">الإجمالي: <span className="font-bold text-foreground">{fmt(g.isConsumption ? g.allocated : g.total)}</span></div>
               {g.allocated > 0.01 && (<div className="tabular-nums text-emerald-600">سُدِّد: <span className="font-bold">{fmt(g.allocated)}</span></div>)}
               {g.surplus > 0.01 && (<div className="tabular-nums text-primary">فائض: <span className="font-bold">{fmt(g.surplus)}</span></div>)}
-              {isAdmin && !g.groupId.startsWith("orphan-") && (
+              {isAdmin && !g.isConsumption && !g.groupId.startsWith("orphan-") && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -393,7 +401,7 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
                   <Pencil size={12} /> تعديل
                 </Button>
               )}
-              {isAdmin && (
+              {isAdmin && !g.isConsumption && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -410,7 +418,23 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
             </div>
           </div>
 
-          {g.items.length > 0 ? (
+          {g.isConsumption ? (
+            <div className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+              <ArrowDownCircle size={14} className="text-amber-600" />
+              سُدِّد <b className="text-foreground tabular-nums">{fmt(g.allocated)}</b> من الرصيد الدائن على {g.items.length} فاتورة:
+              {g.items.map((it, i) => (
+                <span key={`${g.groupId}-c-${i}`}>
+                  {it.invoice_id ? (
+                    <Link to={`/invoices/view/${it.invoice_id}`} className="text-primary hover:underline">
+                      {it.invoice_number || "—"}
+                    </Link>
+                  ) : (it.invoice_number || "—")}
+                  <span className="text-xs"> (+{fmt(it.applied)})</span>
+                  {i < g.items.length - 1 ? "،" : ""}
+                </span>
+              ))}
+            </div>
+          ) : g.items.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

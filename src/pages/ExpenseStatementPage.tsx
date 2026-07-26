@@ -31,7 +31,9 @@ export default function ExpenseStatementPage() {
 
   const load = async () => {
     setLoading(true);
-    let q = (supabase as any).from("transactions").select("id, date, description, amount, category, method, account_id, accounts(name)").eq("type", "expense").gte("date", from).lte("date", to).order("date", { ascending: false });
+    // استثناء قيود استهلاك الرصيد الداخلية (method='credit_balance' — سالبة بلا
+    // حركة نقد): ليست مصروفات فعلية وكانت تُنقص إجمالي التقرير.
+    let q = (supabase as any).from("transactions").select("id, date, description, amount, category, method, account_id, accounts(name)").eq("type", "expense").gte("date", from).lte("date", to).or("method.is.null,method.neq.credit_balance").order("date", { ascending: false });
     if (accountId) q = q.eq("account_id", accountId);
     if (method) q = q.eq("method", method);
     if (category) q = q.eq("category", category);

@@ -63,7 +63,12 @@ export default function StatisticsPage() {
     () => filterByPeriod((invoicesRaw || []).filter((inv: any) => (inv.source || "regular") !== "pos"), period),
     [invoicesRaw, period],
   );
-  const transactions = useMemo(() => filterByPeriod(transactionsRaw || [], period), [transactionsRaw, period]);
+  // «أساس نقدي»: استثناء قيود method='credit_balance' الداخلية بلا تدفق نقدي —
+  // كانت تضخّم الإيرادات وتُنقص المصروفات (فئة customer_credit سالبة في الدائرة).
+  const transactions = useMemo(
+    () => filterByPeriod((transactionsRaw || []).filter((t: any) => t.method !== "credit_balance"), period),
+    [transactionsRaw, period],
+  );
 
   // Monthly aggregation
   const monthlyData = useMemo(() => {

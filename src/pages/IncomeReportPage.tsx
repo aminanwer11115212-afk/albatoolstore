@@ -16,7 +16,12 @@ export default function IncomeReportPage() {
   const [baseSymbol, setBaseSymbol] = useState("");
   const [rateCache, setRateCache] = useState<Record<string, number>>({});
 
-  const filtered = (transactions || []).filter((t: any) => t.date >= dateFrom && t.date <= dateTo);
+  // «أساس نقدي»: استثناء قيود method='credit_balance' الداخلية (زوج دفعة/استهلاك
+  // متقابل بلا حركة نقد عند السداد من الرصيد الدائن) — كانت تضخّم الإيرادات
+  // وتُنقص المصروفات فيتضخم الصافي بمقدار 2×المبلغ لكل عملية سداد.
+  const filtered = (transactions || []).filter(
+    (t: any) => t.date >= dateFrom && t.date <= dateTo && t.method !== "credit_balance",
+  );
 
   // Fetch base currency + rates for currency codes lacking a stored rate
   useEffect(() => {

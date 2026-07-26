@@ -557,10 +557,13 @@ export function useCashFlowChart() {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const dateStr = thirtyDaysAgo.toISOString().split("T")[0];
 
+      // نفس قاعدة get_dashboard_stats: قيود method='credit_balance' داخلية
+      // بلا تدفق نقدي — تُستثنى من رسم التدفق النقدي (or وليس neq لإبقاء NULL).
       const { data, error } = await supabase
         .from("transactions")
         .select("date, type, amount")
         .gte("date", dateStr)
+        .or("method.is.null,method.neq.credit_balance")
         .order("date", { ascending: true });
       if (error) throw error;
 

@@ -24,10 +24,13 @@ export default function FilteredTransactionsPage({ type }: FilteredTransactionsP
   const { data: transactions, isLoading } = useQuery({
     queryKey: ["filtered-transactions", type, dateFrom, dateTo],
     queryFn: async () => {
+      // «أساس نقدي»: استثناء قيود method='credit_balance' الداخلية بلا تدفق نقدي
+      // من قوائم الإيرادات/المصروفات ومجموعها.
       let q = supabase
         .from("transactions")
         .select("*, accounts:account_id(name), customers(name), suppliers(name)")
         .eq("type", type)
+        .or("method.is.null,method.neq.credit_balance")
         .order("date", { ascending: false })
         .limit(MAX_ROWS);
       if (dateFrom) q = q.gte("date", dateFrom);
