@@ -26,36 +26,36 @@ function readPage(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
 
-/** Extracts the first arg (key) and second arg (defaults array literal) of useColumnWidths(...). */
-function extractUseColumnWidthsArgs(src: string): { key: string; defaults: string } {
+/** Extracts the defaults array literal (2nd arg) of useColumnWidths(...). */
+function extractUseColumnWidthsDefaults(src: string): string {
   const idx = src.indexOf("useColumnWidths(");
   if (idx < 0) throw new Error("useColumnWidths call not found");
-  // find a useColumnWidths call (not the import). Look for one followed by newline then key.
-  // Simplest: find "useColumnWidths(\n    KEY," pattern.
-  const m = src.match(/useColumnWidths\(\s*([A-Z_][A-Z0-9_]*)\s*,\s*(\[[^\]]*\])/);
+  // المفتاح (الوسيط الأول) صار استدعاء دالة screenColWidthsKey(...) بدل ثابت،
+  // لذا نلتقط الوسيط الثاني (مصفوفة الـ defaults) مهما كان شكل الوسيط الأول.
+  const m = src.match(/useColumnWidths\(\s*[^,]+,\s*(\[[^\]]*\])/);
   if (!m) throw new Error("useColumnWidths(args) not parseable");
-  return { key: m[1], defaults: m[2].replace(/\s+/g, " ").trim() };
+  return m[1].replace(/\s+/g, " ").trim();
 }
 
-describe("مزامنة عرض الأعمدة بين الصفحات الأربع — SHARED_COLS_WIDTHS_KEY", () => {
+describe("مزامنة عرض الأعمدة بين الصفحات الأربع — مفاتيح لكل شاشة (screenColWidthsKey)", () => {
   describe("فحص ثوابت المصدر", () => {
     for (const page of PAGES) {
-      it(`${page}: يستخدم SHARED_COLS_WIDTHS_KEY و defaults المتفقة`, () => {
+      it(`${page}: يستخدم screenColWidthsKey(...) و نفس الـ defaults`, () => {
         const src = readPage(page);
-        const { key, defaults } = extractUseColumnWidthsArgs(src);
-        expect(key).toBe("SHARED_COLS_WIDTHS_KEY");
-        // Normalize whitespace inside expected for comparison.
+        const defaults = extractUseColumnWidthsDefaults(src);
+        // المفتاح مُشتق لكل شاشة عبر screenColWidthsKey.
+        expect(/useColumnWidths\(\s*screenColWidthsKey\(/.test(src)).toBe(true);
         expect(defaults.replace(/\s+/g, " ")).toBe(EXPECTED_DEFAULTS.replace(/\s+/g, " "));
       });
 
-      it(`${page}: يستخدم useSharedColsLocked() (لا state محلي للقفل)`, () => {
+      it(`${page}: يستخدم useScreenColsLocked(colsScreenId) (قفل لكل شاشة، لا state محلي)`, () => {
         const src = readPage(page);
-        expect(/const\s*\[\s*colsLocked\s*,\s*setColsLocked\s*\]\s*=\s*useSharedColsLocked\(\)/.test(src)).toBe(true);
+        expect(/const\s*\[\s*colsLocked\s*,\s*setColsLocked\s*\]\s*=\s*useScreenColsLocked\(/.test(src)).toBe(true);
       });
 
-      it(`${page}: يستدعي migrateLegacyColWidths()`, () => {
+      it(`${page}: يعرّف colsScreenId (هوية الشاشة لمفاتيح الأعمدة)`, () => {
         const src = readPage(page);
-        expect(/migrateLegacyColWidths\(\)/.test(src)).toBe(true);
+        expect(/const\s+colsScreenId\s*=/.test(src)).toBe(true);
       });
 
       it(`${page}: لا يستخدم مفاتيح localStorage القديمة الخاصة بالصفحة`, () => {
@@ -66,12 +66,12 @@ describe("مزامنة عرض الأعمدة بين الصفحات الأربع 
     }
 
     it("الصفحات الأربع تستخدم نفس defaults حرفياً (مرجع موحَّد)", () => {
-      const allDefaults = PAGES.map((p) => extractUseColumnWidthsArgs(readPage(p)).defaults.replace(/\s+/g, " "));
+      const allDefaults = PAGES.map((p) => extractUseColumnWidthsDefaults(readPage(p)).replace(/\s+/g, " "));
       const first = allDefaults[0];
       for (const d of allDefaults) expect(d).toBe(first);
     });
 
-    it("ثابت SHARED_COLS_WIDTHS_KEY له القيمة المتوقعة", () => {
+    it("ثابت SHARED_COLS_WIDTHS_KEY (مصدر الترحيل القديم) له القيمة المتوقعة", () => {
       expect(SHARED_COLS_WIDTHS_KEY).toBe("shared:itemsTable:colWidths:v1");
     });
   });
