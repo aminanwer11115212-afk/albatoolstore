@@ -2814,6 +2814,7 @@ export type Database = {
           id: string
           method: string | null
           reference_id: string | null
+          reference_no: string | null
           supplier_id: string | null
           to_account_id: string | null
           type: string
@@ -2835,6 +2836,7 @@ export type Database = {
           id?: string
           method?: string | null
           reference_id?: string | null
+          reference_no?: string | null
           supplier_id?: string | null
           to_account_id?: string | null
           type: string
@@ -2856,6 +2858,7 @@ export type Database = {
           id?: string
           method?: string | null
           reference_id?: string | null
+          reference_no?: string | null
           supplier_id?: string | null
           to_account_id?: string | null
           type?: string
@@ -3118,22 +3121,6 @@ export type Database = {
         }
         Returns: Json
       }
-      record_customer_charge: {
-        Args: {
-          _account_id: string
-          _amount: number
-          _customer_id: string
-          _date: string
-          _method: string
-          _notes: string
-          _reference_no: string
-        }
-        Returns: Json
-      }
-      settle_invoices_from_credit: {
-        Args: { _customer_id: string; _date?: string; _items: Json }
-        Returns: Json
-      }
       apply_exchange_rate_bulk: {
         Args: { _currency_code: string; _new_rate: number }
         Returns: Json
@@ -3307,6 +3294,7 @@ export type Database = {
         }[]
       }
       get_customer_balance_stats: { Args: never; Returns: Json }
+      get_dashboard_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3319,6 +3307,10 @@ export type Database = {
       recalc_all_account_balances: { Args: never; Returns: Json }
       recalc_all_customer_balances: { Args: never; Returns: Json }
       recalc_all_supplier_balances: { Args: never; Returns: Json }
+      recalc_customer_balance: {
+        Args: { _customer_id: string }
+        Returns: undefined
+      }
       receive_purchase_stock_once: { Args: { _po_id: string }; Returns: Json }
       recompute_account_balance: {
         Args: { _account_id: string }
@@ -3331,6 +3323,18 @@ export type Database = {
       recompute_supplier_balance: {
         Args: { _supplier_id: string }
         Returns: undefined
+      }
+      record_customer_charge: {
+        Args: {
+          _account_id: string
+          _amount: number
+          _customer_id: string
+          _date: string
+          _method: string
+          _notes: string
+          _reference_no: string
+        }
+        Returns: Json
       }
       refund_payment_to_customer_credit: {
         Args: { _note?: string; _refund_amount: number; _tx_id: string }
@@ -3362,6 +3366,10 @@ export type Database = {
           _new_reference_no?: string
           _tx_id: string
         }
+        Returns: Json
+      }
+      settle_invoices_from_credit: {
+        Args: { _customer_id: string; _date?: string; _items: Json }
         Returns: Json
       }
       transfer_stock_once:
