@@ -63,7 +63,7 @@ export async function buildInvoicePrintHtml(invoiceId: string): Promise<string> 
     paymentMethod: (invoice as any).payment_method,
     oldBalance: netBalanceOf(iCust),
     previousDebt: prevDebt,
-    previousCredit: Number(iCust?.credit_balance || 0),
+    previousCredit: prevCredit,
     hidePaidBox: false,
     ...extras,
   } as any);
