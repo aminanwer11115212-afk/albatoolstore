@@ -424,7 +424,7 @@ ${showAccount ? (() => {
   const finalNet = jomlaHesab - paidAmount; // >0 عليه، <0 له
   // رصيد العميل الحالي: موجب (عليه) بإشارة +، سالب (له) بإشارة −، صفر = خالص
   const isSettled = Math.abs(finalNet) <= 0.01;
-  const finalDisplay = isSettled ? "خالص" : `${finalNet > 0 ? "+ " : "− "}${fmt(Math.abs(finalNet))}`;
+  const finalDisplay = isSettled ? "خالص" : fmt(Math.abs(finalNet));
   const finalBadge = isSettled ? "" : finalNet > 0 ? "عليه" : "له";
   const finalColor = isSettled ? "#111" : finalNet > 0 ? "#c0392b" : "#16a34a";
   // خلايا بنمط Excel: حدود رفيعة رمادية، خلفية عنوان فاتحة، خط رقمي أحادي المسافات، مضغوط في الأسفل.
@@ -449,7 +449,7 @@ ${showAccount ? (() => {
     ${hasPrev ? row({
       section: "prev-account-row",
       label: "الحساب القديم",
-      value: `${prevNet > 0 ? "+ " : "− "}${fmt(Math.abs(prevNet))}`,
+      value: fmt(Math.abs(prevNet)),
       valColor: prevNet > 0 ? "#c0392b" : "#16a34a",
       sideBadge: prevNet > 0 ? "عليه" : "له",
       badgeColor: prevNet > 0 ? "#c0392b" : "#16a34a",
