@@ -175,7 +175,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
             noHeader,
             oldBalance: netBalanceOf(iCust),
             previousDebt: prevDebt,
-            previousCredit: Number(iCust?.credit_balance || 0),
+            previousCredit: prevCredit,
             hidePaidBox: false,
             ...extras,
           });
