@@ -34,7 +34,9 @@ export async function buildInvoicePrintHtml(invoiceId: string): Promise<string> 
   const extras = await loadInvoiceExtras((invoice as any).id);
   const iCust: any = (invoice as any).customers;
   const invRemaining = Math.max(Number((invoice as any).total || 0) - Number((invoice as any).paid_amount || 0), 0);
-  const prevDebt = Math.max(Number(iCust?.balance || 0) - invRemaining, 0);
+  const invSurplus   = Math.max(Number((invoice as any).paid_amount || 0) - Number((invoice as any).total || 0), 0);
+  const prevDebt   = Math.max(Number(iCust?.balance || 0) - invRemaining, 0);
+  const prevCredit = Math.max(Number(iCust?.credit_balance || 0) - invSurplus, 0);
 
   return generatePrintHTML({
     type: "invoice",
