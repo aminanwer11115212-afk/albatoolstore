@@ -138,9 +138,11 @@ export default function DocumentPreviewPage({ docType }: Props) {
           }));
           const extras = await loadInvoiceExtras(invoice.id);
           const iCust: any = invoice.customers;
-          // اطرح متبقّي هذه الفاتورة من الرصيد المدين حتى لا يُحسب مرتين
+          // اطرح متبقّي/فائض هذه الفاتورة من رصيد العميل الحالي حتى لا يُحسب مرتين
           const invRemaining = Math.max(Number(invoice.total || 0) - Number(invoice.paid_amount || 0), 0);
-          const prevDebt = Math.max(Number(iCust?.balance || 0) - invRemaining, 0);
+          const invSurplus   = Math.max(Number(invoice.paid_amount || 0) - Number(invoice.total || 0), 0);
+          const prevDebt   = Math.max(Number(iCust?.balance || 0) - invRemaining, 0);
+          const prevCredit = Math.max(Number(iCust?.credit_balance || 0) - invSurplus, 0);
           docHtml = generatePrintHTML({
             type: "invoice",
             isCash: invoice.type === "cash",
