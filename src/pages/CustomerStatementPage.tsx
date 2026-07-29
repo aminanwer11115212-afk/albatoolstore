@@ -17,6 +17,8 @@ import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvo
 import SettleInvoicesFromCreditDialog from "@/components/statement/SettleInvoicesFromCreditDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 import CustomerBalanceAuditTab from "@/components/customer/CustomerBalanceAuditTab";
+import SettlementLedgerTab from "@/components/customer/SettlementLedgerTab";
+
 
 export default function CustomerStatementPage() {
   const { data: customers, isLoading: customersLoading, isError: customersError } = useCustomers();
