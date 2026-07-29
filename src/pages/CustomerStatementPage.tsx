@@ -53,7 +53,10 @@ export default function CustomerStatementPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   // تبويبات صفحة كشف الحساب: الفواتير / محذوفة / حركات مالية.
   // الرصيد وصناديق الملخص وتحقّق الرصيد تظل مرئية دائماً فوق التبويبات.
-  const [tab, setTab] = useState<"invoices" | "deleted" | "transactions" | "audit">("invoices");
+  const [tab, setTab] = useState<"ledger" | "invoices" | "deleted" | "transactions" | "audit">("ledger");
+  // فلاتر سجل الحركات (دفتر الأستاذ)
+  const [ledgerKindFilter, setLedgerKindFilter] = useState<LedgerKind | "all">("all");
+  const [ledgerSearch, setLedgerSearch] = useState("");
   const [exportingPdf, setExportingPdf] = useState(false);
   // مؤشر تصدير PDF: نستمع للحدث الذي يبعثه FinancialReportPreviewPage
   useEffect(() => {
