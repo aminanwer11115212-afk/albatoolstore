@@ -546,6 +546,22 @@ export default function CustomerPaymentDialog({
         accountId && (split.applied > 0 || split.overpay > 0) ? (supabase as any).rpc("recompute_account_balance", { _account_id: accountId }) : Promise.resolve(),
       ]);
 
+      // تسوية تلقائية: أي فائض جديد يُطبَّق فوراً على فواتير العميل المفتوحة الأخرى
+      // عبر نفس منطق السداد اليدوي (settle_invoices_from_credit) بترتيب FIFO/LIFO.
+      let autoSettled: any = null;
+      if (split.overpay > 0 && !isPos && customerId) {
+        try {
+          const { data: auto } = await (supabase as any).rpc("auto_settle_customer_credit", {
+            _customer_id: customerId,
+            _source_kind: "invoice_overpay",
+            _source_ref: invoiceId,
+            _exclude_invoice_id: invoiceId,
+            _date: date,
+          });
+          if (auto?.ok) autoSettled = auto;
+        } catch {}
+      }
+
       if (method === "bank" && accountId) {
         try { localStorage.setItem("lov:last-bank-account", accountId); } catch {}
       }
@@ -558,6 +574,11 @@ export default function CustomerPaymentDialog({
       if (creditApplied > 0) parts.push(`رصيد دائن مستخدم ${creditApplied.toLocaleString()}`);
       if (split.overpay > 0) parts.push(`رصيد دائن جديد ${split.overpay.toLocaleString()}`);
       if (disc > 0) parts.push(`خصم ${disc.toLocaleString()}`);
+      if (autoSettled) {
+        const n2 = Array.isArray(autoSettled.results) ? autoSettled.results.length : 0;
+        parts.push(`تسوية تلقائية ${Number(autoSettled.applied_total || 0).toLocaleString()} على ${n2} فاتورة`);
+      }
+
       toast.success(
         (parts.length ? `تم تسجيل ${parts.join(" + ")}` : "تم التسجيل") +
           ` — الحالة: ${labelStatus(nextStatus)}`,
