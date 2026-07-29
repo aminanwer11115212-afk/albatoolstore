@@ -349,6 +349,37 @@ export default function CustomerStatementPage() {
     else { setDelSortKey(k); setDelSortDir("desc"); }
   };
 
+  // ===== دفتر الأستاذ: سجل حركات موحّد بالتسلسل الزمني =====
+  // يُبنى من نفس مصدر البيانات (الفواتير + الحركات) بفلترة التاريخ فقط،
+  // حتى لا تُشوّه فلاتر الجداول الأخرى الرصيد الجاري.
+  const ledger = useMemo(() => {
+    const inRange = (d?: string) => {
+      if (fromDate && (d || "") < fromDate) return false;
+      if (toDate && (d || "") > toDate) return false;
+      return true;
+    };
+    return buildCustomerLedger({
+      invoices: (invoices || []).filter((i: any) => inRange(i.date)),
+      transactions: (transactions || []).filter((t: any) => inRange(t.date)),
+      deletedInvoices: visibleDeleted,
+      accountNameById,
+      includeDeleted: true,
+    });
+  }, [invoices, transactions, visibleDeleted, accountNameById, fromDate, toDate]);
+
+  const visibleLedger = useMemo(() => {
+    const q = ledgerSearch.trim().toLowerCase();
+    return ledger.events.filter((e) => {
+      if (ledgerKindFilter !== "all" && e.kind !== ledgerKindFilter) return false;
+      if (!q) return true;
+      return `${e.refNumber} ${e.statement} ${e.reason} ${e.accountLabel} ${e.operationNo || ""}`
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [ledger, ledgerKindFilter, ledgerSearch]);
+
+
+
   // ===== Balance reconciliation: statement math vs netBalanceOf (shared across pages) =====
   const reconciliation = useMemo(() => {
     if (!selectedCustomer) return null;
