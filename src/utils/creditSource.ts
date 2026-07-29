@@ -108,3 +108,34 @@ export const CREDIT_SOURCE_OPTIONS: { value: CreditSource; label: string }[] = [
   { value: "return_credit", label: "من مرتجع" },
   { value: "unknown", label: "غير محدد" },
 ];
+
+/**
+ * وصف مصدر التسوية التلقائية لقيد `credit_used` (allocation.auto = true).
+ * يُستخدم لعرض «مسددة بالكامل (من دفعة فاتورة رقم X)» بدل «مسددة» بلا سياق.
+ */
+export interface AutoSettlementInfo {
+  auto: boolean;
+  sourceKind: "invoice_overpay" | "manual_charge" | null;
+  sourceInvoiceNumber: string | null;
+  sourceDate: string | null;
+  /** نص عربي جاهز للعرض بجانب حالة الفاتورة */
+  text: string | null;
+}
+
+export function describeAutoSettlement(row: { allocation?: any } | null | undefined): AutoSettlementInfo {
+  const a = row?.allocation || null;
+  const none: AutoSettlementInfo = { auto: false, sourceKind: null, sourceInvoiceNumber: null, sourceDate: null, text: null };
+  if (!a || a.auto !== true) return none;
+  const kind = a.source_kind === "invoice_overpay" ? "invoice_overpay" : a.source_kind === "manual_charge" ? "manual_charge" : null;
+  const num = a.source_invoice_number ? String(a.source_invoice_number) : null;
+  const date = a.source_date ? String(a.source_date) : null;
+  let text: string | null = null;
+  if (kind === "invoice_overpay") text = `من دفعة فاتورة رقم ${num || "—"}`;
+  else if (kind === "manual_charge") text = `من شحن رصيد بتاريخ ${date || "—"}`;
+  return { auto: true, sourceKind: kind, sourceInvoiceNumber: num, sourceDate: date, text };
+}
+
+/** نص حالة الفاتورة مع سياق مصدر التسوية التلقائية إن وُجد. */
+export function autoSettledStatusText(baseLabel: string, info: AutoSettlementInfo): string {
+  return info.auto && info.text ? `${baseLabel} (${info.text})` : baseLabel;
+}

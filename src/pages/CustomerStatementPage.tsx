@@ -17,6 +17,8 @@ import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvo
 import SettleInvoicesFromCreditDialog from "@/components/statement/SettleInvoicesFromCreditDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 import CustomerBalanceAuditTab from "@/components/customer/CustomerBalanceAuditTab";
+import SettlementLedgerTab from "@/components/customer/SettlementLedgerTab";
+
 
 export default function CustomerStatementPage() {
   const { data: customers, isLoading: customersLoading, isError: customersError } = useCustomers();
@@ -52,7 +54,7 @@ export default function CustomerStatementPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   // تبويبات صفحة كشف الحساب: الفواتير / محذوفة / حركات مالية.
   // الرصيد وصناديق الملخص وتحقّق الرصيد تظل مرئية دائماً فوق التبويبات.
-  const [tab, setTab] = useState<"invoices" | "deleted" | "transactions" | "audit">("invoices");
+  const [tab, setTab] = useState<"invoices" | "ledger" | "deleted" | "transactions" | "audit">("invoices");
   const [exportingPdf, setExportingPdf] = useState(false);
   // مؤشر تصدير PDF: نستمع للحدث الذي يبعثه FinancialReportPreviewPage
   useEffect(() => {
@@ -733,10 +735,12 @@ export default function CustomerStatementPage() {
           <div data-testid="statement-tabs" role="tablist" className="flex flex-wrap gap-1 border-b border-border">
             {([
               ["invoices", `الفواتير (${filteredInvoices.length})`],
+              ["ledger", "كشف تفصيلي تسويي"],
               ["deleted", `الفواتير المحذوفة (${(deletedInvoices || []).length})`],
               ["transactions", `الحركات المالية (${filteredTransactions.length})`],
               ["audit", "تدقيق الرصيد"],
             ] as const).map(([key, label]) => (
+
               <button
                 key={key}
                 type="button"
@@ -805,6 +809,12 @@ export default function CustomerStatementPage() {
               </table>
             </div>
           </div>
+
+          <SettlementLedgerTab
+            invoices={(invoices as any[]) || []}
+            transactions={(transactions as any[]) || []}
+            hidden={tab !== "ledger"}
+          />
 
 
           {(deletedInvoices || []).length > 0 && (
