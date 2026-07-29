@@ -808,6 +808,12 @@ export default function CustomerStatementPage() {
             </div>
           </div>
 
+          <SettlementLedgerTab
+            invoices={(invoices as any[]) || []}
+            transactions={(transactions as any[]) || []}
+            hidden={tab !== "ledger"}
+          />
+
 
           {(deletedInvoices || []).length > 0 && (
             <div data-section="deleted-invoices" data-section-label="فواتير محذوفة" className={`legacy-card card-block border-destructive/30 ${tab === "deleted" ? "" : "hidden"}`}>
