@@ -235,7 +235,6 @@ export type Database = {
       company_settings: {
         Row: {
           address: string | null
-          auto_settle_credit_enabled: boolean
           bank_account: string | null
           bank_name: string | null
           bot_auto_repair_enabled: boolean
@@ -273,7 +272,6 @@ export type Database = {
         }
         Insert: {
           address?: string | null
-          auto_settle_credit_enabled?: boolean
           bank_account?: string | null
           bank_name?: string | null
           bot_auto_repair_enabled?: boolean
@@ -311,7 +309,6 @@ export type Database = {
         }
         Update: {
           address?: string | null
-          auto_settle_credit_enabled?: boolean
           bank_account?: string | null
           bank_name?: string | null
           bot_auto_repair_enabled?: boolean
@@ -3145,16 +3142,6 @@ export type Database = {
       assert_invoice_payment_consistency: {
         Args: { _invoice_id: string }
         Returns: undefined
-      }
-      auto_settle_customer_credit: {
-        Args: {
-          _customer_id: string
-          _date?: string
-          _exclude_invoice_id?: string
-          _source_kind?: string
-          _source_ref?: string
-        }
-        Returns: Json
       }
       bot_auto_maintenance: { Args: never; Returns: Json }
       bot_repair_all: { Args: never; Returns: Json }

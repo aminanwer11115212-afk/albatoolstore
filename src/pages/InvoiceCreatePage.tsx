@@ -706,36 +706,19 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
           reference_id: editId,
         } as any);
       }
-      // 2) قيد الفائض كسلفة/دائن للعميل — نفس اصطلاح CustomerPaymentDialog
+      // 2) قيد الفائض كسلفة/دائن للعميل
       if (payAccount && cashOver > 0 && savedCustomerId) {
         await supabase.from("transactions").insert({
           type: "income",
           amount: cashOver,
           date: payDate,
-          description: `فائض دفعة${invoiceNumber ? ` من الفاتورة ${invoiceNumber}` : ""} — رصيد دائن${refSuffix}`,
+          description: `فائض دفعة فاتورة - سلفة عميل${refSuffix}`,
           account_id: payAccount,
           customer_id: savedCustomerId,
           reference_id: editId,
           category: "customer_credit",
-          allocation: { kind: "overpay_surplus", invoice_id: editId, invoice_number: invoiceNumber || null },
         } as any);
-
-        // تسوية تلقائية للفواتير المفتوحة الأخرى من هذا الفائض
-        try {
-          await (supabase as any).rpc("recompute_customer_balance", { _customer_id: savedCustomerId });
-          const { data: auto } = await (supabase as any).rpc("auto_settle_customer_credit", {
-            _customer_id: savedCustomerId,
-            _source_kind: "invoice_overpay",
-            _source_ref: editId,
-            _exclude_invoice_id: editId,
-            _date: payDate,
-          });
-          if (auto?.ok) {
-            toast.success(`تسوية تلقائية: ${Number(auto.applied_total || 0).toLocaleString()} على فواتير سابقة من الفائض`);
-          }
-        } catch {}
       }
-
 
       await recordInvoiceRevision({
         invoiceId: editId,
