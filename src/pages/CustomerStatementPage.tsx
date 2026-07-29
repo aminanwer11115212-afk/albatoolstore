@@ -436,6 +436,35 @@ export default function CustomerStatementPage() {
       ],
       sections: [
         {
+          key: "ledger",
+          label: `سجل الحركات — دفتر الأستاذ (${ledger.events.length})`,
+          columns: [
+            { key: "date", label: "التاريخ", align: "center" as const },
+            { key: "ref", label: "المرجع", align: "center" as const },
+            { key: "kind", label: "النوع", align: "center" as const },
+            { key: "statement", label: "البيان والسبب", align: "right" as const },
+            { key: "debit", label: "مدين (عليه)", numeric: true },
+            { key: "credit", label: "دائن (له)", numeric: true },
+            { key: "balance", label: "الرصيد", numeric: true },
+          ],
+          rows: ledger.events.map((e) => ({
+            date: e.date,
+            ref: e.refNumber,
+            kind: LEDGER_KIND_LABEL[e.kind],
+            statement: `${e.child ? "↳ " : ""}${e.statement} — ${e.reason}`,
+            debit: e.debit || "—",
+            credit: e.credit || "—",
+            balance: e.excluded ? "—" : e.balance,
+          })),
+          totals: {
+            date: "الرصيد الختامي",
+            debit: ledger.totalDebit,
+            credit: ledger.totalCredit,
+            balance: `${Math.abs(ledger.closing).toLocaleString()} ${ledger.closing > 0 ? "(عليه)" : ledger.closing < 0 ? "(له)" : "(خالص)"}`,
+          },
+        },
+        {
+
           key: "invoices", label: `الفواتير (${filteredInvoices.length})`,
           columns: [
             { key: "invoice_number", label: "رقم الفاتورة", align: "center" },
