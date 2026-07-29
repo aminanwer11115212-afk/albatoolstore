@@ -733,10 +733,12 @@ export default function CustomerStatementPage() {
           <div data-testid="statement-tabs" role="tablist" className="flex flex-wrap gap-1 border-b border-border">
             {([
               ["invoices", `الفواتير (${filteredInvoices.length})`],
+              ["ledger", "كشف تفصيلي تسويي"],
               ["deleted", `الفواتير المحذوفة (${(deletedInvoices || []).length})`],
               ["transactions", `الحركات المالية (${filteredTransactions.length})`],
               ["audit", "تدقيق الرصيد"],
             ] as const).map(([key, label]) => (
+
               <button
                 key={key}
                 type="button"
