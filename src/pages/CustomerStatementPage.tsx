@@ -796,6 +796,7 @@ export default function CustomerStatementPage() {
           {/* شريط تبويبات: يفصل الأقسام التفصيلية عن صناديق الرصيد الدائم أعلى الصفحة */}
           <div data-testid="statement-tabs" role="tablist" className="flex flex-wrap gap-1 border-b border-border">
             {([
+              ["ledger", `سجل الحركات (${ledger.events.length})`],
               ["invoices", `الفواتير (${filteredInvoices.length})`],
               ["deleted", `الفواتير المحذوفة (${(deletedInvoices || []).length})`],
               ["transactions", `الحركات المالية (${filteredTransactions.length})`],
@@ -817,6 +818,121 @@ export default function CustomerStatementPage() {
               </button>
             ))}
           </div>
+
+          {/* ===== سجل الحركات — دفتر أستاذ العميل ===== */}
+          <div
+            data-section="ledger"
+            data-section-label="سجل الحركات"
+            className={`legacy-card card-block ${tab === "ledger" ? "" : "hidden"}`}
+          >
+            <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 justify-between">
+              <div>
+                <h3 className="font-semibold text-foreground">سجل الحركات (دفتر الأستاذ)</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  كل حدث بترتيبه الزمني: إنشاء فاتورة، دفعة، شحن رصيد، سداد من الرصيد — مع الرصيد الجاري بعد كل سطر.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={ledgerKindFilter}
+                  onChange={(e) => setLedgerKindFilter(e.target.value as any)}
+                  className="bg-muted rounded px-2 py-1 text-xs text-foreground border border-border outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="all">كل الأنواع</option>
+                  {(Object.keys(LEDGER_KIND_LABEL) as LedgerKind[]).map((k) => (
+                    <option key={k} value={k}>{LEDGER_KIND_LABEL[k]}</option>
+                  ))}
+                </select>
+                <div className="relative">
+                  <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    value={ledgerSearch}
+                    onChange={(e) => setLedgerSearch(e.target.value)}
+                    placeholder="بحث بالمرجع أو البيان أو رقم العملية"
+                    className="bg-muted rounded pr-7 pl-2 py-1 text-xs text-foreground border border-border outline-none focus:ring-1 focus:ring-primary w-64"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm mobile-stack-table">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground">#</th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground">التاريخ</th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground">المرجع</th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground">النوع</th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground">البيان والسبب</th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground">مدين (عليه)</th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground">دائن (له)</th>
+                    <th className="text-right px-3 py-3 font-semibold text-muted-foreground">الرصيد</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+                  ) : !visibleLedger.length ? (
+                    <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">لا توجد حركات في هذه الفترة</td></tr>
+                  ) : visibleLedger.map((e, i) => (
+                    <tr
+                      key={e.id}
+                      className={`border-b border-border hover:bg-muted/50 ${e.excluded ? "opacity-60" : ""}`}
+                    >
+                      <td data-label="#" className="px-3 py-3 text-muted-foreground tabular-nums">{i + 1}</td>
+                      <td data-label="التاريخ" className="px-3 py-3 text-foreground whitespace-nowrap">{e.date}</td>
+                      <td data-label="المرجع" className="px-3 py-3">
+                        {e.invoiceId ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/invoices/${e.invoiceId}`)}
+                            className="text-primary hover:underline font-semibold"
+                          >
+                            {e.refNumber}
+                          </button>
+                        ) : (
+                          <span className="text-foreground">{e.refNumber}</span>
+                        )}
+                      </td>
+                      <td data-label="النوع" className="px-3 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${LEDGER_KIND_CLASS[e.kind]}`}>
+                          {LEDGER_KIND_LABEL[e.kind]}
+                        </span>
+                      </td>
+                      <td data-label="البيان والسبب" className="px-3 py-3 text-foreground">
+                        <div className="flex flex-col">
+                          <span>{e.child ? "↳ " : ""}{e.statement}</span>
+                          <span className="text-xs text-muted-foreground">{e.reason}</span>
+                        </div>
+                      </td>
+                      <td data-label="مدين" className="px-3 py-3 text-destructive tabular-nums">
+                        {e.debit ? e.debit.toLocaleString() : "—"}
+                      </td>
+                      <td data-label="دائن" className="px-3 py-3 text-success tabular-nums">
+                        {e.credit ? e.credit.toLocaleString() : "—"}
+                      </td>
+                      <td data-label="الرصيد" className="px-3 py-3 font-bold tabular-nums">
+                        {e.excluded ? "—" : e.balance.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {visibleLedger.length > 0 && (
+                    <tr className="bg-muted font-bold">
+                      <td colSpan={5} className="px-3 py-3 text-foreground">الإجمالي / الرصيد الختامي</td>
+                      <td className="px-3 py-3 text-destructive tabular-nums">{ledger.totalDebit.toLocaleString()}</td>
+                      <td className="px-3 py-3 text-success tabular-nums">{ledger.totalCredit.toLocaleString()}</td>
+                      <td className={`px-3 py-3 tabular-nums ${ledger.closing > 0 ? "text-destructive" : "text-success"}`}>
+                        {Math.abs(ledger.closing).toLocaleString()}{" "}
+                        {ledger.closing > 0 ? "(عليه)" : ledger.closing < 0 ? "(له)" : "(خالص)"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+
 
           <div data-section="invoices" data-section-label="الفواتير" className={`legacy-card card-block ${tab === "invoices" ? "" : "hidden"}`}>
             <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 justify-between">
