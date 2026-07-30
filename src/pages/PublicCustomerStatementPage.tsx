@@ -369,38 +369,53 @@ export default function PublicCustomerStatementPage() {
           </div>
         </div>
 
-        {/* Invoices */}
-        <div className="ps-section-title">الفواتير ({invoices.length})</div>
-        {invoices.length ? (
-          <table className="ps-table">
+        {/* سجل الحركات — جدول واحد زمني برصيد تراكمي صفاً بصف */}
+        <div className="ps-section-title">سجل الحركات ({ledger.rows.length})</div>
+        {ledger.rows.length ? (
+          <table className="ps-table ps-ledger">
             <thead>
               <tr>
                 <th style={{ width: 35 }}>#</th>
-                <th>رقم الفاتورة</th>
                 <th style={{ width: 100 }}>التاريخ</th>
-                <th style={{ width: 110 }}>الإجمالي</th>
-                <th style={{ width: 110 }}>المدفوع</th>
-                <th style={{ width: 110 }}>المتبقي</th>
-                <th style={{ width: 90 }}>الحالة</th>
+                <th>البيان</th>
+                <th style={{ width: 110 }}>المرجع</th>
+                <th style={{ width: 110 }}>عليه (مدين)</th>
+                <th style={{ width: 110 }}>له (دائن)</th>
+                <th style={{ width: 130 }}>الرصيد بعد الحركة</th>
               </tr>
             </thead>
             <tbody>
-              {invoices.map((inv, i) => (
-                <tr key={inv.id}>
+              {ledger.rows.map((row, i) => (
+                <tr key={row.id}>
                   <td>{i + 1}</td>
-                  <td style={{ fontWeight: 700 }}>{inv.invoice_number}</td>
-                  <td>{inv.date}</td>
-                  <td>{fmt(inv.total)}</td>
-                  <td style={{ color: "#16a34a" }}>{fmt(inv.paid_amount)}</td>
-                  <td style={{ color: "#c0392b", fontWeight: 700 }}>{fmt(inv.due_amount)}</td>
-                  <td>{arInvoiceStatus(inv.workflow_status || inv.status)}</td>
+                  <td>{row.date}</td>
+                  <td style={{ textAlign: "right" }}>{row.statement}</td>
+                  <td style={{ fontWeight: 700 }}>{row.refNumber}</td>
+                  <td style={{ color: row.debit ? "#c0392b" : "#999", fontWeight: row.debit ? 700 : 400 }}>
+                    {row.debit ? fmt(row.debit) : "—"}
+                  </td>
+                  <td style={{ color: row.credit ? "#16a34a" : "#999", fontWeight: row.credit ? 700 : 400 }}>
+                    {row.credit ? fmt(row.credit) : "—"}
+                  </td>
+                  <td style={{ fontWeight: 800, color: row.balance > 0 ? "#c0392b" : row.balance < 0 ? "#16a34a" : "#1a1a1a" }}>
+                    {fmt(Math.abs(row.balance))} {row.balance > 0 ? "عليه" : row.balance < 0 ? "له" : ""}
+                  </td>
                 </tr>
               ))}
+              <tr style={{ background: "#eef2ff" }}>
+                <td colSpan={4} style={{ fontWeight: 800 }}>الإجمالي</td>
+                <td style={{ fontWeight: 800, color: "#c0392b" }}>{fmt(ledger.totalDebit)}</td>
+                <td style={{ fontWeight: 800, color: "#16a34a" }}>{fmt(ledger.totalCredit)}</td>
+                <td style={{ fontWeight: 900 }}>
+                  {fmt(Math.abs(ledger.closing))} {ledger.closing > 0 ? "عليه" : ledger.closing < 0 ? "له" : "خالص"}
+                </td>
+              </tr>
             </tbody>
           </table>
         ) : (
-          <div className="ps-empty">لا توجد فواتير</div>
+          <div className="ps-empty">لا توجد حركات</div>
         )}
+
 
         {/* Quotes */}
         <div data-section="ps-quotes" data-section-label="عروض الأسعار">
