@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Printer, Share2, Copy, Check } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
-import { arInvoiceStatus, arQuoteStatus, arReturnStatus } from "@/utils/statusLabels";
+import { arQuoteStatus, arReturnStatus } from "@/utils/statusLabels";
 import { openWhatsApp } from "@/utils/whatsapp";
+import { buildCustomerLedger } from "@/utils/buildCustomerLedger";
+import { netBalanceOf } from "@/utils/balanceDisplay";
+
 
 interface Customer {
   id: string;
