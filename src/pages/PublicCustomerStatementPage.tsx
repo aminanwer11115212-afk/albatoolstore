@@ -235,7 +235,9 @@ export default function PublicCustomerStatementPage() {
            الإطار أسود دائماً والقيمة وحدها ملوّنة (كما في printTemplate)، مع
            min-width مرن حتى لا تتكسّر الصناديق على الشاشات الصغيرة. */
         .ps-summary-row { display: flex; justify-content: center; gap: 30px; margin: 16px 0; flex-wrap: wrap; }
-        .ps-summary-box { border: 2px solid #1a1a1a; border-radius: 6px; padding: 12px 30px; text-align: center; min-width: min(220px, 100%); flex: 1 1 220px; }
+        /* flex: 0 1 auto مطابق لقالب الطباعة — الصندوق يأخذ حجمه الطبيعي ولا
+           يتمدّد بانياً شريطاً عريضاً حين ينزل وحده على سطر جديد. */
+        .ps-summary-box { border: 2px solid #1a1a1a; border-radius: 6px; padding: 12px 30px; text-align: center; min-width: min(220px, 100%); flex: 0 1 auto; }
         .ps-summary-box-title { font-size: 15px; font-weight: 800; color: #1a1a1a; margin-bottom: 4px; }
         .ps-summary-box-value { font-size: 20px; font-weight: 900; }
         .ps-summary-box.blue .ps-summary-box-value { color: #2980b9; }
@@ -278,10 +280,22 @@ export default function PublicCustomerStatementPage() {
         .ps-btn-default { background: white; color: #1a1a1a; border-color: #d1d5db; }
         .ps-thanks { text-align: center; margin-top: 18px; font-size: 13px; color: #555; font-style: italic; }
 
+        /* على الشاشات الضيقة تمرّر الجداول أفقياً داخل حاويتها بدل أن تُعصر
+           فتنكسر الكلمات حرفاً حرفاً — الصفحة نفسها لا تمرّر أفقياً أبداً. */
+        .ps-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        @media (max-width: 640px) {
+          .ps-table { min-width: 560px; }
+          .ps-page { padding: 12px; }
+          .ps-summary-box { padding: 10px 16px; }
+        }
+
         @media print {
           .ps-actions { display: none !important; }
           .public-statement { background: #fff !important; padding: 0 !important; }
           .ps-page { box-shadow: none !important; padding: 8mm !important; max-width: 100% !important; }
+          /* الطباعة تُظهر الجدول كاملاً — لا تمرير ولا عرض أدنى */
+          .ps-table-scroll { overflow: visible !important; }
+          .ps-table { min-width: 0 !important; }
           @page { size: A4; margin: 10mm; }
         }
       `}</style>
@@ -415,7 +429,7 @@ export default function PublicCustomerStatementPage() {
         {/* الفواتير — كل فاتورة سطر مستقل، وتحتها تسوياتها من شحنات الرصيد */}
         <div className="ps-section-title">الفواتير وتسوياتها ({statement?.groups.length || 0})</div>
         {statement && statement.groups.length ? (
-          <table className="ps-table ps-by-invoice">
+          <div className="ps-table-scroll"><table className="ps-table ps-by-invoice">
             <thead>
               <tr>
                 <th style={{ width: 35 }}>#</th>
@@ -489,7 +503,7 @@ export default function PublicCustomerStatementPage() {
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         ) : (
           <div className="ps-empty">لا توجد فواتير</div>
         )}
@@ -498,7 +512,7 @@ export default function PublicCustomerStatementPage() {
         {statement && statement.charges.length > 0 && (
           <div data-section="ps-charges" data-section-label="شحنات الرصيد">
             <div className="ps-section-title">شحنات الرصيد ({statement.charges.length})</div>
-            <table className="ps-table">
+            <div className="ps-table-scroll"><table className="ps-table">
               <thead>
                 <tr>
                   <th style={{ width: 35 }}>#</th>
@@ -523,7 +537,7 @@ export default function PublicCustomerStatementPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         )}
 
@@ -532,7 +546,7 @@ export default function PublicCustomerStatementPage() {
         <div data-section="ps-quotes" data-section-label="عروض الأسعار">
           <div className="ps-section-title">عروض الأسعار ({quotes.length})</div>
           {quotes.length ? (
-            <table className="ps-table">
+            <div className="ps-table-scroll"><table className="ps-table">
               <thead>
                 <tr>
                   <th style={{ width: 35 }}>#</th>
@@ -555,7 +569,7 @@ export default function PublicCustomerStatementPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           ) : (
             <div className="ps-empty">لا توجد عروض أسعار</div>
           )}
@@ -565,7 +579,7 @@ export default function PublicCustomerStatementPage() {
         <div data-section="ps-returns" data-section-label="المرتجعات">
           <div className="ps-section-title">المرتجعات ({returns.length})</div>
           {returns.length ? (
-            <table className="ps-table">
+            <div className="ps-table-scroll"><table className="ps-table">
               <thead>
                 <tr>
                   <th style={{ width: 35 }}>#</th>
@@ -586,7 +600,7 @@ export default function PublicCustomerStatementPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           ) : (
             <div className="ps-empty">لا توجد مرتجعات</div>
           )}
