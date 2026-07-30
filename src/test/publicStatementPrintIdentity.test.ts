@@ -166,6 +166,8 @@ describe("سلامة العرض على الشاشات الصغيرة", () => {
   it("عرض أدنى للجدول تحت 640px حتى لا تنكسر الكلمات حرفاً حرفاً", () => {
     const mq = pageSrc.slice(pageSrc.indexOf("@media (max-width: 640px)"));
     expect(mq).toContain(".ps-table { min-width: 560px; }");
+    // جدول الفواتير 7 أعمدة يحتاج عرضاً أكبر
+    expect(mq).toContain(".ps-table.ps-by-invoice { min-width: 780px; }");
   });
 
   it("الطباعة تُلغي التمرير والعرض الأدنى فيظهر الجدول كاملاً", () => {

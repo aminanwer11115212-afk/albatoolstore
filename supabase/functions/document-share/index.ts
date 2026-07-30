@@ -41,82 +41,138 @@ function logError(requestId: string, event: string, err: unknown, extra?: Record
 
 /**
  * تجميع كشف العميل حسب الفاتورة — نسخة مطابقة لـ
- * `src/utils/buildStatementByInvoice.ts` (عرض فقط، لا منطق حساب جديد).
- * كل فاتورة سطر بقيمتها، وتحتها التسويات التي استهلكت من متبقيها عبر شحن رصيد.
+ * `src/utils/buildCustomerAccountView.ts` (عرض فقط، لا منطق حساب جديد).
+ *
+ * كل فاتورة سطر تتبعه **حركاتها المرتبطة بها صراحةً فقط** (`reference_id`) —
+ * لا استنتاج FIFO ولا تسوية تراكمية. الرصيد الدائن غير المرتبط بفاتورة يبقى
+ * في «الرصيد القابل للتوزيع» ينقص من إجمالي حساب العميل.
  */
+const AR_DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+
+function stampOf(row: { date?: any; created_at?: any }) {
+  const created = row.created_at ? String(row.created_at) : "";
+  const plain = row.date ? String(row.date).slice(0, 10) : created.slice(0, 10);
+  const d = created ? new Date(created) : plain ? new Date(plain + "T00:00:00") : null;
+  const ok = d && !isNaN(d.getTime());
+  const time = created && ok
+    ? String(d!.getHours()).padStart(2, "0") + ":" + String(d!.getMinutes()).padStart(2, "0")
+    : "";
+  return {
+    at: ok ? d!.toISOString() : plain,
+    text: [plain, ok ? AR_DAYS[d!.getDay()] : "", time].filter(Boolean).join(" · "),
+  };
+}
+
+/** أثر الحركة — دلتا موقّعة لا رصيد: «−X» أخضر يُنقص، «+X» أحمر يزيد. */
+function effectHTML(v: number): string {
+  const n = Math.round(v * 100) / 100;
+  if (Math.abs(n) < 0.01) return `<span style="color:#666;">لا أثر</span>`;
+  const color = n < 0 ? "#16a34a" : "#c0392b";
+  return `<span style="color:${color};font-weight:800;white-space:nowrap;">${n < 0 ? "−" : "+"}${fmt(Math.abs(n))}</span>`;
+}
+
+/** رصيد بلغة «له/عليه»: «له +X» أخضر، «عليه −X» أحمر، «خالص» رمادي. */
+function signedHTML(v: number): string {
+  const n = Math.round(v * 100) / 100;
+  if (Math.abs(n) < 0.01) return `<span style="color:#666;font-weight:800;">خالص</span>`;
+  const color = n > 0 ? "#c0392b" : "#16a34a";
+  const label = n > 0 ? "عليه −" : "له +";
+  return `<span style="color:${color};font-weight:800;white-space:nowrap;">${label}${fmt(Math.abs(n))}</span>`;
+}
+
 function groupStatementByInvoice(
-  invoices: Array<{ id?: string; invoice_number: string; date: string; total: number; paid_amount: number; status?: string }>,
+  invoices: Array<{ id?: string; invoice_number: string; date: string; created_at?: string; total: number; paid_amount: number; status?: string }>,
   transactions: Array<any>,
 ) {
   const r2 = (n: number) => Math.round(n * 100) / 100;
   const n = (v: any) => Number(v || 0);
+  const isOverpay = (t: any) =>
+    /فائض/.test(String(t.description || "")) || t.allocation?.kind === "overpay";
 
-  const charges = transactions
-    .filter((t) => t.category === "customer_credit" && n(t.amount) > 0)
-    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))
-    .map((t) => ({ row: t, amount: r2(n(t.amount)), consumed: 0 }));
+  const live = invoices.filter((i) => i.status !== "cancelled");
+  const ids = new Set(live.map((i) => String(i.id)));
 
-  const groups = invoices
-    .filter((inv) => inv.status !== "cancelled")
-    .slice()
-    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))
+  // ادمج (استهلاك رصيد + دفعة بطريقة credit_balance) — أثرهما معاً صفر.
+  const merged = new Set<string>();
+  for (const c of transactions.filter((t) => t.category === "customer_credit" && n(t.amount) < 0)) {
+    const m = transactions.find(
+      (p) => p.category === "customer_payment" && p.method === "credit_balance" &&
+        !merged.has(p.id) && Math.abs(n(p.amount) - Math.abs(n(c.amount))) < 0.01,
+    );
+    if (m) merged.add(m.id);
+  }
+
+  const byInv = new Map<string, any[]>();
+  const pool: any[] = [];
+  const linkedOverpay = new Map<string, number>();
+
+  for (const t of transactions) {
+    if (merged.has(t.id)) continue;
+    const amt = n(t.amount);
+    const st = stampOf(t);
+    const ref = t.reference_id ? String(t.reference_id) : null;
+    const linked = ref && ids.has(ref);
+    let label = "", effect = 0;
+
+    if (t.category === "customer_credit" && amt < 0) { label = "سداد من رصيد العميل"; effect = 0; }
+    else if (t.category === "customer_credit" && amt > 0) {
+      label = isOverpay(t) ? "فائض دفعة → رصيد العميل" : "شحن رصيد للعميل";
+      effect = -r2(amt);
+      if (isOverpay(t) && linked) linkedOverpay.set(ref!, r2((linkedOverpay.get(ref!) || 0) + amt));
+    } else if (t.category === "customer_payment") {
+      label = linked ? "دفعة على الفاتورة" : "دفعة من العميل";
+      effect = -r2(Math.abs(amt));
+    } else { label = t.description || "حركة مالية"; effect = amt < 0 ? r2(Math.abs(amt)) : -r2(amt); }
+
+    const entry = { id: t.id, label, effect, when: st.text, at: st.at, running: 0 };
+    const toInvoice = linked && !(t.category === "customer_credit" && amt > 0 && !isOverpay(t));
+    if (toInvoice) {
+      if (!byInv.has(ref!)) byInv.set(ref!, []);
+      byInv.get(ref!)!.push(entry);
+    } else pool.push(entry);
+  }
+
+  const groups = live
     .map((inv) => {
+      const st = stampOf(inv);
       const total = r2(n(inv.total));
       const paid = r2(n(inv.paid_amount));
+      const over = r2(linkedOverpay.get(String(inv.id)) || 0);
       return {
-        id: inv.id || inv.invoice_number,
         invoice_number: inv.invoice_number,
-        date: inv.date,
+        when: st.text,
+        at: st.at,
         total,
         paid,
-        remaining: r2(Math.max(total - paid, 0)),
-        settlements: [] as Array<{
-          date: string; applied: number; previousRemaining: number; remainingAfter: number;
-          chargeAmount: number | null; chargeRef: string | null; chargeSurplusAfter: number | null;
-        }>,
+        remaining: r2(total - paid - over),
+        movements: (byInv.get(String(inv.id)) || []).sort((a, b) => a.at.localeCompare(b.at)),
+        runningAtCreation: 0,
+        runningAfter: 0,
       };
-    });
-  const byId = new Map(groups.map((g) => [g.id, g]));
+    })
+    .sort((a, b) => a.at.localeCompare(b.at));
+  pool.sort((a, b) => a.at.localeCompare(b.at));
 
-  const consumptions = transactions
-    .filter((t) => t.category === "customer_credit" && n(t.amount) < 0 && t.reference_id)
-    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
-
-  for (const c of consumptions) {
-    const g = byId.get(String(c.reference_id));
-    if (!g) continue;
-    const applied = r2(Math.abs(n(c.amount)));
-    const group = c.allocation?.group_id ? String(c.allocation.group_id) : null;
-    const explicit = charges.find(
-      (x) => (group && String(x.row.allocation?.group_id || "") === group) ||
-        String(c.allocation?.charge_tx_id || "") === x.row.id,
-    );
-    const src = explicit || charges.find((x) => x.amount - x.consumed > 0.01) || null;
-    if (src) src.consumed = r2(src.consumed + applied);
-    g.settlements.push({
-      date: c.date || "",
-      applied,
-      previousRemaining: 0,
-      remainingAfter: 0,
-      chargeAmount: src ? src.amount : null,
-      chargeRef: src ? (src.row.allocation?.operation_no || src.row.reference_no || null) : null,
-      chargeSurplusAfter: src ? r2(src.amount - src.consumed) : null,
-    });
-  }
-
-  // المتبقي قبل/بعد كل تسوية محسوب رجوعاً من المتبقي النهائي (مصدر الحقيقة).
+  let running = 0;
   for (const g of groups) {
-    let after = g.remaining;
-    for (let i = g.settlements.length - 1; i >= 0; i--) {
-      g.settlements[i].remainingAfter = after;
-      g.settlements[i].previousRemaining = r2(after + g.settlements[i].applied);
-      after = g.settlements[i].previousRemaining;
-    }
+    running = r2(running + g.total);
+    g.runningAtCreation = running;
+    for (const m of g.movements) { running = r2(running + m.effect); m.running = running; }
+    g.runningAfter = running;
   }
+  for (const e of pool) { running = r2(running + e.effect); e.running = running; }
 
-  const totalDue = r2(groups.reduce((s, g) => s + g.remaining, 0));
-  const totalCredit = r2(charges.reduce((s, c) => s + Math.max(r2(c.amount - c.consumed), 0), 0));
-  return { groups, totalDue, totalCredit };
+  const totalInvoiced = r2(groups.reduce((s, g) => s + g.total, 0));
+  const totalPaid = r2(groups.reduce((s, g) => s + g.paid, 0));
+  const totalRemaining = r2(groups.reduce((s, g) => s + g.remaining, 0));
+  const netCredit = r2(
+    transactions.filter((t) => t.category === "customer_credit").reduce((s, t) => s + n(t.amount), 0),
+  );
+  const creditPoolTotal = r2(netCredit - r2([...linkedOverpay.values()].reduce((s, v) => s + v, 0)));
+  return {
+    groups, pool, totalInvoiced, totalPaid, totalRemaining, creditPoolTotal,
+    accountTotal: r2(totalRemaining - creditPoolTotal),
+  };
 }
 
 function buildStatementHTML(args: {
@@ -152,23 +208,30 @@ function buildStatementHTML(args: {
     ? `<table><thead><tr><th>#</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${items.map(render).join("")}</tbody></table>`
     : `<div class="empty">لا توجد بيانات</div>`;
 
-  // كشف العميل مجمّع حسب الفاتورة: الفاتورة سطر، وتسوياتها أسطر تحتها مباشرة.
+  // كشف العميل مجمّع حسب الفاتورة: الفاتورة سطر، وحركاتها المرتبطة بها تحتها.
   const grouped = kind === "customer" ? groupStatementByInvoice(invoices as any[], transactions as any[]) : null;
   const groupedInvoicesTable = !grouped
     ? ""
     : grouped.groups.length
-      ? `<table><thead><tr><th>#</th><th>التاريخ</th><th>البيان</th><th>القيمة / السابق</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>${
+      ? `<table><thead><tr><th>#</th><th>التاريخ واليوم والساعة</th><th>البيان</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>حساب العميل بعدها</th></tr></thead><tbody>${
           grouped.groups.map((g, i) => `
-      <tr class="inv-row"><td>${i + 1}</td><td>${attr(g.date)}</td><td style="text-align:right;font-weight:700;">فاتورة ${attr(g.invoice_number)}</td><td style="font-weight:700;">${fmt(g.total)}</td><td style="color:#16a34a;font-weight:700;">${g.paid ? fmt(g.paid) : "—"}</td><td style="font-weight:800;color:${g.remaining > 0 ? "#c0392b" : "#16a34a"};">${g.remaining > 0 ? fmt(g.remaining) : "مسددة"}</td></tr>${
-        g.settlements.map((s) => `
-      <tr class="settle-row"><td></td><td>${attr(s.date)}</td><td style="text-align:right;">↳ تسوية من شحن رصيد${s.chargeAmount != null ? " " + fmt(s.chargeAmount) : ""}${s.chargeRef ? ` (${attr(s.chargeRef)})` : ""}${s.chargeSurplusAfter != null && s.chargeSurplusAfter > 0.009 ? ` — الفائض بعد التغطية ${fmt(s.chargeSurplusAfter)} رصيد دائن للعميل` : ""}</td><td>${fmt(s.previousRemaining)}</td><td style="color:#16a34a;font-weight:700;">${fmt(s.applied)}</td><td style="font-weight:700;color:${s.remainingAfter > 0 ? "#c0392b" : "#16a34a"};">${s.remainingAfter > 0 ? fmt(s.remainingAfter) : "مسددة"}</td></tr>`).join("")
+      <tr class="inv-row"><td>${i + 1}</td><td>${attr(g.when)}</td><td style="text-align:right;font-weight:700;">فاتورة ${attr(g.invoice_number)}</td><td style="font-weight:700;">${fmt(g.total)}</td><td style="color:#16a34a;font-weight:700;">${g.paid ? fmt(g.paid) : "—"}</td><td>${signedHTML(g.remaining)}</td><td>${signedHTML(g.runningAtCreation)}</td></tr>${
+        g.movements.map((m) => `
+      <tr class="settle-row"><td></td><td>${attr(m.when)}</td><td style="text-align:right;">↳ ${attr(m.label)}</td><td>—</td><td style="color:#16a34a;font-weight:700;">${m.effect ? fmt(Math.abs(m.effect)) : "—"}</td><td>${effectHTML(m.effect)}</td><td>${signedHTML(m.running)}</td></tr>`).join("")
       }`).join("")
-        }<tr class="total-row"><td colspan="5" style="text-align:right;font-weight:800;">مجموع المتبقي على الفواتير</td><td style="font-weight:800;color:#c0392b;">${fmt(grouped.totalDue)}</td></tr>${
-          grouped.totalCredit > 0.009
-            ? `<tr class="total-row"><td colspan="5" style="text-align:right;font-weight:800;">يُخصم منه رصيد دائن غير مستهلَك</td><td style="font-weight:800;color:#16a34a;">−${fmt(grouped.totalCredit)}</td></tr>`
+        }<tr class="total-row"><td colspan="3" style="text-align:right;font-weight:800;">مجموع الفواتير</td><td style="font-weight:800;">${fmt(grouped.totalInvoiced)}</td><td style="font-weight:800;color:#16a34a;">${fmt(grouped.totalPaid)}</td><td>${signedHTML(grouped.totalRemaining)}</td><td></td></tr>${
+          grouped.creditPoolTotal > 0.009
+            ? `<tr class="total-row"><td colspan="5" style="text-align:right;font-weight:800;">يُخصم منه رصيد العميل القابل للتوزيع</td><td style="font-weight:800;color:#16a34a;">+${fmt(grouped.creditPoolTotal)}</td><td></td></tr>`
             : ""
-        }<tr class="closing-row"><td colspan="5" style="text-align:right;font-weight:900;">الرصيد النهائي</td><td style="font-weight:900;color:${netColor};">${fmt(netValue)} ${net > 0.001 ? "عليه" : net < -0.001 ? "له" : "خالص"}</td></tr></tbody></table>`
+        }<tr class="closing-row"><td colspan="5" style="text-align:right;font-weight:900;">إجمالي حساب العميل</td><td colspan="2">${signedHTML(grouped.accountTotal)}</td></tr></tbody></table>`
       : `<div class="empty">لا توجد فواتير</div>`;
+
+  // الرصيد القابل للتوزيع — لا يُوزَّع تلقائياً على أي فاتورة.
+  const creditPoolTable = !grouped || !grouped.pool.length
+    ? ""
+    : `<div class="section-title">رصيد العميل القابل للتوزيع</div><table><thead><tr><th>#</th><th>التاريخ واليوم والساعة</th><th>البيان</th><th>المبلغ</th><th>حساب العميل بعدها</th></tr></thead><tbody>${
+        grouped.pool.map((e, i) => `<tr><td>${i + 1}</td><td>${attr(e.when)}</td><td style="text-align:right;">${attr(e.label)}</td><td>${effectHTML(e.effect)}</td><td>${signedHTML(e.running)}</td></tr>`).join("")
+      }<tr class="total-row"><td colspan="3" style="text-align:right;font-weight:800;">المتاح للتوزيع</td><td style="font-weight:800;color:#16a34a;">+${fmt(grouped.creditPoolTotal)}</td><td>${signedHTML(grouped.accountTotal)}</td></tr></tbody></table>`;
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -218,7 +281,7 @@ function buildStatementHTML(args: {
   <div class="info-row"><div>${party?.phone ? `<span class="info-label">الهاتف:</span> <span class="info-value">${attr(party.phone)}</span>` : ""}</div><div>${party?.address ? `<span class="info-label">العنوان:</span> <span class="info-value">${attr(party.address)}</span>` : ""}</div></div>
   <div style="margin:10px 0 14px;padding:14px 18px;border:2px solid ${netColor};border-radius:10px;background:#fafafa;display:flex;justify-content:space-between;align-items:center;font-size:15px"><span style="font-weight:800;color:${netColor}">${netLabel}</span><strong style="font-size:22px;color:${netColor}">${fmt(netValue)}</strong></div>
   <div class="summary-row">${kind === "customer" ? `<div class="summary-box"><div class="summary-box-title">إجمالي الفواتير</div><div class="summary-box-value">${fmt(invoiceTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المدفوع</div><div class="summary-box-value">${fmt(paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المتبقي</div><div class="summary-box-value">${fmt(invoiceTotal - paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">رصيد دائن</div><div class="summary-box-value">${fmt(credit)}</div></div>` : `<div class="summary-box"><div class="summary-box-title">إجمالي أوامر الشراء</div><div class="summary-box-value">${fmt(ordersTotal)}</div></div><div class="summary-box"><div class="summary-box-title">الرصيد</div><div class="summary-box-value">${fmt(balance)}</div></div>`}</div>
-  ${kind === "customer" ? `<div class="section-title">الفواتير وتسوياتها</div>${groupedInvoicesTable}<div class="section-title">عروض الأسعار</div>${rows(quotes, ["رقم العرض", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.quote_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}<div class="section-title">المرتجعات</div>${rows(returns, ["رقم المرتجع", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.return_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}` : `<div class="section-title">أوامر الشراء</div>${rows(orders, ["رقم الأمر", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.order_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}`}
+  ${kind === "customer" ? `<div class="section-title">الفواتير وحركاتها</div>${groupedInvoicesTable}${creditPoolTable}<div class="section-title">عروض الأسعار</div>${rows(quotes, ["رقم العرض", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.quote_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}<div class="section-title">المرتجعات</div>${rows(returns, ["رقم المرتجع", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.return_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}` : `<div class="section-title">أوامر الشراء</div>${rows(orders, ["رقم الأمر", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.order_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}`}
   ${kind === "customer" ? "" : `<div class="section-title">المعاملات</div>${rows(transactions, ["التاريخ", "النوع", "المبلغ", "الوصف"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.date)}</td><td>${attr(r.type || "-")}</td><td>${fmt(r.amount)}</td><td>${attr(r.description || "-")}</td></tr>`)}`}
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>

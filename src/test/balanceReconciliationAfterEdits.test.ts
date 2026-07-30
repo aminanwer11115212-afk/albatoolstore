@@ -6,11 +6,11 @@
  *   • حذف دفعة مرتبطة بفاتورة → `paid_amount -= amount` ثم حذف صف الحركة.
  *   • تعديل دفعة            → `paid_amount += (جديد − قديم)` وتحديث الصف.
  *   • حذف شحن رصيد          → حذف صف `customer_credit` فقط.
- * ثم يُقارَن الصافي المعروض (buildStatementByInvoice / buildCustomerLedger)
- * بالصافي المحسوب من الصفوف بقاعدة `recompute_customer_balance`.
+ * ثم يُقارَن الصافي المعروض (buildCustomerAccountView) بالصافي المحسوب من
+ * الصفوف بقاعدة `recompute_customer_balance`.
  */
 import { describe, it, expect } from "vitest";
-import { buildStatementByInvoice } from "@/utils/buildStatementByInvoice";
+import { buildCustomerAccountView } from "@/utils/buildCustomerAccountView";
 import { buildCustomerLedger } from "@/utils/buildCustomerLedger";
 import { creditChargeDeletability, projectDeleteImpact, projectEditImpact } from "@/utils/ledgerEntryActions";
 
@@ -32,7 +32,7 @@ function netBalance(invoices: Inv[], txs: Tx[]): number {
 
 /** الصافي كما يعرضه الكشف المجمّع. */
 function displayedNet(invoices: Inv[], txs: Tx[]): number {
-  return buildStatementByInvoice({ invoices, transactions: txs, netBalance: netBalance(invoices, txs) }).closing;
+  return buildCustomerAccountView({ invoices, transactions: txs, netBalance: netBalance(invoices, txs) }).accountTotal;
 }
 
 /** محاكاة `cancel_invoice_payment`. */
@@ -131,15 +131,35 @@ describe("تعديل الدفعات", () => {
     expect(displayedNet(after.invoices, after.transactions)).toBe(actual);
   });
 
-  it("زيادة الدفعة فوق الإجمالي لا تجعل مديونية الفاتورة سالبة", () => {
-    const after = editPayment(baseInvoices, baseTxs, "pc", 1000);
-    const g = buildStatementByInvoice({
+  it("رفع الدفعة إلى كامل قيمة الفاتورة يقفلها ويُبقي العرض مطابقاً", () => {
+    // الحد الأعلى المسموح: `revise_invoice_payment` يرفض ما يتجاوز الإجمالي
+    // (`would_overpay`) — الفائض مساره الوحيد هو splitPayment إلى رصيد دائن.
+    const after = editPayment(baseInvoices, baseTxs, "pc", 300);
+    const g = buildCustomerAccountView({
       invoices: after.invoices,
       transactions: after.transactions,
       netBalance: netBalance(after.invoices, after.transactions),
-    }).groups.find((x) => x.invoiceNumber === "C")!;
+    }).blocks.find((x) => x.invoiceNumber === "C")!;
     expect(g.remaining).toBe(0);
     expect(displayedNet(after.invoices, after.transactions)).toBe(netBalance(after.invoices, after.transactions));
+  });
+
+  it("الفائض عبر splitPayment يظهر «له +» تحت فاتورته لا مديونية سالبة", () => {
+    // دفع 400 على فاتورة C (300): 300 تُقيَّد عليها و100 تصير رصيداً دائناً
+    const invoices = baseInvoices.map((i) => (i.id === "c" ? { ...i, paid_amount: 300, status: "paid" } : i));
+    const txs = [
+      ...baseTxs.filter((t) => t.id !== "pc"),
+      { id: "pc", customer_id: "c1", category: "customer_payment", amount: 300, reference_id: "c", method: "cash", date: "2026-03-02" },
+      { id: "oc", customer_id: "c1", category: "customer_credit", amount: 100, reference_id: "c", date: "2026-03-02", description: "فائض دفعة على فاتورة C" },
+    ];
+    const g = buildCustomerAccountView({
+      invoices,
+      transactions: txs,
+      netBalance: netBalance(invoices, txs),
+    }).blocks.find((x) => x.invoiceNumber === "C")!;
+    expect(g.remaining).toBe(-100);
+    expect(g.linkedOverpay).toBe(100);
+    expect(displayedNet(invoices, txs)).toBe(netBalance(invoices, txs));
   });
 });
 
@@ -209,13 +229,14 @@ describe("سلاسل عمليات مختلطة تبقى متّزنة", () => {
     ];
     for (const [label, make] of combos) {
       const s = make();
-      const res = buildStatementByInvoice({
+      const res = buildCustomerAccountView({
         invoices: s.invoices,
         transactions: s.transactions,
         netBalance: netBalance(s.invoices, s.transactions),
       });
-      expect({ label, v: r2(res.totalDue - res.totalCredit + res.reconciliation) }).toEqual({ label, v: res.closing });
-      expect({ label, v: res.closing }).toEqual({ label, v: netBalance(s.invoices, s.transactions) });
+      expect({ label, v: r2(res.totalRemaining - res.creditPoolTotal) }).toEqual({ label, v: res.accountTotal });
+      expect({ label, v: res.accountTotal }).toEqual({ label, v: netBalance(s.invoices, s.transactions) });
+      expect({ label, v: res.drift }).toEqual({ label, v: 0 });
     }
   });
 });

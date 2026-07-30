@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Lockfile الوحيد المعتمد في المشروع هو bun.lock
+package-lock.json
