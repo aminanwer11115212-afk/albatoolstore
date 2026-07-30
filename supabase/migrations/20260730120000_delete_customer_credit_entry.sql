@@ -182,3 +182,19 @@ CREATE INDEX IF NOT EXISTS idx_transactions_customer_category
   WHERE customer_id IS NOT NULL;
 
 NOTIFY pgrst, 'reload schema';
+
+-- ============================================================
+-- فهرس كان مقصوداً ولم يُنشَأ أبداً.
+--
+-- هجرة 20260607141228 أعادت تعريف `idx_data_anomalies_status` بأعمدة أوسع
+-- (status, severity, last_seen_at DESC)، لكن `CREATE INDEX IF NOT EXISTS`
+-- يطابق **بالاسم فقط**، والاسم كان موجوداً من هجرة 20260502051022 بعمود
+-- واحد — فمرّت التعليمة بصمت وبقي الفهرس أحادي العمود. نُنشئ المُركَّب باسم
+-- مستقل حتى يوجد فعلاً.
+--
+-- (تعارض ثانٍ مقصود إبقاؤه: `idx_purchase_attachments_order` المعرَّف
+--  (purchase_order_id, deleted_at) يغطي البحث بـ purchase_order_id وحده،
+--  فلا حاجة لفهرس إضافي.)
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_data_anomalies_status_severity_seen
+  ON public.data_anomalies (status, severity, last_seen_at DESC);

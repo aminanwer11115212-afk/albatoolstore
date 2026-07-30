@@ -144,7 +144,7 @@ export default function DeleteLedgerEntryDialog({
           {summaryRows.map((row) => (
             <div key={row.label} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
               <span className="text-muted-foreground">{row.label}</span>
-              <span className="font-semibold text-foreground tabular-nums text-left">{row.value}</span>
+              <span className="font-semibold text-foreground tabular-nums">{row.value}</span>
             </div>
           ))}
         </div>
