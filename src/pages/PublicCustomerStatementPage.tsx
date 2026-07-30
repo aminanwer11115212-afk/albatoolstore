@@ -65,10 +65,16 @@ interface StockReturn {
 interface Tx {
   id: string;
   date: string;
+  created_at?: string | null;
   amount: number;
   type: string;
+  category?: string | null;
   description?: string | null;
   method?: string | null;
+  account_id?: string | null;
+  reference_id?: string | null;
+  reference_no?: string | null;
+  allocation?: any;
 }
 
 interface StatementData {
@@ -78,7 +84,9 @@ interface StatementData {
   quotes: Quote[];
   returns: StockReturn[];
   transactions: Tx[];
+  accounts?: { id: string; name: string }[];
 }
+
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
