@@ -4,7 +4,7 @@ import { Printer, Share2, Copy, Check } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import { arQuoteStatus, arReturnStatus } from "@/utils/statusLabels";
 import { openWhatsApp } from "@/utils/whatsapp";
-import { buildStatementByInvoice } from "@/utils/buildStatementByInvoice";
+import { buildCustomerAccountView, signedBalanceText, effectText } from "@/utils/buildCustomerAccountView";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 
 
@@ -93,6 +93,19 @@ import { resolveLogoUrl } from "@/utils/albatoolLogo";
 const fmt = (n: number | null | undefined) =>
   Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
+/** «2026-07-30 · الخميس · 14:45» */
+const stampText = (x: { date: string; dayName: string; time: string }) =>
+  [x.date, x.dayName, x.time].filter(Boolean).join(" · ");
+
+function toneCell({ text, tone }: { text: string; tone: "debit" | "credit" | "settled" }) {
+  const color = tone === "credit" ? "#16a34a" : tone === "debit" ? "#c0392b" : "#666";
+  return <span style={{ color, fontWeight: 800, whiteSpace: "nowrap" }}>{text}</span>;
+}
+/** رصيد بلغة «له/عليه» — للأرصدة والمتبقي. */
+const signedCell = (value: number) => toneCell(signedBalanceText(value));
+/** دلتا حركة موقّعة — لا تصف رصيداً فلا تستعمل «له/عليه». */
+const effectCell = (value: number) => toneCell(effectText(value));
+
 export default function PublicCustomerStatementPage() {
   const { token } = useParams<{ token: string }>();
   const [data, setData] = useState<StatementData | null>(null);
@@ -125,34 +138,19 @@ export default function PublicCustomerStatementPage() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  const totals = useMemo(() => {
-    if (!data) return { sales: 0, paid: 0, due: 0, unpaid: 0, returns: 0, payments: 0, net: 0 };
-    const sales = data.invoices.reduce((s, i) => s + Number(i.total || 0), 0);
-    const paid = data.invoices.reduce((s, i) => s + Number(i.paid_amount || 0), 0);
-    const due = data.invoices.reduce((s, i) => s + Math.max(0, Number(i.due_amount || 0)), 0);
-    const unpaid = data.invoices.filter((i) => Number(i.due_amount || 0) > 0).length;
-    const returns = data.returns.reduce((s, r) => s + Number(r.total || 0), 0);
-    const payments = data.transactions
-      .filter((t) => t.type === "income")
-      .reduce((s, t) => s + Number(t.amount || 0), 0);
-    // الصافي الحقيقي على العميل — مصدر واحد موحّد: netBalanceOf
-    const custNet = netBalanceOf(data.customer as any);
-    return { sales, paid, due, unpaid, returns, payments, net: custNet };
-  }, [data]);
-
   /**
    * كشف مجمّع حسب الفاتورة: كل فاتورة سطر مستقل بقيمتها، وتحتها مباشرة أي
    * تسوية استهلكت من متبقيها عبر شحن رصيد لاحق. حلّ محل السجل المسطّح الذي
    * كان يخلط الفواتير والدفعات في تسلسل زمني واحد يصعب على العميل قراءته.
    * المنطق الحسابي كما هو (buildCustomerLedger/classifyCreditRow) — العرض فقط تغيّر.
    */
-  const statement = useMemo(() => {
+  const account = useMemo(() => {
     if (!data) return null;
-    return buildStatementByInvoice({
+    return buildCustomerAccountView({
       invoices: data.invoices,
       transactions: data.transactions,
+      accountNameById: new Map((data.accounts || []).map((a) => [a.id, a.name])),
       netBalance: netBalanceOf(data.customer as any),
-      order: (data.company as any)?.credit_consumption_order === "lifo" ? "lifo" : "fifo",
     });
   }, [data]);
 
@@ -202,8 +200,11 @@ export default function PublicCustomerStatementPage() {
     );
   }
 
-  const { customer, company, invoices, quotes, returns, transactions } = data;
+  const { customer, company, quotes, returns } = data;
   const logoURL = resolveLogoUrl(company?.logo_url);
+  // رقم واحد في كل الصفحة: الصناديق والصندوق النهائي تقرأ نفس ما يجمعه الجدول،
+  // فلا يرى العميل مجموعين مختلفين لو انحرف الرصيد المخزَّن.
+  const accountNet = account?.accountTotal ?? 0;
 
   return (
     <div dir="rtl" lang="ar" className="public-statement min-h-screen bg-gray-100 py-6 print:bg-white print:py-0">
@@ -285,6 +286,9 @@ export default function PublicCustomerStatementPage() {
         .ps-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         @media (max-width: 640px) {
           .ps-table { min-width: 560px; }
+          /* جدول الفواتير 7 أعمدة — يحتاج عرضاً أكبر وإلا انكسر البيان حرفاً حرفاً */
+          .ps-table.ps-by-invoice { min-width: 780px; }
+          .ps-by-invoice td, .ps-by-invoice th { white-space: nowrap; }
           .ps-page { padding: 12px; }
           .ps-summary-box { padding: 10px 16px; }
         }
@@ -326,7 +330,7 @@ export default function PublicCustomerStatementPage() {
             { key: "ps-signatures", label: "التواقيع" },
           ]}
           shareTitle={`كشف حساب — ${customer.name}`}
-          shareSummary={`الصافي: ${fmt(Math.abs(totals.net))} ${company?.currency || ""}${totals.net > 0 ? " عليه" : totals.net < 0 ? " له" : ""}`}
+          shareSummary={`الصافي: ${fmt(Math.abs(accountNet))} ${company?.currency || ""}${accountNet > 0 ? " عليه" : accountNet < 0 ? " له" : ""}`}
           pdfFilename={`كشف-حساب-${customer.name}`}
           showWhatsApp={false}
         />
@@ -408,99 +412,91 @@ export default function PublicCustomerStatementPage() {
         <div className="ps-summary-row">
           <div className="ps-summary-box blue">
             <div className="ps-summary-box-title">إجمالي المبيعات</div>
-            <div className="ps-summary-box-value">{fmt(totals.sales)}</div>
+            <div className="ps-summary-box-value">{fmt(account?.totalInvoiced ?? 0)}</div>
           </div>
           <div className="ps-summary-box green">
-            <div className="ps-summary-box-title">المدفوع</div>
-            <div className="ps-summary-box-value">{fmt(totals.paid + totals.payments)}</div>
+            <div className="ps-summary-box-title">المدفوع على الفواتير</div>
+            <div className="ps-summary-box-value">{fmt(account?.totalPaid ?? 0)}</div>
           </div>
-          <div className={`ps-summary-box ${totals.net > 0 ? "red" : totals.net < 0 ? "green" : ""}`}>
+          <div className={`ps-summary-box ${accountNet > 0 ? "red" : accountNet < 0 ? "green" : ""}`}>
             <div className="ps-summary-box-title">
-              {totals.net > 0 ? "الصافي المستحق (عليه)" : totals.net < 0 ? "رصيد دائن (له)" : "الحساب خالص"}
+              {accountNet > 0 ? "الصافي المستحق (عليه)" : accountNet < 0 ? "رصيد دائن (له)" : "الحساب خالص"}
             </div>
-            <div className="ps-summary-box-value">{fmt(Math.abs(totals.net))}</div>
+            <div className="ps-summary-box-value">{fmt(Math.abs(accountNet))}</div>
           </div>
           <div className="ps-summary-box">
             <div className="ps-summary-box-title">فواتير غير مسددة</div>
-            <div className="ps-summary-box-value">{totals.unpaid}</div>
+            <div className="ps-summary-box-value">
+              {(account?.blocks || []).filter((b) => b.remaining > 0.009).length}
+            </div>
           </div>
         </div>
 
-        {/* الفواتير — كل فاتورة سطر مستقل، وتحتها تسوياتها من شحنات الرصيد */}
-        <div className="ps-section-title">الفواتير وتسوياتها ({statement?.groups.length || 0})</div>
-        {statement && statement.groups.length ? (
+        {/* الفواتير — كل فاتورة سطر مستقل تتبعه حركاتها المرتبطة بها فقط */}
+        <div className="ps-section-title">الفواتير وحركاتها ({account?.blocks.length || 0})</div>
+        {account && account.blocks.length ? (
           <div className="ps-table-scroll"><table className="ps-table ps-by-invoice">
             <thead>
               <tr>
                 <th style={{ width: 35 }}>#</th>
-                <th style={{ width: 100 }}>التاريخ</th>
+                <th style={{ width: 150 }}>التاريخ واليوم والساعة</th>
                 <th>البيان</th>
-                <th style={{ width: 105 }}>القيمة / السابق</th>
-                <th style={{ width: 105 }}>المدفوع</th>
-                <th style={{ width: 115 }}>المتبقي</th>
+                <th style={{ width: 100 }}>الإجمالي</th>
+                <th style={{ width: 100 }}>المدفوع</th>
+                <th style={{ width: 120 }}>المتبقي</th>
+                <th style={{ width: 130 }}>حساب العميل بعدها</th>
               </tr>
             </thead>
             <tbody>
-              {statement.groups.map((g, i) => (
-                <Fragment key={g.invoiceId}>
+              {account.blocks.map((b, i) => (
+                <Fragment key={b.invoiceId}>
                   <tr className="ps-inv-row">
                     <td>{i + 1}</td>
-                    <td>{g.date}</td>
-                    <td style={{ textAlign: "right", fontWeight: 700 }}>فاتورة {g.invoiceNumber}</td>
-                    <td style={{ fontWeight: 700 }}>{fmt(g.total)}</td>
-                    <td style={{ color: "#16a34a", fontWeight: 700 }}>{g.paid ? fmt(g.paid) : "—"}</td>
-                    <td style={{ fontWeight: 800, color: g.remaining > 0 ? "#c0392b" : "#16a34a" }}>
-                      {g.remaining > 0 ? fmt(g.remaining) : "مسددة"}
-                    </td>
+                    <td>{stampText(b)}</td>
+                    <td style={{ textAlign: "right", fontWeight: 700 }}>فاتورة {b.invoiceNumber}</td>
+                    <td style={{ fontWeight: 700 }}>{fmt(b.total)}</td>
+                    <td style={{ color: "#16a34a", fontWeight: 700 }}>{b.paid ? fmt(b.paid) : "—"}</td>
+                    <td>{signedCell(b.remaining)}</td>
+                    <td>{signedCell(b.runningAtCreation)}</td>
                   </tr>
-                  {g.settlements.map((s) => (
-                    <tr key={s.id} className="ps-settle-row">
+                  {b.movements.map((m) => (
+                    <tr key={m.id} className="ps-settle-row">
                       <td />
-                      <td>{s.date}</td>
+                      <td>{stampText(m)}</td>
                       <td style={{ textAlign: "right" }}>
-                        <span className="ps-settle-arrow">↳</span> تسوية من شحن رصيد
-                        {s.chargeAmount != null ? ` ${fmt(s.chargeAmount)}` : ""}
-                        {s.chargeRef ? ` (${s.chargeRef})` : ""}
-                        {s.chargeSurplusAfter != null && s.chargeSurplusAfter > 0.009 && (
-                          <span className="ps-settle-surplus">
-                            {" "}— الفائض بعد التغطية {fmt(s.chargeSurplusAfter)} رصيد دائن للعميل
-                          </span>
-                        )}
+                        <span className="ps-settle-arrow">↳</span> {m.label}
+                        <span style={{ color: "#667" }}> — {m.detail}</span>
                       </td>
-                      <td>{fmt(s.previousRemaining)}</td>
-                      <td style={{ color: "#16a34a", fontWeight: 700 }}>{fmt(s.applied)}</td>
-                      <td style={{ fontWeight: 700, color: s.remainingAfter > 0 ? "#c0392b" : "#16a34a" }}>
-                        {s.remainingAfter > 0 ? fmt(s.remainingAfter) : "مسددة"}
+                      <td>—</td>
+                      <td style={{ color: "#16a34a", fontWeight: 700 }}>
+                        {m.effect ? fmt(Math.abs(m.effect)) : "—"}
                       </td>
+                      <td>{effectCell(m.effect)}</td>
+                      <td>{signedCell(m.runningBalance)}</td>
                     </tr>
                   ))}
                 </Fragment>
               ))}
 
               <tr className="ps-total-row">
-                <td colSpan={5} style={{ textAlign: "right", fontWeight: 800 }}>مجموع المتبقي على الفواتير</td>
-                <td style={{ fontWeight: 800, color: "#c0392b" }}>{fmt(statement.totalDue)}</td>
+                <td colSpan={3} style={{ textAlign: "right", fontWeight: 800 }}>مجموع الفواتير</td>
+                <td style={{ fontWeight: 800 }}>{fmt(account.totalInvoiced)}</td>
+                <td style={{ fontWeight: 800, color: "#16a34a" }}>{fmt(account.totalPaid)}</td>
+                <td>{signedCell(account.totalRemaining)}</td>
+                <td />
               </tr>
-              {statement.totalCredit > 0.009 && (
+              {account.creditPoolTotal > 0.009 && (
                 <tr className="ps-total-row">
                   <td colSpan={5} style={{ textAlign: "right", fontWeight: 800 }}>
-                    يُخصم منه رصيد دائن غير مستهلَك
+                    يُخصم منه رصيد العميل القابل للتوزيع
                   </td>
-                  <td style={{ fontWeight: 800, color: "#16a34a" }}>−{fmt(statement.totalCredit)}</td>
-                </tr>
-              )}
-              {Math.abs(statement.reconciliation) >= 0.01 && (
-                <tr className="ps-total-row">
-                  <td colSpan={5} style={{ textAlign: "right", fontWeight: 800 }}>تسوية رصيد مُرحَّل</td>
-                  <td style={{ fontWeight: 800 }}>{fmt(statement.reconciliation)}</td>
+                  <td style={{ fontWeight: 800, color: "#16a34a" }}>+{fmt(account.creditPoolTotal)}</td>
+                  <td />
                 </tr>
               )}
               <tr className="ps-closing-row">
-                <td colSpan={5} style={{ textAlign: "right", fontWeight: 900 }}>الرصيد النهائي</td>
-                <td style={{ fontWeight: 900, color: statement.closing > 0 ? "#c0392b" : "#16a34a" }}>
-                  {fmt(Math.abs(statement.closing))}{" "}
-                  {statement.closing > 0.009 ? "عليه" : statement.closing < -0.009 ? "له" : "خالص"}
-                </td>
+                <td colSpan={5} style={{ textAlign: "right", fontWeight: 900 }}>إجمالي حساب العميل</td>
+                <td colSpan={2}>{signedCell(account.accountTotal)}</td>
               </tr>
             </tbody>
           </table></div>
@@ -508,117 +504,52 @@ export default function PublicCustomerStatementPage() {
           <div className="ps-empty">لا توجد فواتير</div>
         )}
 
-        {/* شحنات الرصيد وفائضها — مصدر التسويات أعلاه */}
-        {statement && statement.charges.length > 0 && (
-          <div data-section="ps-charges" data-section-label="شحنات الرصيد">
-            <div className="ps-section-title">شحنات الرصيد ({statement.charges.length})</div>
+        {/* رصيد العميل القابل للتوزيع — لا يُوزَّع تلقائياً على أي فاتورة */}
+        {account && account.creditPool.length > 0 && (
+          <div data-section="ps-charges" data-section-label="رصيد العميل">
+            <div className="ps-section-title">رصيد العميل القابل للتوزيع ({account.creditPool.length})</div>
             <div className="ps-table-scroll"><table className="ps-table">
               <thead>
                 <tr>
                   <th style={{ width: 35 }}>#</th>
-                  <th style={{ width: 100 }}>التاريخ</th>
-                  <th>المرجع</th>
-                  <th style={{ width: 110 }}>قيمة الشحنة</th>
-                  <th style={{ width: 110 }}>المستهلَك</th>
-                  <th style={{ width: 115 }}>الفائض المتبقي</th>
+                  <th style={{ width: 150 }}>التاريخ واليوم والساعة</th>
+                  <th>البيان</th>
+                  <th style={{ width: 120 }}>المبلغ</th>
+                  <th style={{ width: 130 }}>حساب العميل بعدها</th>
                 </tr>
               </thead>
               <tbody>
-                {statement.charges.map((c, i) => (
-                  <tr key={c.id}>
+                {account.creditPool.map((e, i) => (
+                  <tr key={e.id}>
                     <td>{i + 1}</td>
-                    <td>{c.date}</td>
-                    <td style={{ fontWeight: 700 }}>{c.ref || "—"}</td>
-                    <td>{fmt(c.amount)}</td>
-                    <td style={{ color: c.consumed ? "#c0392b" : "#999" }}>{c.consumed ? fmt(c.consumed) : "—"}</td>
-                    <td style={{ fontWeight: 800, color: c.remaining > 0 ? "#16a34a" : "#999" }}>
-                      {c.remaining > 0 ? fmt(c.remaining) : "مستهلَكة بالكامل"}
+                    <td>{stampText(e)}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {e.label}<span style={{ color: "#667" }}> — {e.detail}</span>
                     </td>
+                    <td>{effectCell(e.effect)}</td>
+                    <td>{signedCell(e.runningBalance)}</td>
                   </tr>
                 ))}
+                <tr className="ps-total-row">
+                  <td colSpan={3} style={{ textAlign: "right", fontWeight: 800 }}>المتاح للتوزيع</td>
+                  <td style={{ fontWeight: 800, color: "#16a34a" }}>+{fmt(account.creditPoolTotal)}</td>
+                  <td>{signedCell(account.accountTotal)}</td>
+                </tr>
               </tbody>
             </table></div>
           </div>
         )}
 
-
-        {/* Quotes */}
-        <div data-section="ps-quotes" data-section-label="عروض الأسعار">
-          <div className="ps-section-title">عروض الأسعار ({quotes.length})</div>
-          {quotes.length ? (
-            <div className="ps-table-scroll"><table className="ps-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 35 }}>#</th>
-                  <th>رقم العرض</th>
-                  <th style={{ width: 100 }}>التاريخ</th>
-                  
-                  <th style={{ width: 130 }}>الإجمالي</th>
-                  <th style={{ width: 90 }}>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {quotes.map((q, i) => (
-                  <tr key={q.id}>
-                    <td>{i + 1}</td>
-                    <td style={{ fontWeight: 700 }}>{q.quote_number}</td>
-                    <td>{q.date}</td>
-                    
-                    <td>{fmt(q.total)}</td>
-                    <td>{arQuoteStatus(q.status)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-          ) : (
-            <div className="ps-empty">لا توجد عروض أسعار</div>
-          )}
-        </div>
-
-        {/* Returns */}
-        <div data-section="ps-returns" data-section-label="المرتجعات">
-          <div className="ps-section-title">المرتجعات ({returns.length})</div>
-          {returns.length ? (
-            <div className="ps-table-scroll"><table className="ps-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 35 }}>#</th>
-                  <th>رقم المرتجع</th>
-                  <th style={{ width: 100 }}>التاريخ</th>
-                  <th style={{ width: 130 }}>الإجمالي</th>
-                  <th style={{ width: 90 }}>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {returns.map((r, i) => (
-                  <tr key={r.id}>
-                    <td>{i + 1}</td>
-                    <td style={{ fontWeight: 700 }}>{r.return_number}</td>
-                    <td>{r.date}</td>
-                    <td>{fmt(r.total)}</td>
-                    <td>{arReturnStatus(r.status)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-          ) : (
-            <div className="ps-empty">لا توجد مرتجعات</div>
-          )}
-        </div>
-
-        {/* الدفعات والمعاملات صارت مدمجة داخل «سجل الحركات» أعلاه */}
-
-
         {/* Final balance */}
         <div
           data-section="ps-final"
           data-section-label="الرصيد النهائي"
-          className={`ps-final ${totals.net < 0 ? "credit" : ""}`}
+          className={`ps-final ${accountNet < 0 ? "credit" : ""}`}
         >
           <div className="t">
-            {totals.net > 0 ? "الصافي المستحق على العميل" : totals.net < 0 ? "رصيد دائن للعميل" : "الحساب خالص"}
+            {accountNet > 0 ? "الصافي المستحق على العميل" : accountNet < 0 ? "رصيد دائن للعميل" : "الحساب خالص"}
           </div>
-          <div className="v">{fmt(Math.abs(totals.net))} {company?.currency || ""}</div>
+          <div className="v">{fmt(Math.abs(accountNet))} {company?.currency || ""}</div>
         </div>
 
         {/* التواقيع — نفس كتلة قالب طباعة الفاتورة وعرض السعر */}
