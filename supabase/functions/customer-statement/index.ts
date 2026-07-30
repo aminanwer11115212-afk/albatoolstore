@@ -53,6 +53,15 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    // عزل الكاش (POS): أي كشف مخصّص لعميل يستثني فواتير نقطة البيع
+    // والمعاملات المرتبطة بها (transactions.reference_id = invoice id).
+    const posRes = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("customer_id", id)
+      .eq("source", "pos");
+    const posIds = new Set<string>((posRes.data || []).map((r: any) => r.id));
+
     const [
       customerRes,
       companyRes,
@@ -65,8 +74,9 @@ Deno.serve(async (req) => {
       supabase.from("company_settings").select("*").limit(1).maybeSingle(),
       supabase
         .from("invoices")
-        .select("id, invoice_number, date, due_date, total, paid_amount, due_amount, status, workflow_status, type, currency_code, notes")
+        .select("id, invoice_number, date, created_at, due_date, total, paid_amount, due_amount, status, workflow_status, type, source, currency_code, notes")
         .eq("customer_id", id)
+        .neq("source", "pos")
         .order("date", { ascending: false }),
       supabase
         .from("quotes")
@@ -80,10 +90,11 @@ Deno.serve(async (req) => {
         .order("date", { ascending: false }),
       supabase
         .from("transactions")
-        .select("id, date, amount, type, description, method")
+        .select("id, date, created_at, amount, type, category, description, method, account_id, reference_id, reference_no, allocation")
         .eq("customer_id", id)
         .order("date", { ascending: false }),
     ]);
+
 
     if (customerRes.error) throw customerRes.error;
     if (!customerRes.data) {
