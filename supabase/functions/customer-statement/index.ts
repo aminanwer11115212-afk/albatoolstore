@@ -104,6 +104,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    // استبعاد المعاملات المرتبطة بفواتير نقطة البيع
+    const cleanTx = (transactionsRes.data || []).filter(
+      (t: any) => !t.reference_id || !posIds.has(t.reference_id),
+    );
+
+    // أسماء الحسابات المستخدمة (لعرض «تحويل بنكي — بنك كذا»)
+    const accountIds = [...new Set(cleanTx.map((t: any) => t.account_id).filter(Boolean))];
+    let accounts: any[] = [];
+    if (accountIds.length) {
+      const accRes = await supabase.from("accounts").select("id, name").in("id", accountIds);
+      accounts = accRes.data || [];
+    }
+
     return new Response(
       JSON.stringify({
         customer: customerRes.data,
@@ -111,11 +124,13 @@ Deno.serve(async (req) => {
         invoices: invoicesRes.data || [],
         quotes: quotesRes.data || [],
         returns: returnsRes.data || [],
-        transactions: transactionsRes.data || [],
+        transactions: cleanTx,
+        accounts,
         expires_at: new Date(payload.e * 1000).toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
+
   } catch (e) {
     const msg = e instanceof Error ? e.message : "internal";
     return new Response(JSON.stringify({ error: msg }), {
