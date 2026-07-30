@@ -39,11 +39,91 @@ function logError(requestId: string, event: string, err: unknown, extra?: Record
 }
 
 
+/**
+ * تجميع كشف العميل حسب الفاتورة — نسخة مطابقة لـ
+ * `src/utils/buildStatementByInvoice.ts` (عرض فقط، لا منطق حساب جديد).
+ * كل فاتورة سطر بقيمتها، وتحتها التسويات التي استهلكت من متبقيها عبر شحن رصيد.
+ */
+function groupStatementByInvoice(
+  invoices: Array<{ id?: string; invoice_number: string; date: string; total: number; paid_amount: number; status?: string }>,
+  transactions: Array<any>,
+) {
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const n = (v: any) => Number(v || 0);
+
+  const charges = transactions
+    .filter((t) => t.category === "customer_credit" && n(t.amount) > 0)
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))
+    .map((t) => ({ row: t, amount: r2(n(t.amount)), consumed: 0 }));
+
+  const groups = invoices
+    .filter((inv) => inv.status !== "cancelled")
+    .slice()
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))
+    .map((inv) => {
+      const total = r2(n(inv.total));
+      const paid = r2(n(inv.paid_amount));
+      return {
+        id: inv.id || inv.invoice_number,
+        invoice_number: inv.invoice_number,
+        date: inv.date,
+        total,
+        paid,
+        remaining: r2(Math.max(total - paid, 0)),
+        settlements: [] as Array<{
+          date: string; applied: number; previousRemaining: number; remainingAfter: number;
+          chargeAmount: number | null; chargeRef: string | null; chargeSurplusAfter: number | null;
+        }>,
+      };
+    });
+  const byId = new Map(groups.map((g) => [g.id, g]));
+
+  const consumptions = transactions
+    .filter((t) => t.category === "customer_credit" && n(t.amount) < 0 && t.reference_id)
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+
+  for (const c of consumptions) {
+    const g = byId.get(String(c.reference_id));
+    if (!g) continue;
+    const applied = r2(Math.abs(n(c.amount)));
+    const group = c.allocation?.group_id ? String(c.allocation.group_id) : null;
+    const explicit = charges.find(
+      (x) => (group && String(x.row.allocation?.group_id || "") === group) ||
+        String(c.allocation?.charge_tx_id || "") === x.row.id,
+    );
+    const src = explicit || charges.find((x) => x.amount - x.consumed > 0.01) || null;
+    if (src) src.consumed = r2(src.consumed + applied);
+    g.settlements.push({
+      date: c.date || "",
+      applied,
+      previousRemaining: 0,
+      remainingAfter: 0,
+      chargeAmount: src ? src.amount : null,
+      chargeRef: src ? (src.row.allocation?.operation_no || src.row.reference_no || null) : null,
+      chargeSurplusAfter: src ? r2(src.amount - src.consumed) : null,
+    });
+  }
+
+  // المتبقي قبل/بعد كل تسوية محسوب رجوعاً من المتبقي النهائي (مصدر الحقيقة).
+  for (const g of groups) {
+    let after = g.remaining;
+    for (let i = g.settlements.length - 1; i >= 0; i--) {
+      g.settlements[i].remainingAfter = after;
+      g.settlements[i].previousRemaining = r2(after + g.settlements[i].applied);
+      after = g.settlements[i].previousRemaining;
+    }
+  }
+
+  const totalDue = r2(groups.reduce((s, g) => s + g.remaining, 0));
+  const totalCredit = r2(charges.reduce((s, c) => s + Math.max(r2(c.amount - c.consumed), 0), 0));
+  return { groups, totalDue, totalCredit };
+}
+
 function buildStatementHTML(args: {
   kind: "customer" | "supplier";
   party: { name?: string; phone?: string; address?: string; balance?: number; credit_balance?: number } | null;
   company: any;
-  invoices?: Array<{ invoice_number: string; date: string; total: number; paid_amount: number }>;
+  invoices?: Array<{ id?: string; invoice_number: string; date: string; total: number; paid_amount: number; status?: string }>;
   quotes?: Array<{ quote_number: string; date: string; total: number; status?: string }>;
   returns?: Array<{ return_number: string; date: string; total: number; status?: string }>;
   orders?: Array<{ order_number: string; date: string; total: number; status?: string }>;
@@ -71,6 +151,24 @@ function buildStatementHTML(args: {
   const rows = (items: any[], cols: string[], render: (r: any, i: number) => string) => items.length
     ? `<table><thead><tr><th>#</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${items.map(render).join("")}</tbody></table>`
     : `<div class="empty">لا توجد بيانات</div>`;
+
+  // كشف العميل مجمّع حسب الفاتورة: الفاتورة سطر، وتسوياتها أسطر تحتها مباشرة.
+  const grouped = kind === "customer" ? groupStatementByInvoice(invoices as any[], transactions as any[]) : null;
+  const groupedInvoicesTable = !grouped
+    ? ""
+    : grouped.groups.length
+      ? `<table><thead><tr><th>#</th><th>التاريخ</th><th>البيان</th><th>القيمة / السابق</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>${
+          grouped.groups.map((g, i) => `
+      <tr class="inv-row"><td>${i + 1}</td><td>${attr(g.date)}</td><td style="text-align:right;font-weight:700;">فاتورة ${attr(g.invoice_number)}</td><td style="font-weight:700;">${fmt(g.total)}</td><td style="color:#16a34a;font-weight:700;">${g.paid ? fmt(g.paid) : "—"}</td><td style="font-weight:800;color:${g.remaining > 0 ? "#c0392b" : "#16a34a"};">${g.remaining > 0 ? fmt(g.remaining) : "مسددة"}</td></tr>${
+        g.settlements.map((s) => `
+      <tr class="settle-row"><td></td><td>${attr(s.date)}</td><td style="text-align:right;">↳ تسوية من شحن رصيد${s.chargeAmount != null ? " " + fmt(s.chargeAmount) : ""}${s.chargeRef ? ` (${attr(s.chargeRef)})` : ""}${s.chargeSurplusAfter != null && s.chargeSurplusAfter > 0.009 ? ` — الفائض بعد التغطية ${fmt(s.chargeSurplusAfter)} رصيد دائن للعميل` : ""}</td><td>${fmt(s.previousRemaining)}</td><td style="color:#16a34a;font-weight:700;">${fmt(s.applied)}</td><td style="font-weight:700;color:${s.remainingAfter > 0 ? "#c0392b" : "#16a34a"};">${s.remainingAfter > 0 ? fmt(s.remainingAfter) : "مسددة"}</td></tr>`).join("")
+      }`).join("")
+        }<tr class="total-row"><td colspan="5" style="text-align:right;font-weight:800;">مجموع المتبقي على الفواتير</td><td style="font-weight:800;color:#c0392b;">${fmt(grouped.totalDue)}</td></tr>${
+          grouped.totalCredit > 0.009
+            ? `<tr class="total-row"><td colspan="5" style="text-align:right;font-weight:800;">يُخصم منه رصيد دائن غير مستهلَك</td><td style="font-weight:800;color:#16a34a;">−${fmt(grouped.totalCredit)}</td></tr>`
+            : ""
+        }<tr class="closing-row"><td colspan="5" style="text-align:right;font-weight:900;">الرصيد النهائي</td><td style="font-weight:900;color:${netColor};">${fmt(netValue)} ${net > 0.001 ? "عليه" : net < -0.001 ? "له" : "خالص"}</td></tr></tbody></table>`
+      : `<div class="empty">لا توجد فواتير</div>`;
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -106,6 +204,10 @@ function buildStatementHTML(args: {
   .summary-box-value { font-size: 20px; font-weight: 900; color: #2980b9; }
   .section-title { font-size: 15px; font-weight: 900; color: #5b2c8e; margin: 18px 0 6px; }
   .empty { text-align: center; padding: 12px; color: #777; background: #fafafa; border: 1px dashed #ccc; border-radius: 6px; margin: 8px 0; }
+  tbody tr.inv-row td { background: #fff; border-top: 2px solid #1a1a1a; }
+  tbody tr.settle-row td { background: #f6f8fb; font-size: 12px; color: #33475b; }
+  tbody tr.total-row td { background: #eef2ff; border-top: 2px solid #1a1a1a; }
+  tbody tr.closing-row td { background: #e2e8f8; font-size: 15px; border-top: 2px solid #1a1a1a; }
   @media print { body { padding: 0; background: #fff; } .toolbar { display: none !important; } .page { box-shadow: none; border-radius: 0; padding: 0; } }
 </style></head><body>
 <div class="toolbar"><button id="__btn_pdf"><span id="__btn_label">⬇️ تحميل PDF</span></button></div>
@@ -116,8 +218,8 @@ function buildStatementHTML(args: {
   <div class="info-row"><div>${party?.phone ? `<span class="info-label">الهاتف:</span> <span class="info-value">${attr(party.phone)}</span>` : ""}</div><div>${party?.address ? `<span class="info-label">العنوان:</span> <span class="info-value">${attr(party.address)}</span>` : ""}</div></div>
   <div style="margin:10px 0 14px;padding:14px 18px;border:2px solid ${netColor};border-radius:10px;background:#fafafa;display:flex;justify-content:space-between;align-items:center;font-size:15px"><span style="font-weight:800;color:${netColor}">${netLabel}</span><strong style="font-size:22px;color:${netColor}">${fmt(netValue)}</strong></div>
   <div class="summary-row">${kind === "customer" ? `<div class="summary-box"><div class="summary-box-title">إجمالي الفواتير</div><div class="summary-box-value">${fmt(invoiceTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المدفوع</div><div class="summary-box-value">${fmt(paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المتبقي</div><div class="summary-box-value">${fmt(invoiceTotal - paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">رصيد دائن</div><div class="summary-box-value">${fmt(credit)}</div></div>` : `<div class="summary-box"><div class="summary-box-title">إجمالي أوامر الشراء</div><div class="summary-box-value">${fmt(ordersTotal)}</div></div><div class="summary-box"><div class="summary-box-title">الرصيد</div><div class="summary-box-value">${fmt(balance)}</div></div>`}</div>
-  ${kind === "customer" ? `<div class="section-title">الفواتير</div>${rows(invoices, ["رقم الفاتورة", "التاريخ", "الإجمالي", "المدفوع", "المتبقي"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.invoice_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${fmt(r.paid_amount)}</td><td>${fmt(Number(r.total || 0) - Number(r.paid_amount || 0))}</td></tr>`)}<div class="section-title">عروض الأسعار</div>${rows(quotes, ["رقم العرض", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.quote_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}<div class="section-title">المرتجعات</div>${rows(returns, ["رقم المرتجع", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.return_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}` : `<div class="section-title">أوامر الشراء</div>${rows(orders, ["رقم الأمر", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.order_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}`}
-  <div class="section-title">المعاملات</div>${rows(transactions, ["التاريخ", "النوع", "المبلغ", "الوصف"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.date)}</td><td>${attr(r.type || "-")}</td><td>${fmt(r.amount)}</td><td>${attr(r.description || "-")}</td></tr>`)}
+  ${kind === "customer" ? `<div class="section-title">الفواتير وتسوياتها</div>${groupedInvoicesTable}<div class="section-title">عروض الأسعار</div>${rows(quotes, ["رقم العرض", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.quote_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}<div class="section-title">المرتجعات</div>${rows(returns, ["رقم المرتجع", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.return_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}` : `<div class="section-title">أوامر الشراء</div>${rows(orders, ["رقم الأمر", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.order_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}`}
+  ${kind === "customer" ? "" : `<div class="section-title">المعاملات</div>${rows(transactions, ["التاريخ", "النوع", "المبلغ", "الوصف"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.date)}</td><td>${attr(r.type || "-")}</td><td>${fmt(r.amount)}</td><td>${attr(r.description || "-")}</td></tr>`)}`}
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>(function(){var btn=document.getElementById('__btn_pdf');var label=document.getElementById('__btn_label');btn.onclick=async function(){btn.disabled=true;label.innerHTML='<span class="spinner"></span> جاري إنشاء PDF...';try{var blob=await window.html2pdf().set({margin:8,filename:${JSON.stringify(title + ".pdf")},image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,logging:false},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.getElementById('__doc_root')).outputPdf('blob');var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=${JSON.stringify(title + ".pdf")};document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1000);label.textContent='✓ تم التحميل';setTimeout(function(){btn.disabled=false;label.textContent='⬇️ تحميل PDF';},2000);}catch(e){btn.disabled=false;label.textContent='⬇️ تحميل PDF';alert('فشل توليد PDF: '+(e&&e.message||e));}};})();</script>
@@ -441,10 +543,11 @@ Deno.serve(async (req) => {
     } else if (tk.doc_type === "statement-customer") {
       const [customerRes, invoicesRes, quotesRes, returnsRes, transactionsRes] = await Promise.all([
         supabase.from("customers").select("name, phone, address, balance, credit_balance").eq("id", tk.doc_id).maybeSingle(),
-        supabase.from("invoices").select("invoice_number, date, total, paid_amount").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
+        // id/status وحقول الحركة الكاملة لازمة لتجميع الكشف حسب الفاتورة
+        supabase.from("invoices").select("id, invoice_number, date, total, paid_amount, status").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
         supabase.from("quotes").select("quote_number, date, total, status").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
         supabase.from("stock_returns").select("return_number, date, total, status").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
-        supabase.from("transactions").select("date, type, amount, description").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
+        supabase.from("transactions").select("date, type, amount, description, category, method, reference_id, reference_no, allocation").eq("customer_id", tk.doc_id).order("date", { ascending: false }),
       ]);
       if (!customerRes.data) return buildErrorHTML("العميل غير موجود", 404);
       statementHtml = buildStatementHTML({
