@@ -14,6 +14,9 @@ import CreditConsumptionOrderControl from "@/components/statement/CreditConsumpt
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
 import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
+import EditChargeDialog, { type EditableCharge } from "@/components/finance/EditChargeDialog";
+import DeleteLedgerEntryDialog, { type DeletableEntry } from "@/components/statement/DeleteLedgerEntryDialog";
+import { classifyLedgerEntry, creditChargeDeletability } from "@/utils/ledgerEntryActions";
 import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvoiceDialog";
 import SettleInvoicesFromCreditDialog from "@/components/statement/SettleInvoicesFromCreditDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
@@ -209,6 +212,38 @@ export default function CustomerStatementPage() {
   const isRevisablePayment = (t: any): boolean =>
     t.category === "customer_payment" && t.method !== "credit_balance" && !!t.reference_id;
   const [reviseTx, setReviseTx] = useState<EditablePayment | null>(null);
+  // شحن رصيد قابل للتعديل: يحتاج مجموعة (`allocation.group_id`) كي يعمل
+  // `revise_customer_charge`؛ شحنات الفائض التلقائي بلا مجموعة تُحذف ولا تُعدَّل.
+  const [reviseCharge, setReviseCharge] = useState<EditableCharge | null>(null);
+  const [deleteEntry, setDeleteEntry] = useState<DeletableEntry | null>(null);
+  const invoiceNumberById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const inv of (invoices as any[]) || []) m.set(inv.id, inv.invoice_number || "");
+    return m;
+  }, [invoices]);
+  const openDeleteEntry = (t: any) => {
+    setDeleteEntry({
+      ...t,
+      invoiceNumber: t.reference_id ? invoiceNumberById.get(t.reference_id) || null : null,
+      accountLabel: accountLabel(t),
+    });
+  };
+  const openReviseCharge = (t: any) => {
+    const groupId = t.allocation?.group_id ? String(t.allocation.group_id) : null;
+    if (!groupId) {
+      toast.error("هذه الشحنة بلا مجموعة تخصيص — يمكن حذفها فقط");
+      return;
+    }
+    setReviseCharge({
+      groupId,
+      customerId: t.customer_id || selectedCustomerId,
+      amount: Number(t.amount || 0),
+      method: t.method,
+      accountId: t.account_id,
+      date: t.date,
+      hasConsumption: !creditChargeDeletability(t, (transactions as any[]) || []).canDelete,
+    });
+  };
   const [applyCreditOpen, setApplyCreditOpen] = useState(false);
   const [settleFromCreditOpen, setSettleFromCreditOpen] = useState(false);
   const refreshAfterRevise = () => {
@@ -1184,7 +1219,7 @@ export default function CustomerStatementPage() {
                         </button>
                       </th>
                       <th className="text-right px-5 py-3 font-semibold text-muted-foreground">الوصف</th>
-                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground print:hidden">تعديل</th>
+                      <th className="text-right px-5 py-3 font-semibold text-muted-foreground print:hidden">إجراءات</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1232,18 +1267,40 @@ export default function CustomerStatementPage() {
                           </td>
                           <td data-label="الوصف" className="px-5 py-3 text-muted-foreground text-xs">{t.description || "-"}</td>
                           <td data-label="تعديل" className="px-5 py-3 print:hidden">
-                            {isRevisablePayment(t) ? (
-                              <button
-                                type="button"
-                                onClick={() => setReviseTx({ id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id, customer_id: t.customer_id, description: t.description, method: (t as any).method, account_id: (t as any).account_id, date: (t as any).date })}
-                                className="text-xs text-primary hover:underline"
-                                title="تعديل مبلغ/خصم هذه الدفعة"
-                              >
-                                تعديل
-                              </button>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">—</span>
-                            )}
+                            {(() => {
+                              const entryKind = classifyLedgerEntry(t);
+                              const canEdit = isRevisablePayment(t) || entryKind === "credit_charge";
+                              const canDelete = isRevisablePayment(t) || entryKind === "credit_charge";
+                              if (!canEdit && !canDelete) return <span className="text-muted-foreground text-xs">—</span>;
+                              return (
+                                <div className="flex items-center gap-3">
+                                  {canEdit && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        entryKind === "credit_charge"
+                                          ? openReviseCharge(t)
+                                          : setReviseTx({ id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id, customer_id: t.customer_id, description: t.description, method: (t as any).method, account_id: (t as any).account_id, date: (t as any).date })
+                                      }
+                                      className="text-xs text-primary hover:underline"
+                                      title={entryKind === "credit_charge" ? "تعديل شحن الرصيد" : "تعديل مبلغ/خصم هذه الدفعة"}
+                                    >
+                                      تعديل
+                                    </button>
+                                  )}
+                                  {canDelete && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openDeleteEntry(t)}
+                                      className="text-xs text-destructive hover:underline"
+                                      title={entryKind === "credit_charge" ? "حذف شحن الرصيد" : "حذف هذه الدفعة"}
+                                    >
+                                      حذف
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                         </tr>
                       );
@@ -1308,6 +1365,22 @@ export default function CustomerStatementPage() {
         tx={reviseTx}
         onClose={() => setReviseTx(null)}
         onSaved={refreshAfterRevise}
+      />
+
+      <EditChargeDialog
+        open={!!reviseCharge}
+        charge={reviseCharge}
+        onClose={() => setReviseCharge(null)}
+        onSaved={refreshAfterRevise}
+      />
+
+      <DeleteLedgerEntryDialog
+        open={!!deleteEntry}
+        entry={deleteEntry}
+        transactions={(transactions as any[]) || []}
+        currentNet={netBalanceOf(selectedCustomer)}
+        onClose={() => setDeleteEntry(null)}
+        onDeleted={refreshAfterRevise}
       />
 
       <ApplyCreditToInvoiceDialog

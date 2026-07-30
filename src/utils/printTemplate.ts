@@ -692,7 +692,7 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     var el = contentEl();
     var opt = {
       margin: 8,
-      filename: getDocTitle() + '.pdf',
+      filename: buildDocFileName(),
       image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -785,14 +785,15 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
       var blob = await genPdfBlob();
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url; a.download = getDocTitle() + '.pdf';
+      a.href = url; a.download = buildDocFileName();
       document.body.appendChild(a); a.click();
       setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
     } catch(e){ alert('فشل توليد PDF: ' + e.message); }
     btn.disabled = false; btn.textContent = old;
   };
 
-  function buildWaFileName(){
+  // اسم ملف موحّد لكل مخارج الـPDF (تنزيل + واتساب): النوع - العميل - رقم المستند
+  function buildDocFileName(){
     // حوّل الأرقام العربية/الفارسية إلى لاتينية
     var digitMap = { '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
                      '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9' };
@@ -825,8 +826,8 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
 
     return name + '.pdf';
   }
-  function buildWaFileNameExt(ext){
-    var n = buildWaFileName();
+  function buildDocFileNameExt(ext){
+    var n = buildDocFileName();
     // استبدل امتداد .pdf الافتراضي بالامتداد المطلوب
     n = n.replace(/\\.pdf$/i, '');
     return n + '.' + ext;
@@ -905,7 +906,7 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     var btn = this; btn.disabled = true; var old = btn.textContent; btn.textContent = '⏳ جاري...';
     try {
       var blob = await genPdfBlob();
-      var fileName = buildWaFileName();
+      var fileName = buildDocFileName();
       var file = new File([blob], fileName, { type: 'application/pdf' });
 
       // مشاركة الملف فقط بدون أي نص — المستخدم يختار جهة الاتصال

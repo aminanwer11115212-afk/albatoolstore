@@ -74,6 +74,11 @@ import {
   calcTotal,
   btnStyle,
   invoiceItemsHash,
+  resolveDefaultRate,
+  deriveRateFromRows,
+  priceFromProduct,
+  backfillForeignPrice,
+  applyRateToRow,
 } from "@/utils/invoiceCreateHelpers";
 
 
@@ -153,6 +158,12 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
 
   // Default exchange rate
   const [defaultRate, setDefaultRate] = useState<number>(1);
+  // آخر سعر صرف عام من قاعدة البيانات، والمشتقّ من بنود الفاتورة المفتوحة.
+  // الاثنان في refs لأن تأثيري التحميل (الفاتورة/السعر) يتسابقان بأي ترتيب.
+  const globalRateRef = useRef<number>(0);
+  const derivedRateRef = useRef<number>(0);
+  // يُرفع عند تعديل المستخدم لسعر الصرف يدوياً فلا يُستبدَل باللاحق آلياً.
+  const rateTouchedRef = useRef(false);
 
   // Quick add row + table rows (مُستخرج إلى hook موحّد)
   const { quickRow, setQuickRow, rows, setRows } = useDocumentItems();
@@ -380,8 +391,10 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     })();
   }, [customer?.id]);
 
+  // سعر الصرف العام يُقرأ في الحالتين (إنشاء وتعديل). كان مقصوراً على الإنشاء،
+  // فكانت الفاتورة القديمة التي لا يحمل أي بند فيها سعراً أجنبياً تبقى على معدّل 1
+  // ويُدرَج الصنف الجديد بسعره الأجنبي الخام كسعر محلي.
   useEffect(() => {
-    if (editId) return;
     (async () => {
       const { data: er } = await supabase
         .from("exchange_rates")
@@ -390,12 +403,15 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const rate = Number(er?.rate_to_base || 1);
-      if (rate && rate > 0 && rate !== 1) {
-        setDefaultRate(rate);
-        setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: rate, unit_price: r.foreign_price * rate }));
-        setRows((prev) => prev.map((r) => (r.product_id ? r : { ...r, exchange_rate: rate, unit_price: r.foreign_price * rate })));
-      }
+      const rate = Number(er?.rate_to_base || 0);
+      if (!(rate > 0)) return;
+      globalRateRef.current = rate;
+      // في وضع التعديل: لا نتجاوز المعدّل المشتقّ من بنود الفاتورة نفسها إن وُجد.
+      const effective = resolveDefaultRate(editId ? derivedRateRef.current : 0, rate);
+      if (effective === 1) return;
+      setDefaultRate(effective);
+      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: r.foreign_price * effective }));
+      setRows((prev) => prev.map((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: r.foreign_price * effective })));
     })();
   }, [editId]);
 
@@ -457,11 +473,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
         setGeneralDiscount(Math.max(0, (Number(inv.discount) || 0) - itemDiscounts));
         setRows(mapped);
         // اضبط معدل الصرف الافتراضي للبنود الجديدة على معدل الفاتورة نفسه
-        // (مشتقّاً من بنودها) بدل 1 — وإلا أُدرج الصنف الجديد بالسعر الأجنبي الخام.
-        const derivedRate = mapped.find((r: any) => Number(r.foreign_price) > 0 && Number(r.exchange_rate) > 0)?.exchange_rate;
-        if (derivedRate && derivedRate > 0) {
-          setDefaultRate(derivedRate);
-          setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: derivedRate, unit_price: r.foreign_price * derivedRate }));
+        // (مشتقّاً من بنودها)، فإن لم يحمل أي بند سعراً أجنبياً فعلى السعر العام
+        // — لا على 1، وإلا أُدرج الصنف الجديد بالسعر الأجنبي الخام.
+        derivedRateRef.current = deriveRateFromRows(mapped);
+        const effectiveRate = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
+        if (effectiveRate > 0 && !rateTouchedRef.current) {
+          setDefaultRate(effectiveRate);
+          setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effectiveRate, unit_price: r.foreign_price * effectiveRate }));
         }
         // احفظ بصمة البنود الأصلية لتخطّي إعادة الكتابة وعمليات المخزون لاحقاً إن لم تتغيّر
         originalItemsHashRef.current = invoiceItemsHash(mapped);
@@ -471,6 +489,44 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       }
     })();
   }, [editId, navigate]);
+
+  // ---------- Backfill: سعر أجنبي مفقود في بنود فاتورة قديمة ----------
+  // بنود حُفظت قبل تفعيل السعر الأجنبي تصل بـ foreign_price فارغ رغم وجوده في
+  // بطاقة المنتج، بينما مسار الإضافة يقرأه دائماً — فيختلف المساران. نملأه من
+  // البطاقة ونشتقّ سعر الصرف منه بحيث يبقى السعر المحلي والإجمالي كما هما تماماً.
+  const backfilledForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!editId || productsLoading || products.length === 0) return;
+    if (backfilledForRef.current === editId) return;
+    setRows((prev) => {
+      if (prev.length === 0) return prev;
+      let changed = false;
+      const next = prev.map((r) => {
+        if (!r.dbId || !r.product_id) return r;
+        const patch = backfillForeignPrice(r, products.find((p) => p.id === r.product_id));
+        if (!patch) return r;
+        changed = true;
+        return { ...r, ...patch };
+      });
+      if (!changed) return prev;
+      backfilledForRef.current = editId;
+      derivedRateRef.current = deriveRateFromRows(next);
+      // البصمة تتغيّر بتغيّر السعر الأجنبي — حدّثها حتى لا يُحسب هذا الملء
+      // "تعديلاً للبنود" فتُعاد كتابتها وتُطبَّق حركات مخزون بلا سبب.
+      originalItemsHashRef.current = invoiceItemsHash(next);
+      return next;
+    });
+  }, [editId, products, productsLoading]);
+
+  // بعد الملء أعلاه قد يصبح للفاتورة معدّل مشتق — اعتمده للبنود الجديدة.
+  useEffect(() => {
+    if (!editId || rateTouchedRef.current) return;
+    const effective = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
+    if (effective > 0 && effective !== defaultRate) {
+      setDefaultRate(effective);
+      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: r.foreign_price * effective }));
+    }
+  }, [editId, rows.length, defaultRate]);
 
   // ---------- Search ----------
   const customerMatches = useMemo(() => {
@@ -522,10 +578,13 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     }
     setRows((prev) => prev.map((r) => {
       if (r.uid !== rowUid) return r;
-      const fp = Number(p.foreign_price) || Number(p.sale_price) || 0;
-      const up = fp * r.exchange_rate;
+      // صف الجدول قد يكون قديماً بمعدّل 1 — استخدم معدّل الفاتورة الافتراضي
+      // حتى يتطابق التسعير مع مسار الفاتورة الجديدة.
+      const rate = (Number(r.exchange_rate) || 0) > 0 ? r.exchange_rate : defaultRate;
+      const { foreign_price: fp, unit_price: up } = priceFromProduct(p, rate);
       const updated: InvRow = {
         ...r,
+        exchange_rate: rate,
         product_id: p.id,
         product_name: p.name,
         productSearch: p.name,
@@ -548,10 +607,11 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       return;
     }
     setQuickRow((r) => {
-      const fp = Number(p.foreign_price) || Number(p.sale_price) || 0;
-      const up = fp * r.exchange_rate;
+      const rate = (Number(r.exchange_rate) || 0) > 0 ? r.exchange_rate : defaultRate;
+      const { foreign_price: fp, unit_price: up } = priceFromProduct(p, rate);
       const updated: InvRow = {
         ...r,
+        exchange_rate: rate,
         product_id: p.id,
         product_name: p.name,
         productSearch: p.name,
@@ -1390,6 +1450,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     // غير محفوظة بعد → نُبقي النافذة المنبثقة بالبيانات الحالية في الذاكرة.
     openPrintWindow(generatePrintHTML({
       type: "invoice",
+      // رقم الفاتورة لازم في الترويسة وفي اسم ملف الـPDF المُصدَّر — كان ساقطاً
+      // هنا وحده (صفحة عرض السعر تمرّره) فيخرج الملف بلا رقم.
+      number: invoiceNumber,
       isCash,
       date: invoiceDate,
       customer,
@@ -1938,7 +2001,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
             <div className="quick-add-field">
               <input ref={quickRateRef} data-nav-col="exchange_rate" type="number" step="0.01" className="form-control text-center" placeholder="معدل التحويل"
                 value={quickRow.exchange_rate}
-                onChange={(e) => { const er = Number(e.target.value) || 1; setQuickRow((r) => { const u = { ...r, exchange_rate: er, unit_price: r.foreign_price * er }; u.total = calcTotal(u); return u; }); setRows((prev) => prev.map((row) => { const u = { ...row, exchange_rate: er, unit_price: row.foreign_price * er }; u.total = calcTotal(u); return u; })); }}
+                onChange={(e) => { const er = Number(e.target.value) || 1; rateTouchedRef.current = true; setDefaultRate(er); setQuickRow((r) => { const u = { ...r, exchange_rate: er, unit_price: r.foreign_price * er }; u.total = calcTotal(u); return u; }); setRows((prev) => prev.map((row) => { const u = applyRateToRow(row, er); if (u === row) return row; u.total = calcTotal(u); return u; })); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addQuickRowToTable(); } }} />
               <ExpandFieldButton currentExtra={quickExtras[4] || 0} onDrag={(v) => quickSetExtra(4, v)} onReset={() => quickReset(4)} />
             </div>
@@ -2100,6 +2163,12 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                                 if (row.uid !== r.uid) return row;
                                 const up = Number(e.target.value) || 0;
                                 const merged = { ...row, unit_price: up };
+                                // أبقِ سعر الصرف متسقاً مع (المحلي ÷ الأجنبي) — وهو
+                                // نفس ما يُشتق عند إعادة فتح الفاتورة، فلا يختلف العرض
+                                // قبل الحفظ وبعده.
+                                if ((Number(row.foreign_price) || 0) > 0 && up > 0) {
+                                  merged.exchange_rate = Math.round((up / row.foreign_price) * 1000) / 1000;
+                                }
                                 merged.total = calcTotal(merged);
                                 return merged;
                               }));
@@ -2350,8 +2419,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                           docLabel: pos ? "فاتورة كاش" : "فاتورة",
                         });
                       }}
-                      title="إرسال واتساب مع رابط الفاتورة" style={btnStyle("#10b981")}>
-                      <MessageCircle size={14} /> واتساب
+                      title="إرسال رابط الفاتورة للعميل عبر واتساب" style={btnStyle("#10b981")}>
+                      <MessageCircle size={14} /> إرسال للعميل
                     </button>
                   ),
                 },

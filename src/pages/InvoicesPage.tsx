@@ -562,7 +562,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                             type="button"
                             className="btn-xs btn-primary"
                             onClick={() => handleWhatsApp(inv)}
-                            title="واتساب"
+                            title="إرسال للعميل عبر واتساب"
                           >
                             ✉
                           </button>
@@ -616,7 +616,7 @@ export default function InvoicesPage({ posOnly = false }: { posOnly?: boolean } 
                       <button className="btn-xs btn-warning" onClick={() => navigate(`/invoices/edit/${inv.id}`)}>✎ تعديل</button>
                       <button className="btn-xs btn-info" onClick={() => handlePrint(inv, "full", false)} title="طباعة">🖨 طباعة</button>
                       {pickCustomerWhatsApp(inv.customers) && (
-                        <button className="btn-xs btn-primary" onClick={() => handleWhatsApp(inv)}>✉ واتساب</button>
+                        <button className="btn-xs btn-primary" onClick={() => handleWhatsApp(inv)} title="إرسال رابط الفاتورة للعميل عبر واتساب">✉ إرسال للعميل</button>
                       )}
                       <button className="btn-xs btn-danger" onClick={() => handleDelete(inv.id, { invoice_number: inv.invoice_number, date: fmtDate(inv.date) })}>🗑 حذف</button>
                     </>
