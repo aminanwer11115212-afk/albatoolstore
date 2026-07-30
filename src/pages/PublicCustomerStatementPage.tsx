@@ -231,16 +231,15 @@ export default function PublicCustomerStatementPage() {
         .ps-info-value { color: #c0392b; font-weight: 700; }
         .ps-info-value-blue { color: #2980b9; font-weight: 800; }
 
-        /* === SUMMARY BOXES (matches print template) === */
-        .ps-summary-row { display: flex; justify-content: center; gap: 16px; margin: 16px 0; flex-wrap: wrap; }
-        .ps-summary-box { border: 2px solid #1a1a1a; border-radius: 6px; padding: 12px 24px; text-align: center; min-width: 170px; flex: 1; }
-        .ps-summary-box-title { font-size: 13px; font-weight: 800; color: #1a1a1a; margin-bottom: 4px; }
-        .ps-summary-box-value { font-size: 20px; font-weight: 900; color: #2c3e50; }
-        .ps-summary-box.blue { border-color: #2980b9; }
+        /* === SUMMARY BOXES — نفس مقاسات وألوان قالب طباعة الفاتورة ===
+           الإطار أسود دائماً والقيمة وحدها ملوّنة (كما في printTemplate)، مع
+           min-width مرن حتى لا تتكسّر الصناديق على الشاشات الصغيرة. */
+        .ps-summary-row { display: flex; justify-content: center; gap: 30px; margin: 16px 0; flex-wrap: wrap; }
+        .ps-summary-box { border: 2px solid #1a1a1a; border-radius: 6px; padding: 12px 30px; text-align: center; min-width: min(220px, 100%); flex: 1 1 220px; }
+        .ps-summary-box-title { font-size: 15px; font-weight: 800; color: #1a1a1a; margin-bottom: 4px; }
+        .ps-summary-box-value { font-size: 20px; font-weight: 900; }
         .ps-summary-box.blue .ps-summary-box-value { color: #2980b9; }
-        .ps-summary-box.red { border-color: #c0392b; }
         .ps-summary-box.red .ps-summary-box-value { color: #c0392b; }
-        .ps-summary-box.green { border-color: #16a34a; }
         .ps-summary-box.green .ps-summary-box-value { color: #16a34a; }
 
         /* === SECTIONS & TABLES === */
@@ -257,13 +256,20 @@ export default function PublicCustomerStatementPage() {
         .ps-by-invoice .ps-settle-row td { background: #f6f8fb; font-size: 12px; color: #33475b; }
         .ps-settle-arrow { color: #5b4cad; font-weight: 900; margin-left: 4px; }
         .ps-settle-surplus { color: #16a34a; font-weight: 700; }
-        .ps-by-invoice .ps-total-row td { background: #eef2ff; border-top: 2px solid #1a1a1a; }
-        .ps-by-invoice .ps-closing-row td { background: #e2e8f8; font-size: 15px; border-top: 2px solid #1a1a1a; }
+        /* صفوف المجاميع بنفس هوية .total-row في قالب طباعة الفاتورة */
+        .ps-by-invoice .ps-total-row td { background: #f0f0f0; font-weight: 800; font-size: 14px; border: 2px solid #1a1a1a; }
+        .ps-by-invoice .ps-closing-row td { background: #e8eef7; font-weight: 900; font-size: 15px; border: 2px solid #1a1a1a; }
 
-        /* === FINAL BALANCE === */
-        .ps-final { margin-top: 20px; padding: 14px; border: 2px solid #2980b9; border-radius: 8px; text-align: center; background: #ecf6fc; }
-        .ps-final .t { font-size: 14px; font-weight: 800; color: #1a1a1a; }
+        /* === FINAL BALANCE — بألوان صف «رصيد العميل الحالي» في قالب الفاتورة === */
+        .ps-final { margin-top: 20px; padding: 14px; border: 2px solid #1a1a1a; border-radius: 6px; text-align: center; background: #e8eef7; }
+        .ps-final .t { font-size: 15px; font-weight: 800; color: #1a1a1a; }
         .ps-final .v { font-size: 26px; font-weight: 900; color: #c0392b; margin-top: 4px; }
+        .ps-final.credit .v { color: #16a34a; }
+
+        /* === SIGNATURES (identical to printTemplate.ts) === */
+        .ps-signatures { display: flex; justify-content: space-between; padding: 20px 50px 10px; margin-top: 20px; flex-wrap: wrap; gap: 12px; }
+        .ps-sig-box { text-align: center; width: 150px; }
+        .ps-sig-line { border-top: 1px solid #999; margin-top: 45px; padding-top: 5px; font-size: 12px; color: #555; font-weight: 600; }
 
         /* === ACTIONS / THANKS === */
         .ps-actions { max-width: 800px; margin: 0 auto 12px; display: flex; gap: 8px; justify-content: flex-end; padding: 0 20px; }
@@ -303,6 +309,7 @@ export default function PublicCustomerStatementPage() {
             { key: "ps-quotes", label: "عروض الأسعار" },
             { key: "ps-returns", label: "المرتجعات" },
             { key: "ps-final", label: "الرصيد النهائي" },
+            { key: "ps-signatures", label: "التواقيع" },
           ]}
           shareTitle={`كشف حساب — ${customer.name}`}
           shareSummary={`الصافي: ${fmt(Math.abs(totals.net))} ${company?.currency || ""}${totals.net > 0 ? " عليه" : totals.net < 0 ? " له" : ""}`}
@@ -589,11 +596,21 @@ export default function PublicCustomerStatementPage() {
 
 
         {/* Final balance */}
-        <div data-section="ps-final" data-section-label="الرصيد النهائي" className="ps-final">
+        <div
+          data-section="ps-final"
+          data-section-label="الرصيد النهائي"
+          className={`ps-final ${totals.net < 0 ? "credit" : ""}`}
+        >
           <div className="t">
             {totals.net > 0 ? "الصافي المستحق على العميل" : totals.net < 0 ? "رصيد دائن للعميل" : "الحساب خالص"}
           </div>
           <div className="v">{fmt(Math.abs(totals.net))} {company?.currency || ""}</div>
+        </div>
+
+        {/* التواقيع — نفس كتلة قالب طباعة الفاتورة وعرض السعر */}
+        <div data-section="ps-signatures" data-section-label="التواقيع" className="ps-signatures">
+          <div className="ps-sig-box"><div className="ps-sig-line">توقيع المستلم</div></div>
+          <div className="ps-sig-box"><div className="ps-sig-line">توقيع المسؤول</div></div>
         </div>
 
         <div className="ps-thanks">شكراً لتعاملكم معنا</div>
