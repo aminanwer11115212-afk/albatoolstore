@@ -466,36 +466,8 @@ export default function PublicCustomerStatementPage() {
           )}
         </div>
 
-        {/* Payments / Transactions */}
-        <div className="ps-section-title">الدفعات والمعاملات ({transactions.length})</div>
-        {transactions.length ? (
-          <table className="ps-table">
-            <thead>
-              <tr>
-                <th style={{ width: 35 }}>#</th>
-                <th style={{ width: 100 }}>التاريخ</th>
-                <th style={{ width: 80 }}>النوع</th>
-                <th style={{ width: 120 }}>المبلغ</th>
-                <th style={{ width: 100 }}>الطريقة</th>
-                <th>الوصف</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((t, i) => (
-                <tr key={t.id}>
-                  <td>{i + 1}</td>
-                  <td>{t.date}</td>
-                  <td>{t.type === "income" ? "قبض" : t.type === "expense" ? "صرف" : t.type}</td>
-                  <td style={{ fontWeight: 700, color: t.type === "income" ? "#16a34a" : "#c0392b" }}>{fmt(t.amount)}</td>
-                  <td>{t.method || "-"}</td>
-                  <td style={{ textAlign: "right" }}>{t.description || "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="ps-empty">لا توجد دفعات</div>
-        )}
+        {/* الدفعات والمعاملات صارت مدمجة داخل «سجل الحركات» أعلاه */}
+
 
         {/* Final balance */}
         <div data-section="ps-final" data-section-label="الرصيد النهائي" className="ps-final">
