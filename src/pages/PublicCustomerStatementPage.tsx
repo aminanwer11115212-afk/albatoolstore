@@ -135,13 +135,78 @@ export default function PublicCustomerStatementPage() {
     const payments = data.transactions
       .filter((t) => t.type === "income")
       .reduce((s, t) => s + Number(t.amount || 0), 0);
-    // الصافي الحقيقي على العميل = المديونية من الفواتير − رصيده الدائن.
-    // نستخدم net_balance من الخادم إن توفّر، وإلا نحسبه محلياً.
-    const custNet = data.customer.net_balance !== null && data.customer.net_balance !== undefined
-      ? Number(data.customer.net_balance)
-      : Number(data.customer.balance || 0) - Number(data.customer.credit_balance || 0);
+    // الصافي الحقيقي على العميل — مصدر واحد موحّد: netBalanceOf
+    const custNet = netBalanceOf(data.customer as any);
     return { sales, paid, due, unpaid, returns, payments, net: custNet };
   }, [data]);
+
+  /**
+   * سجل الحركات المُبسَّط للزبون: فاتورة (عليه) / دفعة نقدية (له) / شحن رصيد (له).
+   * تُستبعد حركات التسوية الداخلية (استهلاك الرصيد التلقائي والتعديلات) لأنها
+   * لا تُغيّر الصافي وتُربك الزبون — تبقى مرئية فقط في كشف الإدارة الداخلي.
+   * الرصيد التراكمي يُحسب صفاً بصف وينتهي بنفس netBalanceOf.
+   */
+  const ledger = useMemo(() => {
+    if (!data) return { rows: [] as any[], totalDebit: 0, totalCredit: 0, closing: 0 };
+    const accountNameById = new Map<string, string>(
+      (data.accounts || []).map((a) => [a.id, a.name]),
+    );
+    const full = buildCustomerLedger({
+      invoices: data.invoices,
+      transactions: data.transactions,
+      accountNameById,
+      includeDeleted: false,
+    });
+    const VISIBLE = new Set(["invoice", "payment", "charge", "overpay"]);
+    const visible = full.events.filter((e) => VISIBLE.has(e.kind) && !e.excluded);
+
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const net = netBalanceOf(data.customer as any);
+    const sumDebit = r2(visible.reduce((s, e) => s + e.debit, 0));
+    const sumCredit = r2(visible.reduce((s, e) => s + e.credit, 0));
+
+    // صف افتتاحي/تسوية يضمن أن نهاية الجدول = net_balance بالضبط
+    const opening = r2(net - (sumDebit - sumCredit));
+    const rows: any[] = [];
+    if (Math.abs(opening) >= 0.01) {
+      rows.push({
+        id: "opening",
+        date: visible[0]?.date || "",
+        statement: "رصيد سابق مُرحَّل",
+        refNumber: "—",
+        debit: opening > 0 ? opening : 0,
+        credit: opening < 0 ? -opening : 0,
+        balance: opening,
+      });
+    }
+    let running = Math.abs(opening) >= 0.01 ? opening : 0;
+    let totalDebit = Math.max(0, opening);
+    let totalCredit = Math.max(0, -opening);
+    for (const e of visible) {
+      running = r2(running + e.debit - e.credit);
+      totalDebit = r2(totalDebit + e.debit);
+      totalCredit = r2(totalCredit + e.credit);
+      rows.push({
+        id: e.id,
+        date: e.date,
+        statement:
+          e.kind === "invoice"
+            ? `فاتورة ${e.refNumber}`
+            : e.kind === "charge"
+              ? "شحن رصيد للحساب"
+              : e.kind === "overpay"
+                ? "فائض دفعة أُضيف للرصيد"
+                : e.statement,
+        refNumber: e.refNumber,
+        debit: e.debit,
+        credit: e.credit,
+        balance: running,
+      });
+    }
+    return { rows, totalDebit, totalCredit, closing: r2(net) };
+  }, [data]);
+
+
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
 
