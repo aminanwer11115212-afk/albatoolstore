@@ -1921,10 +1921,10 @@ export default function QuoteCreatePage() {
                           toast.error(err?.message || "فشل إنشاء رابط المشاركة");
                         }
                       }}
-                      title="إرسال واتساب مع رابط عرض السعر"
+                      title="إرسال رابط عرض السعر للعميل عبر واتساب"
                       style={btnStyle("#10b981")}
                     >
-                      <MessageCircle size={14} /> واتساب
+                      <MessageCircle size={14} /> إرسال للعميل
                     </button>
                   ),
                 },

@@ -357,8 +357,9 @@ export default function QuotesPage() {
                               type="button"
                               style={{ display: "block", width: "100%", padding: "6px 10px", textAlign: "right", border: 0, background: "transparent", cursor: "pointer", fontSize: 12 }}
                               onClick={() => handleSendQuote(q, "whatsapp")}
+                              title="إرسال رابط عرض السعر للعميل عبر واتساب"
                             >
-                              💬 واتساب
+                              💬 إرسال للعميل (واتساب)
                             </button>
                             <button
                               type="button"

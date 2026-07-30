@@ -137,9 +137,9 @@ export default function SideQuoteDetailPage() {
                 const { markQuoteAsSent } = await import("@/utils/quoteSentStatus");
                 await markQuoteAsSent(id!);
               }}
-              title="إرسال رابط المعاينة عبر واتساب"
+              title="إرسال رابط المعاينة للعميل عبر واتساب"
             >
-              واتساب
+              إرسال للعميل
             </button>
           </div>
         </div>

@@ -1450,6 +1450,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     // غير محفوظة بعد → نُبقي النافذة المنبثقة بالبيانات الحالية في الذاكرة.
     openPrintWindow(generatePrintHTML({
       type: "invoice",
+      // رقم الفاتورة لازم في الترويسة وفي اسم ملف الـPDF المُصدَّر — كان ساقطاً
+      // هنا وحده (صفحة عرض السعر تمرّره) فيخرج الملف بلا رقم.
+      number: invoiceNumber,
       isCash,
       date: invoiceDate,
       customer,
@@ -2416,8 +2419,8 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                           docLabel: pos ? "فاتورة كاش" : "فاتورة",
                         });
                       }}
-                      title="إرسال واتساب مع رابط الفاتورة" style={btnStyle("#10b981")}>
-                      <MessageCircle size={14} /> واتساب
+                      title="إرسال رابط الفاتورة للعميل عبر واتساب" style={btnStyle("#10b981")}>
+                      <MessageCircle size={14} /> إرسال للعميل
                     </button>
                   ),
                 },
