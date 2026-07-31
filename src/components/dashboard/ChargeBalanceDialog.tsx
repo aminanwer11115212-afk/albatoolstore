@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useDialogSize } from "@/hooks/useDialogSize";
 import { startsWithAny } from "@/utils/searchMatch";
 import { openWhatsApp } from "@/utils/whatsapp";
+import { buildChargeWhatsAppMessage } from "@/utils/chargeWhatsAppMessage";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
 import { useSafeQueryClient as useQueryClient } from "@/lib/safeQueryClient";
@@ -93,17 +94,16 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
   const amt = Number(amount) || 0;
   const netAfter = netBefore - amt;
 
+  // صيغة ثابتة في كل الحالات: شُحن كذا، خُصم كذا من الدَّين، وبقي كذا.
   const whatsappPreview = useMemo(() => {
     if (!selectedCustomer) return "";
-    const [yy, mm, dd] = (date || "").split("-");
-    const dateFmt = yy && mm && dd ? `${dd}/${mm}/${yy}` : date;
-    // ملاحظة: لا نعرض سطر "المتبقي" في رسالة شحن الرصيد بناءً على طلب المستخدم.
-    return [
-      `مرحبا ${selectedCustomer.name}`,
-      `تم شحن مبلغ ${amt.toLocaleString()}`,
-      `التاريخ ${dateFmt}`,
-    ].join("\n");
-  }, [selectedCustomer, amt, date]);
+    return buildChargeWhatsAppMessage({
+      customerName: selectedCustomer.name,
+      amount: amt,
+      netBefore,
+      date,
+    });
+  }, [selectedCustomer, amt, netBefore, date]);
 
   function reset() {
     setCustomerId(""); setCustomerSearch(""); setAmount(""); setMethod("bank_transfer");
