@@ -3282,6 +3282,10 @@ export type Database = {
         Args: { _product_id: string; _qty: number }
         Returns: undefined
       }
+      delete_customer_credit_entry: {
+        Args: { _reason?: string; _tx_id: string }
+        Returns: Json
+      }
       delete_invoice_items_silent: {
         Args: { p_invoice_id: string }
         Returns: undefined
