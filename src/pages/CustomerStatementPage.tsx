@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useCompanySettings } from "@/hooks/useData";
-import { Search, X, Printer, Loader2, ArrowRight } from "lucide-react";
+import { Search, X, Printer, Loader2, ArrowRight, Pencil } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf } from "@/utils/balanceDisplay";
@@ -16,7 +16,8 @@ import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
 import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
 import EditChargeDialog, { type EditableCharge } from "@/components/finance/EditChargeDialog";
 import DeleteLedgerEntryDialog, { type DeletableEntry } from "@/components/statement/DeleteLedgerEntryDialog";
-import { classifyLedgerEntry, creditChargeDeletability } from "@/utils/ledgerEntryActions";
+import FinancialMovementsDialog from "@/components/statement/FinancialMovementsDialog";
+import { classifyLedgerEntry, creditChargeDeletability, movementCapabilities } from "@/utils/ledgerEntryActions";
 
 /** «2026-07-30 · 14:45» — التاريخ والساعة فقط، بلا اسم اليوم. */
 function stampText(x: { date: string; time: string }): string {
@@ -281,6 +282,19 @@ export default function CustomerStatementPage() {
       accountId: t.account_id,
       date: t.date,
       hasConsumption: !creditChargeDeletability(t, (transactions as any[]) || []).canDelete,
+    });
+  };
+  const [movementsOpen, setMovementsOpen] = useState(false);
+  /**
+   * موجّه التعديل الواحد: نافذة الحركات لا تعرف أي حوار يفتح لأي نوع — تنادي
+   * هنا فيُختار الحوار حسب نوع الحركة. فيبقى قرار «ماذا يفتح» في مكان واحد.
+   */
+  const openEditMovement = (t: any) => {
+    if (classifyLedgerEntry(t) === "credit_charge") return openReviseCharge(t);
+    setReviseTx({
+      id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id,
+      customer_id: t.customer_id, description: t.description,
+      method: (t as any).method, account_id: (t as any).account_id, date: (t as any).date,
     });
   };
   const [applyCreditOpen, setApplyCreditOpen] = useState(false);
@@ -617,6 +631,16 @@ export default function CustomerStatementPage() {
               💳 توزيع الرصيد على فاتورة
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setMovementsOpen(true)}
+            data-testid="open-movements-btn"
+            className="inline-flex items-center gap-2 bg-card border border-border hover:bg-muted px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
+            title="تعديل أو حذف دفعات الفواتير وشحنات الرصيد"
+          >
+            <Pencil className="h-4 w-4" />
+            الحركات المالية
+          </button>
           <button
             type="button"
             onClick={handleOpenPrint}
@@ -1290,6 +1314,16 @@ export default function CustomerStatementPage() {
         charge={reviseCharge}
         onClose={() => setReviseCharge(null)}
         onSaved={refreshAfterRevise}
+      />
+
+      <FinancialMovementsDialog
+        open={movementsOpen}
+        transactions={(transactions as any[]) || []}
+        invoiceNumberById={invoiceNumberById}
+        accountLabel={accountLabel}
+        onClose={() => setMovementsOpen(false)}
+        onEdit={(t) => { setMovementsOpen(false); openEditMovement(t); }}
+        onDelete={(t) => { setMovementsOpen(false); openDeleteEntry(t); }}
       />
 
       <DeleteLedgerEntryDialog

@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { startsWithAny } from "@/utils/searchMatch";
 import { toast } from "sonner";
-import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck } from "lucide-react";
+import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck, Eye, FileDown } from "lucide-react";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
 import { useDocPrintShortcuts } from "@/hooks/useDocPrintShortcuts";
@@ -780,9 +780,17 @@ export default function QuoteCreatePage() {
       return;
     }
     // غير محفوظ بعد → نُبقي النافذة المنبثقة بنفس البيانات الحالية في الذاكرة.
+    openPrintWindow(await buildCurrentPrintHTML(variant, noHeader));
+  }
+
+  /**
+   * HTML الطباعة من بيانات الشاشة الحالية — تعمل قبل الحفظ وبعده فتعكس أي
+   * تعديل لم يُحفظ. تستعملها «معاينة» و«واتساب PDF» و«طباعة» معاً.
+   */
+  async function buildCurrentPrintHTML(variant: PrintVariant = "full", noHeader: boolean = false): Promise<string> {
     const { data: companyArr } = await supabase.from("company_settings").select("*").limit(1);
     const company = companyArr?.[0] || null;
-    openPrintWindow(generatePrintHTML({
+    return generatePrintHTML({
       type: "quote",
       number: quoteNumber,
       date: quoteDate,
@@ -804,7 +812,35 @@ export default function QuoteCreatePage() {
       oldBalance: netBalanceOf(customer as any),
       variant,
       noHeader,
-    }));
+    });
+  }
+
+  /** يمنع نقرتين متتاليتين تولّدان ملفين */
+  const [sharingPdf, setSharingPdf] = useState(false);
+
+  /** يولّد PDF من الشاشة الحالية ويشاركه عبر واتساب. */
+  async function shareCurrentPdf() {
+    if (sharingPdf) return;
+    setSharingPdf(true);
+    try {
+      const { shareDocumentPdf } = await import("@/utils/shareDocumentPdf");
+      const out = await shareDocumentPdf({
+        html: await buildCurrentPrintHTML("full", false),
+        docLabel: "عرض سعر",
+        customerName: customer?.name || null,
+        docNumber: quoteNumber,
+        total: totals.total,
+        message: `عرض سعر رقم ${quoteNumber} — الإجمالي ${totals.total.toLocaleString()}`,
+        phone: pickCustomerWhatsApp(customer as any),
+      });
+      toast.success(
+        out.via === "web-share" ? "تمت المشاركة" : `تم تنزيل «${out.fileName}» — أرفقه في واتساب`,
+      );
+    } catch (e: any) {
+      toast.error(e?.message || "تعذّر توليد PDF");
+    } finally {
+      setSharingPdf(false);
+    }
   }
 
   // ---------- Save ----------
@@ -2113,6 +2149,35 @@ export default function QuoteCreatePage() {
                   })(),
                 },
 
+                {
+                  id: "preview",
+                  group: "3-share",
+                  node: (
+                    <button
+                      type="button"
+                      onClick={async () => openPrintWindow(await buildCurrentPrintHTML("full", false))}
+                      style={btnStyle("#6366f1")}
+                      title="معاينة عرض السعر كما سيصل العميل — تعمل قبل الحفظ أيضاً"
+                    >
+                      <Eye size={14} /> معاينة
+                    </button>
+                  ),
+                },
+                {
+                  id: "wa-pdf",
+                  group: "3-share",
+                  node: (
+                    <button
+                      type="button"
+                      disabled={sharingPdf}
+                      onClick={() => shareCurrentPdf()}
+                      style={btnStyle("#0ea5e9")}
+                      title="توليد PDF ومشاركته عبر واتساب"
+                    >
+                      <FileDown size={14} /> {sharingPdf ? "جاري التجهيز..." : "واتساب PDF"}
+                    </button>
+                  ),
+                },
                 {
                   id: "print",
                   group: "3-share",

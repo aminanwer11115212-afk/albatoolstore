@@ -274,8 +274,18 @@ function buildStatementHTML(args: {
   const netValue = Math.abs(net);
 
   // اسم ملف الكشف يحمل اسم الجهة فلا يصل العميل ملف باسم عام
+  // نفس تنظيف `cleanNamePart` في الواجهة: توحيد NFC وإزالة محارف الاتجاه
+  // والعرض الصفري. هذه المحارف لا تُرى لكنها بايتات في اسم الملف، فتصل إلى
+  // واتساب رموزاً غريبة أو تقلب ترتيب الاسم.
+  const cleanPart = (x: unknown) =>
+    String(x || "")
+      .normalize("NFC")
+      .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00AD]/g, "")
+      .replace(/[\\/:*?"<>|\r\n\t]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   const pdfName = [title, party?.name]
-    .map((x) => String(x || "").replace(/[\\/:*?"<>|\r\n\t]+/g, " ").replace(/\s+/g, " ").trim())
+    .map(cleanPart)
     .filter(Boolean)
     .join(" - ")
     .slice(0, 120) + ".pdf";

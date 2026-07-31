@@ -8,7 +8,7 @@ import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
-import { Plus, Edit, Printer, MessageCircle, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet } from "lucide-react";
+import { Plus, Edit, Printer, MessageCircle, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet, Eye, FileDown } from "lucide-react";
 import StatusButton, { WORKFLOW_STATUS_OPTIONS, INVOICE_STATUS_OPTIONS } from "@/components/StatusButton";
 import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
@@ -1448,7 +1448,45 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       return;
     }
     // غير محفوظة بعد → نُبقي النافذة المنبثقة بالبيانات الحالية في الذاكرة.
-    openPrintWindow(generatePrintHTML({
+    openPrintWindow(buildCurrentPrintHTML(variant, noHeader));
+  }
+
+  /** يمنع نقرتين متتاليتين تولّدان ملفين */
+  const [sharingPdf, setSharingPdf] = useState(false);
+
+  /** يولّد PDF من الشاشة الحالية ويشاركه عبر واتساب. */
+  async function shareCurrentPdf() {
+    if (sharingPdf) return;
+    setSharingPdf(true);
+    try {
+      const { shareDocumentPdf } = await import("@/utils/shareDocumentPdf");
+      const label = pos ? "فاتورة كاش" : "فاتورة مبيعات";
+      const out = await shareDocumentPdf({
+        html: buildCurrentPrintHTML("full", false),
+        docLabel: label,
+        customerName: customer?.name || (pos ? (walkInName?.trim() || "عميل نقدي") : null),
+        docNumber: invoiceNumber,
+        total: totals.total,
+        message: `${label} رقم ${invoiceNumber} — الإجمالي ${totals.total.toLocaleString()} ${currencyCode}`,
+        phone: pickCustomerWhatsApp(customer),
+      });
+      toast.success(
+        out.via === "web-share" ? "تمت المشاركة" : `تم تنزيل «${out.fileName}» — أرفقه في واتساب`,
+      );
+    } catch (e: any) {
+      toast.error(e?.message || "تعذّر توليد PDF");
+    } finally {
+      setSharingPdf(false);
+    }
+  }
+
+  /**
+   * HTML الطباعة من بيانات الشاشة الحالية — تعمل قبل الحفظ وبعده، فتعكس أي
+   * تعديل لم يُحفظ بعد. تستعملها «معاينة» و«واتساب PDF» و«طباعة» معاً حتى لا
+   * يختلف ما يراه المستخدم عمّا يصل العميل.
+   */
+  function buildCurrentPrintHTML(variant: PrintVariant = "full", noHeader: boolean = false): string {
+    return generatePrintHTML({
       type: "invoice",
       // رقم الفاتورة لازم في الترويسة وفي اسم ملف الـPDF المُصدَّر — كان ساقطاً
       // هنا وحده (صفحة عرض السعر تمرّره) فيخرج الملف بلا رقم.
@@ -1476,7 +1514,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       company,
       variant,
       noHeader,
-    } as any));
+    } as any);
   }
 
 
@@ -2382,6 +2420,35 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                   node: (
                     <button type="button" onClick={() => printInvoiceNow()} style={btnStyle("#ef4444")} title="طباعة مباشرة (F10)">
                       <Printer size={14} /> طباعة
+                    </button>
+                  ),
+                },
+                {
+                  id: "preview",
+                  group: "3-share",
+                  node: (
+                    <button
+                      type="button"
+                      onClick={() => openPrintWindow(buildCurrentPrintHTML("full", false))}
+                      style={btnStyle("#6366f1")}
+                      title="معاينة الفاتورة كما ستصل العميل — تعمل قبل الحفظ أيضاً"
+                    >
+                      <Eye size={14} /> معاينة
+                    </button>
+                  ),
+                },
+                {
+                  id: "wa-pdf",
+                  group: "3-share",
+                  node: (
+                    <button
+                      type="button"
+                      disabled={sharingPdf}
+                      onClick={() => shareCurrentPdf()}
+                      style={btnStyle("#0ea5e9")}
+                      title="توليد PDF ومشاركته عبر واتساب"
+                    >
+                      <FileDown size={14} /> {sharingPdf ? "جاري التجهيز..." : "واتساب PDF"}
                     </button>
                   ),
                 },

@@ -1,9 +1,9 @@
 /**
- * رسالة واتساب شحن الرصيد — الصيغة ثابتة في كل الحالات.
+ * رسالة واتساب شحن الرصيد.
  *
- * الثبات مقصود: العميل يقرأ نفس خمسة السطور بنفس الترتيب في كل مرة، فلا
- * يحتاج إلى تفسير رسالة مختلفة الشكل عند كل شحنة. الاختبارات تحرس الصيغة
- * نفسها كما تحرس الأرقام.
+ * تحكي القصة بترتيبها: ماذا شُحن، وكيف كان الحساب، وكم ابتلع الشحن منه، وما
+ * بقي. سطر «تم خصم» وحده مشروط — يختفي إن لم يكن هناك خصم. بقية السطور ثابتة
+ * حتى يألف العميل شكل الرسالة.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -15,97 +15,107 @@ import { signedAmountText } from "@/utils/buildCustomerAccountView";
 
 const msg = (o: Partial<Parameters<typeof buildChargeWhatsAppMessage>[0]>) =>
   buildChargeWhatsAppMessage({
-    customerName: "أمين اسماعيل",
-    amount: 500,
-    netBefore: 300,
+    customerName: "ايهاب الدين امدرمان",
+    amount: 50000,
+    netBefore: 100000,
     date: "2026-07-31",
     ...o,
   });
 
-describe("المثال المطلوب: شحن 500 وعليه 300", () => {
-  it("تُظهر الشحن والخصم والمتبقي بالترتيب", () => {
+describe("المثال المطلوب: شحن 50,000 وعليه 100,000", () => {
+  it("ستة سطور بالترتيب والأرقام المطلوبة", () => {
     expect(msg({})).toBe(
       [
-        "مرحبا أمين اسماعيل",
-        "تم شحن +500",
-        "تم خصم 300",
-        "المتبقي +200",
+        "عميلنا العزيز ايهاب الدين امدرمان",
+        "تم شحن +50,000",
+        "الحساب −100,000",
+        "تم خصم +50,000",
+        "المتبقي −50,000",
         "التاريخ 31/07/2026",
       ].join("\n"),
     );
   });
 });
 
-describe("الصيغة ثابتة مهما اختلفت الحالة", () => {
-  const cases: Array<[string, number, number]> = [
-    ["لا دَين على العميل", 500, 0],
-    ["الشحن أقل من الدَّين", 400, 1000],
-    ["الشحن يساوي الدَّين تماماً", 300, 300],
-    ["العميل له رصيد سابق", 500, -200],
+describe("سطر «تم خصم» يظهر فقط حين يوجد خصم فعلي", () => {
+  it("يختفي تماماً حين لا دَين على العميل — لا يُكتب «تم خصم 0»", () => {
+    const out = msg({ amount: 50000, netBefore: 0 });
+    expect(out).not.toContain("تم خصم");
+    expect(out.split("\n")).toEqual([
+      "عميلنا العزيز ايهاب الدين امدرمان",
+      "تم شحن +50,000",
+      "الحساب 0",
+      "المتبقي +50,000",
+      "التاريخ 31/07/2026",
+    ]);
+  });
+
+  it("يختفي حين يكون للعميل رصيد سابق — لا دَين يُخصم منه", () => {
+    const out = msg({ amount: 50000, netBefore: -20000 });
+    expect(out).not.toContain("تم خصم");
+    expect(out).toContain("الحساب +20,000");
+    expect(out).toContain("المتبقي +70,000");
+  });
+
+  it("يظهر بكامل المبلغ حين لا يكفي الشحن لتغطية الدَّين", () => {
+    const lines = msg({ amount: 40000, netBefore: 100000 }).split("\n");
+    expect(lines[2]).toBe("الحساب −100,000");
+    expect(lines[3]).toBe("تم خصم +40,000");
+    expect(lines[4]).toBe("المتبقي −60,000");
+  });
+
+  it("يظهر حين يُقفل الشحن الحساب تماماً", () => {
+    const lines = msg({ amount: 100000, netBefore: 100000 }).split("\n");
+    expect(lines[3]).toBe("تم خصم +100,000");
+    expect(lines[4]).toBe("المتبقي 0");
+  });
+});
+
+describe("ترتيب السطور وثباتها", () => {
+  const cases: Array<[string, number, number, number]> = [
+    ["عليه دَين أكبر من الشحن", 50000, 100000, 6],
+    ["عليه دَين أصغر من الشحن", 100000, 40000, 6],
+    ["لا دَين عليه", 50000, 0, 5],
+    ["له رصيد سابق", 50000, -20000, 5],
   ];
 
-  it.each(cases)("%s — خمسة سطور بنفس الترتيب", (_label, amount, netBefore) => {
+  it.each(cases)("%s — السطور بالترتيب المتوقّع", (_l, amount, netBefore, count) => {
     const lines = msg({ amount, netBefore }).split("\n");
-    expect(lines).toHaveLength(5);
-    expect(lines[0].startsWith("مرحبا ")).toBe(true);
-    expect(lines[1].startsWith("تم شحن +")).toBe(true);
-    expect(lines[2].startsWith("تم خصم ")).toBe(true);
-    expect(lines[3]).toMatch(/^المتبقي (?:[+−][\d,]+|0)$/);
-    expect(lines[4].startsWith("التاريخ ")).toBe(true);
-  });
-
-  it("بلا دَين: الخصم صفر والمبلغ كلّه يبقى للعميل", () => {
-    const lines = msg({ amount: 500, netBefore: 0 }).split("\n");
-    expect(lines[2]).toBe("تم خصم 0");
-    expect(lines[3]).toBe("المتبقي +500");
-  });
-
-  it("الشحن أقل من الدَّين: يُخصم كاملاً ويبقى على العميل الباقي بالسالب", () => {
-    const lines = msg({ amount: 400, netBefore: 1000 }).split("\n");
-    expect(lines[2]).toBe("تم خصم 400");
-    expect(lines[3]).toBe("المتبقي −600");
-  });
-
-  it("الشحن يساوي الدَّين: الحساب يُقفل على صفر بلا إشارة", () => {
-    const lines = msg({ amount: 300, netBefore: 300 }).split("\n");
-    expect(lines[2]).toBe("تم خصم 300");
-    expect(lines[3]).toBe("المتبقي 0");
-  });
-
-  it("لعميل له رصيد سابق: لا خصم ويتراكم الرصيد", () => {
-    const lines = msg({ amount: 500, netBefore: -200 }).split("\n");
-    expect(lines[2]).toBe("تم خصم 0");
-    expect(lines[3]).toBe("المتبقي +700");
+    expect(lines).toHaveLength(count);
+    expect(lines[0].startsWith("عميلنا العزيز ")).toBe(true);
+    expect(lines[1]).toMatch(/^تم شحن \+[\d,]+$/);
+    expect(lines[2]).toMatch(/^الحساب (?:[+−][\d,]+|0)$/);
+    expect(lines.at(-2)).toMatch(/^المتبقي (?:[+−][\d,]+|0)$/);
+    expect(lines.at(-1)!.startsWith("التاريخ ")).toBe(true);
   });
 });
 
 describe("الأرقام صحيحة لا مجرّد صيغة", () => {
   it("الخصم لا يتجاوز المبلغ ولا الدَّين", () => {
-    expect(chargeApplied(500, 300)).toBe(300); // محدود بالدَّين
-    expect(chargeApplied(400, 1000)).toBe(400); // محدود بالمبلغ
-    expect(chargeApplied(500, -200)).toBe(0); // لا دَين أصلاً
+    expect(chargeApplied(50000, 100000)).toBe(50000); // محدود بالمبلغ
+    expect(chargeApplied(100000, 40000)).toBe(40000); // محدود بالدَّين
+    expect(chargeApplied(50000, -20000)).toBe(0); // لا دَين أصلاً
   });
 
-  it("«المتبقي» = صافي الحساب بعد الشحن — الخصم + المتبقي يعيدان المعادلة", () => {
-    for (const [amount, netBefore] of [[500, 300], [400, 1000], [300, 300], [500, -200]]) {
-      const after = netBefore - amount; // بإشارة الدفاتر
-      const shown = msg({ amount, netBefore }).split("\n")[3].replace("المتبقي ", "");
-      const expected = Math.abs(after) < 0.01 ? "0" : `${after < 0 ? "+" : "−"}${Math.abs(after).toLocaleString()}`;
-      expect(shown).toBe(expected);
+  it("«الحساب» ثم «المتبقي» يفرّقان بمقدار المبلغ المشحون تماماً", () => {
+    for (const [amount, netBefore] of [[50000, 100000], [100000, 40000], [50000, 0], [50000, -20000]]) {
+      const lines = msg({ amount, netBefore }).split("\n");
+      const num = (s: string) => Number(s.replace(/[^\d]/g, "")) * (s.includes("−") ? -1 : 1);
+      const before = num(lines[2]);
+      const after = num(lines.at(-2)!);
+      expect(after - before).toBe(amount);
     }
   });
 
-  it("إشارة «المتبقي» هي نفسها المستعملة في كشف الحساب", () => {
+  it("«المتبقي» = صافي الحساب بعد الشحن بإشارة كشف الحساب نفسها", () => {
     // موجب لصالح العميل في الاثنين — فلا تتناقض الرسالة مع الكشف
-    const shown = msg({ amount: 500, netBefore: 300 }).split("\n")[3];
-    expect(shown).toContain(signedAmountText(200).text);
-    const owing = msg({ amount: 400, netBefore: 1000 }).split("\n")[3];
-    expect(owing).toContain(signedAmountText(-600).text);
+    expect(msg({ amount: 50000, netBefore: 100000 })).toContain(signedAmountText(-50000).text);
+    expect(msg({ amount: 100000, netBefore: 40000 })).toContain(signedAmountText(60000).text);
   });
 
   it("المبالغ الكبيرة بفواصل الآلاف", () => {
     expect(msg({ amount: 800000, netBefore: 126000 }).split("\n")[1]).toBe("تم شحن +800,000");
-    expect(msg({ amount: 800000, netBefore: 126000 }).split("\n")[3]).toBe("المتبقي +674,000");
+    expect(msg({ amount: 800000, netBefore: 126000 }).split("\n")[4]).toBe("المتبقي +674,000");
   });
 });
 

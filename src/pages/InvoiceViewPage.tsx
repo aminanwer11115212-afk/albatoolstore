@@ -31,6 +31,7 @@ import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 import InvoiceCustomerCreditBanner from "@/components/invoice/InvoiceCustomerCreditBanner";
 import InvoiceAccountingAlert from "@/components/invoice/InvoiceAccountingAlert";
 import InvoiceAuditTab from "@/components/invoice/InvoiceAuditTab";
+import InvoiceBalanceBoxes from "@/components/invoice/InvoiceBalanceBoxes";
 import InvoiceConsistencyCheck from "@/components/invoice/InvoiceConsistencyCheck";
 import DeleteInvoiceConfirmDialog from "@/components/invoice/DeleteInvoiceConfirmDialog";
 import { recordInvoiceRevision, diffRows } from "@/utils/invoiceRevisions";
@@ -725,6 +726,12 @@ export default function InvoiceViewPage() {
       )}
 
       <div hidden={activeTab !== "document"}>
+      {/* حساب العميل: القديم قبل هذه الفاتورة، والحالي الآن */}
+      {invoice?.id && (
+        <div className="mb-4">
+          <InvoiceBalanceBoxes invoiceId={invoice.id} customerId={invoice.customer_id} />
+        </div>
+      )}
       {/* Workflow Status Stepper */}
       <div className="bg-card border border-border rounded-lg p-4" dir="rtl">
         <div className="flex items-center justify-between mb-3">

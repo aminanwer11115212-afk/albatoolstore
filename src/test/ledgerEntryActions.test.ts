@@ -15,6 +15,9 @@ import {
   projectEditImpact,
   chargeGroupId,
   type LedgerTx,
+  movementCapabilities,
+  actionableMovements,
+  BLOCK_MESSAGE,
 } from "@/utils/ledgerEntryActions";
 import { buildCustomerLedger } from "@/utils/buildCustomerLedger";
 
@@ -220,5 +223,86 @@ describe("تطابق الرصيد مع net_balance بعد الحذف — سين�
     // ودفتر الأستاذ يقفل على نفس الرقم
     const ledger = buildCustomerLedger({ invoices, transactions: txs, includeDeleted: false });
     expect(ledger.closing).toBe(-100);
+  });
+});
+
+describe("قدرات الحركة — المصدر الواحد الذي تقرأ منه الواجهة", () => {
+  const t = (o: Partial<LedgerTx>): LedgerTx => ({
+    id: "x", customer_id: "c1", amount: 100, date: "2026-01-01", ...o,
+  });
+
+  it("دفعة مرتبطة بفاتورة: تُعدَّل وتُحذف", () => {
+    const caps = movementCapabilities(
+      t({ category: "customer_payment", method: "cash", reference_id: "inv-1" }), []);
+    expect(caps).toMatchObject({
+      kind: "payment_invoice", label: "دفعة على فاتورة",
+      canEdit: true, canDelete: true, editBlockedBy: null, deleteBlockedBy: null,
+    });
+  });
+
+  // revise_invoice_payment يرفض بلا فاتورة، بينما cancel_invoice_payment يقبل
+  it("دفعة مستقلة: تُحذف ولا تُعدَّل — مطابقةً لحارسَي الـRPC", () => {
+    const caps = movementCapabilities(
+      t({ category: "customer_payment", method: "cash", reference_id: null }), []);
+    expect(caps.canDelete).toBe(true);
+    expect(caps.canEdit).toBe(false);
+    expect(caps.editBlockedBy).toBe("no_linked_invoice");
+  });
+
+  it("قيد استهلاك الرصيد: لا يُعدَّل ولا يُحذف من هنا", () => {
+    for (const tx of [
+      t({ category: "customer_credit", amount: -100, reference_id: "inv-1" }),
+      t({ category: "customer_payment", method: "credit_balance", reference_id: "inv-1" }),
+    ]) {
+      const caps = movementCapabilities(tx, []);
+      expect(caps.canEdit).toBe(false);
+      expect(caps.canDelete).toBe(false);
+      expect(caps.deleteBlockedBy).toBe("credit_consumption");
+    }
+  });
+
+  it("شحنة بمجموعة وغير مستهلَكة: تُعدَّل وتُحذف", () => {
+    const charge = t({ category: "customer_credit", amount: 500, allocation: { group_id: "g1" } });
+    const caps = movementCapabilities(charge, [charge]);
+    expect(caps).toMatchObject({ kind: "credit_charge", canEdit: true, canDelete: true });
+  });
+
+  it("شحنة بلا مجموعة (فائض تلقائي): تُحذف ولا تُعدَّل", () => {
+    const charge = t({ category: "customer_credit", amount: 500 });
+    const caps = movementCapabilities(charge, [charge]);
+    expect(caps.canDelete).toBe(true);
+    expect(caps.canEdit).toBe(false);
+    expect(caps.editBlockedBy).toBe("no_charge_group");
+  });
+
+  it("شحنة استُهلك منها: لا تُعدَّل ولا تُحذف، والسبب واحد في الاثنين", () => {
+    const charge = t({ id: "c", category: "customer_credit", amount: 500, allocation: { group_id: "g1" } });
+    const used = t({ id: "u", category: "customer_credit", amount: -200, allocation: { group_id: "g1" } });
+    const caps = movementCapabilities(charge, [charge, used]);
+    expect(caps.canEdit).toBe(false);
+    expect(caps.canDelete).toBe(false);
+    expect(caps.editBlockedBy).toBe("explicit_consumption");
+    expect(caps.deleteBlockedBy).toBe("explicit_consumption");
+  });
+
+  it("كل سبب منع له رسالة عربية", () => {
+    const reasons = [
+      "credit_consumption", "no_linked_invoice", "no_charge_group",
+      "explicit_consumption", "insufficient_remaining_credit", "not_supported",
+    ] as const;
+    for (const r of reasons) {
+      expect(BLOCK_MESSAGE[r]).toBeTruthy();
+      expect(BLOCK_MESSAGE[r].length).toBeGreaterThan(10);
+    }
+  });
+
+  it("actionableMovements تُرجع ما يمكن فعل شيء به فقط، الأحدث أولاً", () => {
+    const rows = [
+      t({ id: "old", category: "customer_payment", method: "cash", reference_id: "i", date: "2026-01-01" }),
+      t({ id: "new", category: "customer_payment", method: "cash", reference_id: "i", date: "2026-03-01" }),
+      t({ id: "consume", category: "customer_credit", amount: -50, date: "2026-02-01" }),
+    ];
+    const out = actionableMovements(rows);
+    expect(out.map((r) => r.tx.id)).toEqual(["new", "old"]);
   });
 });

@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { netBeforeInvoice } from "@/utils/customerNetBefore";
 
 /**
  * يبني HTML الطباعة لفاتورة محفوظة (بنفس منطق صفحة المعاينة) دون فتح صفحة
@@ -33,10 +34,38 @@ export async function buildInvoicePrintHtml(invoiceId: string): Promise<string> 
   }));
   const extras = await loadInvoiceExtras((invoice as any).id);
   const iCust: any = (invoice as any).customers;
-  const invRemaining = Math.max(Number((invoice as any).total || 0) - Number((invoice as any).paid_amount || 0), 0);
-  const invSurplus   = Math.max(Number((invoice as any).paid_amount || 0) - Number((invoice as any).total || 0), 0);
-  const prevDebt   = Math.max(Number(iCust?.balance || 0) - invRemaining, 0);
-  const prevCredit = Math.max(Number(iCust?.credit_balance || 0) - invSurplus, 0);
+  // «الحساب القديم» = صافي الحساب قبل إنشاء هذه الفاتورة، محسوباً تاريخياً.
+  // كان يُشتقّ سابقاً بطرح هذه الفاتورة من الرصيد الحالي، فيُدخل في «القديم»
+  // فواتيرَ أُنشئت بعدها ويشوّه الصافي بالقصّ عند الصفر. القراءة هنا تحتاج
+  // فواتير العميل وحركاته، فإن تعذّرت نعود للاشتقاق القديم بدل ألّا نعرض شيئاً.
+  const customerId = (invoice as any).customer_id;
+  let prevNet: number | null = null;
+  if (customerId) {
+    const [{ data: custInvoices }, { data: custTxs }] = await Promise.all([
+      (supabase as any)
+        .from("invoices")
+        .select("id, total, paid_amount, status, date, created_at")
+        .eq("customer_id", customerId),
+      (supabase as any)
+        .from("transactions")
+        .select("id, category, amount, method, reference_id, date, created_at")
+        .eq("customer_id", customerId)
+        .in("category", ["customer_payment", "customer_credit"]),
+    ]);
+    prevNet = netBeforeInvoice(invoiceId, {
+      invoices: custInvoices || [],
+      transactions: custTxs || [],
+    });
+  }
+  if (prevNet == null) {
+    const invRemaining = Math.max(Number((invoice as any).total || 0) - Number((invoice as any).paid_amount || 0), 0);
+    const invSurplus   = Math.max(Number((invoice as any).paid_amount || 0) - Number((invoice as any).total || 0), 0);
+    prevNet = Math.max(Number(iCust?.balance || 0) - invRemaining, 0)
+            - Math.max(Number(iCust?.credit_balance || 0) - invSurplus, 0);
+  }
+  // القالب يستقبل الرقمين منفصلين: موجب «عليه» في الأول وسالب «له» في الثاني.
+  const prevDebt   = prevNet > 0 ? prevNet : 0;
+  const prevCredit = prevNet < 0 ? -prevNet : 0;
 
   return generatePrintHTML({
     type: "invoice",
