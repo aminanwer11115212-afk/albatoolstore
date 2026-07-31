@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Printer, Share2, Copy, Check } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
@@ -454,8 +454,8 @@ export default function PublicCustomerStatementPage() {
           </div>
         </div>
 
-        {/* الفواتير — كل فاتورة سطر مستقل تتبعه حركاتها المرتبطة بها فقط */}
-        <div className="ps-section-title">الفواتير وحركاتها ({account?.blocks.length || 0})</div>
+        {/* كل فاتورة سطر واحد: القيمة · دفع · المتبقي — بالشكل الذي يطلبه العميل */}
+        <div className="ps-section-title">الفواتير ({account?.blocks.length || 0})</div>
         {account && account.blocks.length ? (
           <div className="ps-table-scroll"><table className="ps-table ps-by-invoice">
             <thead>
@@ -482,8 +482,7 @@ export default function PublicCustomerStatementPage() {
                     </td>
                   </tr>
                 ) : (
-                  <Fragment key={node.block.invoiceId}>
-                    <tr className="ps-inv-row">
+                  <tr key={node.block.invoiceId} className="ps-inv-row">
                       {/* الترقيم يعدّ الفواتير وحدها — الأشرطة ليست بنوداً مرقّمة */}
                       <td>{++seq}</td>
                       <td>{stampText(node.block)}</td>
@@ -495,23 +494,8 @@ export default function PublicCustomerStatementPage() {
                       <td style={{ color: "#16a34a", fontWeight: 700 }}>
                         {node.block.paid ? fmt(node.block.paid) : "—"}
                       </td>
-                      <td>{signedCell(node.block.remaining)}</td>
-                    </tr>
-                    {node.block.movements.map((m) => (
-                      <tr key={m.id} className="ps-settle-row">
-                        <td />
-                        <td>{stampText(m)}</td>
-                        <td style={{ textAlign: "right" }}>
-                          <span className="ps-settle-arrow">↳</span> {m.customerText}
-                        </td>
-                        <td>—</td>
-                        <td style={{ color: "#16a34a", fontWeight: 700 }}>
-                          {m.effect ? fmt(Math.abs(m.effect)) : "—"}
-                        </td>
-                        <td>{effectCell(m.effect)}</td>
-                      </tr>
-                    ))}
-                  </Fragment>
+                    <td>{signedCell(node.block.remaining)}</td>
+                  </tr>
                 ),
               ); })()}
 

@@ -181,3 +181,48 @@ describe("الحارس المنطقي في الواجهة يطابق حارس ا
     expect(creditChargeDeletability(c2, all).canDelete).toBe(false);
   });
 });
+
+describe("شحن الرصيد لا يسدّد أي فاتورة تلقائياً", () => {
+  const forced =
+    allMigrations.find((m) => m.name.includes("force_charge_store_only"))?.sql || "";
+  /** الكود التنفيذي وحده — التعليقات تذكر paid_amount شرحاً لا تنفيذاً. */
+  const forcedCode = forced
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("--"))
+    .join("\n");
+
+  it("هجرة الإجبار موجودة وتُعيد تعريف الدالتين", () => {
+    expect(forced).not.toBe("");
+    expect(forced).toContain("CREATE OR REPLACE FUNCTION public.record_customer_charge");
+    expect(forced).toContain("CREATE OR REPLACE FUNCTION public.allocate_customer_charge");
+  });
+
+  it("لا تلمس invoices ولا paid_amount", () => {
+    expect(forcedCode).not.toMatch(/UPDATE\s+public\.invoices/i);
+    expect(forcedCode).not.toMatch(/paid_amount/i);
+  });
+
+  it("لا تُدرج قيد سداد من الرصيد (customer_credit سالب أو دفعة credit_balance)", () => {
+    expect(forcedCode).not.toMatch(/credit_balance/i);
+    // القيد الوحيد المُدرَج موجب بكامل المبلغ
+    const inserts = forcedCode.match(/INSERT INTO public\.transactions/g) || [];
+    expect(inserts).toHaveLength(1);
+    expect(forced).toContain("'stored_only', true");
+  });
+
+  it("المسار القديم الموزِّع صار يفوّض للتخزين فقط", () => {
+    const body = forced.slice(forced.indexOf("FUNCTION public.allocate_customer_charge"));
+    expect(body).toContain("RETURN public.record_customer_charge(");
+    // ولا يحتوي أي منطق توزيع
+    expect(body).not.toMatch(/FOR\s+\w+\s+IN\s+SELECT/i);
+  });
+
+  it("الواجهة تستدعي مسار التخزين وحده", () => {
+    const dialog = fs.readFileSync(
+      path.resolve(process.cwd(), "src/components/dashboard/ChargeBalanceDialog.tsx"),
+      "utf8",
+    );
+    expect(dialog).toContain('rpc("record_customer_charge"');
+    expect(dialog).not.toContain('rpc("allocate_customer_charge"');
+  });
+});

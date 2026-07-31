@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -516,7 +516,7 @@ export default function CustomerStatementPage() {
       sections: [
         {
           key: "invoices",
-          label: `الفواتير وحركاتها (${accountView.blocks.length})`,
+          label: `الفواتير (${accountView.blocks.length})`,
           columns: [
             { key: "when", label: "التاريخ والساعة", align: "center" as const },
             { key: "statement", label: "البيان", align: "right" as const },
@@ -535,22 +535,13 @@ export default function CustomerStatementPage() {
                   __bandStyle: "background:#e7f8ee;border-top:2px solid #16a34a;border-bottom:2px solid #16a34a;"
                     + "color:#14532d;font-weight:800;text-align:right;padding:9px 12px;",
                 }]
-              : [
-                  {
-                    when: stampText(node.block),
-                    statement: `فاتورة ${node.block.invoiceNumber} — ${invoicePlainText(node.block)}`,
-                    total: node.block.total,
-                    paid: node.block.paid || "—",
-                    remaining: signedBalanceText(node.block.remaining).text,
-                  },
-                  ...node.block.movements.map((m) => ({
-                    when: stampText(m),
-                    statement: `↳ ${m.customerText}`,
-                    total: "—",
-                    paid: m.effect ? Math.abs(m.effect) : "—",
-                    remaining: effectText(m.effect).text,
-                  })),
-                ],
+              : [{
+                  when: stampText(node.block),
+                  statement: `فاتورة ${node.block.invoiceNumber} — ${invoicePlainText(node.block)}`,
+                  total: node.block.total,
+                  paid: node.block.paid || "—",
+                  remaining: signedBalanceText(node.block.remaining).text,
+                }],
           ),
           totals: {
             when: "الجملة",
@@ -930,8 +921,7 @@ export default function CustomerStatementPage() {
                         </td>
                       </tr>
                     ) : (
-                    <Fragment key={node.block.invoiceId}>
-                      <tr className="border-b border-border hover:bg-muted/50 bg-card">
+                      <tr key={node.block.invoiceId} className="border-b border-border hover:bg-muted/50 bg-card">
                         <td data-label="التاريخ" className="px-5 py-3 text-foreground tabular-nums whitespace-nowrap">{stampText(node.block)}</td>
                         <td data-label="البيان" className="px-5 py-3 text-foreground">
                           <span className="font-semibold">فاتورة {node.block.invoiceNumber}</span>
@@ -941,21 +931,6 @@ export default function CustomerStatementPage() {
                         <td data-label="المدفوع" className="px-5 py-3 text-success tabular-nums">{node.block.paid ? node.block.paid.toLocaleString() : "—"}</td>
                         <td data-label="المتبقي" className="px-5 py-3"><BalanceChip value={node.block.remaining} /></td>
                       </tr>
-                      {node.block.movements.map((m) => (
-                        <tr key={m.id} className="border-b border-border bg-muted/30 text-xs">
-                          <td data-label="التاريخ" className="px-5 py-2 text-muted-foreground tabular-nums whitespace-nowrap">{stampText(m)}</td>
-                          <td data-label="البيان" className="px-5 py-2 text-foreground">
-                            <span className="text-primary font-bold ml-1">↳</span>
-                            {m.customerText}
-                          </td>
-                          <td data-label="الإجمالي" className="px-5 py-2 text-muted-foreground">—</td>
-                          <td data-label="المدفوع" className="px-5 py-2 text-success tabular-nums">
-                            {m.effect ? Math.abs(m.effect).toLocaleString() : "—"}
-                          </td>
-                          <td data-label="المتبقي" className="px-5 py-2"><EffectChip value={m.effect} /></td>
-                        </tr>
-                      ))}
-                    </Fragment>
                     ),
                   )}
                   {!isLoading && visibleBlocks.length > 0 && (

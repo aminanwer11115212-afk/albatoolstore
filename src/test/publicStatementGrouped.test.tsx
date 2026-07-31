@@ -57,24 +57,24 @@ afterEach(() => vi.unstubAllGlobals());
 describe("لا سجل حركات ولا تسوية تراكمية", () => {
   it("السجل المسطّح غائب", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByText(/الفواتير وحركاتها/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/^الفواتير \(/)).toBeTruthy());
     expect(screen.queryByText(/سجل الحركات/)).toBeNull();
     expect(screen.queryByText(/الرصيد بعد الحركة/)).toBeNull();
   });
 
   it("لا أسطر «تسوية من شحن رصيد» مستنتجة ولا «الفائض بعد التغطية»", async () => {
     renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     expect(screen.queryByText(/تسوية من شحن رصيد/)).toBeNull();
     expect(screen.queryByText(/الفائض بعد التغطية/)).toBeNull();
     expect(screen.queryByText(/تسوية رصيد مُرحَّل/)).toBeNull();
   });
 });
 
-describe("الفاتورة وحركاتها بدقة الساعة", () => {
+describe("الفاتورة سطر واحد", () => {
   it("سطر الفاتورة يحمل التاريخ والساعة بلا اسم اليوم", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const row = pageOf(container).getByText(/فاتورة INV-1001/).closest("tr")!;
     expect(row.textContent).toContain("2026-07-30 · 09:15");
     expect(row.textContent).not.toContain("الخميس");
@@ -82,33 +82,27 @@ describe("الفاتورة وحركاتها بدقة الساعة", () => {
 
   it("المتبقي يظهر «له +1,000» لا صفراً — العميل دفع أكثر من قيمتها", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const cells = within(pageOf(container).getByText(/فاتورة INV-1001/).closest("tr")!).getAllByRole("cell");
-    // الأعمدة: # | التاريخ | البيان | الإجمالي | المدفوع | المتبقي | حساب العميل بعدها
+    // الأعمدة: # | التاريخ والساعة | البيان | القيمة | دفع | المتبقي
     expect(cells[5].textContent).toBe("له +1,000");
     expect(cells[3].textContent).toBe("4,000");
     expect(cells[4].textContent).toBe("4,000");
   });
 
-  it("حركات الفاتورة تحتها مباشرة: الدفعة ثم الفائض", async () => {
+  it("كل فاتورة سطر واحد — لا أسطر حركات فرعية", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
-    const page = pageOf(container);
-    const invRow = page.getByText(/فاتورة INV-1001/).closest("tr")!;
-    const payRow = invRow.nextElementSibling as HTMLElement;
-    const overRow = payRow.nextElementSibling as HTMLElement;
-    // بلغة مخاطبة العميل لا بلغة المحاسبة
-    expect(payRow.textContent).toContain("دفعتم 4,000 عن طريق نقدًا");
-    expect(payRow.textContent).toContain("10:30");
-    expect(overRow.textContent).toContain("دفعتم زيادة 1,000 عن قيمة الفاتورة");
-    expect(overRow.textContent).toContain("أُضيفت إلى رصيدكم لدينا");
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
+    expect(container.querySelectorAll(".ps-settle-row")).toHaveLength(0);
+    expect(screen.queryByText(/دفعتم 4,000 عن طريق/)).toBeNull();
+    expect(container.querySelectorAll(".ps-inv-row")).toHaveLength(1);
   });
 });
 
 describe("شحن الرصيد كشريط أخضر فاصل", () => {
   it("يظهر داخل الجدول كصف يمتد على كل الأعمدة لا في قسم منفصل", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const band = container.querySelector(".ps-credit-band")!;
     expect(band).toBeTruthy();
     const cell = band.querySelector("td")!;
@@ -119,7 +113,7 @@ describe("شحن الرصيد كشريط أخضر فاصل", () => {
 
   it("نصّه يشرح للعميل المبلغ والتاريخ ورقم العملية والرصيد بعده", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const text = container.querySelector(".ps-credit-band")!.textContent || "";
     expect(text).toContain("تم شحن رصيدكم بمبلغ 4,000");
     expect(text).toContain("رقم العملية OP-9");
@@ -131,7 +125,7 @@ describe("شحن الرصيد كشريط أخضر فاصل", () => {
 
   it("لا يُحتسب في ترقيم الفواتير", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const seqs = [...container.querySelectorAll(".ps-inv-row")].map(
       (r) => r.querySelector("td")!.textContent,
     );
@@ -140,7 +134,7 @@ describe("شحن الرصيد كشريط أخضر فاصل", () => {
 
   it("يقع في موضعه الزمني بعد الفاتورة الأقدم منه", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const rows = [...container.querySelectorAll(".ps-by-invoice tbody tr")];
     const invIdx = rows.findIndex((r) => r.classList.contains("ps-inv-row"));
     const bandIdx = rows.findIndex((r) => r.classList.contains("ps-credit-band"));
@@ -151,7 +145,7 @@ describe("شحن الرصيد كشريط أخضر فاصل", () => {
 describe("شرح مبسّط للعميل", () => {
   it("تحت رقم الفاتورة جملة تشرح قيمتها والمدفوع والمتبقي", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const plain = container.querySelector(".ps-plain")!.textContent || "";
     expect(plain).toContain("قيمتها 4,000");
     expect(plain).toContain("دفعتم 4,000");
@@ -162,14 +156,14 @@ describe("شرح مبسّط للعميل", () => {
 describe("الجملة", () => {
   it("تطابق net_balance وتُعرض «له +5,000» بكلمة العميل نفسها", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const row = pageOf(container).getByText("الجملة").closest("tr")!;
     expect(within(row).getByText("له +5,000")).toBeTruthy();
   });
 
   it("الأعمدة بكلمات العميل: القيمة / دفع / المتبقي", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const heads = [...container.querySelectorAll(".ps-by-invoice thead th")].map((h) => h.textContent);
     expect(heads).toEqual(["#", "التاريخ والساعة", "البيان", "القيمة", "دفع", "المتبقي"]);
   });
@@ -178,7 +172,7 @@ describe("الجملة", () => {
 describe("سلامة بصرية", () => {
   it("الصفحة RTL عربية", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const root = container.querySelector(".public-statement")!;
     expect(root.getAttribute("dir")).toBe("rtl");
     expect(root.getAttribute("lang")).toBe("ar");
@@ -186,7 +180,7 @@ describe("سلامة بصرية", () => {
 
   it("«له» أخضر و«عليه» أحمر", async () => {
     const { container } = renderPage();
-    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    await waitFor(() => screen.getByText(/^الفواتير \(/));
     const credit = pageOf(container).getAllByText(/^له \+/)[0];
     expect(credit.getAttribute("style")).toContain("rgb(22, 163, 74)"); // #16a34a
   });
