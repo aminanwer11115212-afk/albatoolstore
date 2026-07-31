@@ -182,52 +182,62 @@ describe("الحارس المنطقي في الواجهة يطابق حارس ا
   });
 });
 
-describe("شحن الرصيد لا يسدّد أي فاتورة تلقائياً", () => {
-  const forced =
-    allMigrations.find((m) => m.name.includes("force_charge_store_only"))?.sql || "";
-  /** الكود التنفيذي وحده — التعليقات تذكر paid_amount شرحاً لا تنفيذاً. */
-  const forcedCode = forced
-    .split("\n")
-    .filter((l) => !l.trim().startsWith("--"))
-    .join("\n");
+describe("شحن الرصيد يُوزَّع تلقائياً على الأقدم أولاً", () => {
+  const auto =
+    allMigrations.find((m) => m.name.includes("auto_distribute_charge"))?.sql || "";
+  /** الكود التنفيذي وحده — التعليقات تشرح السياسة القديمة أيضاً. */
+  const code = auto.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
 
-  it("هجرة الإجبار موجودة وتُعيد تعريف الدالتين", () => {
-    expect(forced).not.toBe("");
-    expect(forced).toContain("CREATE OR REPLACE FUNCTION public.record_customer_charge");
-    expect(forced).toContain("CREATE OR REPLACE FUNCTION public.allocate_customer_charge");
+  it("الهجرة موجودة وتُعيد تعريف مسار الشحن", () => {
+    expect(auto).not.toBe("");
+    expect(auto).toContain("CREATE OR REPLACE FUNCTION public.record_customer_charge");
   });
 
-  it("لا تلمس invoices ولا paid_amount", () => {
-    expect(forcedCode).not.toMatch(/UPDATE\s+public\.invoices/i);
-    expect(forcedCode).not.toMatch(/paid_amount/i);
+  it("يوزّع على الفواتير الأقدم أولاً", () => {
+    expect(code).toContain("ORDER BY date ASC");
+    expect(code).toContain("UPDATE public.invoices");
+    expect(code).toContain("paid_amount = v_new_paid");
   });
 
-  it("لا تُدرج قيد سداد من الرصيد (customer_credit سالب أو دفعة credit_balance)", () => {
-    expect(forcedCode).not.toMatch(/credit_balance/i);
-    // القيد الوحيد المُدرَج موجب بكامل المبلغ
-    const inserts = forcedCode.match(/INSERT INTO public\.transactions/g) || [];
-    expect(inserts).toHaveLength(1);
-    expect(forced).toContain("'stored_only', true");
+  it("يستثني الملغاة وفواتير الكاش", () => {
+    expect(code).toMatch(/status, ''\) <> 'cancelled'/);
+    expect(code).toMatch(/source, ''\) <> 'pos'/);
   });
 
-  it("المسار القديم الموزِّع صار يفوّض للتخزين فقط", () => {
-    const body = forced.slice(forced.indexOf("FUNCTION public.allocate_customer_charge"));
+  it("كل تخصيص زوج كامل: دفعة credit_balance + استهلاك سالب", () => {
+    const inserts = code.match(/INSERT INTO public\.transactions/g) || [];
+    expect(inserts.length).toBe(3); // قيد الشحن + زوج التخصيص
+    expect(code).toContain("'credit_balance'");
+    expect(code).toContain("-v_apply");
+  });
+
+  it("الفائض يبقى مخزّناً ولا يُجبَر على التوزيع", () => {
+    expect(code).toContain("EXIT WHEN v_remaining <= 0.01");
+    expect(code).toContain("'surplus', v_remaining");
+  });
+
+  it("حارس الصافي يُلغي العملية عند أي انحراف", () => {
+    // التوزيع نقل داخلي: أثر العملية كلّها هو الشحن وحده
+    expect(code).toContain("v_net_before - v_amount");
+    expect(code).toContain("RAISE EXCEPTION 'charge_failed:net_drift");
+  });
+
+  it("لا يكتب يدوياً على customers.balance", () => {
+    expect(code).not.toMatch(/UPDATE\s+public\.customers\s+SET[^;]*\bbalance\b/i);
+    expect(code).toContain("recompute_customer_balance");
+  });
+
+  it("يفحص تناسق كل فاتورة مسّها", () => {
+    expect(code).toContain("assert_invoice_payment_consistency");
+  });
+
+  it("مسار توزيع واحد: القديم يفوّض للجديد", () => {
+    const body = auto.slice(auto.indexOf("FUNCTION public.allocate_customer_charge"));
     expect(body).toContain("RETURN public.record_customer_charge(");
-    // ولا يحتوي أي منطق توزيع
-    expect(body).not.toMatch(/FOR\s+\w+\s+IN\s+SELECT/i);
-  });
-
-  it("الواجهة تستدعي مسار التخزين وحده", () => {
-    const dialog = fs.readFileSync(
-      path.resolve(process.cwd(), "src/components/dashboard/ChargeBalanceDialog.tsx"),
-      "utf8",
-    );
-    expect(dialog).toContain('rpc("record_customer_charge"');
-    expect(dialog).not.toContain('rpc("allocate_customer_charge"');
   });
 });
 
-describe("لا تطبيق تلقائي لرصيد العميل في أي مسار بالنظام", () => {
+describe("الواجهة لا تطبّق الرصيد من تلقاء نفسها عند فتح حوار الدفع", () => {
   const read = (rel: string) => fs.readFileSync(path.resolve(process.cwd(), rel), "utf8");
 
   it("حوار الدفع لا يملأ «استخدام الرصيد» من تلقاء نفسه عند الفتح", () => {
@@ -254,7 +264,7 @@ describe("لا تطبيق تلقائي لرصيد العميل في أي مسا�
     }
   });
 
-  it("المسارات الوحيدة التي تمسّ paid_amount من الرصيد صريحة ويدوية", () => {
+  it("المسارات التي تمسّ paid_amount من الرصيد معروفة ومحصورة", () => {
     // كلتاهما تُستدعى من نافذة يفتحها المستخدم بنفسه، لا من شحن أو فتح حوار.
     const manual = ["apply_customer_credit_to_invoice", "settle_invoices_from_credit"];
     for (const fn of manual) {
@@ -268,6 +278,10 @@ describe("لا تطبيق تلقائي لرصيد العميل في أي مسا�
       "cancel_invoice_payment",
       "delete_invoice_with_reconciliation",
       "refund_payment_to_customer_credit",
+      // تحذف الشحنة وتعكس استهلاكها على الفواتير — عكسٌ لا إنشاء سداد
+      "delete_customer_credit_entry",
+      // التوزيع التلقائي عند الشحن — بطلب صاحب المستودع، بحارس صافٍ
+      "record_customer_charge",
     ];
     // نقسم كل ملف إلى أجسام دوال ونفحص كل جسم وحده — الفحص على مستوى الملف
     // يوقع دوالَّ بريئة تصادف وجودها في نفس الهجرة.
@@ -287,5 +301,86 @@ describe("لا تطبيق تلقائي لرصيد العميل في أي مسا�
     for (const fn of new Set(owners)) {
       expect([...manual, ...reversals]).toContain(fn);
     }
+  });
+});
+
+describe("الحذف النهائي: الفاتورة تمحو دفعتها ولا تعيدها رصيداً", () => {
+  const hard =
+    allMigrations.find((m) => m.name.includes("hard_delete_invoice_and_charges"))?.sql || "";
+  const code = hard.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+
+  it("الهجرة موجودة وتُعيد تعريف الدالتين", () => {
+    expect(hard).not.toBe("");
+    expect(hard).toContain("CREATE OR REPLACE FUNCTION public.delete_invoice_with_reconciliation");
+    expect(hard).toContain("CREATE OR REPLACE FUNCTION public.delete_customer_credit_entry");
+  });
+
+  it("دفعات الفاتورة تُحذف ولا تُحوَّل إلى رصيد دائن", () => {
+    const body = code.slice(code.indexOf("delete_invoice_with_reconciliation"), code.indexOf("delete_customer_credit_entry"));
+    expect(body).toContain("DELETE FROM public.transactions");
+    // لا تحويل فئة: هذا ما كان يُرجع المال رصيداً في كشف الحساب
+    expect(body).not.toMatch(/SET\s+category\s*=\s*'customer_credit'/i);
+  });
+
+  it("لقطة كاملة في activity_log قبل الحذف — الأثر التدقيقي الوحيد بعده", () => {
+    expect(code).toContain("jsonb_agg(to_jsonb(t))");
+    expect(code).toContain("INSERT INTO public.activity_log");
+    expect(code).toContain("'policy', 'hard_delete_not_credited'");
+  });
+
+  it("يعيد حساب رصيد العميل والحسابات المتأثّرة", () => {
+    expect(code).toContain("recompute_customer_balance");
+    expect(code).toContain("recompute_account_balance");
+  });
+
+  it("حذف الشحنة يعكس استهلاكها على الفواتير أولاً بدل رفضه", () => {
+    const body = code.slice(code.indexOf("delete_customer_credit_entry"));
+    expect(body).toContain("UPDATE public.invoices");
+    expect(body).toContain("paid_amount");
+    // ولا يرفض بسبب الاستهلاك
+    expect(body).not.toContain("explicit_consumption");
+    expect(body).not.toContain("insufficient_remaining_credit");
+  });
+
+  it("يحذف نصفَي عملية السداد معاً فلا يبقى قيد بلا مقابله", () => {
+    const body = code.slice(code.indexOf("delete_customer_credit_entry"));
+    expect(body).toMatch(/DELETE FROM public\.transactions[\s\S]{0,400}method = 'credit_balance'/);
+  });
+
+  it("يبقى محصوراً بمدير النظام", () => {
+    const body = code.slice(code.indexOf("delete_customer_credit_entry"));
+    expect(body).toContain("unauthorized_admin_only");
+  });
+});
+
+describe("ملف التطبيق المجمّع", () => {
+  const applyPath = path.resolve(process.cwd(), "supabase/apply/APPLY_PENDING_MIGRATIONS.sql");
+
+  it("موجود ويحمل كل الهجرات المعلّقة", () => {
+    expect(fs.existsSync(applyPath)).toBe(true);
+    const sql = fs.readFileSync(applyPath, "utf8");
+    for (const fn of [
+      "public.delete_customer_credit_entry",
+      "public.record_customer_charge",
+      "public.allocate_customer_charge",
+      "public.delete_invoice_with_reconciliation",
+    ]) {
+      expect(sql).toContain(`CREATE OR REPLACE FUNCTION ${fn}`);
+    }
+  });
+
+  it("النسخة الأخيرة من record_customer_charge هي الموزِّعة تلقائياً", () => {
+    const sql = fs.readFileSync(applyPath, "utf8");
+    // التعريف الأخير هو الذي يبقى في القاعدة — يجب أن يكون التوزيع لا التخزين
+    const last = sql.lastIndexOf("CREATE OR REPLACE FUNCTION public.record_customer_charge");
+    expect(sql.slice(last)).toContain("ORDER BY date ASC");
+    expect(sql.slice(last)).toContain("charge_failed:net_drift");
+  });
+
+  it("آمن التكرار: لا CREATE بلا OR REPLACE ولا DROP", () => {
+    const sql = fs.readFileSync(applyPath, "utf8");
+    const code = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+    expect(code).not.toMatch(/DROP\s+(TABLE|FUNCTION|COLUMN)/i);
+    expect(code).not.toMatch(/CREATE\s+FUNCTION\s/i);
   });
 });

@@ -201,6 +201,11 @@ export interface MovementCapabilities {
   editBlockedBy: BlockReason | null;
   /** سبب منع الحذف — `null` إن كان متاحاً */
   deleteBlockedBy: BlockReason | null;
+  /**
+   * الحذف مسموح لكنه يعكس عمليات أخرى معه — يُعرض تحذيراً قبل التنفيذ.
+   * يُستعمل لشحنة استُهلك منها: حذفها يُنقص `paid_amount` لفواتيرها.
+   */
+  deleteWarning?: BlockReason | null;
 }
 
 export const MOVEMENT_LABEL: Record<LedgerEntryKind, string> = {
@@ -262,7 +267,10 @@ export function movementCapabilities(
   if (kind === "credit_charge") {
     const guard = creditChargeDeletability(t, transactions);
     const hasGroup = !!chargeGroupId(t);
-    // التعديل يعيد إنشاء المجموعة، فيحتاج مجموعة وشحنة غير مستهلَكة معاً.
+    // **الحذف متاح لأي شحنة** — `delete_customer_credit_entry` صارت تعكس
+    // استهلاكها على الفواتير أولاً ثم تحذفها، فالاستهلاك خطوة تسبق الحذف لا
+    // مانع له. أمّا التعديل فيبقى مشروطاً: يعيد إنشاء المجموعة، فيحتاج مجموعة
+    // وشحنة غير مستهلَكة معاً حتى لا يُعاد بناء ما استُهلك نصفه.
     const editBlockedBy: BlockReason | null = !hasGroup
       ? "no_charge_group"
       : guard.canDelete
@@ -271,9 +279,11 @@ export function movementCapabilities(
     return {
       ...base,
       canEdit: editBlockedBy === null,
-      canDelete: guard.canDelete,
+      canDelete: true,
       editBlockedBy,
-      deleteBlockedBy: guard.canDelete ? null : (guard.reason as BlockReason),
+      deleteBlockedBy: null,
+      /** تحذير يُعرض قبل الحذف — ليس منعاً */
+      deleteWarning: guard.canDelete ? null : (guard.reason as BlockReason),
     };
   }
 

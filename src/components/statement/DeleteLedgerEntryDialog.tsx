@@ -86,7 +86,10 @@ export default function DeleteLedgerEntryDialog({
   const amount = Math.abs(Number(entry.amount || 0));
   const impact = projectDeleteImpact(entry, currentNet);
   const guard = isCharge ? creditChargeDeletability(entry, transactions) : null;
-  const blocked = !!guard && !guard.canDelete;
+  // لم يعد الاستهلاك مانعاً: الـRPC تعكسه على الفواتير ثم تحذف الشحنة. يبقى
+  // تحذيراً صريحاً قبل التنفيذ لأن الحذف يُنقص `paid_amount` لفواتير أخرى.
+  const willReverse = !!guard && !guard.canDelete;
+  const blocked = false;
 
   const title = isCharge ? "حذف شحن رصيد" : "حذف دفعة";
 
@@ -174,10 +177,16 @@ export default function DeleteLedgerEntryDialog({
               </div>
             )}
 
-            {blocked && guard && (
-              <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-3 space-y-1">
-                <div className="font-semibold">لا يمكن حذف هذه الشحنة مباشرة</div>
-                <div>{DELETABILITY_MESSAGE[guard.reason]}</div>
+            {willReverse && guard && (
+              <div
+                data-testid="delete-reverse-warning"
+                className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/40 rounded-md p-3 space-y-1"
+              >
+                <div className="font-semibold">تنبيه: هذه الشحنة استُهلك منها</div>
+                <div>
+                  سيُعكَس الاستهلاك أولاً — يُنقص المدفوع على الفواتير التي سُدِّدت منها
+                  وتعود حالتها، ثم تُحذف الشحنة.
+                </div>
                 {guard.linkedConsumed > 0 && (
                   <div className="tabular-nums">
                     المستهلَك منها: {formatMoney(guard.linkedConsumed)} · الرصيد الدائن المتبقي:{" "}

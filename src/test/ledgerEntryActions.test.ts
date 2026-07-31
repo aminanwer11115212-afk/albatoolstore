@@ -275,14 +275,29 @@ describe("قدرات الحركة — المصدر الواحد الذي تقر�
     expect(caps.editBlockedBy).toBe("no_charge_group");
   });
 
-  it("شحنة استُهلك منها: لا تُعدَّل ولا تُحذف، والسبب واحد في الاثنين", () => {
+  // الحذف صار متاحاً لأي شحنة: الـRPC تعكس الاستهلاك أولاً ثم تحذف. أمّا
+  // التعديل فيبقى ممنوعاً لأنه يعيد بناء مجموعة استُهلك نصفها.
+  it("شحنة استُهلك منها: تُحذف مع تحذير ولا تُعدَّل", () => {
     const charge = t({ id: "c", category: "customer_credit", amount: 500, allocation: { group_id: "g1" } });
     const used = t({ id: "u", category: "customer_credit", amount: -200, allocation: { group_id: "g1" } });
     const caps = movementCapabilities(charge, [charge, used]);
+    expect(caps.canDelete).toBe(true);
+    expect(caps.deleteBlockedBy).toBeNull();
+    expect(caps.deleteWarning).toBe("explicit_consumption");
     expect(caps.canEdit).toBe(false);
-    expect(caps.canDelete).toBe(false);
     expect(caps.editBlockedBy).toBe("explicit_consumption");
-    expect(caps.deleteBlockedBy).toBe("explicit_consumption");
+  });
+
+  it("لا شحنة مقفلة عن الحذف مهما كان استهلاكها", () => {
+    const cases = [
+      [t({ id: "a", category: "customer_credit", amount: 500, allocation: { group_id: "g" } }),
+       t({ id: "b", category: "customer_credit", amount: -500, allocation: { group_id: "g" } })],
+      [t({ id: "c", category: "customer_credit", amount: 100 }),
+       t({ id: "d", category: "customer_credit", amount: -90 })],
+    ];
+    for (const rows of cases) {
+      expect(movementCapabilities(rows[0], rows).canDelete).toBe(true);
+    }
   });
 
   it("كل سبب منع له رسالة عربية", () => {
