@@ -12,7 +12,7 @@
 //   * `data-section="paid-amount"`  → "المبلغ المدفوع" = paidAmount
 //   * `data-section="final-total"`  → "المطلوب النهائي" = max(0, grandTotal - paidAmount)
 //   * `<meta name="lov-doc-label|lov-doc-number|lov-customer-name">` for unified PDF naming
-//   * PDF filename format: "<label> - <customer> - <number>.pdf"
+//   * PDF filename format: "<label> - <customer> - <number> - <amount>.pdf"
 
 export function attr(v: unknown): string {
   return String(v ?? "")
@@ -60,6 +60,7 @@ export function buildDocHTML(args: {
 <meta name="lov-doc-label" content="${attr(docTitle)}">
 <meta name="lov-doc-number" content="${attr(docNumber || "")}">
 <meta name="lov-customer-name" content="${attr(customer?.name || "")}">
+<meta name="lov-doc-total" content="${attr(String(Math.round(Number(grandTotal || 0) * 100) / 100))}">
 <title>${attr(docTitle)} ${attr(docNumber || "")}</title>
 <style>
 
@@ -158,11 +159,12 @@ export function buildDocHTML(args: {
 <script>
 (function(){
   // اسم ملف PDF يطابق قالب الطباعة الرسمية (buildWaFileName في printTemplate.ts):
-  //   "<اسم المستند> - <اسم العميل> - <رقم المستند>.pdf"
-  //   مثال: "فاتورة مبيعات - أحمد علي - INV-001.pdf"
+  //   "<اسم المستند> - <اسم العميل> - <رقم المستند> - <المبلغ>.pdf"
+  //   مثال: "فاتورة مبيعات - أحمد علي - INV-001 - 126,000.pdf"
   var __docLabel  = ${JSON.stringify(String(docTitle || "مستند"))};
   var __docNumber = ${JSON.stringify(String(docNumber || ""))};
   var __customer  = ${JSON.stringify(String(customer?.name || "بدون اسم"))};
+  var __docTotal  = ${JSON.stringify(String(Math.round(Number(grandTotal || 0) * 100) / 100))};
   function __cleanName(s){
     s = (s || '').toString().trim();
     if (!s || s === '-' || s === '—' || s === '_' || s === 'undefined' || s === 'null') return '';
@@ -171,6 +173,8 @@ export function buildDocHTML(args: {
   }
   var __parts = [__cleanName(__docLabel) || 'مستند', __cleanName(__customer) || 'بدون اسم'];
   if (__cleanName(__docNumber)) __parts.push(__cleanName(__docNumber));
+  var __amt = Number(__docTotal);
+  if (isFinite(__amt) && __amt > 0) __parts.push(__amt.toLocaleString('en-US'));
   var fileName = __parts.join(' - ').slice(0, 120) + '.pdf';
   // اسم الملف يتوفر أيضاً في DOM لاختبارات e2e (data-attr على زر التحميل).
   var __btnEl = document.getElementById('__btn_pdf');

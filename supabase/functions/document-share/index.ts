@@ -60,7 +60,7 @@ function stampOf(row: { date?: any; created_at?: any }) {
   const day = ok ? AR_DAYS[d!.getDay()] : "";
   return {
     at: ok ? d!.toISOString() : plain,
-    text: [plain, day, time].filter(Boolean).join(" · "),
+    text: [plain, time].filter(Boolean).join(" · "),
     day, plain, time,
   };
 }
@@ -237,6 +237,13 @@ function buildStatementHTML(args: {
   const netColor = net > 0.001 ? "#c0392b" : net < -0.001 ? "#15803d" : "#1a1a1a";
   const netValue = Math.abs(net);
 
+  // اسم ملف الكشف يحمل اسم الجهة فلا يصل العميل ملف باسم عام
+  const pdfName = [title, party?.name]
+    .map((x) => String(x || "").replace(/[\\/:*?"<>|\r\n\t]+/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" - ")
+    .slice(0, 120) + ".pdf";
+
   const rows = (items: any[], cols: string[], render: (r: any, i: number) => string) => items.length
     ? `<table><thead><tr><th>#</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${items.map(render).join("")}</tbody></table>`
     : `<div class="empty">لا توجد بيانات</div>`;
@@ -246,19 +253,16 @@ function buildStatementHTML(args: {
   const groupedInvoicesTable = !grouped
     ? ""
     : grouped.groups.length
-      ? `<table><thead><tr><th>#</th><th>التاريخ واليوم والساعة</th><th>البيان</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>حساب العميل بعدها</th></tr></thead><tbody>${
+      ? `<table><thead><tr><th>#</th><th>التاريخ والساعة</th><th>البيان</th><th>القيمة</th><th>دفع</th><th>المتبقي</th></tr></thead><tbody>${
           (() => { let seq = 0; return grouped.timeline.map((node: any) => node.type === "band"
-            ? `<tr class="credit-band"><td colspan="7">＋ ${attr(node.entry.label)} — يوم ${attr(node.entry.day)} ${attr(node.entry.plainDate)}${node.entry.time ? ` الساعة ${attr(node.entry.time)}` : ""} · حسابكم بعدها: ${signedHTML(node.entry.running)}</td></tr>`
+            ? `<tr class="credit-band"><td colspan="6">＋ ${attr(node.entry.label)} — ${attr(node.entry.plainDate)}${node.entry.time ? ` الساعة ${attr(node.entry.time)}` : ""} · حسابكم بعدها: ${signedHTML(node.entry.running)}</td></tr>`
             : (() => { const g = node.block; return `
-      <tr class="inv-row"><td>${++seq}</td><td>${attr(g.when)}</td><td style="text-align:right;font-weight:700;">فاتورة ${attr(g.invoice_number)}<div style="font-size:11px;font-weight:400;color:#55606e;">${attr(invoicePlain(g))}</div></td><td style="font-weight:700;">${fmt(g.total)}</td><td style="color:#16a34a;font-weight:700;">${g.paid ? fmt(g.paid) : "—"}</td><td>${signedHTML(g.remaining)}</td><td>${signedHTML(g.runningAtCreation)}</td></tr>${
-        g.movements.map((m: any) => `
-      <tr class="settle-row"><td></td><td>${attr(m.when)}</td><td style="text-align:right;">↳ ${attr(m.label)}</td><td>—</td><td style="color:#16a34a;font-weight:700;">${m.effect ? fmt(Math.abs(m.effect)) : "—"}</td><td>${effectHTML(m.effect)}</td><td>${signedHTML(m.running)}</td></tr>`).join("")
-      }`; })()).join(""); })()
-        }<tr class="total-row"><td colspan="3" style="text-align:right;font-weight:800;">مجموع الفواتير</td><td style="font-weight:800;">${fmt(grouped.totalInvoiced)}</td><td style="font-weight:800;color:#16a34a;">${fmt(grouped.totalPaid)}</td><td>${signedHTML(grouped.totalRemaining)}</td><td></td></tr>${
+      <tr class="inv-row"><td>${++seq}</td><td>${attr(g.when)}</td><td style="text-align:right;font-weight:700;">فاتورة ${attr(g.invoice_number)}<div style="font-size:11px;font-weight:400;color:#55606e;">${attr(invoicePlain(g))}</div></td><td style="font-weight:700;">${fmt(g.total)}</td><td style="color:#16a34a;font-weight:700;">${g.paid ? fmt(g.paid) : "—"}</td><td>${signedHTML(g.remaining)}</td></tr>`; })()).join(""); })()
+        }<tr class="total-row"><td colspan="3" style="text-align:right;font-weight:800;">مجموع الفواتير</td><td style="font-weight:800;">${fmt(grouped.totalInvoiced)}</td><td style="font-weight:800;color:#16a34a;">${fmt(grouped.totalPaid)}</td><td>${signedHTML(grouped.totalRemaining)}</td></tr>${
           grouped.creditPoolTotal > 0.009
-            ? `<tr class="total-row"><td colspan="5" style="text-align:right;font-weight:800;">يُخصم منه رصيد العميل القابل للتوزيع</td><td style="font-weight:800;color:#16a34a;">+${fmt(grouped.creditPoolTotal)}</td><td></td></tr>`
+            ? `<tr class="total-row"><td colspan="5" style="text-align:right;font-weight:800;">شحن رصيد</td><td style="font-weight:800;color:#16a34a;">+${fmt(grouped.creditPoolTotal)}</td></tr>`
             : ""
-        }<tr class="closing-row"><td colspan="5" style="text-align:right;font-weight:900;">إجمالي حساب العميل</td><td colspan="2">${signedHTML(grouped.accountTotal)}</td></tr></tbody></table>`
+        }<tr class="closing-row"><td colspan="5" style="text-align:right;font-weight:900;">الجملة</td><td>${signedHTML(grouped.accountTotal)}</td></tr></tbody></table>`
       : `<div class="empty">لا توجد فواتير</div>`;
 
   return `<!DOCTYPE html>
@@ -310,11 +314,11 @@ function buildStatementHTML(args: {
   <div class="info-row"><div>${party?.phone ? `<span class="info-label">الهاتف:</span> <span class="info-value">${attr(party.phone)}</span>` : ""}</div><div>${party?.address ? `<span class="info-label">العنوان:</span> <span class="info-value">${attr(party.address)}</span>` : ""}</div></div>
   <div style="margin:10px 0 14px;padding:14px 18px;border:2px solid ${netColor};border-radius:10px;background:#fafafa;display:flex;justify-content:space-between;align-items:center;font-size:15px"><span style="font-weight:800;color:${netColor}">${netLabel}</span><strong style="font-size:22px;color:${netColor}">${fmt(netValue)}</strong></div>
   <div class="summary-row">${kind === "customer" ? `<div class="summary-box"><div class="summary-box-title">إجمالي الفواتير</div><div class="summary-box-value">${fmt(invoiceTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المدفوع</div><div class="summary-box-value">${fmt(paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المتبقي</div><div class="summary-box-value">${fmt(invoiceTotal - paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">رصيد دائن</div><div class="summary-box-value">${fmt(credit)}</div></div>` : `<div class="summary-box"><div class="summary-box-title">إجمالي أوامر الشراء</div><div class="summary-box-value">${fmt(ordersTotal)}</div></div><div class="summary-box"><div class="summary-box-title">الرصيد</div><div class="summary-box-value">${fmt(balance)}</div></div>`}</div>
-  ${kind === "customer" ? `<div class="section-title">الفواتير وحركاتها</div>${groupedInvoicesTable}<div class="section-title">عروض الأسعار</div>${rows(quotes, ["رقم العرض", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.quote_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}<div class="section-title">المرتجعات</div>${rows(returns, ["رقم المرتجع", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.return_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}` : `<div class="section-title">أوامر الشراء</div>${rows(orders, ["رقم الأمر", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.order_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}`}
+  ${kind === "customer" ? `<div class="section-title">الفواتير</div>${groupedInvoicesTable}<div class="section-title">عروض الأسعار</div>${rows(quotes, ["رقم العرض", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.quote_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}<div class="section-title">المرتجعات</div>${rows(returns, ["رقم المرتجع", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.return_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}` : `<div class="section-title">أوامر الشراء</div>${rows(orders, ["رقم الأمر", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.order_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}`}
   ${kind === "customer" ? "" : `<div class="section-title">المعاملات</div>${rows(transactions, ["التاريخ", "النوع", "المبلغ", "الوصف"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.date)}</td><td>${attr(r.type || "-")}</td><td>${fmt(r.amount)}</td><td>${attr(r.description || "-")}</td></tr>`)}`}
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script>(function(){var btn=document.getElementById('__btn_pdf');var label=document.getElementById('__btn_label');btn.onclick=async function(){btn.disabled=true;label.innerHTML='<span class="spinner"></span> جاري إنشاء PDF...';try{var blob=await window.html2pdf().set({margin:8,filename:${JSON.stringify(title + ".pdf")},image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,logging:false},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.getElementById('__doc_root')).outputPdf('blob');var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=${JSON.stringify(title + ".pdf")};document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1000);label.textContent='✓ تم التحميل';setTimeout(function(){btn.disabled=false;label.textContent='⬇️ تحميل PDF';},2000);}catch(e){btn.disabled=false;label.textContent='⬇️ تحميل PDF';alert('فشل توليد PDF: '+(e&&e.message||e));}};})();</script>
+<script>(function(){var btn=document.getElementById('__btn_pdf');var label=document.getElementById('__btn_label');btn.onclick=async function(){btn.disabled=true;label.innerHTML='<span class="spinner"></span> جاري إنشاء PDF...';try{var blob=await window.html2pdf().set({margin:8,filename:${JSON.stringify(pdfName)},image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true,logging:false},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.getElementById('__doc_root')).outputPdf('blob');var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=${JSON.stringify(pdfName)};document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1000);label.textContent='✓ تم التحميل';setTimeout(function(){btn.disabled=false;label.textContent='⬇️ تحميل PDF';},2000);}catch(e){btn.disabled=false;label.textContent='⬇️ تحميل PDF';alert('فشل توليد PDF: '+(e&&e.message||e));}};})();</script>
 </body></html>`;
 }
 

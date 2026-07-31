@@ -9,6 +9,7 @@
  * تُفعَّل عند مطابقة المسار `/share/document/:token`.
  */
 import { useEffect, useRef, useState } from "react";
+import { buildDocumentFileName } from "@/utils/documentFileName";
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL as string;
 const ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -62,6 +63,19 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
     win.print();
   };
 
+  /** يقرأ meta المستند داخل الـiframe ليبني اسم ملف يفهمه العميل. */
+  const pdfFileNameFrom = (doc: Document | null | undefined, tok: string): string => {
+    const meta = (n: string) =>
+      doc?.querySelector(`meta[name="${n}"]`)?.getAttribute("content") || "";
+    const name = buildDocumentFileName({
+      docLabel: meta("lov-doc-label") || doc?.title || "مستند",
+      customerName: meta("lov-customer-name"),
+      docNumber: meta("lov-doc-number"),
+      total: meta("lov-doc-total"),
+    });
+    return name === "مستند.pdf" ? `مستند-${tok.slice(0, 8)}.pdf` : name;
+  };
+
   const handleDownloadPdf = async () => {
     if (!html || downloading) return;
     setDownloading(true);
@@ -74,7 +88,9 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
       await html2pdf()
         .set({
           margin: 10,
-          filename: `document-${token.slice(0, 8)}.pdf`,
+          // اسم الملف من meta المستند نفسه (النوع/العميل/الرقم/المبلغ) بدل
+          // `document-<token>` الذي لا يدلّ العميل على شيء.
+          filename: pdfFileNameFrom(doc, token),
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
