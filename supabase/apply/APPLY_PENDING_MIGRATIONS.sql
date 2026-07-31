@@ -1,6 +1,6 @@
 -- ============================================================================
 --  طبّق هذا الملف مرّة واحدة في SQL Editor بلوحة Supabase
---  https://supabase.com/dashboard/project/vifrecsqxdbwqtcfkdyb/sql/new
+--  https://supabase.com/dashboard/project/exmasfdcjgwapmobefne/sql/new
 --
 --  يجمع كل الهجرات المعلّقة التي لم تُطبَّق على القاعدة المنشورة، **بترتيبها**.
 --  كلها `CREATE OR REPLACE` فآمنة التكرار: شغّلها مرّة أو عشراً، النتيجة واحدة.

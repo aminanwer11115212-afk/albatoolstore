@@ -400,3 +400,39 @@ describe("مُعرِّف مشروع Supabase موحّد", () => {
     expect(fromToml).toBe(fromEnv);
   });
 });
+
+describe("لا مراجع لمشروع Supabase القديم في الكود الحيّ", () => {
+  /**
+   * المستودع انتقل من مشروع `vifrecsqxdbwqtcfkdyb` إلى `exmasfdcjgwapmobefne`،
+   * لكن روابط شعار مثبّتة في دوال Edge بقيت تشير للقديم — فتصل العميل صورة
+   * ميتة في المستند المشارَك. الهجرات التاريخية مستثناة: هي سجلّ لا يُعاد.
+   */
+  const OLD_REF = "vifrecsqxdbwqtcfkdyb";
+
+  const walk = (dir: string): string[] => {
+    const abs = path.resolve(process.cwd(), dir);
+    if (!fs.existsSync(abs)) return [];
+    return fs.readdirSync(abs, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) return e.name === "test" ? [] : walk(full);
+      // الاختبارات نفسها تذكر المُعرِّف القديم شرحاً — وليست كوداً يُشحن
+      if (/\.test\.(ts|tsx)$/.test(e.name)) return [];
+      return /\.(ts|tsx|sql|toml|json)$/.test(e.name) ? [full] : [];
+    });
+  };
+
+  it("الكود الحيّ يشير للمشروع الحالي وحده", () => {
+    const offenders = walk("supabase/functions")
+      .concat(walk("supabase/apply"), walk("src"))
+      .filter((f) => fs.readFileSync(path.resolve(process.cwd(), f), "utf8").includes(OLD_REF));
+    expect(offenders).toEqual([]);
+  });
+
+  it("رابط ملف التطبيق يشير للمشروع الصحيح", () => {
+    const sql = fs.readFileSync(
+      path.resolve(process.cwd(), "supabase/apply/APPLY_PENDING_MIGRATIONS.sql"), "utf8");
+    const env = fs.readFileSync(path.resolve(process.cwd(), ".env"), "utf8");
+    const ref = env.match(/VITE_SUPABASE_URL\s*=\s*"?https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    expect(sql).toContain(`dashboard/project/${ref}/sql/new`);
+  });
+});
