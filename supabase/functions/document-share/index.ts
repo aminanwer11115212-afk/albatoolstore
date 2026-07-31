@@ -57,10 +57,20 @@ function stampOf(row: { date?: any; created_at?: any }) {
   const time = created && ok
     ? String(d!.getHours()).padStart(2, "0") + ":" + String(d!.getMinutes()).padStart(2, "0")
     : "";
+  const day = ok ? AR_DAYS[d!.getDay()] : "";
   return {
     at: ok ? d!.toISOString() : plain,
-    text: [plain, ok ? AR_DAYS[d!.getDay()] : "", time].filter(Boolean).join(" · "),
+    text: [plain, day, time].filter(Boolean).join(" · "),
+    day, plain, time,
   };
+}
+
+/** شرح الفاتورة بجملة يفهمها العميل مباشرة. */
+function invoicePlain(g: { total: number; paid: number; remaining: number }): string {
+  const t = fmt(g.total), p = fmt(g.paid), rem = fmt(Math.abs(g.remaining));
+  if (g.remaining > 0.009) return `قيمتها ${t} · دفعتم منها ${p} · وبقي عليكم ${rem}`;
+  if (g.remaining < -0.009) return `قيمتها ${t} · دفعتم ${p} · ولكم زيادة ${rem} أُضيفت لرصيدكم`;
+  return `قيمتها ${t} · مسدّدة بالكامل`;
 }
 
 /** أثر الحركة — دلتا موقّعة لا رصيد: «−X» أخضر يُنقص، «+X» أحمر يزيد. */
@@ -114,17 +124,28 @@ function groupStatementByInvoice(
     const linked = ref && ids.has(ref);
     let label = "", effect = 0;
 
-    if (t.category === "customer_credit" && amt < 0) { label = "سداد من رصيد العميل"; effect = 0; }
-    else if (t.category === "customer_credit" && amt > 0) {
-      label = isOverpay(t) ? "فائض دفعة → رصيد العميل" : "شحن رصيد للعميل";
+    const acc = t.method === "credit_balance" ? "رصيد العميل"
+      : t.method === "bank" || t.method === "bank_transfer" ? "تحويل بنكي"
+      : t.method === "mobile" ? "محفظة" : "نقدًا";
+    const opNo = t.allocation?.operation_no || t.reference_no || "";
+    const opTxt = opNo ? ` — رقم العملية ${opNo}` : "";
+    const money = (v: number) => fmt(Math.abs(r2(v)));
+
+    if (t.category === "customer_credit" && amt < 0) {
+      label = `سدّدنا ${money(amt)} من رصيدكم الموجود لدينا على هذه الفاتورة`;
+      effect = 0;
+    } else if (t.category === "customer_credit" && amt > 0) {
+      label = isOverpay(t)
+        ? `دفعتم زيادة ${money(amt)} عن قيمة الفاتورة — أُضيفت إلى رصيدكم لدينا`
+        : `تم شحن رصيدكم بمبلغ ${money(amt)} عن طريق ${acc}${opTxt}`;
       effect = -r2(amt);
       if (isOverpay(t) && linked) linkedOverpay.set(ref!, r2((linkedOverpay.get(ref!) || 0) + amt));
     } else if (t.category === "customer_payment") {
-      label = linked ? "دفعة على الفاتورة" : "دفعة من العميل";
+      label = `دفعتم ${money(amt)} عن طريق ${acc}${opTxt}`;
       effect = -r2(Math.abs(amt));
     } else { label = t.description || "حركة مالية"; effect = amt < 0 ? r2(Math.abs(amt)) : -r2(amt); }
 
-    const entry = { id: t.id, label, effect, when: st.text, at: st.at, running: 0 };
+    const entry = { id: t.id, label, effect, when: st.text, at: st.at, running: 0, day: st.day, plainDate: st.plain, time: st.time };
     const toInvoice = linked && !(t.category === "customer_credit" && amt > 0 && !isOverpay(t));
     if (toInvoice) {
       if (!byInv.has(ref!)) byInv.set(ref!, []);
@@ -153,14 +174,26 @@ function groupStatementByInvoice(
     .sort((a, b) => a.at.localeCompare(b.at));
   pool.sort((a, b) => a.at.localeCompare(b.at));
 
+  // جدول زمني واحد: الفواتير وشحنات الرصيد بترتيبها الحقيقي، فتفصل الشحنة
+  // بين الفواتير في موضعها بدل تجميعها في ذيل الكشف.
+  const timeline: Array<any> = [
+    ...groups.map((g) => ({ type: "invoice", block: g, at: g.at })),
+    ...pool.map((e) => ({ type: "band", entry: e, at: e.at })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+
   let running = 0;
-  for (const g of groups) {
-    running = r2(running + g.total);
-    g.runningAtCreation = running;
-    for (const m of g.movements) { running = r2(running + m.effect); m.running = running; }
-    g.runningAfter = running;
+  for (const node of timeline) {
+    if (node.type === "invoice") {
+      const g = node.block;
+      running = r2(running + g.total);
+      g.runningAtCreation = running;
+      for (const m of g.movements) { running = r2(running + m.effect); m.running = running; }
+      g.runningAfter = running;
+    } else {
+      running = r2(running + node.entry.effect);
+      node.entry.running = running;
+    }
   }
-  for (const e of pool) { running = r2(running + e.effect); e.running = running; }
 
   const totalInvoiced = r2(groups.reduce((s, g) => s + g.total, 0));
   const totalPaid = r2(groups.reduce((s, g) => s + g.paid, 0));
@@ -170,7 +203,7 @@ function groupStatementByInvoice(
   );
   const creditPoolTotal = r2(netCredit - r2([...linkedOverpay.values()].reduce((s, v) => s + v, 0)));
   return {
-    groups, pool, totalInvoiced, totalPaid, totalRemaining, creditPoolTotal,
+    timeline, groups, pool, totalInvoiced, totalPaid, totalRemaining, creditPoolTotal,
     accountTotal: r2(totalRemaining - creditPoolTotal),
   };
 }
@@ -214,24 +247,19 @@ function buildStatementHTML(args: {
     ? ""
     : grouped.groups.length
       ? `<table><thead><tr><th>#</th><th>التاريخ واليوم والساعة</th><th>البيان</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>حساب العميل بعدها</th></tr></thead><tbody>${
-          grouped.groups.map((g, i) => `
-      <tr class="inv-row"><td>${i + 1}</td><td>${attr(g.when)}</td><td style="text-align:right;font-weight:700;">فاتورة ${attr(g.invoice_number)}</td><td style="font-weight:700;">${fmt(g.total)}</td><td style="color:#16a34a;font-weight:700;">${g.paid ? fmt(g.paid) : "—"}</td><td>${signedHTML(g.remaining)}</td><td>${signedHTML(g.runningAtCreation)}</td></tr>${
-        g.movements.map((m) => `
+          (() => { let seq = 0; return grouped.timeline.map((node: any) => node.type === "band"
+            ? `<tr class="credit-band"><td colspan="7">＋ ${attr(node.entry.label)} — يوم ${attr(node.entry.day)} ${attr(node.entry.plainDate)}${node.entry.time ? ` الساعة ${attr(node.entry.time)}` : ""} · حسابكم بعدها: ${signedHTML(node.entry.running)}</td></tr>`
+            : (() => { const g = node.block; return `
+      <tr class="inv-row"><td>${++seq}</td><td>${attr(g.when)}</td><td style="text-align:right;font-weight:700;">فاتورة ${attr(g.invoice_number)}<div style="font-size:11px;font-weight:400;color:#55606e;">${attr(invoicePlain(g))}</div></td><td style="font-weight:700;">${fmt(g.total)}</td><td style="color:#16a34a;font-weight:700;">${g.paid ? fmt(g.paid) : "—"}</td><td>${signedHTML(g.remaining)}</td><td>${signedHTML(g.runningAtCreation)}</td></tr>${
+        g.movements.map((m: any) => `
       <tr class="settle-row"><td></td><td>${attr(m.when)}</td><td style="text-align:right;">↳ ${attr(m.label)}</td><td>—</td><td style="color:#16a34a;font-weight:700;">${m.effect ? fmt(Math.abs(m.effect)) : "—"}</td><td>${effectHTML(m.effect)}</td><td>${signedHTML(m.running)}</td></tr>`).join("")
-      }`).join("")
+      }`; })()).join(""); })()
         }<tr class="total-row"><td colspan="3" style="text-align:right;font-weight:800;">مجموع الفواتير</td><td style="font-weight:800;">${fmt(grouped.totalInvoiced)}</td><td style="font-weight:800;color:#16a34a;">${fmt(grouped.totalPaid)}</td><td>${signedHTML(grouped.totalRemaining)}</td><td></td></tr>${
           grouped.creditPoolTotal > 0.009
             ? `<tr class="total-row"><td colspan="5" style="text-align:right;font-weight:800;">يُخصم منه رصيد العميل القابل للتوزيع</td><td style="font-weight:800;color:#16a34a;">+${fmt(grouped.creditPoolTotal)}</td><td></td></tr>`
             : ""
         }<tr class="closing-row"><td colspan="5" style="text-align:right;font-weight:900;">إجمالي حساب العميل</td><td colspan="2">${signedHTML(grouped.accountTotal)}</td></tr></tbody></table>`
       : `<div class="empty">لا توجد فواتير</div>`;
-
-  // الرصيد القابل للتوزيع — لا يُوزَّع تلقائياً على أي فاتورة.
-  const creditPoolTable = !grouped || !grouped.pool.length
-    ? ""
-    : `<div class="section-title">رصيد العميل القابل للتوزيع</div><table><thead><tr><th>#</th><th>التاريخ واليوم والساعة</th><th>البيان</th><th>المبلغ</th><th>حساب العميل بعدها</th></tr></thead><tbody>${
-        grouped.pool.map((e, i) => `<tr><td>${i + 1}</td><td>${attr(e.when)}</td><td style="text-align:right;">${attr(e.label)}</td><td>${effectHTML(e.effect)}</td><td>${signedHTML(e.running)}</td></tr>`).join("")
-      }<tr class="total-row"><td colspan="3" style="text-align:right;font-weight:800;">المتاح للتوزيع</td><td style="font-weight:800;color:#16a34a;">+${fmt(grouped.creditPoolTotal)}</td><td>${signedHTML(grouped.accountTotal)}</td></tr></tbody></table>`;
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -271,6 +299,7 @@ function buildStatementHTML(args: {
   tbody tr.settle-row td { background: #f6f8fb; font-size: 12px; color: #33475b; }
   tbody tr.total-row td { background: #eef2ff; border-top: 2px solid #1a1a1a; }
   tbody tr.closing-row td { background: #e2e8f8; font-size: 15px; border-top: 2px solid #1a1a1a; }
+  tbody tr.credit-band td { background: #e7f8ee; border-top: 2px solid #16a34a; border-bottom: 2px solid #16a34a; color: #14532d; font-weight: 800; text-align: right; padding: 9px 12px; }
   @media print { body { padding: 0; background: #fff; } .toolbar { display: none !important; } .page { box-shadow: none; border-radius: 0; padding: 0; } }
 </style></head><body>
 <div class="toolbar"><button id="__btn_pdf"><span id="__btn_label">⬇️ تحميل PDF</span></button></div>
@@ -281,7 +310,7 @@ function buildStatementHTML(args: {
   <div class="info-row"><div>${party?.phone ? `<span class="info-label">الهاتف:</span> <span class="info-value">${attr(party.phone)}</span>` : ""}</div><div>${party?.address ? `<span class="info-label">العنوان:</span> <span class="info-value">${attr(party.address)}</span>` : ""}</div></div>
   <div style="margin:10px 0 14px;padding:14px 18px;border:2px solid ${netColor};border-radius:10px;background:#fafafa;display:flex;justify-content:space-between;align-items:center;font-size:15px"><span style="font-weight:800;color:${netColor}">${netLabel}</span><strong style="font-size:22px;color:${netColor}">${fmt(netValue)}</strong></div>
   <div class="summary-row">${kind === "customer" ? `<div class="summary-box"><div class="summary-box-title">إجمالي الفواتير</div><div class="summary-box-value">${fmt(invoiceTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المدفوع</div><div class="summary-box-value">${fmt(paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">المتبقي</div><div class="summary-box-value">${fmt(invoiceTotal - paidTotal)}</div></div><div class="summary-box"><div class="summary-box-title">رصيد دائن</div><div class="summary-box-value">${fmt(credit)}</div></div>` : `<div class="summary-box"><div class="summary-box-title">إجمالي أوامر الشراء</div><div class="summary-box-value">${fmt(ordersTotal)}</div></div><div class="summary-box"><div class="summary-box-title">الرصيد</div><div class="summary-box-value">${fmt(balance)}</div></div>`}</div>
-  ${kind === "customer" ? `<div class="section-title">الفواتير وحركاتها</div>${groupedInvoicesTable}${creditPoolTable}<div class="section-title">عروض الأسعار</div>${rows(quotes, ["رقم العرض", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.quote_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}<div class="section-title">المرتجعات</div>${rows(returns, ["رقم المرتجع", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.return_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}` : `<div class="section-title">أوامر الشراء</div>${rows(orders, ["رقم الأمر", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.order_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}`}
+  ${kind === "customer" ? `<div class="section-title">الفواتير وحركاتها</div>${groupedInvoicesTable}<div class="section-title">عروض الأسعار</div>${rows(quotes, ["رقم العرض", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.quote_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}<div class="section-title">المرتجعات</div>${rows(returns, ["رقم المرتجع", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.return_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}` : `<div class="section-title">أوامر الشراء</div>${rows(orders, ["رقم الأمر", "التاريخ", "الإجمالي", "الحالة"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.order_number)}</td><td>${attr(r.date)}</td><td>${fmt(r.total)}</td><td>${attr(r.status || "-")}</td></tr>`)}`}
   ${kind === "customer" ? "" : `<div class="section-title">المعاملات</div>${rows(transactions, ["التاريخ", "النوع", "المبلغ", "الوصف"], (r, i) => `<tr><td>${i + 1}</td><td>${attr(r.date)}</td><td>${attr(r.type || "-")}</td><td>${fmt(r.amount)}</td><td>${attr(r.description || "-")}</td></tr>`)}`}
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>

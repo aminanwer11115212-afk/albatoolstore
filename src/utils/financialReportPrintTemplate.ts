@@ -27,6 +27,10 @@ export interface FinancialReportSection {
   /** عنوان للقسم */
   label: string;
   columns: FinancialReportColumn[];
+  /**
+   * صفوف الجدول. الصف الذي يحمل `__band` يُرسم كشريط فاصل يمتد على كل
+   * الأعمدة (نصّه في `__band` وتنسيقه في `__bandStyle`) بدل خلايا الأعمدة.
+   */
   rows: Array<Record<string, any>>;
   /** مجموع اختياري يُعرض في صف الإجمالي */
   totals?: Partial<Record<string, number | string>>;
@@ -121,11 +125,21 @@ ${summary.map((s) => `  <div class="summary-box">
       `<th style="width:${c.width || "auto"}; text-align:${c.align || "center"};">${esc(c.label)}</th>`
     ).join("");
     const body = sec.rows.length
-      ? sec.rows.map((r) => `<tr>${sec.columns.map((c) => {
-          const raw = r[c.key];
-          const val = c.numeric ? fmt(typeof raw === "number" ? raw : Number(raw || 0)) : fmt(raw);
-          return `<td style="text-align:${c.align || (c.numeric ? "center" : "right")};">${esc(val)}</td>`;
-        }).join("")}</tr>`).join("")
+      ? sec.rows.map((r) => {
+          // صف يمتد على كل الأعمدة (شريط فاصل مثلاً) — يُرسم كخلية واحدة.
+          if (r.__band) {
+            return `<tr><td colspan="${sec.columns.length}" style="${esc(String(r.__bandStyle || ""))}">${esc(String(r.__band))}</td></tr>`;
+          }
+          return `<tr>${sec.columns.map((c) => {
+            const raw = r[c.key];
+            // العمود الرقمي قد يستقبل نصاً («—» لخلية لا رقم لها). `Number("—")`
+            // يعطي NaN فيُطبع NaN في وجه العميل — نعرض النص كما هو بدل ذلك.
+            const val = c.numeric && (typeof raw === "number" || (raw !== "" && raw != null && !Number.isNaN(Number(raw))))
+              ? fmt(typeof raw === "number" ? raw : Number(raw))
+              : fmt(raw ?? "—");
+            return `<td style="text-align:${c.align || (c.numeric ? "center" : "right")};">${esc(val)}</td>`;
+          }).join("")}</tr>`;
+        }).join("")
       : `<tr><td colspan="${sec.columns.length}" style="text-align:center;color:#888;padding:14px;">لا توجد بيانات</td></tr>`;
     const totalsRow = sec.totals
       ? `<tr class="total-row">${sec.columns.map((c, idx) => {

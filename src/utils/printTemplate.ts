@@ -133,6 +133,7 @@ export function generatePrintHTML(data: PrintData): string {
 <meta name="lov-doc-label" content="${attr(title)}">
 <meta name="lov-doc-number" content="${attr(number || "")}">
 <meta name="lov-customer-name" content="${attr(customer?.name || "")}">
+<meta name="lov-doc-total" content="${attr(String(Math.round(grandTotal * 100) / 100))}">
 <meta name="lov-wa-phone" content="">
 <title>${esc(title)} ${esc(number || "")}</title>
 <style>
@@ -810,6 +811,12 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     var docLabel   = clean(getMeta('lov-doc-label'));
     var docNumber  = clean(getMeta('lov-doc-number'));
     var customerNm = clean(getMeta('lov-customer-name'));
+    // مبلغ المستند بفواصل الآلاف — يصل الملف للعميل باسمه ومبلغه
+    var docTotal   = clean(getMeta('lov-doc-total'));
+    if (docTotal) {
+      var n = Number(docTotal);
+      docTotal = isFinite(n) && n > 0 ? n.toLocaleString('en-US') : '';
+    }
 
     // fallbacks افتراضية
     if (!docLabel)   docLabel   = clean(getDocTitle()) || 'مستند';
@@ -818,6 +825,7 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
 
     var parts = [docLabel, customerNm];
     if (docNumber) parts.push(docNumber);
+    if (docTotal) parts.push(docTotal);
     var name = parts.join(' - ').trim();
     if (!name) name = 'document';
 

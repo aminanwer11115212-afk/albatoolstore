@@ -96,30 +96,64 @@ describe("الفاتورة وحركاتها بدقة الساعة", () => {
     const invRow = page.getByText(/فاتورة INV-1001/).closest("tr")!;
     const payRow = invRow.nextElementSibling as HTMLElement;
     const overRow = payRow.nextElementSibling as HTMLElement;
-    expect(payRow.textContent).toContain("دفعة على الفاتورة");
+    // بلغة مخاطبة العميل لا بلغة المحاسبة
+    expect(payRow.textContent).toContain("دفعتم 4,000 عن طريق نقدًا");
     expect(payRow.textContent).toContain("10:30");
-    expect(overRow.textContent).toContain("فائض دفعة → رصيد العميل");
+    expect(overRow.textContent).toContain("دفعتم زيادة 1,000 عن قيمة الفاتورة");
+    expect(overRow.textContent).toContain("أُضيفت إلى رصيدكم لدينا");
   });
 });
 
-describe("رصيد العميل القابل للتوزيع", () => {
-  it("الشحنة غير المرتبطة بفاتورة تظهر في قسم مستقل لا تحت فاتورة", async () => {
+describe("شحن الرصيد كشريط أخضر فاصل", () => {
+  it("يظهر داخل الجدول كصف يمتد على كل الأعمدة لا في قسم منفصل", async () => {
     const { container } = renderPage();
     await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
-    const page = pageOf(container);
-    expect(page.getAllByText(/رصيد العميل القابل للتوزيع/).length).toBeGreaterThan(0);
-    const chargeRow = page.getByText(/شحن رصيد للعميل/).closest("tr")!;
-    expect(chargeRow.textContent).toContain("2026-07-31 · الجمعة · 12:00");
-    // عمود المبلغ يعرض أثر الحركة: تُخصم 4,000 من مجموع حساب العميل
-    expect(within(chargeRow).getByText("−4,000")).toBeTruthy();
-    // وعمود الرصيد بعدها يعرضه بلغة «له/عليه»
-    expect(within(chargeRow).getByText("له +5,000")).toBeTruthy();
+    const band = container.querySelector(".ps-credit-band")!;
+    expect(band).toBeTruthy();
+    const cell = band.querySelector("td")!;
+    expect(cell.getAttribute("colspan")).toBe("7");
+    // لم يعد هناك قسم مستقل في ذيل الكشف
+    expect(pageOf(container).queryByText("المتاح للتوزيع")).toBeNull();
   });
 
-  it("المتاح للتوزيع 4,000 — الفائض المنسوب لفاتورة غير محسوب فيه", async () => {
+  it("نصّه يشرح للعميل المبلغ واليوم ورقم العملية والرصيد بعده", async () => {
     const { container } = renderPage();
     await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
-    expect(pageOf(container).getByText("المتاح للتوزيع").closest("tr")!.textContent).toContain("4,000");
+    const text = container.querySelector(".ps-credit-band")!.textContent || "";
+    expect(text).toContain("تم شحن رصيدكم بمبلغ 4,000");
+    expect(text).toContain("رقم العملية OP-9");
+    expect(text).toContain("يوم الجمعة 2026-07-31");
+    expect(text).toContain("الساعة 12:00");
+    expect(text).toContain("حسابكم بعدها: له +5,000");
+  });
+
+  it("لا يُحتسب في ترقيم الفواتير", async () => {
+    const { container } = renderPage();
+    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    const seqs = [...container.querySelectorAll(".ps-inv-row")].map(
+      (r) => r.querySelector("td")!.textContent,
+    );
+    expect(seqs).toEqual(seqs.map((_, i) => String(i + 1)));
+  });
+
+  it("يقع في موضعه الزمني بعد الفاتورة الأقدم منه", async () => {
+    const { container } = renderPage();
+    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    const rows = [...container.querySelectorAll(".ps-by-invoice tbody tr")];
+    const invIdx = rows.findIndex((r) => r.classList.contains("ps-inv-row"));
+    const bandIdx = rows.findIndex((r) => r.classList.contains("ps-credit-band"));
+    expect(bandIdx).toBeGreaterThan(invIdx);
+  });
+});
+
+describe("شرح مبسّط للعميل", () => {
+  it("تحت رقم الفاتورة جملة تشرح قيمتها والمدفوع والمتبقي", async () => {
+    const { container } = renderPage();
+    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    const plain = container.querySelector(".ps-plain")!.textContent || "";
+    expect(plain).toContain("قيمتها 4,000");
+    expect(plain).toContain("دفعتم 4,000");
+    expect(plain).toContain("ولكم زيادة 1,000 أُضيفت لرصيدكم");
   });
 });
 

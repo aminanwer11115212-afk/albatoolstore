@@ -47,6 +47,8 @@ export interface AccountEntry {
   label: string;
   /** الحساب/الطريقة/رقم العملية */
   detail: string;
+  /** جملة كاملة بصيغة مخاطبة العميل — لمن لا يقرأ لغة المحاسبة */
+  customerText: string;
   /** أثر العملية على حساب العميل — موجب يزيد ما عليه، سالب يزيد ما له */
   effect: number;
   /** رصيد حساب العميل بعد هذه العملية */
@@ -78,7 +80,17 @@ export interface InvoiceBlock {
   runningAfter: number;
 }
 
+/**
+ * عقدة في الجدول الزمني: إمّا كتلة فاتورة، وإمّا شريط شحن رصيد يفصل بين
+ * الفواتير في موضعه الزمني الصحيح.
+ */
+export type TimelineNode =
+  | { type: "invoice"; block: InvoiceBlock }
+  | { type: "credit_band"; entry: AccountEntry };
+
 export interface CustomerAccountView {
+  /** الفواتير وشحنات الرصيد بترتيبها الزمني الواحد */
+  timeline: TimelineNode[];
   blocks: InvoiceBlock[];
   /** شحنات الرصيد غير المرتبطة بفاتورة — قابلة للتوزيع يدوياً */
   creditPool: AccountEntry[];
@@ -126,6 +138,9 @@ export function stampOf(row: { date?: any; created_at?: any }): {
     dayName: valid ? DAY_NAMES[d!.getDay()] : "",
   };
 }
+
+/** تنسيق مبلغ للعرض للعميل. */
+const money = (n: number) => Math.abs(r2(n)).toLocaleString();
 
 function accountOf(t: any, map?: Map<string, string>): string {
   if (t.method === "credit_balance") return "رصيد العميل";
@@ -186,7 +201,8 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
     const amt = num(t.amount);
     const st = stampOf(t);
     const acc = accountOf(t, accountNameById);
-    const opNo = extractOperationNo(t.description);
+    // رقم العملية: العمود المخصّص أولاً ثم ما يُستخرج من الوصف (بيانات قديمة)
+    const opNo = t.allocation?.operation_no || t.reference_no || extractOperationNo(t.description);
     const detail = `${acc}${opNo ? ` — رقم العملية ${opNo}` : ""}`;
     const ref = t.reference_id ? String(t.reference_id) : null;
 
@@ -198,6 +214,7 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
         ...st,
         label: "سداد من رصيد العميل",
         detail,
+        customerText: `سدّدنا ${money(Math.abs(amt))} من رصيدكم الموجود لدينا على هذه الفاتورة`,
         effect: 0,
         runningBalance: 0,
         raw: t,
@@ -214,6 +231,9 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
         kind: isOverpay ? "overpay" : "credit_charge",
         ...st,
         label: isOverpay ? "فائض دفعة → رصيد العميل" : "شحن رصيد للعميل",
+        customerText: isOverpay
+          ? `دفعتم زيادة ${money(amt)} عن قيمة الفاتورة — أُضيفت إلى رصيدكم لدينا`
+          : `تم شحن رصيدكم بمبلغ ${money(amt)} عن طريق ${acc}${opNo ? ` — رقم العملية ${opNo}` : ""}`,
         detail,
         effect: -r2(amt),
         runningBalance: 0,
@@ -236,6 +256,7 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
         ...st,
         label: ref && invoiceIds.has(ref) ? "دفعة على الفاتورة" : "دفعة من العميل",
         detail,
+        customerText: `دفعتم ${money(Math.abs(amt))} عن طريق ${acc}${opNo ? ` — رقم العملية ${opNo}` : ""}`,
         effect: -r2(Math.abs(amt)),
         runningBalance: 0,
         raw: t,
@@ -250,6 +271,7 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
       ...st,
       label: t.description || "حركة مالية",
       detail,
+      customerText: t.description || `حركة على الحساب بمبلغ ${money(amt)}`,
       effect: amt < 0 ? r2(Math.abs(amt)) : -r2(amt),
       runningBalance: 0,
       raw: t,
@@ -284,20 +306,32 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
 
   const poolSorted = pool.sort((a, b) => a.at.localeCompare(b.at));
 
-  // ===== 4) الرصيد الجاري بترتيب العرض — ينتهي عند إجمالي حساب العميل =====
+  // ===== 4) جدول زمني واحد: الفواتير وشحنات الرصيد بترتيبها الحقيقي =====
+  // شحنة الرصيد تفصل بين الفواتير في موضعها الزمني (شريط أخضر في العرض)
+  // بدل أن تُجمَع كلها في ذيل الكشف بعيداً عن سياقها.
+  const timeline: TimelineNode[] = [
+    ...blocks.map((block) => ({ type: "invoice" as const, block, at: block.at })),
+    ...poolSorted.map((entry) => ({ type: "credit_band" as const, entry, at: entry.at })),
+  ]
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .map(({ at: _at, ...node }) => node as TimelineNode);
+
+  // ===== 5) الرصيد الجاري بترتيب الجدول الزمني — ينتهي عند إجمالي الحساب =====
   let running = 0;
-  for (const b of blocks) {
-    running = r2(running + b.total);
-    b.runningAtCreation = running;
-    for (const m of b.movements) {
-      running = r2(running + m.effect);
-      m.runningBalance = running;
+  for (const node of timeline) {
+    if (node.type === "invoice") {
+      const b = node.block;
+      running = r2(running + b.total);
+      b.runningAtCreation = running;
+      for (const m of b.movements) {
+        running = r2(running + m.effect);
+        m.runningBalance = running;
+      }
+      b.runningAfter = running;
+    } else {
+      running = r2(running + node.entry.effect);
+      node.entry.runningBalance = running;
     }
-    b.runningAfter = running;
-  }
-  for (const e of poolSorted) {
-    running = r2(running + e.effect);
-    e.runningBalance = running;
   }
 
   const totalInvoiced = r2(blocks.reduce((s, b) => s + b.total, 0));
@@ -319,6 +353,7 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
   const accountTotal = r2(totalRemaining - creditPoolTotal);
 
   return {
+    timeline,
     blocks,
     creditPool: poolSorted,
     creditPoolTotal,

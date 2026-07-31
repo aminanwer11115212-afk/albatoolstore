@@ -97,6 +97,11 @@ export default function FinancialReportPreviewPage() {
   };
 
   const docTitle = data?.title || "تقرير مالي";
+  /**
+   * اسم ملف الـPDF: العنوان + اسم الجهة (اسم العميل في كشف الحساب) حتى يصل
+   * الملف للعميل باسمه لا باسم عام يتكرّر مع كل عميل. التنظيف في cleanFileName.
+   */
+  const pdfDocName = [docTitle, data?.subtitle].filter(Boolean).join(" - ");
 
   const handlePrint = () => {
     iframeRef.current?.contentWindow?.focus();
@@ -122,7 +127,7 @@ export default function FinancialReportPreviewPage() {
     wrap.appendChild(clone);
     const opt = {
       margin: 8,
-      filename: `${docTitle}.pdf`,
+      filename: cleanFileName(pdfDocName, "pdf"),
       image: { type: "jpeg", quality: 0.95 },
       html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
@@ -146,7 +151,7 @@ export default function FinancialReportPreviewPage() {
       if (!blob) throw new Error("لا يوجد محتوى للتصدير");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = cleanFileName(docTitle, "pdf");
+      a.href = url; a.download = cleanFileName(pdfDocName, "pdf");
       document.body.appendChild(a); a.click();
       setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
       toast.success("تم تنزيل PDF بنجاح", { id: "pdf-gen" });
@@ -175,7 +180,7 @@ export default function FinancialReportPreviewPage() {
     try {
       const blob = await generatePdfBlob();
       if (!blob) return;
-      const file = new File([blob], cleanFileName(docTitle, "pdf"), { type: "application/pdf" });
+      const file = new File([blob], cleanFileName(pdfDocName, "pdf"), { type: "application/pdf" });
       const nav: any = navigator;
       let canShare = false;
       try { canShare = !!(nav.canShare && nav.share && nav.canShare({ files: [file] })); } catch { canShare = false; }
