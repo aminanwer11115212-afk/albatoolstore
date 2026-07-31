@@ -18,6 +18,16 @@ import EditChargeDialog, { type EditableCharge } from "@/components/finance/Edit
 import DeleteLedgerEntryDialog, { type DeletableEntry } from "@/components/statement/DeleteLedgerEntryDialog";
 import { classifyLedgerEntry, creditChargeDeletability } from "@/utils/ledgerEntryActions";
 
+/** شرح الفاتورة بجملة يفهمها العميل مباشرة. */
+function invoicePlainText(b: { total: number; paid: number; remaining: number }): string {
+  const t = Number(b.total || 0).toLocaleString();
+  const p = Number(b.paid || 0).toLocaleString();
+  const rem = Math.abs(Number(b.remaining || 0)).toLocaleString();
+  if (b.remaining > 0.009) return `قيمتها ${t} · دُفع منها ${p} · وبقي ${rem}`;
+  if (b.remaining < -0.009) return `قيمتها ${t} · دُفع ${p} · وزيادة ${rem} أُضيفت للرصيد`;
+  return `قيمتها ${t} · مسدّدة بالكامل`;
+}
+
 /** «2026-07-30 · الخميس · 14:45» — التفاصيل بدقة الساعة كما هي مطلوبة في الكشف. */
 function stampText(x: { date: string; dayName: string; time: string }): string {
   return [x.date, x.dayName, x.time].filter(Boolean).join(" · ");
@@ -467,11 +477,18 @@ export default function CustomerStatementPage() {
   // الرصيد الجاري داخل الكتل محسوب على الكشف الكامل، فلا تُشوّهه الفلترة.
   const visibleBlocks = useMemo(() => {
     const allowed = new Set(filteredInvoices.map((i: any) => String(i.id)));
-    const order = new Map(filteredInvoices.map((i: any, idx: number) => [String(i.id), idx]));
-    return accountView.blocks
-      .filter((b) => allowed.has(b.invoiceId))
-      .sort((a, b) => (order.get(a.invoiceId) ?? 0) - (order.get(b.invoiceId) ?? 0));
+    return accountView.blocks.filter((b) => allowed.has(b.invoiceId));
   }, [accountView, filteredInvoices]);
+
+  // الجدول الزمني المعروض: الفواتير المطابقة للفلتر وأشرطة شحن الرصيد بينها.
+  // تُخفى الأشرطة عند تفعيل بحث برقم فاتورة لأنها لا تخصّ فاتورة بعينها.
+  const visibleTimeline = useMemo(() => {
+    const allowed = new Set(visibleBlocks.map((b) => b.invoiceId));
+    const hideBands = invSearch.trim().length > 0;
+    return accountView.timeline.filter((node) =>
+      node.type === "invoice" ? allowed.has(node.block.invoiceId) : !hideBands,
+    );
+  }, [accountView, visibleBlocks, invSearch]);
 
   const resetFilters = () => {
     setFromDate(""); setToDate(""); setMinAmount(""); setMaxAmount(""); setPaymentStatus("all");
@@ -508,25 +525,36 @@ export default function CustomerStatementPage() {
             { key: "remaining", label: "المتبقي / الأثر", align: "center" as const },
             { key: "balance", label: "حساب العميل بعدها", align: "center" as const },
           ],
-          // كل فاتورة سطر تتبعه حركاتها الحقيقية — بلا توزيع تلقائي.
-          rows: accountView.blocks.flatMap((b) => [
-            {
-              when: stampText(b),
-              statement: `فاتورة ${b.invoiceNumber}`,
-              total: b.total,
-              paid: b.paid || "—",
-              remaining: signedBalanceText(b.remaining).text,
-              balance: signedBalanceText(b.runningAfter).text,
-            },
-            ...b.movements.map((m) => ({
-              when: stampText(m),
-              statement: `↳ ${m.label} — ${m.detail}`,
-              total: "—",
-              paid: m.effect ? Math.abs(m.effect) : "—",
-              remaining: m.effect ? signedBalanceText(m.effect).text : "—",
-              balance: signedBalanceText(m.runningBalance).text,
-            })),
-          ]),
+          // الجدول الزمني: فاتورة وحركاتها، وشحنة الرصيد شريط فاصل في موضعها.
+          // الأعمدة الرقمية تستقبل رقماً أو "—" فقط — لا نص يُحوَّل إلى NaN.
+          rows: accountView.timeline.flatMap<Record<string, any>>((node) =>
+            node.type === "credit_band"
+              ? [{
+                  __band: `＋ ${node.entry.customerText} — يوم ${node.entry.dayName} ${node.entry.date}`
+                    + `${node.entry.time ? ` الساعة ${node.entry.time}` : ""}`
+                    + ` · حسابكم بعدها: ${signedBalanceText(node.entry.runningBalance).text}`,
+                  __bandStyle: "background:#e7f8ee;border-top:2px solid #16a34a;border-bottom:2px solid #16a34a;"
+                    + "color:#14532d;font-weight:800;text-align:right;padding:9px 12px;",
+                }]
+              : [
+                  {
+                    when: stampText(node.block),
+                    statement: `فاتورة ${node.block.invoiceNumber} — ${invoicePlainText(node.block)}`,
+                    total: node.block.total,
+                    paid: node.block.paid || "—",
+                    remaining: signedBalanceText(node.block.remaining).text,
+                    balance: signedBalanceText(node.block.runningAtCreation).text,
+                  },
+                  ...node.block.movements.map((m) => ({
+                    when: stampText(m),
+                    statement: `↳ ${m.customerText}`,
+                    total: "—",
+                    paid: m.effect ? Math.abs(m.effect) : "—",
+                    remaining: effectText(m.effect).text,
+                    balance: signedBalanceText(m.runningBalance).text,
+                  })),
+                ],
+          ),
           totals: {
             when: "إجمالي حساب العميل",
             total: accountView.totalInvoiced,
@@ -535,27 +563,6 @@ export default function CustomerStatementPage() {
             balance: signedBalanceText(accountView.accountTotal).text,
           },
         },
-        ...(accountView.creditPool.length ? [{
-          key: "credit_pool",
-          label: `رصيد العميل القابل للتوزيع (${accountView.creditPool.length})`,
-          columns: [
-            { key: "when", label: "التاريخ واليوم والساعة", align: "center" as const },
-            { key: "statement", label: "البيان", align: "right" as const },
-            { key: "amount", label: "المبلغ", numeric: true },
-            { key: "balance", label: "حساب العميل بعدها", align: "center" as const },
-          ],
-          rows: accountView.creditPool.map((e) => ({
-            when: stampText(e),
-            statement: `${e.label} — ${e.detail}`,
-            amount: Math.abs(e.effect),
-            balance: signedBalanceText(e.runningBalance).text,
-          })),
-          totals: {
-            when: "المتاح للتوزيع",
-            amount: accountView.creditPoolTotal,
-            balance: signedBalanceText(accountView.accountTotal).text,
-          },
-        }] : []),
         ...(filteredTransactions.length ? [{
           key: "transactions", label: `المعاملات (${filteredTransactions.length})`,
           columns: [
@@ -916,37 +923,48 @@ export default function CustomerStatementPage() {
                 </tr></thead>
                 <tbody>
                   {isLoading ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
-                  : !visibleBlocks.length ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا توجد فواتير مطابقة</td></tr>
-                  : visibleBlocks.map((b) => (
-                    <Fragment key={b.invoiceId}>
-                      <tr className="border-b border-border hover:bg-muted/50 bg-card">
-                        <td data-label="التاريخ" className="px-5 py-3 text-foreground tabular-nums whitespace-nowrap">{stampText(b)}</td>
-                        <td data-label="البيان" className="px-5 py-3 font-semibold text-foreground">فاتورة {b.invoiceNumber}</td>
-                        <td data-label="الإجمالي" className="px-5 py-3 text-foreground tabular-nums">{b.total.toLocaleString()}</td>
-                        <td data-label="المدفوع" className="px-5 py-3 text-success tabular-nums">{b.paid ? b.paid.toLocaleString() : "—"}</td>
-                        <td data-label="المتبقي" className="px-5 py-3"><BalanceChip value={b.remaining} /></td>
-                        <td data-label="حساب العميل بعدها" className="px-5 py-3"><BalanceChip value={b.runningAtCreation} /></td>
+                  : !visibleTimeline.length ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا توجد فواتير مطابقة</td></tr>
+                  : visibleTimeline.map((node) =>
+                    node.type === "credit_band" ? (
+                      <tr key={node.entry.id} className="border-y-2 border-success/60 bg-success/10">
+                        <td colSpan={6} className="px-5 py-2.5 text-sm font-bold text-success text-right">
+                          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-success text-success-foreground text-[10px] font-black ml-2">＋</span>
+                          {node.entry.customerText} — يوم {node.entry.dayName} {node.entry.date}
+                          {node.entry.time ? ` الساعة ${node.entry.time}` : ""}
+                          <span className="font-semibold"> · حساب العميل بعدها: {signedBalanceText(node.entry.runningBalance).text}</span>
+                        </td>
                       </tr>
-                      {b.movements.map((m) => (
+                    ) : (
+                    <Fragment key={node.block.invoiceId}>
+                      <tr className="border-b border-border hover:bg-muted/50 bg-card">
+                        <td data-label="التاريخ" className="px-5 py-3 text-foreground tabular-nums whitespace-nowrap">{stampText(node.block)}</td>
+                        <td data-label="البيان" className="px-5 py-3 text-foreground">
+                          <span className="font-semibold">فاتورة {node.block.invoiceNumber}</span>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">{invoicePlainText(node.block)}</div>
+                        </td>
+                        <td data-label="الإجمالي" className="px-5 py-3 text-foreground tabular-nums">{node.block.total.toLocaleString()}</td>
+                        <td data-label="المدفوع" className="px-5 py-3 text-success tabular-nums">{node.block.paid ? node.block.paid.toLocaleString() : "—"}</td>
+                        <td data-label="المتبقي" className="px-5 py-3"><BalanceChip value={node.block.remaining} /></td>
+                        <td data-label="حساب العميل بعدها" className="px-5 py-3"><BalanceChip value={node.block.runningAtCreation} /></td>
+                      </tr>
+                      {node.block.movements.map((m) => (
                         <tr key={m.id} className="border-b border-border bg-muted/30 text-xs">
                           <td data-label="التاريخ" className="px-5 py-2 text-muted-foreground tabular-nums whitespace-nowrap">{stampText(m)}</td>
                           <td data-label="البيان" className="px-5 py-2 text-foreground">
                             <span className="text-primary font-bold ml-1">↳</span>
-                            {m.label}
-                            <span className="text-muted-foreground"> — {m.detail}</span>
+                            {m.customerText}
                           </td>
                           <td data-label="الإجمالي" className="px-5 py-2 text-muted-foreground">—</td>
                           <td data-label="المدفوع" className="px-5 py-2 text-success tabular-nums">
                             {m.effect ? Math.abs(m.effect).toLocaleString() : "—"}
                           </td>
-                          <td data-label="الأثر" className="px-5 py-2">
-                            <EffectChip value={m.effect} />
-                          </td>
+                          <td data-label="الأثر" className="px-5 py-2"><EffectChip value={m.effect} /></td>
                           <td data-label="حساب العميل بعدها" className="px-5 py-2"><BalanceChip value={m.runningBalance} /></td>
                         </tr>
                       ))}
                     </Fragment>
-                  ))}
+                    ),
+                  )}
                   {!isLoading && visibleBlocks.length > 0 && (
                     <tr className="bg-muted font-bold border-t-2 border-border">
                       <td className="px-5 py-3 text-foreground">إجمالي حساب العميل</td>
@@ -963,46 +981,6 @@ export default function CustomerStatementPage() {
               </table>
             </div>
 
-            {/* رصيد العميل القابل للتوزيع — يُخصم من مجموع الحساب ويوزّعه المستخدم يدوياً */}
-            {accountView.creditPool.length > 0 && (
-              <div className="border-t border-border">
-                <div className="px-5 py-3 flex flex-wrap items-center gap-2 justify-between bg-success/5">
-                  <div>
-                    <h4 className="font-semibold text-foreground text-sm">رصيد العميل القابل للتوزيع</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      لا يُوزَّع تلقائياً — وزّعه على الفواتير من زر «تطبيق رصيد على فاتورة».
-                    </p>
-                  </div>
-                  <span className="text-lg font-bold text-success tabular-nums">
-                    +{accountView.creditPoolTotal.toLocaleString()}
-                  </span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs mobile-stack-table">
-                    <thead><tr className="bg-muted">
-                      <th className="text-right px-5 py-2 font-semibold text-muted-foreground">التاريخ واليوم والساعة</th>
-                      <th className="text-right px-5 py-2 font-semibold text-muted-foreground">البيان</th>
-                      <th className="text-right px-5 py-2 font-semibold text-muted-foreground">المبلغ</th>
-                      <th className="text-right px-5 py-2 font-semibold text-muted-foreground">حساب العميل بعدها</th>
-                    </tr></thead>
-                    <tbody>
-                      {accountView.creditPool.map((e) => (
-                        <tr key={e.id} className="border-b border-border">
-                          <td data-label="التاريخ" className="px-5 py-2 text-muted-foreground tabular-nums whitespace-nowrap">{stampText(e)}</td>
-                          <td data-label="البيان" className="px-5 py-2 text-foreground">
-                            {e.label}<span className="text-muted-foreground"> — {e.detail}</span>
-                          </td>
-                          <td data-label="المبلغ" className="px-5 py-2 tabular-nums">
-                            <EffectChip value={e.effect} />
-                          </td>
-                          <td data-label="حساب العميل بعدها" className="px-5 py-2"><BalanceChip value={e.runningBalance} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
 
 
