@@ -523,3 +523,35 @@ describe("مسارا التوزيع من كشف الحساب — الطريق ا
     expect(rpcs).toEqual(["record_customer_charge"]);
   });
 });
+
+describe("ملف الفحص والإصلاح", () => {
+  const p = path.resolve(process.cwd(), "supabase/apply/VERIFY_AND_REPAIR.sql");
+
+  it("موجود ويكشف النسخة الحيّة", () => {
+    expect(fs.existsSync(p)).toBe(true);
+    const sql = fs.readFileSync(p, "utf8");
+    expect(sql).toContain("pg_get_functiondef");
+    expect(sql).toContain("AUTO_DISTRIBUTE");
+    expect(sql).toContain("STORE_ONLY");
+  });
+
+  it("نسخة الإصلاح مطابقة لهجرة «تخزين فقط» — لا تلمس الفواتير", () => {
+    const sql = fs.readFileSync(p, "utf8");
+    const fix = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION public.record_customer_charge"));
+    const code = fix.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+    expect(code).toContain("'stored_only', true");
+    expect(code).not.toMatch(/UPDATE\s+public\.invoices/i);
+    expect(code).not.toMatch(/paid_amount/i);
+  });
+
+  it("لا يحذف بيانات بجملة عامة — الحذف يمرّ بمسار العكس", () => {
+    const sql = fs.readFileSync(p, "utf8");
+    const code = sql
+      .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n")
+      // النصوص المقتبسة ليست جُملاً: استعلام الكشف يبحث عن 'UPDATE public.invoices'
+      // داخل تعريف الدالة، فلا يُعدّ تنفيذاً
+      .replace(/'[^']*'/g, "''");
+    expect(code).not.toMatch(/DELETE\s+FROM/i);
+    expect(code).not.toMatch(/\bUPDATE\s+public\.(invoices|customers)\b/i);
+  });
+});
