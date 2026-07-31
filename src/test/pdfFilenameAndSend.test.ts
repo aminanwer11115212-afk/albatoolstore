@@ -1,4 +1,4 @@
-import { cleanNamePart, buildDocumentFileName } from "@/utils/documentFileName";
+import { cleanNamePart, buildDocumentFileName, formatAmountPart } from "@/utils/documentFileName";
 /**
  * البند 4 — اسم ملف الـPDF يحتوي رقم المستند الكامل + زر «إرسال للعميل».
  *
@@ -180,5 +180,37 @@ describe("زرّا «معاينة» و«واتساب PDF» في شاشات ال�
 
   it("عرض السعر يُسمّى «عرض سعر» لا «فاتورة»", () => {
     expect(read("src/pages/QuoteCreatePage.tsx")).toContain('docLabel: "عرض سعر"');
+  });
+});
+
+describe("اسم PDF واحد من التطبيق ومن صفحة المشاركة", () => {
+  const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
+
+  /**
+   * صفحة المشاركة تحمل زرَّي تحميل: واحد من الواجهة وآخر داخل إطار دالة Edge.
+   * لو اختلفت قاعدة تنسيق المبلغ بينهما، خرج الملف باسمين مختلفين حسب الزر —
+   * وهو ما ظهر كفرق بين اسم الملف من اللابتوب واسمه من الهاتف.
+   */
+  it("قاعدة تنسيق المبلغ في دالة Edge مطابقة لـ formatAmountPart", () => {
+    const tpl = read("supabase/functions/document-share/template.ts");
+    expect(tpl).toContain("Math.round(__amt * 100) / 100 === Math.round(__amt)");
+    expect(tpl).toContain("maximumFractionDigits: 2");
+    // لا استعمال للصيغة الافتراضية (ثلاث خانات)
+    expect(tpl).not.toMatch(/__amt\.toLocaleString\('en-US'\)\s*\)/);
+  });
+
+  it("القاعدتان تعطيان النتيجة نفسها على مبالغ حقيقية", () => {
+    // محاكاة قاعدة دالة Edge حرفياً
+    const edge = (n: number) =>
+      Math.round(n * 100) / 100 === Math.round(n)
+        ? Math.round(n).toLocaleString("en-US")
+        : n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+    for (const amount of [1596000, 350000, 126000.5, 99.999, 0.5, 1234567.891]) {
+      expect(formatAmountPart(amount)).toBe(edge(amount));
+    }
+  });
+
+  it("مبلغ الصورة يخرج بالاسم نفسه من المسارين", () => {
+    expect(formatAmountPart(1596000)).toBe("1,596,000");
   });
 });

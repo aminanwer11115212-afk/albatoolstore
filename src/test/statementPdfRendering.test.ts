@@ -184,7 +184,10 @@ describe("كل مسارات PDF للفواتير تحمل المبلغ", () => {
   it("قالب رابط المشاركة (الفاتورة التي يفتحها العميل)", () => {
     const src = read("supabase/functions/document-share/template.ts");
     expect(src).toContain('<meta name="lov-doc-total"');
-    expect(src).toContain("if (isFinite(__amt) && __amt > 0) __parts.push(__amt.toLocaleString('en-US'));");
+    // المبلغ يُضاف بنفس قاعدة `formatAmountPart` في الواجهة، فلا يختلف اسم
+    // الملف بين التطبيق وصفحة المشاركة
+    expect(src).toContain("isFinite(__amt) && __amt > 0");
+    expect(src).toContain("maximumFractionDigits: 2");
   });
 
   it("صفحة رابط العميل لا تسمّي الملف بالـtoken", () => {

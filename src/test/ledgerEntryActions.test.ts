@@ -261,18 +261,17 @@ describe("قدرات الحركة — المصدر الواحد الذي تقر�
     }
   });
 
-  it("شحنة بمجموعة وغير مستهلَكة: تُعدَّل وتُحذف", () => {
-    const charge = t({ category: "customer_credit", amount: 500, allocation: { group_id: "g1" } });
+  // **لا تعديل لأي شحنة رصيد** — بطلب صاحب المستودع. الحذف وإعادة الشحن
+  // أوضح في السجل من مسار يعكس المجموعة ثم يعيد إنشاءها.
+  it.each([
+    ["بمجموعة", { group_id: "g1" }],
+    ["بلا مجموعة", undefined],
+  ])("شحنة %s: تُحذف ولا تُعدَّل أبداً", (_l, allocation) => {
+    const charge = t({ category: "customer_credit", amount: 500, allocation });
     const caps = movementCapabilities(charge, [charge]);
-    expect(caps).toMatchObject({ kind: "credit_charge", canEdit: true, canDelete: true });
-  });
-
-  it("شحنة بلا مجموعة (فائض تلقائي): تُحذف ولا تُعدَّل", () => {
-    const charge = t({ category: "customer_credit", amount: 500 });
-    const caps = movementCapabilities(charge, [charge]);
-    expect(caps.canDelete).toBe(true);
-    expect(caps.canEdit).toBe(false);
-    expect(caps.editBlockedBy).toBe("no_charge_group");
+    expect(caps).toMatchObject({ kind: "credit_charge", canEdit: false, canDelete: true });
+    expect(caps.editBlockedBy).toBe("edit_not_allowed");
+    expect(caps.deleteBlockedBy).toBeNull();
   });
 
   // الحذف صار متاحاً لأي شحنة: الـRPC تعكس الاستهلاك أولاً ثم تحذف. أمّا
@@ -285,7 +284,7 @@ describe("قدرات الحركة — المصدر الواحد الذي تقر�
     expect(caps.deleteBlockedBy).toBeNull();
     expect(caps.deleteWarning).toBe("explicit_consumption");
     expect(caps.canEdit).toBe(false);
-    expect(caps.editBlockedBy).toBe("explicit_consumption");
+    expect(caps.editBlockedBy).toBe("edit_not_allowed");
   });
 
   it("لا شحنة مقفلة عن الحذف مهما كان استهلاكها", () => {
@@ -303,7 +302,8 @@ describe("قدرات الحركة — المصدر الواحد الذي تقر�
   it("كل سبب منع له رسالة عربية", () => {
     const reasons = [
       "credit_consumption", "no_linked_invoice", "no_charge_group",
-      "explicit_consumption", "insufficient_remaining_credit", "not_supported",
+      "explicit_consumption", "insufficient_remaining_credit",
+      "edit_not_allowed", "not_supported",
     ] as const;
     for (const r of reasons) {
       expect(BLOCK_MESSAGE[r]).toBeTruthy();

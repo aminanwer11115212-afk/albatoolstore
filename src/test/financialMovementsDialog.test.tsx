@@ -108,9 +108,10 @@ describe("العدّاد والتصفية والبحث", () => {
   it("العدّاد يحصي ما تسمح به القدرات لا رقماً مكتوباً يدوياً", () => {
     renderDialog();
     const caps = ALL.map((t) => movementCapabilities(t, ALL));
-    const editable = caps.filter((c) => c.canEdit).length;   // الدفعة + شحنتان = 3
-    const deletable = caps.filter((c) => c.canDelete).length; // + المستقلة = 4
-    expect(editable).toBe(3);
+    // لا تعديل للشحنات إطلاقاً ⇒ الدفعة المرتبطة وحدها قابلة للتعديل
+    const editable = caps.filter((c) => c.canEdit).length;
+    const deletable = caps.filter((c) => c.canDelete).length;
+    expect(editable).toBe(1);
     expect(deletable).toBe(4);
     const text = screen.getByTestId("movements-counts").textContent || "";
     expect(text).toContain(`${editable} قابلة للتعديل`);

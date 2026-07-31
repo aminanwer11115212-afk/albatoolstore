@@ -189,6 +189,7 @@ export type BlockReason =
   | "no_charge_group"
   | "explicit_consumption"
   | "insufficient_remaining_credit"
+  | "edit_not_allowed"
   | "not_supported";
 
 export interface MovementCapabilities {
@@ -225,6 +226,8 @@ export const BLOCK_MESSAGE: Record<BlockReason, string> = {
   explicit_consumption: "استُهلك من هذه الشحنة على فواتير — ألغِ الاستهلاك أولاً",
   insufficient_remaining_credit:
     "الرصيد الدائن المتبقي أقل من قيمة الشحنة — حذفها يجعله سالباً",
+  edit_not_allowed:
+    "شحنات الرصيد لا تُعدَّل — احذفها وأعد شحنها بالمبلغ الصحيح، فتبقى كل عملية واضحة في السجل",
   not_supported: "هذا النوع من الحركات لا يُعدَّل ولا يُحذف من كشف الحساب",
 };
 
@@ -266,21 +269,14 @@ export function movementCapabilities(
 
   if (kind === "credit_charge") {
     const guard = creditChargeDeletability(t, transactions);
-    const hasGroup = !!chargeGroupId(t);
-    // **الحذف متاح لأي شحنة** — `delete_customer_credit_entry` صارت تعكس
-    // استهلاكها على الفواتير أولاً ثم تحذفها، فالاستهلاك خطوة تسبق الحذف لا
-    // مانع له. أمّا التعديل فيبقى مشروطاً: يعيد إنشاء المجموعة، فيحتاج مجموعة
-    // وشحنة غير مستهلَكة معاً حتى لا يُعاد بناء ما استُهلك نصفه.
-    const editBlockedBy: BlockReason | null = !hasGroup
-      ? "no_charge_group"
-      : guard.canDelete
-        ? null
-        : (guard.reason as BlockReason);
+    // **لا تعديل لشحنات الرصيد إطلاقاً** — بطلب صاحب المستودع. تعديل الشحنة
+    // كان يعكس المجموعة ثم يعيد إنشاءها بمبلغ جديد، وهو مسار طويل يصعب تتبّع
+    // أثره. الحذف ثم إعادة الشحن أوضح: عمليتان مستقلّتان في السجل.
     return {
       ...base,
-      canEdit: editBlockedBy === null,
+      canEdit: false,
       canDelete: true,
-      editBlockedBy,
+      editBlockedBy: "edit_not_allowed",
       deleteBlockedBy: null,
       /** تحذير يُعرض قبل الحذف — ليس منعاً */
       deleteWarning: guard.canDelete ? null : (guard.reason as BlockReason),
