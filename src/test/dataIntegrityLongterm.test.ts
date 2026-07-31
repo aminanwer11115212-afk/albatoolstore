@@ -425,3 +425,101 @@ describe("لا مراجع لمشروع Supabase القديم في الكود ا�
     expect(sql).toContain(`dashboard/project/${ref}/sql/new`);
   });
 });
+
+/**
+ * القاعدة: **حالة الفاتورة لا تتغيّر بشحن الرصيد — إلا بعد التوزيع من كشف
+ * الحساب.** أي أن المسار الوحيد الذي يُغيّر الحالة بسبب الرصيد هو توزيع
+ * يدوي صريح يفتحه المستخدم من كشف حساب العميل:
+ *   `apply_customer_credit_to_invoice` (فاتورة واحدة)
+ *   `settle_invoices_from_credit`      (عدة فواتير دفعةً واحدة)
+ */
+describe("حالة الفاتورة لا تتغيّر بشحن الرصيد إلا بتوزيع يدوي من كشف الحساب", () => {
+  const forced =
+    allMigrations.find((m) => m.name.includes("force_charge_store_only"))?.sql || "";
+  const code = forced.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+
+  it("دالة الشحن لا تكتب status ولا تلمس invoices إطلاقاً", () => {
+    expect(code).not.toMatch(/UPDATE\s+public\.invoices/i);
+    expect(code).not.toMatch(/\bstatus\b\s*=/i);
+    expect(code).not.toMatch(/paid_amount/i);
+  });
+
+  /**
+   * التريغر الوحيد على `transactions` يعيد حساب رصيد **العميل** فقط. لو أُضيف
+   * يوماً تريغر يشتقّ حالة الفاتورة من الحركات، لتغيّرت الحالة بمجرّد الشحن
+   * دون أن يمرّ أحد بمسار سداد — وهذا ما يمنعه هذا الاختبار.
+   */
+  it("لا تريغر على transactions يكتب على invoices", () => {
+    for (const { sql } of allMigrations) {
+      const triggers = [...sql.matchAll(
+        /CREATE\s+(?:OR REPLACE\s+)?TRIGGER\s+(\w+)[\s\S]{0,200}?ON\s+public\.transactions[\s\S]{0,200}?EXECUTE\s+FUNCTION\s+public\.(\w+)/gi,
+      )];
+      for (const [, , fnName] of triggers) {
+        // جسم الدالة التي يستدعيها التريغر
+        const at = sql.indexOf(`FUNCTION public.${fnName}(`);
+        if (at < 0) continue;
+        const body = sql.slice(at, sql.indexOf("$$;", at) + 3)
+          .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+        expect(body).not.toMatch(/UPDATE\s+public\.invoices/i);
+      }
+    }
+  });
+
+  it("تغيير حالة الفاتورة محصور بدوال يستدعيها المستخدم صراحةً", () => {
+    // **التعريف الأخير وحده هو الحيّ**: الهجرات مرتّبة بالطابع الزمني، وكل
+    // `CREATE OR REPLACE` لاحق يستبدل ما قبله. فحص التعريفات المُستبدَلة يوقع
+    // دوالَّ صُلِحت فعلاً — مثل `allocate_customer_charge` التي كانت توزّع
+    // ثم صارت تفوّض للتخزين.
+    const latest = new Map<string, string>();
+    for (const { sql } of [...allMigrations].sort((a, b) => a.name.localeCompare(b.name))) {
+      const parts = sql.split(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\./i).slice(1);
+      for (const part of parts) {
+        const name = part.match(/^(\w+)/)?.[1];
+        if (!name) continue;
+        latest.set(name, part.slice(0, part.search(/\n\$\$;/) + 1 || undefined));
+      }
+    }
+    const owners = new Set<string>();
+    for (const [name, body] of latest) {
+      if (/UPDATE\s+public\.invoices[\s\S]{0,300}?\bstatus\b\s*=/i.test(body)) owners.add(name);
+    }
+    // المسارات المسموحة كلها يفتحها المستخدم صراحةً. أوّلان منها هما
+    // **التوزيع من كشف الحساب** — الطريق الوحيد الذي يُغيّر الحالة بسبب الرصيد.
+    const allowed = [
+      "apply_customer_credit_to_invoice", "settle_invoices_from_credit",
+      "revise_invoice_payment", "cancel_invoice_payment",
+      "delete_invoice_with_reconciliation", "refund_payment_to_customer_credit",
+      "delete_customer_credit_entry", "mark_overdue_invoices",
+      "advance_invoice_workflow", "recalc_invoice_payment_state",
+      // تصفير إداري صريح يطلبه المدير من شاشة الصيانة — لا علاقة له بالشحن
+      "admin_reset_stock_and_ledgers",
+    ];
+    for (const fn of owners) expect(allowed).toContain(fn);
+  });
+});
+
+describe("مسارا التوزيع من كشف الحساب — الطريق الوحيد لتغيير الحالة بالرصيد", () => {
+  const bodyOf = (fn: string) =>
+    allMigrations.find((m) => m.sql.includes(`FUNCTION public.${fn}`))?.sql || "";
+
+  it.each([
+    ["apply_customer_credit_to_invoice", "توزيع على فاتورة واحدة"],
+    ["settle_invoices_from_credit", "توزيع على عدة فواتير"],
+  ])("%s موجود ويكتب الحالة (%s)", (fn) => {
+    const sql = bodyOf(fn);
+    expect(sql).not.toBe("");
+    expect(sql).toMatch(/UPDATE\s+public\.invoices/i);
+    expect(sql).toContain("recompute_customer_balance");
+  });
+
+  it("كلاهما يُستدعى من كشف الحساب لا من مسار الشحن", () => {
+    const apply = fs.readFileSync(
+      path.resolve(process.cwd(), "src/components/statement/ApplyCreditToInvoiceDialog.tsx"), "utf8");
+    expect(apply).toContain('rpc("apply_customer_credit_to_invoice"');
+    // حوار الشحن لا **يستدعي** أياً منهما (ذِكرهما في تعليق شرحاً مقبول)
+    const charge = fs.readFileSync(
+      path.resolve(process.cwd(), "src/components/dashboard/ChargeBalanceDialog.tsx"), "utf8");
+    const rpcs = [...charge.matchAll(/rpc\(\s*"(\w+)"/g)].map((m) => m[1]);
+    expect(rpcs).toEqual(["record_customer_charge"]);
+  });
+});
