@@ -1,22 +1,27 @@
 /**
- * رسالة واتساب لشحن رصيد العميل — صيغة **ثابتة** لا تتغيّر من حالة لأخرى،
- * فيألفها العميل ويقرأها بنظرة واحدة:
+ * رسالة واتساب لشحن رصيد العميل — تحكي القصة كاملة بترتيبها:
+ * ماذا شُحن، وكيف كان الحساب، وكم ابتلع الشحن منه، وما بقي.
  *
- *   مرحبا أمين اسماعيل
- *   تم شحن +500
- *   تم خصم 300
- *   المتبقي +200
+ *   عميلنا العزيز ايهاب الدين امدرمان
+ *   تم شحن +50,000
+ *   الحساب −100,000
+ *   تم خصم +50,000
+ *   المتبقي −50,000
  *   التاريخ 31/07/2026
  *
  * ## معنى السطور
  *   «تم شحن»  — المبلغ المشحون كاملاً.
- *   «تم خصم»  — ما ابتلعه الشحن من دَين العميل القائم (صفر إن لم يكن عليه شيء).
- *   «المتبقي» — صافي حساب العميل **بعد** الشحن بإشارة العرض:
- *                 موجب «+» رصيد له مخزَّن عندنا،
- *                 سالب «−» ما زال عليه.
+ *   «الحساب»  — صافي حساب العميل **قبل** الشحن.
+ *   «تم خصم»  — ما ابتلعه الشحن من دَين العميل القائم.
+ *                **يُحذف السطر كاملاً إذا لم يكن هناك خصم** — لا يُكتب «0».
+ *   «المتبقي» — صافي حساب العميل **بعد** الشحن.
  *
- * الإشارة هنا هي نفسها المستعملة في كشف الحساب (`signedAmountText`)، فلا يرى
- * العميل «+» يعني شيئاً في الرسالة وشيئاً آخر في الكشف.
+ * ## الإشارة
+ * كل المبالغ الموقّعة بإشارة **العرض** الموحّدة في النظام كلّه:
+ *   «+» في مصلحة العميل (رصيد له، أو خصم يُنقص دَينه)
+ *   «−» عليه
+ * وهي نفسها إشارة `signedAmountText` في كشف الحساب، فلا تعني «+» شيئاً في
+ * الرسالة وشيئاً آخر في الكشف. الصفر بلا إشارة.
  */
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -44,22 +49,29 @@ export function chargeApplied(amount: number, netBefore: number): number {
   return r2(Math.min(Math.max(r2(amount), 0), owed));
 }
 
+/** رقم موقّع بإشارة العرض. الصفر بلا إشارة — «+0» تُقرأ ركيكة. */
+function signed(shown: number): string {
+  const n = r2(shown);
+  if (Math.abs(n) < 0.01) return "0";
+  return `${n < 0 ? "−" : "+"}${money(n)}`;
+}
+
 export function buildChargeWhatsAppMessage(input: ChargeMessageInput): string {
   const { customerName, date } = input;
   const amount = Math.max(r2(input.amount), 0);
-  const applied = chargeApplied(amount, input.netBefore);
-  // بإشارة العرض: موجب لصالح العميل. `netAfter` بإشارة الدفاتر أولاً ثم نعكسها.
-  const shownAfter = r2(-(r2(input.netBefore) - amount));
-
-  // الصفر بلا إشارة: «+0» تقرأ ركيكة، والحساب الخالص لا يحتاج إشارة أصلاً.
-  const afterText =
-    Math.abs(shownAfter) < 0.01 ? "0" : `${shownAfter < 0 ? "−" : "+"}${money(shownAfter)}`;
+  const netBefore = r2(input.netBefore);
+  const applied = chargeApplied(amount, netBefore);
+  // بإشارة العرض: موجب لصالح العميل، فتُعكس إشارة الدفاتر.
+  const shownBefore = r2(-netBefore);
+  const shownAfter = r2(-(netBefore - amount));
 
   return [
-    `مرحبا ${customerName}`,
+    `عميلنا العزيز ${customerName}`,
     `تم شحن +${money(amount)}`,
-    `تم خصم ${money(applied)}`,
-    `المتبقي ${afterText}`,
+    `الحساب ${signed(shownBefore)}`,
+    // بلا خصم لا سطر أصلاً — «تم خصم 0» سطر فارغ المعنى يشوّش القراءة.
+    ...(applied > 0.009 ? [`تم خصم +${money(applied)}`] : []),
+    `المتبقي ${signed(shownAfter)}`,
     `التاريخ ${formatChargeDate(date)}`,
   ].join("\n");
 }
