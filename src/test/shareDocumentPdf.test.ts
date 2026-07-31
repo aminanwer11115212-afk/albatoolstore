@@ -52,10 +52,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  // @ts-expect-error تنظيف ما ثبّتناه على navigator
-  delete navigator.canShare;
-  // @ts-expect-error تنظيف ما ثبّتناه على navigator
-  delete navigator.share;
+  // تنظيف ما ثبّتناه على navigator
+  delete (navigator as any).canShare;
+  delete (navigator as any).share;
 });
 
 /** جوال يدعم مشاركة الملفات */
