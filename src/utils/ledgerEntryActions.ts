@@ -167,3 +167,131 @@ export function projectEditImpact(entry: LedgerTx, currentNet: number, newAmount
   const delta = r2(oldAmount - (Number(newAmount) || 0));
   return { before: r2(currentNet), after: r2(currentNet + delta), delta };
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * قدرات الحركة — المصدر الواحد الذي تقرأ منه الواجهة
+ *
+ * كانت شروط «هل يُعدَّل / هل يُحذف» متفرّقة في الشاشات، فتختلف عن حرّاس الـRPC
+ * فيرى المستخدم زراً يفشل عند الضغط، أو يُحجب عنه فعل تسمح به القاعدة فعلاً.
+ * هذه الدالة تجمعها في مكان واحد **مطابقاً حرفياً** لما ترفضه الدوال في
+ * القاعدة، واختبار في `src/test/ledgerEntryActions.test.ts` يقارن الاثنين:
+ *
+ *   revise_invoice_payment            → يرفض بلا فاتورة مرتبطة (no_linked_invoice)
+ *                                       ويرفض الاستهلاك (credit_consumption_not_editable)
+ *   cancel_invoice_payment            → يقبل الدفعة المستقلة، ويرفض الاستهلاك
+ *   revise_customer_charge            → يحتاج allocation.group_id، ويرفض المستهلَكة
+ *   delete_customer_credit_entry      → يرفض المستهلَكة وما يُنقص الرصيد تحت الصفر
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export type BlockReason =
+  | "credit_consumption"
+  | "no_linked_invoice"
+  | "no_charge_group"
+  | "explicit_consumption"
+  | "insufficient_remaining_credit"
+  | "not_supported";
+
+export interface MovementCapabilities {
+  kind: LedgerEntryKind;
+  /** عنوان عربي قصير للحركة كما تظهر في القائمة */
+  label: string;
+  canEdit: boolean;
+  canDelete: boolean;
+  /** سبب منع التعديل — `null` إن كان متاحاً */
+  editBlockedBy: BlockReason | null;
+  /** سبب منع الحذف — `null` إن كان متاحاً */
+  deleteBlockedBy: BlockReason | null;
+}
+
+export const MOVEMENT_LABEL: Record<LedgerEntryKind, string> = {
+  payment_invoice: "دفعة على فاتورة",
+  payment_standalone: "دفعة مستقلة",
+  payment_from_credit: "سداد من الرصيد",
+  credit_charge: "شحن رصيد",
+  credit_consume: "استهلاك رصيد",
+  other: "حركة مالية",
+};
+
+export const BLOCK_MESSAGE: Record<BlockReason, string> = {
+  credit_consumption:
+    "قيد استهلاك رصيد — يُعكَس بحذف شحنته أو بإلغاء سداد الفاتورة، لا من هنا",
+  no_linked_invoice: "دفعة غير مرتبطة بفاتورة — تُحذف ولا تُعدَّل",
+  no_charge_group: "شحنة بلا مجموعة تخصيص (فائض تلقائي) — تُحذف ولا تُعدَّل",
+  explicit_consumption: "استُهلك من هذه الشحنة على فواتير — ألغِ الاستهلاك أولاً",
+  insufficient_remaining_credit:
+    "الرصيد الدائن المتبقي أقل من قيمة الشحنة — حذفها يجعله سالباً",
+  not_supported: "هذا النوع من الحركات لا يُعدَّل ولا يُحذف من كشف الحساب",
+};
+
+/**
+ * ما الذي يُسمح به على هذه الحركة، ولماذا لا إن مُنع.
+ * `transactions` لازمة لفحص استهلاك شحنات الرصيد.
+ */
+export function movementCapabilities(
+  t: LedgerTx,
+  transactions: LedgerTx[],
+): MovementCapabilities {
+  const kind = classifyLedgerEntry(t);
+  const base = { kind, label: MOVEMENT_LABEL[kind] };
+
+  if (kind === "payment_invoice") {
+    return { ...base, canEdit: true, canDelete: true, editBlockedBy: null, deleteBlockedBy: null };
+  }
+
+  // الدفعة المستقلة: القاعدة تحذفها بلا مشكلة لكن التعديل يحتاج فاتورة مرتبطة.
+  if (kind === "payment_standalone") {
+    return {
+      ...base,
+      canEdit: false,
+      canDelete: true,
+      editBlockedBy: "no_linked_invoice",
+      deleteBlockedBy: null,
+    };
+  }
+
+  if (kind === "payment_from_credit" || kind === "credit_consume") {
+    return {
+      ...base,
+      canEdit: false,
+      canDelete: false,
+      editBlockedBy: "credit_consumption",
+      deleteBlockedBy: "credit_consumption",
+    };
+  }
+
+  if (kind === "credit_charge") {
+    const guard = creditChargeDeletability(t, transactions);
+    const hasGroup = !!chargeGroupId(t);
+    // التعديل يعيد إنشاء المجموعة، فيحتاج مجموعة وشحنة غير مستهلَكة معاً.
+    const editBlockedBy: BlockReason | null = !hasGroup
+      ? "no_charge_group"
+      : guard.canDelete
+        ? null
+        : (guard.reason as BlockReason);
+    return {
+      ...base,
+      canEdit: editBlockedBy === null,
+      canDelete: guard.canDelete,
+      editBlockedBy,
+      deleteBlockedBy: guard.canDelete ? null : (guard.reason as BlockReason),
+    };
+  }
+
+  return {
+    ...base,
+    canEdit: false,
+    canDelete: false,
+    editBlockedBy: "not_supported",
+    deleteBlockedBy: "not_supported",
+  };
+}
+
+/** الحركات التي يستطيع المستخدم فعل شيء بها — ما يُعرض في نافذة التعديل. */
+export function actionableMovements(
+  transactions: LedgerTx[],
+): Array<{ tx: LedgerTx; caps: MovementCapabilities }> {
+  return transactions
+    .map((tx) => ({ tx, caps: movementCapabilities(tx, transactions) }))
+    .filter(({ caps }) => caps.canEdit || caps.canDelete)
+    .sort((a, b) => String(b.tx.date || "").localeCompare(String(a.tx.date || "")));
+}

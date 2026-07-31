@@ -168,6 +168,9 @@ export function buildDocHTML(args: {
   function __cleanName(s){
     s = (s || '').toString().trim();
     if (!s || s === '-' || s === '—' || s === '_' || s === 'undefined' || s === 'null') return '';
+    // NFC + إزالة محارف الاتجاه/العرض الصفري — غير مرئية لكنها تصل واتساب رموزاً
+    try { s = s.normalize('NFC'); } catch (e) { /* بيئة بلا normalize */ }
+    s = s.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00AD]/g, '');
     s = s.replace(/[\\/:*?"<>|\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
     return s;
   }
