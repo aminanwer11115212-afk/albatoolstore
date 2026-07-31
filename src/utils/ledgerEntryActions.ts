@@ -305,3 +305,42 @@ export function actionableMovements(
     .filter(({ caps }) => caps.canEdit || caps.canDelete)
     .sort((a, b) => String(b.tx.date || "").localeCompare(String(a.tx.date || "")));
 }
+
+/**
+ * أصل قيد الاستهلاك: الشحنة التي خُصم منها، والفاتورة التي طُبِّق عليها.
+ *
+ * رسالة «يُعكَس بحذف شحنته» بلا تحديد أيّ شحنة هي طريق مسدود أمام المستخدم.
+ * هذه الدالة تجد الأصل فعلاً فتصير الرسالة قابلة للتنفيذ — وإن لم تجده، فذاك
+ * خبر مهم بذاته: القيد يتيم، أي أن شحنته حُذفت وبقي هو.
+ */
+export interface ConsumptionOrigin {
+  /** الشحنة التي خُصم منها هذا الاستهلاك — `null` إن لم تُوجد في القائمة */
+  charge: LedgerTx | null;
+  /** مُعرِّف الفاتورة التي طُبِّق عليها */
+  invoiceId: string | null;
+  /** لا شحنة له في القائمة ⇒ قيد يتيم يحتاج مراجعة */
+  orphan: boolean;
+}
+
+export function consumptionOrigin(t: LedgerTx, transactions: LedgerTx[]): ConsumptionOrigin {
+  const kind = classifyLedgerEntry(t);
+  const invoiceId = t.reference_id ? String(t.reference_id) : null;
+  if (kind !== "credit_consume" && kind !== "payment_from_credit") {
+    return { charge: null, invoiceId, orphan: false };
+  }
+  const group = chargeGroupId(t);
+  const chargeTxId = t.allocation?.charge_tx_id ? String(t.allocation.charge_tx_id) : null;
+  const ref = chargeReference(t);
+
+  const charge =
+    transactions.find(
+      (c) =>
+        c.id !== t.id &&
+        classifyLedgerEntry(c) === "credit_charge" &&
+        (c.id === chargeTxId ||
+          (!!group && chargeGroupId(c) === group) ||
+          (!!ref && chargeReference(c) === ref)),
+    ) || null;
+
+  return { charge, invoiceId, orphan: !charge };
+}
