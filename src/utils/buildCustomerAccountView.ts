@@ -370,14 +370,19 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
 
 /**
  * نص أثر الحركة — دلتا موقّعة لا رصيد.
- * سالب يُنقص ما على العميل ⇒ «−X» أخضر؛ موجب يزيده ⇒ «+X» أحمر.
+ *
+ * الإشارة معروضة **بلغة العميل** لا بلغة الدفاتر، فتطابق `signedBalanceText`
+ * وتطابق ما يكتبه العميل نفسه («دفع 300 … متبقي -200 … شحن رصيد +300»):
+ *   ما يصبّ في مصلحته (دفعة/شحن) ⇒ «+X» **أخضر**
+ *   ما يزيد عليه (فاتورة)         ⇒ «−X» **أحمر**
+ * أي أن العلامة المعروضة عكس `effect` الداخلي الذي يقيس الدين علينا.
  * لا تُستعمل هنا لغة «له/عليه» لأنها تصف رصيداً لا حركة.
  */
 export function effectText(effect: number): { text: string; tone: "debit" | "credit" | "settled" } {
   const n = r2(effect);
   if (Math.abs(n) < 0.01) return { text: "لا أثر", tone: "settled" };
-  if (n < 0) return { text: `−${Math.abs(n).toLocaleString()}`, tone: "credit" };
-  return { text: `+${n.toLocaleString()}`, tone: "debit" };
+  if (n < 0) return { text: `+${Math.abs(n).toLocaleString()}`, tone: "credit" };
+  return { text: `−${n.toLocaleString()}`, tone: "debit" };
 }
 
 /** نص الرصيد بإشارته: «له +X» أخضر، «عليه −X» أحمر، «خالص» محايد. */

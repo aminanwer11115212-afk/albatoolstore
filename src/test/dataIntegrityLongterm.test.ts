@@ -226,3 +226,66 @@ describe("شحن الرصيد لا يسدّد أي فاتورة تلقائياً
     expect(dialog).not.toContain('rpc("allocate_customer_charge"');
   });
 });
+
+describe("لا تطبيق تلقائي لرصيد العميل في أي مسار بالنظام", () => {
+  const read = (rel: string) => fs.readFileSync(path.resolve(process.cwd(), rel), "utf8");
+
+  it("حوار الدفع لا يملأ «استخدام الرصيد» من تلقاء نفسه عند الفتح", () => {
+    const dlg = read("src/components/invoice/CustomerPaymentDialog.tsx");
+    /** الكود التنفيذي وحده — التعليقات تشرح المنع فتذكر الكلمات نفسها. */
+    const code = dlg.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    // كان يقترح تلقائياً: setCreditUse(String(useCredit)) داخل تأثير الفتح
+    expect(code).not.toMatch(/const\s+useCredit\s*=\s*Math\.min\(credit,\s*remaining\)/);
+    // لا استدعاء لـ setCreditUse بقيمة غير فارغة خارج معالِج يبدأه المستخدم
+    expect(code).not.toMatch(/setCreditUse\(String\(useCredit\)\)/);
+    // يبقى المسار اليدوي وحده: زر «استخدم الكل» + الكتابة في الحقل
+    expect(dlg).toContain("استخدم الكل");
+    expect(dlg).toContain("applyAllCredit");
+  });
+
+  it("لا نصّ في الواجهة يَعِد المستخدم باستخدام تلقائي للرصيد", () => {
+    for (const f of [
+      "src/components/invoice/CustomerPaymentDialog.tsx",
+      "src/components/invoice/InvoiceCustomerCreditBanner.tsx",
+      "src/components/dashboard/ChargeBalanceDialog.tsx",
+    ]) {
+      // النفي مسموح («لا يُستخدم تلقائياً») — الممنوع هو الوعد المُثبِت
+      expect(read(f)).not.toMatch(/(?<!لا )(?:يُستخدم|يُوزَّع|يُسدَّد) تلقائياً/);
+    }
+  });
+
+  it("المسارات الوحيدة التي تمسّ paid_amount من الرصيد صريحة ويدوية", () => {
+    // كلتاهما تُستدعى من نافذة يفتحها المستخدم بنفسه، لا من شحن أو فتح حوار.
+    const manual = ["apply_customer_credit_to_invoice", "settle_invoices_from_credit"];
+    for (const fn of manual) {
+      expect(allSql).toContain(`FUNCTION public.${fn}`);
+    }
+    // ولا مسار ثالث: أي دالة أخرى تكتب دفعة method='credit_balance' تعني توزيعاً خفياً.
+    // المسموح غير ذلك دوالُّ **تعكس** السداد (تُنقص paid_amount) لا تُنشئه، وكلها
+    // يفتحها المستخدم بنفسه من نافذة تعديل/إلغاء صريحة.
+    const reversals = [
+      "revise_invoice_payment",
+      "cancel_invoice_payment",
+      "delete_invoice_with_reconciliation",
+      "refund_payment_to_customer_credit",
+    ];
+    // نقسم كل ملف إلى أجسام دوال ونفحص كل جسم وحده — الفحص على مستوى الملف
+    // يوقع دوالَّ بريئة تصادف وجودها في نفس الهجرة.
+    const owners: string[] = [];
+    for (const { sql } of allMigrations) {
+      const parts = sql.split(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\./i).slice(1);
+      for (const part of parts) {
+        const name = part.match(/^(\w+)/)?.[1];
+        if (!name) continue;
+        const body = part.slice(0, part.search(/\n\$\$;/) + 1 || undefined);
+        if (/'credit_balance'/.test(body) && /UPDATE\s+public\.invoices/i.test(body)) {
+          owners.push(name);
+        }
+      }
+    }
+    expect(owners.length).toBeGreaterThan(0); // الفحص فعّال لا فارغ
+    for (const fn of new Set(owners)) {
+      expect([...manual, ...reversals]).toContain(fn);
+    }
+  });
+});

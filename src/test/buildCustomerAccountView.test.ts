@@ -6,7 +6,7 @@
  * `effect` على كامل السلسلة.
  */
 import { describe, it, expect } from "vitest";
-import { buildCustomerAccountView, signedBalanceText, stampOf } from "@/utils/buildCustomerAccountView";
+import { buildCustomerAccountView, signedBalanceText, effectText, stampOf } from "@/utils/buildCustomerAccountView";
 
 const CUST = "c1";
 
@@ -217,5 +217,30 @@ describe("الفواتير الملغاة", () => {
     expect(view.blocks.map((b) => b.invoiceNumber)).toEqual(["A"]);
     expect(view.accountTotal).toBe(1000);
     expect(view.drift).toBe(0);
+  });
+});
+
+describe("إشارة العرض بلغة العميل — «+» أخضر و«−» أحمر", () => {
+  it("ما يصبّ في مصلحة العميل يُعرض «+» بلون الدائن", () => {
+    // دفعة/شحن أثرهما الداخلي سالب (ينقص ما علينا) ⇒ يُعرضان «+» أخضر
+    expect(effectText(-300)).toEqual({ text: "+300", tone: "credit" });
+  });
+
+  it("ما يزيد على العميل يُعرض «−» بلون المدين", () => {
+    expect(effectText(500)).toEqual({ text: "−500", tone: "debit" });
+  });
+
+  it("لا إشارة بلا أثر", () => {
+    expect(effectText(0).tone).toBe("settled");
+  });
+
+  it("تطابق إشارة الرصيد: «له +» أخضر و«عليه −» أحمر", () => {
+    // نفس اتجاه الإشارة في الحركة والرصيد — فلا يرى العميل «+» أخضر هنا و«+» أحمر هناك
+    expect(signedBalanceText(-300)).toEqual({ text: "له +300", tone: "credit" });
+    expect(signedBalanceText(500)).toEqual({ text: "عليه −500", tone: "debit" });
+    expect(effectText(-300).text.startsWith("+")).toBe(true);
+    expect(effectText(-300).tone).toBe(signedBalanceText(-300).tone);
+    expect(effectText(500).text.startsWith("−")).toBe(true);
+    expect(effectText(500).tone).toBe(signedBalanceText(500).tone);
   });
 });

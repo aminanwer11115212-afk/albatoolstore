@@ -97,7 +97,7 @@ export default function InvoiceCustomerCreditBanner({ customerId, invoiceNumber,
           {currentCredit > 0 && (
             <span className="text-[10px] text-emerald-700 dark:text-emerald-300">
               {" "}
-              — يُستخدم تلقائياً على أي فاتورة جديدة من حقل «استخدام رصيد دائن»
+              — محفوظ باسم العميل ولا يُسدَّد على أي فاتورة تلقائياً؛ توزّعه يدوياً من كشف الحساب
             </span>
           )}
         </div>
