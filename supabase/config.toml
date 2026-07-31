@@ -1,4 +1,8 @@
-project_id = "vifrecsqxdbwqtcfkdyb"
+# المشروع المنشور فعلاً — نفس ما يستعمله التطبيق في `.env`:
+#   VITE_SUPABASE_URL="https://exmasfdcjgwapmobefne.supabase.co"
+# كان هنا `vifrecsqxdbwqtcfkdyb` وهو مشروع آخر لا صلة له بالبيانات، فأي
+# `supabase link` أو رابط لوحة يُبنى من هذا الملف كان يذهب للمكان الخطأ.
+project_id = "exmasfdcjgwapmobefne"
 
 [functions]
   [functions.auth-email-hook]

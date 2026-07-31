@@ -384,3 +384,19 @@ describe("ملف التطبيق المجمّع", () => {
     expect(code).not.toMatch(/CREATE\s+FUNCTION\s/i);
   });
 });
+
+describe("مُعرِّف مشروع Supabase موحّد", () => {
+  /**
+   * كان `config.toml` يحمل مشروعاً آخر لا صلة له بالبيانات، فأي رابط لوحة أو
+   * `supabase link` يُبنى منه يذهب للمكان الخطأ — وقد ضلّل فعلاً.
+   */
+  it("config.toml يطابق المشروع الذي يستعمله التطبيق في .env", () => {
+    const toml = fs.readFileSync(path.resolve(process.cwd(), "supabase/config.toml"), "utf8");
+    const env = fs.readFileSync(path.resolve(process.cwd(), ".env"), "utf8");
+    const fromToml = toml.match(/^project_id\s*=\s*"([^"]+)"/m)?.[1];
+    const fromEnv = env.match(/VITE_SUPABASE_URL\s*=\s*"?https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    expect(fromToml).toBeTruthy();
+    expect(fromEnv).toBeTruthy();
+    expect(fromToml).toBe(fromEnv);
+  });
+});
