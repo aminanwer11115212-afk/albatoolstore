@@ -92,25 +92,29 @@ describe("ملخّص ما قبل التنفيذ", () => {
   });
 });
 
-describe("حارس الشحنة المستهلَكة", () => {
-  it("يمنع الحذف ويطلب مراجعة الاستهلاك أولاً", () => {
+// الاستهلاك لم يعد مانعاً للحذف: `delete_customer_credit_entry` تعكسه على
+// الفواتير أولاً ثم تحذف الشحنة. يبقى تحذيراً صريحاً لأن الحذف يُنقص
+// `paid_amount` لفواتير أخرى — أثر يجب أن يراه المستخدم قبل التأكيد.
+describe("الشحنة المستهلَكة: تحذير لا منع", () => {
+  it("يظهر تحذير يشرح ما سيُعكَس قبل الحذف", () => {
     renderDialog(charge, [charge, consumedCharge], -80);
-    expect(screen.getByText("لا يمكن حذف هذه الشحنة مباشرة")).toBeTruthy();
-    expect(screen.getByText(/راجع الاستهلاك وألغِ التوزيع أولاً/)).toBeTruthy();
+    expect(screen.getByTestId("delete-reverse-warning")).toBeTruthy();
+    expect(screen.getByText("تنبيه: هذه الشحنة استُهلك منها")).toBeTruthy();
+    expect(screen.getByText(/يُنقص المدفوع على الفواتير/)).toBeTruthy();
     expect(screen.getByText(/المستهلَك منها: 120/)).toBeTruthy();
   });
 
-  it("زر التأكيد معطّل", () => {
+  it("زر التأكيد مفعّل رغم الاستهلاك", () => {
     renderDialog(charge, [charge, consumedCharge], -80);
     const btn = screen.getByRole("button", { name: "تأكيد الحذف" }) as HTMLButtonElement;
-    expect(btn.disabled).toBe(true);
+    expect(btn.disabled).toBe(false);
   });
 
-  it("الشحنة السليمة تُتيح التأكيد", () => {
+  it("الشحنة السليمة تُتيح التأكيد بلا تحذير", () => {
     renderDialog(charge, [charge], -200);
     const btn = screen.getByRole("button", { name: "تأكيد الحذف" }) as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
-    expect(screen.queryByText("لا يمكن حذف هذه الشحنة مباشرة")).toBeNull();
+    expect(screen.queryByTestId("delete-reverse-warning")).toBeNull();
   });
 });
 

@@ -16,13 +16,15 @@ export type DeleteInvoiceResult = {
 };
 
 /**
- * يحذف فاتورة بالكامل (مع كل توابعها) ويُرجع كميات بنودها إلى المخزون
- * إن كانت خُصمت سابقاً. عند الحذف تُحوَّل الدفعات المسجّلة على الفاتورة (لعميل
- * غير POS) إلى **رصيد دائن للعميل** عبر `delete_invoice_with_reconciliation`
- * (تُحفظ نفس الحركة مع تغيير الفئة إلى customer_credit وفكّ الربط بالفاتورة)،
- * حفاظاً على تدفّق النقد في الحسابات والأثر التدقيقي. ثم يعيد
- * `recompute_customer_balance` حساب الرصيد من بقية الحركات. يسجّل العملية في
- * `activity_log`.
+ * يحذف فاتورة بالكامل (مع كل توابعها) ويُرجع كميات بنودها إلى المخزون.
+ *
+ * **الدفعات تُمحى ولا تُحوَّل**: عبر `delete_invoice_with_reconciliation` تُحذف
+ * قيود الدفع والرصيد المرتبطة بالفاتورة نهائياً، فلا يعود مبلغها رصيداً دائناً
+ * يظهر في كشف حساب العميل. كانت تُحوَّل إلى `customer_credit` سابقاً، فيبقى
+ * المال في الحساب رغم أن الفاتورة كلّها لم تعد موجودة.
+ *
+ * الأثر التدقيقي محفوظ: لقطة كاملة من الصفوف المحذوفة تُكتب في `activity_log`
+ * قبل حذفها. ثم يعيد `recompute_customer_balance` حساب الرصيد من بقية الحركات.
  */
 export async function deleteInvoiceWithStockRestore(
   invoiceId: string,
@@ -38,24 +40,13 @@ export async function deleteInvoiceWithStockRestore(
   if (invErr) throw new Error(`تعذّر قراءة الفاتورة: ${invErr.message}`);
   if (!inv) throw new Error("الفاتورة غير موجودة");
 
-  // حارس الحذف: يُمنع الحذف فقط إذا كانت الفاتورة مدفوعة بالكامل + سير العمل «تمت»
-  // (العميل استلم الطلبية وسدّد كامل قيمتها). في كل الحالات الأخرى الحذف مسموح.
-  {
-    const st = String((inv as any).status || "").toLowerCase();
-    const wf = String((inv as any).workflow_status || "").toLowerCase();
-    const total = Number((inv as any).total || 0);
-    const paid = Number((inv as any).paid_amount || 0);
-    const fullyPaid = st === "paid" || (total > 0 && paid >= total - 0.01);
-    if (fullyPaid && wf === "done") {
-      throw new Error(
-        "لا يمكن حذف هذه الفاتورة: العميل سدّد كامل قيمتها واستلم الطلبية (تمت). " +
-        "لعكس العملية أنشئ إشعار مرتجع أو استرداد رصيد.",
-      );
-    }
-  }
+  // لا حارس يمنع الحذف: أي فاتورة تُحذف من أي مكان بطلب صاحب المستودع. كان
+  // الحذف يُمنع على الفاتورة المدفوعة بالكامل ذات سير العمل «تمت» — والأثر
+  // التدقيقي محفوظ في `activity_log` بلقطة كاملة قبل الحذف، فالمنع لم يكن
+  // يحمي بياناً بقدر ما كان يحبس المستخدم.
 
 
-  // 1) حذف دفعات الفواتير العادية بالكامل (بدون تحويلها لرصيد عميل).
+  // 1) حذف دفعات الفواتير العادية نهائياً — لا تحويل لرصيد عميل.
   //    فواتير الكاش/POS لا تخص بطاقة عميل.
   let deletedPayments = 0;
   const shouldReconcilePayments = !!(inv as any).customer_id && (inv as any).source !== "pos";
@@ -65,8 +56,10 @@ export async function deleteInvoiceWithStockRestore(
       { _invoice_id: invoiceId },
     );
     if (reconErr) throw new Error(`تعذّر إلغاء الدفعات: ${reconErr.message}`);
-    // converted_amount = مجموع الدفعات المحوّلة لرصيد دائن (المبلغ، لا العدد).
-    deletedPayments = Number(reconc?.converted_amount ?? reconc?.deleted_payments ?? 0);
+    // deleted_amount = مجموع ما مُحي من دفعات وقيود رصيد على هذه الفاتورة.
+    deletedPayments = Number(
+      reconc?.deleted_amount ?? reconc?.converted_amount ?? reconc?.deleted_payments ?? 0,
+    );
   }
 
   // 2) قراءة بنود الفاتورة

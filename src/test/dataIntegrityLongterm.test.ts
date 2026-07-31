@@ -268,6 +268,8 @@ describe("لا تطبيق تلقائي لرصيد العميل في أي مسا�
       "cancel_invoice_payment",
       "delete_invoice_with_reconciliation",
       "refund_payment_to_customer_credit",
+      // تحذف الشحنة وتعكس استهلاكها على الفواتير — عكسٌ لا إنشاء سداد
+      "delete_customer_credit_entry",
     ];
     // نقسم كل ملف إلى أجسام دوال ونفحص كل جسم وحده — الفحص على مستوى الملف
     // يوقع دوالَّ بريئة تصادف وجودها في نفس الهجرة.
@@ -287,5 +289,78 @@ describe("لا تطبيق تلقائي لرصيد العميل في أي مسا�
     for (const fn of new Set(owners)) {
       expect([...manual, ...reversals]).toContain(fn);
     }
+  });
+});
+
+describe("الحذف النهائي: الفاتورة تمحو دفعتها ولا تعيدها رصيداً", () => {
+  const hard =
+    allMigrations.find((m) => m.name.includes("hard_delete_invoice_and_charges"))?.sql || "";
+  const code = hard.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+
+  it("الهجرة موجودة وتُعيد تعريف الدالتين", () => {
+    expect(hard).not.toBe("");
+    expect(hard).toContain("CREATE OR REPLACE FUNCTION public.delete_invoice_with_reconciliation");
+    expect(hard).toContain("CREATE OR REPLACE FUNCTION public.delete_customer_credit_entry");
+  });
+
+  it("دفعات الفاتورة تُحذف ولا تُحوَّل إلى رصيد دائن", () => {
+    const body = code.slice(code.indexOf("delete_invoice_with_reconciliation"), code.indexOf("delete_customer_credit_entry"));
+    expect(body).toContain("DELETE FROM public.transactions");
+    // لا تحويل فئة: هذا ما كان يُرجع المال رصيداً في كشف الحساب
+    expect(body).not.toMatch(/SET\s+category\s*=\s*'customer_credit'/i);
+  });
+
+  it("لقطة كاملة في activity_log قبل الحذف — الأثر التدقيقي الوحيد بعده", () => {
+    expect(code).toContain("jsonb_agg(to_jsonb(t))");
+    expect(code).toContain("INSERT INTO public.activity_log");
+    expect(code).toContain("'policy', 'hard_delete_not_credited'");
+  });
+
+  it("يعيد حساب رصيد العميل والحسابات المتأثّرة", () => {
+    expect(code).toContain("recompute_customer_balance");
+    expect(code).toContain("recompute_account_balance");
+  });
+
+  it("حذف الشحنة يعكس استهلاكها على الفواتير أولاً بدل رفضه", () => {
+    const body = code.slice(code.indexOf("delete_customer_credit_entry"));
+    expect(body).toContain("UPDATE public.invoices");
+    expect(body).toContain("paid_amount");
+    // ولا يرفض بسبب الاستهلاك
+    expect(body).not.toContain("explicit_consumption");
+    expect(body).not.toContain("insufficient_remaining_credit");
+  });
+
+  it("يحذف نصفَي عملية السداد معاً فلا يبقى قيد بلا مقابله", () => {
+    const body = code.slice(code.indexOf("delete_customer_credit_entry"));
+    expect(body).toMatch(/DELETE FROM public\.transactions[\s\S]{0,400}method = 'credit_balance'/);
+  });
+
+  it("يبقى محصوراً بمدير النظام", () => {
+    const body = code.slice(code.indexOf("delete_customer_credit_entry"));
+    expect(body).toContain("unauthorized_admin_only");
+  });
+});
+
+describe("ملف التطبيق المجمّع", () => {
+  const applyPath = path.resolve(process.cwd(), "supabase/apply/APPLY_PENDING_MIGRATIONS.sql");
+
+  it("موجود ويحمل كل الهجرات المعلّقة", () => {
+    expect(fs.existsSync(applyPath)).toBe(true);
+    const sql = fs.readFileSync(applyPath, "utf8");
+    for (const fn of [
+      "public.delete_customer_credit_entry",
+      "public.record_customer_charge",
+      "public.allocate_customer_charge",
+      "public.delete_invoice_with_reconciliation",
+    ]) {
+      expect(sql).toContain(`CREATE OR REPLACE FUNCTION ${fn}`);
+    }
+  });
+
+  it("آمن التكرار: لا CREATE بلا OR REPLACE ولا DROP", () => {
+    const sql = fs.readFileSync(applyPath, "utf8");
+    const code = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+    expect(code).not.toMatch(/DROP\s+(TABLE|FUNCTION|COLUMN)/i);
+    expect(code).not.toMatch(/CREATE\s+FUNCTION\s/i);
   });
 });
