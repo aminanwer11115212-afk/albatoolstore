@@ -65,29 +65,24 @@ function stampOf(row: { date?: any; created_at?: any }) {
   };
 }
 
-/** شرح الفاتورة بجملة يفهمها العميل مباشرة. */
-function invoicePlain(g: { total: number; paid: number; remaining: number }): string {
-  const t = fmt(g.total), p = fmt(g.paid), rem = fmt(Math.abs(g.remaining));
-  if (g.remaining > 0.009) return `قيمتها ${t} · دفعتم منها ${p} · وبقي عليكم ${rem}`;
-  if (g.remaining < -0.009) return `قيمتها ${t} · دفعتم ${p} · ولكم زيادة ${rem} أُضيفت لرصيدكم`;
-  return `قيمتها ${t} · مسدّدة بالكامل`;
+/**
+ * رقم موقّع مختصر لعمود «المتبقي» — بإشارة **العرض**: موجب لصالح العميل.
+ * «+300» أخضر / «−100» أحمر / «خالص» رمادي. نفس `signedAmountText` في الواجهة.
+ */
+/**
+ * نصّ سطر الشحن — المبلغ وحده بإشارته. أثره على الحساب مقروء من عمودَي
+ * «المدفوع» و«المتبقي»، وتفاصيله الكاملة مكانها شاشة المعاملات.
+ * مطابق لـ `chargeLabel` في `buildCustomerAccountView.ts`.
+ */
+function chargeLabel(isOver: boolean, amount: number): string {
+  return `${isOver ? "دفعة زائدة" : "تم شحن"} +${fmt(amount)}`;
 }
 
-/** أثر الحركة — دلتا موقّعة لا رصيد: «−X» أخضر يُنقص، «+X» أحمر يزيد. */
-function effectHTML(v: number): string {
-  const n = Math.round(v * 100) / 100;
-  if (Math.abs(n) < 0.01) return `<span style="color:#666;">لا أثر</span>`;
-  const color = n < 0 ? "#16a34a" : "#c0392b";
-  return `<span style="color:${color};font-weight:800;white-space:nowrap;">${n < 0 ? "−" : "+"}${fmt(Math.abs(n))}</span>`;
-}
-
-/** رصيد بلغة «له/عليه»: «له +X» أخضر، «عليه −X» أحمر، «خالص» رمادي. */
-function signedHTML(v: number): string {
-  const n = Math.round(v * 100) / 100;
+function amountHTML(shown: number): string {
+  const n = Math.round(shown * 100) / 100;
   if (Math.abs(n) < 0.01) return `<span style="color:#666;font-weight:800;">خالص</span>`;
-  const color = n > 0 ? "#c0392b" : "#16a34a";
-  const label = n > 0 ? "عليه −" : "له +";
-  return `<span style="color:${color};font-weight:800;white-space:nowrap;">${label}${fmt(Math.abs(n))}</span>`;
+  const color = n > 0 ? "#16a34a" : "#c0392b";
+  return `<span style="color:${color};font-weight:800;white-space:nowrap;">${n > 0 ? "+" : "−"}${fmt(Math.abs(n))}</span>`;
 }
 
 function groupStatementByInvoice(
@@ -116,6 +111,12 @@ function groupStatementByInvoice(
   const pool: any[] = [];
   const linkedOverpay = new Map<string, number>();
 
+  /** إضافات الرصيد — أسطر مستقلة في الجدول المسطّح (السداد منه لا يُعرض) */
+  const creditAdds: Array<any> = [];
+  /** ما سُدِّد من الرصيد لكل فاتورة — يُستبعد من «المدفوع» على سطرها */
+  const settledByInv = new Map<string, number>();
+  const invNoById = new Map<string, string>(live.map((i: any) => [String(i.id), String(i.invoice_number || "—")]));
+
   for (const t of transactions) {
     if (merged.has(t.id)) continue;
     const amt = n(t.amount);
@@ -132,14 +133,16 @@ function groupStatementByInvoice(
     const money = (v: number) => fmt(Math.abs(r2(v)));
 
     if (t.category === "customer_credit" && amt < 0) {
-      label = `سدّدنا ${money(amt)} من رصيدكم الموجود لدينا على هذه الفاتورة`;
+      label = `سداد من رصيد العميل${linked ? ` — فاتورة ${invNoById.get(ref!)}` : ""}`;
       effect = 0;
+      if (linked) settledByInv.set(ref!, r2((settledByInv.get(ref!) || 0) + Math.abs(amt)));
+      continue;
     } else if (t.category === "customer_credit" && amt > 0) {
-      label = isOverpay(t)
-        ? `دفعتم زيادة ${money(amt)} عن قيمة الفاتورة — أُضيفت إلى رصيدكم لدينا`
-        : `تم شحن رصيدكم بمبلغ ${money(amt)} عن طريق ${acc}${opTxt}`;
+      // صندوق واحد للفائض: الشحن والدفعة الزائدة يدخلان نفس الصندوق.
+      label = ""; // يُبنى لاحقاً لأنه يحتاج صافي الحساب قبل الشحن
       effect = -r2(amt);
       if (isOverpay(t) && linked) linkedOverpay.set(ref!, r2((linkedOverpay.get(ref!) || 0) + amt));
+      creditAdds.push({ isOver: isOverpay(t), amount: r2(amt), at: st.at, plain: st.plain, time: st.time, id: t.id });
     } else if (t.category === "customer_payment") {
       label = `دفعتم ${money(amt)} عن طريق ${acc}${opTxt}`;
       effect = -r2(Math.abs(amt));
@@ -160,12 +163,13 @@ function groupStatementByInvoice(
       const paid = r2(n(inv.paid_amount));
       const over = r2(linkedOverpay.get(String(inv.id)) || 0);
       return {
+        id: String(inv.id),
         invoice_number: inv.invoice_number,
         when: st.text,
         at: st.at,
         total,
         paid,
-        remaining: r2(total - paid - over),
+        remaining: r2(total - paid), // الفائض صار في الصندوق الواحد لا على الفاتورة
         movements: (byInv.get(String(inv.id)) || []).sort((a, b) => a.at.localeCompare(b.at)),
         runningAtCreation: 0,
         runningAfter: 0,
@@ -201,10 +205,42 @@ function groupStatementByInvoice(
   const netCredit = r2(
     transactions.filter((t) => t.category === "customer_credit").reduce((s, t) => s + n(t.amount), 0),
   );
-  const creditPoolTotal = r2(netCredit - r2([...linkedOverpay.values()].reduce((s, v) => s + v, 0)));
+  const creditPoolTotal = netCredit; // صندوق واحد: الشحن والفائض معاً
+  const accountTotal = r2(totalRemaining - creditPoolTotal);
+
+  // ===== الجدول المسطّح — نفس عقد `buildCustomerAccountView` في الواجهة =====
+  // نوعان من الأسطر فقط: فاتورة، وشحن رصيد. السداد من الرصيد لا يُعرض لأنه
+  // نقل داخلي لا يغيّر الصافي؛ وعمود «المتبقي» يُظهر أثر الشحن على الحساب.
+  // سطر الفاتورة يحمل **النقد وحده** حتى يقفل الطرح: Σقيمة − Σمدفوع = الصافي.
+  const seeds: Array<any> = [
+    ...groups.map((g: any) => {
+      const cash = r2(g.paid - r2(settledByInv.get(String(g.id)) || 0));
+      return {
+        at: g.at, delta: r2(cash - g.total), kind: "invoice", id: `inv:${g.id}`,
+        when: g.when, value: g.total, paid: cash,
+        make: () => ({ label: `فاتورة ${g.invoice_number}`, remaining: r2(cash - g.total) }),
+      };
+    }),
+    ...creditAdds.map((c: any) => ({
+      at: c.at, delta: c.amount, kind: "credit", id: `credit:${c.id}`,
+      when: [c.plain, c.time].filter(Boolean).join(" · "), value: null, paid: c.amount,
+      make: (netAfter: number) => ({ label: chargeLabel(c.isOver, c.amount), remaining: netAfter }),
+    })),
+  ].sort((a, b) => String(a.at).localeCompare(String(b.at)));
+
+  let netRunning = 0;
+  const rows = seeds.map((sd) => {
+    netRunning = r2(netRunning + sd.delta);
+    const { label, remaining } = sd.make(netRunning);
+    return { id: sd.id, kind: sd.kind, when: sd.when, label, value: sd.value, paid: sd.paid, remaining };
+  });
+
+  const rowsValue = r2(rows.reduce((s: number, r: any) => s + (r.value || 0), 0));
+  const rowsPaid = r2(rows.reduce((s: number, r: any) => s + (r.paid || 0), 0));
+
   return {
-    timeline, groups, pool, totalInvoiced, totalPaid, totalRemaining, creditPoolTotal,
-    accountTotal: r2(totalRemaining - creditPoolTotal),
+    rows, rowsValue, rowsPaid, timeline, groups, pool,
+    totalInvoiced, totalPaid, totalRemaining, creditPoolTotal, accountTotal,
   };
 }
 
@@ -252,18 +288,11 @@ function buildStatementHTML(args: {
   const grouped = kind === "customer" ? groupStatementByInvoice(invoices as any[], transactions as any[]) : null;
   const groupedInvoicesTable = !grouped
     ? ""
-    : grouped.groups.length
-      ? `<table><thead><tr><th>#</th><th>التاريخ والساعة</th><th>البيان</th><th>القيمة</th><th>دفع</th><th>المتبقي</th></tr></thead><tbody>${
-          (() => { let seq = 0; return grouped.timeline.map((node: any) => node.type === "band"
-            ? `<tr class="credit-band"><td colspan="6">＋ ${attr(node.entry.label)} — ${attr(node.entry.plainDate)}${node.entry.time ? ` الساعة ${attr(node.entry.time)}` : ""} · حسابكم بعدها: ${signedHTML(node.entry.running)}</td></tr>`
-            : (() => { const g = node.block; return `
-      <tr class="inv-row"><td>${++seq}</td><td>${attr(g.when)}</td><td style="text-align:right;font-weight:700;">فاتورة ${attr(g.invoice_number)}<div style="font-size:11px;font-weight:400;color:#55606e;">${attr(invoicePlain(g))}</div></td><td style="font-weight:700;">${fmt(g.total)}</td><td style="color:#16a34a;font-weight:700;">${g.paid ? fmt(g.paid) : "—"}</td><td>${signedHTML(g.remaining)}</td></tr>`; })()).join(""); })()
-        }<tr class="total-row"><td colspan="3" style="text-align:right;font-weight:800;">مجموع الفواتير</td><td style="font-weight:800;">${fmt(grouped.totalInvoiced)}</td><td style="font-weight:800;color:#16a34a;">${fmt(grouped.totalPaid)}</td><td>${signedHTML(grouped.totalRemaining)}</td></tr>${
-          grouped.creditPoolTotal > 0.009
-            ? `<tr class="total-row"><td colspan="5" style="text-align:right;font-weight:800;">شحن رصيد</td><td style="font-weight:800;color:#16a34a;">+${fmt(grouped.creditPoolTotal)}</td></tr>`
-            : ""
-        }<tr class="closing-row"><td colspan="5" style="text-align:right;font-weight:900;">الجملة</td><td>${signedHTML(grouped.accountTotal)}</td></tr></tbody></table>`
-      : `<div class="empty">لا توجد فواتير</div>`;
+    : grouped.rows.length
+      ? `<table><thead><tr><th style="width:34px">#</th><th style="width:128px">التاريخ والساعة</th><th>البيان</th><th style="width:95px">القيمة</th><th style="width:95px">المدفوع</th><th style="width:105px">المتبقي</th></tr></thead><tbody>${
+          grouped.rows.map((r: any, i: number) => `<tr class="row-${r.kind}"><td>${i + 1}</td><td>${attr(r.when)}</td><td style="text-align:right;font-weight:${r.kind === "invoice" ? 700 : 600};">${r.kind === "credit" ? "＋ " : ""}${attr(r.label)}</td><td style="font-weight:700;">${r.value == null ? "—" : fmt(r.value)}</td><td style="font-weight:700;${r.paid ? "color:#16a34a;" : ""}">${r.paid == null || r.paid < 0.009 ? "—" : fmt(r.paid)}</td><td>${amountHTML(r.remaining)}</td></tr>`).join("")
+        }<tr class="closing-row"><td colspan="3" style="text-align:right;font-weight:900;">المجموع</td><td style="font-weight:900;">${fmt(grouped.rowsValue)}</td><td style="font-weight:900;color:#16a34a;">${fmt(grouped.rowsPaid)}</td><td>${amountHTML(-grouped.accountTotal)}</td></tr></tbody></table>`
+      : `<div class="empty">لا توجد حركات على الحساب</div>`;
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -299,11 +328,12 @@ function buildStatementHTML(args: {
   .summary-box-value { font-size: 20px; font-weight: 900; color: #2980b9; }
   .section-title { font-size: 15px; font-weight: 900; color: #5b2c8e; margin: 18px 0 6px; }
   .empty { text-align: center; padding: 12px; color: #777; background: #fafafa; border: 1px dashed #ccc; border-radius: 6px; margin: 8px 0; }
-  tbody tr.inv-row td { background: #fff; border-top: 2px solid #1a1a1a; }
-  tbody tr.settle-row td { background: #f6f8fb; font-size: 12px; color: #33475b; }
-  tbody tr.total-row td { background: #eef2ff; border-top: 2px solid #1a1a1a; }
-  tbody tr.closing-row td { background: #e2e8f8; font-size: 15px; border-top: 2px solid #1a1a1a; }
-  tbody tr.credit-band td { background: #e7f8ee; border-top: 2px solid #16a34a; border-bottom: 2px solid #16a34a; color: #14532d; font-weight: 800; text-align: right; padding: 9px 12px; }
+  /* جدول مسطّح: نوعا أسطر متساويا الشكل يميّزهما اللون وحده، فتبقى الأعمدة
+     مقروءة رأسياً بلا شريط يمتد ويقطعها. */
+  tbody tr td { padding: 9px 10px; font-size: 13.5px; }
+  tbody tr.row-invoice td { background: #fff; }
+  tbody tr.row-credit td { background: #e7f8ee; border-top: 2px solid #16a34a; border-bottom: 2px solid #16a34a; color: #14532d; }
+  tbody tr.closing-row td { background: #e2e8f8; font-size: 15px; border-top: 2px solid #1a1a1a; font-weight: 900; }
   @media print { body { padding: 0; background: #fff; } .toolbar { display: none !important; } .page { box-shadow: none; border-radius: 0; padding: 0; } }
 </style></head><body>
 <div class="toolbar"><button id="__btn_pdf"><span id="__btn_label">⬇️ تحميل PDF</span></button></div>
