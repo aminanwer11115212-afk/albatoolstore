@@ -72,11 +72,12 @@ describe("لا سجل حركات ولا تسوية تراكمية", () => {
 });
 
 describe("الفاتورة وحركاتها بدقة الساعة", () => {
-  it("سطر الفاتورة يحمل التاريخ واليوم والساعة", async () => {
+  it("سطر الفاتورة يحمل التاريخ والساعة بلا اسم اليوم", async () => {
     const { container } = renderPage();
     await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
     const row = pageOf(container).getByText(/فاتورة INV-1001/).closest("tr")!;
-    expect(row.textContent).toContain("2026-07-30 · الخميس · 09:15");
+    expect(row.textContent).toContain("2026-07-30 · 09:15");
+    expect(row.textContent).not.toContain("الخميس");
   });
 
   it("المتبقي يظهر «له +1,000» لا صفراً — العميل دفع أكثر من قيمتها", async () => {
@@ -111,19 +112,20 @@ describe("شحن الرصيد كشريط أخضر فاصل", () => {
     const band = container.querySelector(".ps-credit-band")!;
     expect(band).toBeTruthy();
     const cell = band.querySelector("td")!;
-    expect(cell.getAttribute("colspan")).toBe("7");
+    expect(cell.getAttribute("colspan")).toBe("6");
     // لم يعد هناك قسم مستقل في ذيل الكشف
     expect(pageOf(container).queryByText("المتاح للتوزيع")).toBeNull();
   });
 
-  it("نصّه يشرح للعميل المبلغ واليوم ورقم العملية والرصيد بعده", async () => {
+  it("نصّه يشرح للعميل المبلغ والتاريخ ورقم العملية والرصيد بعده", async () => {
     const { container } = renderPage();
     await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
     const text = container.querySelector(".ps-credit-band")!.textContent || "";
     expect(text).toContain("تم شحن رصيدكم بمبلغ 4,000");
     expect(text).toContain("رقم العملية OP-9");
-    expect(text).toContain("يوم الجمعة 2026-07-31");
+    expect(text).toContain("2026-07-31");
     expect(text).toContain("الساعة 12:00");
+    expect(text).not.toContain("الجمعة");
     expect(text).toContain("حسابكم بعدها: له +5,000");
   });
 
@@ -157,12 +159,19 @@ describe("شرح مبسّط للعميل", () => {
   });
 });
 
-describe("إجمالي حساب العميل", () => {
-  it("يطابق net_balance ويُعرض «له +5,000»", async () => {
+describe("الجملة", () => {
+  it("تطابق net_balance وتُعرض «له +5,000» بكلمة العميل نفسها", async () => {
     const { container } = renderPage();
     await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
-    const row = pageOf(container).getByText("إجمالي حساب العميل").closest("tr")!;
+    const row = pageOf(container).getByText("الجملة").closest("tr")!;
     expect(within(row).getByText("له +5,000")).toBeTruthy();
+  });
+
+  it("الأعمدة بكلمات العميل: القيمة / دفع / المتبقي", async () => {
+    const { container } = renderPage();
+    await waitFor(() => screen.getByText(/الفواتير وحركاتها/));
+    const heads = [...container.querySelectorAll(".ps-by-invoice thead th")].map((h) => h.textContent);
+    expect(heads).toEqual(["#", "التاريخ والساعة", "البيان", "القيمة", "دفع", "المتبقي"]);
   });
 });
 

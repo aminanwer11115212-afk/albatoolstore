@@ -93,9 +93,9 @@ import { resolveLogoUrl } from "@/utils/albatoolLogo";
 const fmt = (n: number | null | undefined) =>
   Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
-/** «2026-07-30 · الخميس · 14:45» */
-const stampText = (x: { date: string; dayName: string; time: string }) =>
-  [x.date, x.dayName, x.time].filter(Boolean).join(" · ");
+/** «2026-07-30 · 14:45» — التاريخ والساعة فقط، بلا اسم اليوم. */
+const stampText = (x: { date: string; time: string }) =>
+  [x.date, x.time].filter(Boolean).join(" · ");
 
 function toneCell({ text, tone }: { text: string; tone: "debit" | "credit" | "settled" }) {
   const color = tone === "credit" ? "#16a34a" : tone === "debit" ? "#c0392b" : "#666";
@@ -461,21 +461,20 @@ export default function PublicCustomerStatementPage() {
             <thead>
               <tr>
                 <th style={{ width: 35 }}>#</th>
-                <th style={{ width: 150 }}>التاريخ واليوم والساعة</th>
+                <th style={{ width: 130 }}>التاريخ والساعة</th>
                 <th>البيان</th>
-                <th style={{ width: 100 }}>الإجمالي</th>
-                <th style={{ width: 100 }}>المدفوع</th>
-                <th style={{ width: 120 }}>المتبقي</th>
-                <th style={{ width: 130 }}>حساب العميل بعدها</th>
+                <th style={{ width: 110 }}>القيمة</th>
+                <th style={{ width: 110 }}>دفع</th>
+                <th style={{ width: 130 }}>المتبقي</th>
               </tr>
             </thead>
             <tbody>
               {(() => { let seq = 0; return account.timeline.map((node) =>
                 node.type === "credit_band" ? (
                   <tr key={node.entry.id} className="ps-credit-band">
-                    <td colSpan={7}>
+                    <td colSpan={6}>
                       <span className="ps-band-icon">＋</span>
-                      {node.entry.customerText} — يوم {node.entry.dayName} {node.entry.date}
+                      {node.entry.customerText} — {node.entry.date}
                       {node.entry.time ? ` الساعة ${node.entry.time}` : ""}
                       <span className="ps-band-after">
                         {" "}· حسابكم بعدها: {signedBalanceText(node.entry.runningBalance).text}
@@ -497,7 +496,6 @@ export default function PublicCustomerStatementPage() {
                         {node.block.paid ? fmt(node.block.paid) : "—"}
                       </td>
                       <td>{signedCell(node.block.remaining)}</td>
-                      <td>{signedCell(node.block.runningAtCreation)}</td>
                     </tr>
                     {node.block.movements.map((m) => (
                       <tr key={m.id} className="ps-settle-row">
@@ -511,7 +509,6 @@ export default function PublicCustomerStatementPage() {
                           {m.effect ? fmt(Math.abs(m.effect)) : "—"}
                         </td>
                         <td>{effectCell(m.effect)}</td>
-                        <td>{signedCell(m.runningBalance)}</td>
                       </tr>
                     ))}
                   </Fragment>
@@ -523,20 +520,18 @@ export default function PublicCustomerStatementPage() {
                 <td style={{ fontWeight: 800 }}>{fmt(account.totalInvoiced)}</td>
                 <td style={{ fontWeight: 800, color: "#16a34a" }}>{fmt(account.totalPaid)}</td>
                 <td>{signedCell(account.totalRemaining)}</td>
-                <td />
               </tr>
               {account.creditPoolTotal > 0.009 && (
                 <tr className="ps-total-row">
                   <td colSpan={5} style={{ textAlign: "right", fontWeight: 800 }}>
-                    يُخصم منه رصيد العميل القابل للتوزيع
+                    شحن رصيد
                   </td>
                   <td style={{ fontWeight: 800, color: "#16a34a" }}>+{fmt(account.creditPoolTotal)}</td>
-                  <td />
                 </tr>
               )}
               <tr className="ps-closing-row">
-                <td colSpan={5} style={{ textAlign: "right", fontWeight: 900 }}>إجمالي حساب العميل</td>
-                <td colSpan={2}>{signedCell(account.accountTotal)}</td>
+                <td colSpan={5} style={{ textAlign: "right", fontWeight: 900 }}>الجملة</td>
+                <td>{signedCell(account.accountTotal)}</td>
               </tr>
             </tbody>
           </table></div>

@@ -171,3 +171,59 @@ describe("أسماء ملفات PDF", () => {
     expect(html).toContain("isFinite(n) && n > 0 ? n.toLocaleString('en-US') : ''");
   });
 });
+
+describe("كل مسارات PDF للفواتير تحمل المبلغ", () => {
+  const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
+
+  it("قالب الطباعة الرسمي (زر تحميل PDF + واتساب PDF)", () => {
+    const src = read("src/utils/printTemplate.ts");
+    expect(src).toContain('<meta name="lov-doc-total"');
+    expect(src).toContain("if (docTotal) parts.push(docTotal);");
+  });
+
+  it("قالب رابط المشاركة (الفاتورة التي يفتحها العميل)", () => {
+    const src = read("supabase/functions/document-share/template.ts");
+    expect(src).toContain('<meta name="lov-doc-total"');
+    expect(src).toContain("if (isFinite(__amt) && __amt > 0) __parts.push(__amt.toLocaleString('en-US'));");
+  });
+
+  it("صفحة رابط العميل لا تسمّي الملف بالـtoken", () => {
+    const src = read("src/pages/StandaloneShareDocument.tsx");
+    expect(src).not.toContain("filename: `document-${token.slice(0, 8)}.pdf`");
+    expect(src).toContain("filename: pdfFileNameFrom(doc, token)");
+    expect(src).toContain('meta("lov-doc-total")');
+  });
+
+  it("كشف الحساب في رابط المشاركة يحمل اسم الجهة", () => {
+    const src = read("supabase/functions/document-share/index.ts");
+    expect(src).toContain("const pdfName = [title, party?.name]");
+    expect(src).not.toContain('JSON.stringify(title + ".pdf")');
+  });
+});
+
+describe("buildDocumentFileName", () => {
+  it("يجمع النوع والعميل والرقم والمبلغ", async () => {
+    const { buildDocumentFileName } = await import("@/utils/documentFileName");
+    expect(buildDocumentFileName({
+      docLabel: "فاتورة مبيعات", customerName: "أمين اسماعيل",
+      docNumber: "INV-93158", total: 126000,
+    })).toBe("فاتورة مبيعات - أمين اسماعيل - INV-93158 - 126,000.pdf");
+  });
+
+  it("يتجاهل الأجزاء الفارغة والمبلغ الصفري", async () => {
+    const { buildDocumentFileName } = await import("@/utils/documentFileName");
+    expect(buildDocumentFileName({ docLabel: "عرض سعر", customerName: "—", docNumber: "", total: 0 }))
+      .toBe("عرض سعر.pdf");
+  });
+
+  it("يحوّل الأرقام العربية ويزيل المحارف الممنوعة", async () => {
+    const { buildDocumentFileName } = await import("@/utils/documentFileName");
+    expect(buildDocumentFileName({ docLabel: "فاتورة", customerName: 'أ/ب:ج', docNumber: "INV-٩٩" }))
+      .toBe("فاتورة - أ ب ج - INV-99.pdf");
+  });
+
+  it("بلا أي جزء صالح يعطي اسماً محايداً لا فارغاً", async () => {
+    const { buildDocumentFileName } = await import("@/utils/documentFileName");
+    expect(buildDocumentFileName({})).toBe("مستند.pdf");
+  });
+});
