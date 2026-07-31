@@ -59,16 +59,28 @@ describe("اسم ملف الـPDF يحمل رقم المستند", () => {
 describe("صفحات الإنشاء تمرّر رقم المستند للطباعة", () => {
   const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 
+  // بناء HTML الطباعة استُخرج في `buildCurrentPrintHTML` ليشترك فيه ثلاثة
+  // أزرار (معاينة/طباعة/واتساب PDF) — فالفحص يتبع الدالة لا نداء openPrintWindow.
   it("صفحة إنشاء الفاتورة تمرّر number", () => {
     const src = read("src/pages/InvoiceCreatePage.tsx");
-    const call = src.slice(src.indexOf("openPrintWindow(generatePrintHTML({"));
-    expect(call.slice(0, 400)).toContain("number: invoiceNumber");
+    const call = src.slice(src.indexOf("function buildCurrentPrintHTML"));
+    expect(call.slice(0, 600)).toContain("number: invoiceNumber");
   });
 
   it("صفحة إنشاء عرض السعر تمرّر number", () => {
     const src = read("src/pages/QuoteCreatePage.tsx");
-    const call = src.slice(src.indexOf("openPrintWindow(generatePrintHTML({"));
-    expect(call.slice(0, 400)).toContain("number: quoteNumber");
+    const call = src.slice(src.indexOf("function buildCurrentPrintHTML"));
+    expect(call.slice(0, 600)).toContain("number: quoteNumber");
+  });
+
+  it("الأزرار الثلاثة تبني الـHTML من نفس الدالة — فلا يختلف ما يُعاين عمّا يُرسل", () => {
+    for (const page of ["src/pages/InvoiceCreatePage.tsx", "src/pages/QuoteCreatePage.tsx"]) {
+      const src = read(page);
+      expect(src).toContain("function buildCurrentPrintHTML");
+      // لا نداء مباشر لـ generatePrintHTML خارج الدالة الموحّدة
+      expect((src.match(/generatePrintHTML\(\{/g) || []).length).toBe(1);
+      expect(src).toContain("buildCurrentPrintHTML(\"full\", false)");
+    }
   });
 });
 
@@ -129,5 +141,44 @@ describe("اسم الملف لا يحمل محارف غير مرئية تفسد�
 
   it("الاسم السليم لا يتغيّر", () => {
     expect(cleanNamePart("ايهاب الدين امدرمان")).toBe("ايهاب الدين امدرمان");
+  });
+});
+
+describe("زرّا «معاينة» و«واتساب PDF» في شاشات الإنشاء والتعديل", () => {
+  const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
+  // شاشة الفاتورة واحدة للإنشاء والتعديل (`editId`)، فالزران يظهران في الحالتين.
+  const pages = ["src/pages/InvoiceCreatePage.tsx", "src/pages/QuoteCreatePage.tsx"];
+
+  it.each(pages)("%s فيه زر معاينة يفتح نافذة المعاينة", (page) => {
+    const src = read(page);
+    expect(src).toContain('id: "preview"');
+    expect(src).toContain("معاينة");
+    expect(src).toMatch(/openPrintWindow\(\s*(await\s+)?buildCurrentPrintHTML/);
+  });
+
+  it.each(pages)("%s فيه زر واتساب PDF يمرّ من المسار الموحّد", (page) => {
+    const src = read(page);
+    expect(src).toContain('id: "wa-pdf"');
+    expect(src).toContain("واتساب PDF");
+    expect(src).toContain('import("@/utils/shareDocumentPdf")');
+    expect(src).toContain("shareDocumentPdf({");
+  });
+
+  it.each(pages)("%s يمرّر نوع المستند ورقمه ومبلغه لاسم الملف", (page) => {
+    const src = read(page);
+    const call = src.slice(src.indexOf("shareDocumentPdf({"));
+    for (const field of ["docLabel:", "customerName:", "docNumber:", "total:"]) {
+      expect(call.slice(0, 700)).toContain(field);
+    }
+  });
+
+  it.each(pages)("%s يمنع النقر المزدوج أثناء التوليد", (page) => {
+    const src = read(page);
+    expect(src).toContain("sharingPdf");
+    expect(src).toContain("disabled={sharingPdf}");
+  });
+
+  it("عرض السعر يُسمّى «عرض سعر» لا «فاتورة»", () => {
+    expect(read("src/pages/QuoteCreatePage.tsx")).toContain('docLabel: "عرض سعر"');
   });
 });
