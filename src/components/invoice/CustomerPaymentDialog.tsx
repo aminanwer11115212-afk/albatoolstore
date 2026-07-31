@@ -148,12 +148,9 @@ export default function CustomerPaymentDialog({
               debt: Number((data as any).balance || 0),
               credit,
             });
-            // اقتراح تلقائي: استخدم الرصيد الدائن أولاً لسد المتبقي
-            if (credit > 0.01 && remaining > 0.01) {
-              const useCredit = Math.min(credit, remaining);
-              setCreditUse(String(useCredit));
-              setAmount(String(Math.max(0, remaining - useCredit)));
-            }
+            // لا اقتراح تلقائي: رصيد العميل لا يُطبَّق على أي فاتورة من تلقاء
+            // نفسه. يبقى `creditUse` صفراً حتى يضغط المستخدم «استخدم الكل» أو
+            // يكتب المبلغ بنفسه — نفس مبدأ «الشحن تخزين فقط» في قاعدة البيانات.
           }
         })();
         // اجلب آخر 5 فواتير للعميل (باستثناء الحالية)
@@ -986,7 +983,7 @@ export default function CustomerPaymentDialog({
                   placeholder="0.00"
                 />
                 <div className="text-[10px] text-muted-foreground mt-1">
-                  المتاح: {(custBalance?.credit || 0).toLocaleString()} — يُخصم من رصيد العميل ويُضاف كدفعة على الفاتورة
+                  المتاح: {(custBalance?.credit || 0).toLocaleString()} — لا يُستخدم تلقائياً؛ اكتب المبلغ أو اضغط «استخدم الكل» لخصمه من رصيد العميل وإضافته كدفعة على هذه الفاتورة
                 </div>
                 <div className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 leading-relaxed bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded px-2 py-1">
                   ملاحظة محاسبية: أي دفعة تزيد عن قيمة الفاتورة تُسجَّل تلقائياً كـ <b>رصيد دائن للعميل</b> (customer_credit) ولا تُربط برقم الفاتورة القديمة. الفائض يظهر في كشف الحساب ويُستخدم من هنا على الفاتورة الجديدة.

@@ -6,7 +6,7 @@
  * `effect` على كامل السلسلة.
  */
 import { describe, it, expect } from "vitest";
-import { buildCustomerAccountView, signedBalanceText, stampOf } from "@/utils/buildCustomerAccountView";
+import { buildCustomerAccountView, signedBalanceText, signedAmountText, effectText, stampOf } from "@/utils/buildCustomerAccountView";
 
 const CUST = "c1";
 
@@ -43,15 +43,20 @@ describe("المثال المطلوب: دفع 5000 على فاتورة 4000", ()
   const net = netOf(invoices, transactions);
   const view = buildCustomerAccountView({ invoices, transactions, netBalance: net });
 
-  it("المتبقي على الفاتورة يظهر «له» بالموجب لا صفراً", () => {
-    expect(view.blocks[0].remaining).toBe(-1000);
+  // صندوق الفائض الواحد: الزيادة لم تعد تُخصم من متبقّي الفاتورة، بل تدخل
+  // الصندوق القابل للتوزيع اليدوي كأي رصيد آخر — فلا يُحتسب المال مرّتين.
+  it("الفاتورة نفسها تُقفل «خالص» — الزيادة ليست متبقّياً سالباً عليها", () => {
+    expect(view.blocks[0].remaining).toBe(0);
     expect(view.blocks[0].linkedOverpay).toBe(1000);
-    expect(signedBalanceText(view.blocks[0].remaining)).toEqual({ text: "له +1,000", tone: "credit" });
+    expect(signedBalanceText(view.blocks[0].remaining)).toEqual({ text: "خالص", tone: "settled" });
   });
 
-  it("الفائض المرتبط بالفاتورة يظهر تحتها لا في الرصيد القابل للتوزيع", () => {
-    expect(view.blocks[0].movements.map((m) => m.kind)).toEqual(["payment", "overpay"]);
-    expect(view.creditPool).toHaveLength(0);
+  it("الزيادة تدخل صندوق الفائض الواحد بسطر باسم فاتورتها", () => {
+    expect(view.creditPool.map((e) => e.kind)).toEqual(["overpay"]);
+    expect(view.creditPoolTotal).toBe(1000);
+    const row = view.rows.find((r) => r.kind === "credit")!;
+    expect(row.label).toBe("دفعة زائدة +1,000");
+    expect(row.remaining).toBe(1000);
   });
 
   it("إجمالي حساب العميل = net_balance", () => {
@@ -61,7 +66,7 @@ describe("المثال المطلوب: دفع 5000 على فاتورة 4000", ()
   });
 
   it("الرصيد الجاري ينتهي عند إجمالي الحساب", () => {
-    const last = view.blocks[0].movements.at(-1)!;
+    const last = view.creditPool.at(-1)!;
     expect(last.runningBalance).toBe(view.accountTotal);
   });
 });
@@ -76,9 +81,9 @@ describe("شحن رصيد لاحق يُخصم من مجموع الحساب وي�
   const net = netOf(invoices, transactions);
   const view = buildCustomerAccountView({ invoices, transactions, netBalance: net });
 
-  it("الشحنة غير مرتبطة بفاتورة ⇒ في الرصيد القابل للتوزيع", () => {
-    expect(view.creditPool.map((e) => e.kind)).toEqual(["credit_charge"]);
-    expect(view.creditPoolTotal).toBe(4000);
+  it("الشحنة والفائض معاً في الصندوق الواحد القابل للتوزيع", () => {
+    expect(view.creditPool.map((e) => e.kind)).toEqual(["overpay", "credit_charge"]);
+    expect(view.creditPoolTotal).toBe(5000); // فائض 1000 + شحن 4000
   });
 
   it("لا توزيع تلقائي: حالة الفاتورة ومدفوعها لم يتغيّرا بسبب الشحنة", () => {
@@ -217,5 +222,131 @@ describe("الفواتير الملغاة", () => {
     expect(view.blocks.map((b) => b.invoiceNumber)).toEqual(["A"]);
     expect(view.accountTotal).toBe(1000);
     expect(view.drift).toBe(0);
+  });
+});
+
+describe("إشارة العرض بلغة العميل — «+» أخضر و«−» أحمر", () => {
+  it("ما يصبّ في مصلحة العميل يُعرض «+» بلون الدائن", () => {
+    // دفعة/شحن أثرهما الداخلي سالب (ينقص ما علينا) ⇒ يُعرضان «+» أخضر
+    expect(effectText(-300)).toEqual({ text: "+300", tone: "credit" });
+  });
+
+  it("ما يزيد على العميل يُعرض «−» بلون المدين", () => {
+    expect(effectText(500)).toEqual({ text: "−500", tone: "debit" });
+  });
+
+  it("لا إشارة بلا أثر", () => {
+    expect(effectText(0).tone).toBe("settled");
+  });
+
+  it("تطابق إشارة الرصيد: «له +» أخضر و«عليه −» أحمر", () => {
+    // نفس اتجاه الإشارة في الحركة والرصيد — فلا يرى العميل «+» أخضر هنا و«+» أحمر هناك
+    expect(signedBalanceText(-300)).toEqual({ text: "له +300", tone: "credit" });
+    expect(signedBalanceText(500)).toEqual({ text: "عليه −500", tone: "debit" });
+    expect(effectText(-300).text.startsWith("+")).toBe(true);
+    expect(effectText(-300).tone).toBe(signedBalanceText(-300).tone);
+    expect(effectText(500).text.startsWith("−")).toBe(true);
+    expect(effectText(500).tone).toBe(signedBalanceText(500).tone);
+  });
+});
+
+describe("الجدول المسطّح — الشكل الذي طلبه العميل", () => {
+  // فاتورتان بـ200 لكل منهما ثم شحن 500: الشحن يبتلع 400 ويبقى 100 مخزّناً.
+  const invoices = [
+    { id: "a", invoice_number: "A", date: "2026-07-20", created_at: "2026-07-20T09:00:00", total: 200, paid_amount: 0, status: "pending" },
+    { id: "b", invoice_number: "B", date: "2026-07-21", created_at: "2026-07-21T09:00:00", total: 200, paid_amount: 0, status: "pending" },
+  ];
+  const transactions = [
+    { id: "ch", category: "customer_credit", amount: 500, reference_no: "OP-7", date: "2026-07-25", created_at: "2026-07-25T12:00:00", description: "شحن رصيد" },
+  ];
+  const view = () => buildCustomerAccountView({ invoices, transactions, netBalance: -100 });
+
+  it("ثلاثة أسطر: فاتورتان وسطر شحن يقول كم خُصم وكم بقي", () => {
+    const rows = view().rows.map((r) => [r.label, r.value, r.paid, signedAmountText(r.remaining).text]);
+    expect(rows).toEqual([
+      ["فاتورة A", 200, 0, "\u2212200"],
+      ["فاتورة B", 200, 0, "\u2212200"],
+      ["تم شحن +500", null, 500, "+100"],
+    ]);
+  });
+
+  it("لا أسطر سداد من الرصيد إطلاقاً", () => {
+    const invs = [{ id: "a", invoice_number: "A", date: "2026-01-01", created_at: "2026-01-01T09:00:00", total: 300, paid_amount: 300, status: "paid" }];
+    const txs = [
+      { id: "p", category: "customer_payment", amount: 200, reference_id: "a", method: "cash", date: "2026-01-01", created_at: "2026-01-01T09:30:00" },
+      { id: "ch", category: "customer_credit", amount: 300, date: "2026-01-02", created_at: "2026-01-02T09:00:00", description: "شحن رصيد" },
+      { id: "s", category: "customer_credit", amount: -100, reference_id: "a", method: "credit_balance", date: "2026-01-03", created_at: "2026-01-03T09:00:00" },
+      { id: "sp", category: "customer_payment", amount: 100, reference_id: "a", method: "credit_balance", date: "2026-01-03", created_at: "2026-01-03T09:00:00" },
+    ];
+    const v = buildCustomerAccountView({ invoices: invs, transactions: txs, netBalance: -200 });
+    expect(v.rows.map((r) => r.kind)).toEqual(["invoice", "credit"]);
+    expect(v.rows.every((r) => !/سداد من رصيد/.test(r.label))).toBe(true);
+    // سطر الفاتورة يحمل النقد وحده (200) لا paid_amount (300) — وإلا انكسر الطرح
+    expect(v.rows[0].paid).toBe(200);
+    expect(v.rowsValue - v.rowsPaid).toBe(v.accountTotal);
+    expect(v.drift).toBe(0);
+  });
+
+  it("الطرح يقفل: Σالقيمة − Σالمدفوع = صافي الحساب", () => {
+    const v = view();
+    expect(v.rowsValue).toBe(400);
+    expect(v.rowsPaid).toBe(500);
+    expect(v.rowsValue - v.rowsPaid).toBe(v.accountTotal);
+    expect(signedAmountText(-v.accountTotal).text).toBe("+100");
+    expect(v.drift).toBe(0);
+  });
+
+  // البيان مختصر عمداً: الأثر مقروء من العمودين، والتفاصيل في شاشة المعاملات.
+  it("سطر الشحن مبلغ وحده بلا شرح — بلا دَين قبله", () => {
+    const v = buildCustomerAccountView({
+      invoices: [],
+      transactions: [{ id: "ch", category: "customer_credit", amount: 500, date: "2026-07-25", created_at: "2026-07-25T12:00:00", description: "شحن رصيد" }],
+      netBalance: -500,
+    });
+    expect(v.rows[0].label).toBe("تم شحن +500");
+    expect(v.rows[0].remaining).toBe(500);
+  });
+
+  it("سطر الشحن مبلغ وحده — والمتبقي يبقى سالباً إن لم يكفِ الدَّين", () => {
+    const v = buildCustomerAccountView({
+      invoices: [{ id: "a", invoice_number: "A", date: "2026-01-01", created_at: "2026-01-01T09:00:00", total: 1000, paid_amount: 0, status: "pending" }],
+      transactions: [{ id: "ch", category: "customer_credit", amount: 400, date: "2026-01-02", created_at: "2026-01-02T09:00:00", description: "شحن رصيد" }],
+      netBalance: 600,
+    });
+    expect(v.rows[1].label).toBe("تم شحن +400");
+    expect(signedAmountText(v.rows[1].remaining).text).toBe("\u2212600");
+  });
+
+  it("البيان لا يحمل أي شرح للخصم — مكانه الأعمدة لا الكلمات", () => {
+    const v = view();
+    const charge = v.rows.find((r) => r.kind === "credit")!;
+    expect(charge.label).not.toMatch(/خُصم|مخزّن|صافي الحساب/);
+  });
+});
+
+describe("صندوق الفائض الواحد", () => {
+  it("الدفعة الزائدة تدخل الصندوق ولا تُخصم من متبقّي فاتورتها", () => {
+    const invoices = [{ id: "a", invoice_number: "A", date: "2026-01-01", created_at: "2026-01-01T09:00:00", total: 4000, paid_amount: 4000, status: "paid" }];
+    const transactions = [
+      { id: "p", category: "customer_payment", amount: 4000, reference_id: "a", method: "cash", date: "2026-01-01", created_at: "2026-01-01T10:00:00" },
+      { id: "o", category: "customer_credit", amount: 1000, reference_id: "a", date: "2026-01-01", created_at: "2026-01-01T10:00:00", description: "فائض دفعة على فاتورة A" },
+    ];
+    const v = buildCustomerAccountView({ invoices, transactions, netBalance: -1000 });
+    expect(v.blocks[0].remaining).toBe(0);      // الفاتورة خالصة لا «له +1000»
+    expect(v.creditPoolTotal).toBe(1000);       // المال في الصندوق وحده
+    expect(v.accountTotal).toBe(-1000);
+    expect(v.drift).toBe(0);
+    const extra = v.rows.find((r) => r.kind === "credit")!;
+    expect(extra.label).toBe("دفعة زائدة +1,000");
+    expect(extra.remaining).toBe(1000);
+    expect(v.rowsValue - v.rowsPaid).toBe(v.accountTotal);
+  });
+});
+
+describe("signedAmountText", () => {
+  it("موجب أخضر بإشارة + وسالب أحمر بإشارة −", () => {
+    expect(signedAmountText(300)).toEqual({ text: "+300", tone: "credit" });
+    expect(signedAmountText(-100)).toEqual({ text: "\u2212100", tone: "debit" });
+    expect(signedAmountText(0)).toEqual({ text: "خالص", tone: "settled" });
   });
 });

@@ -130,7 +130,10 @@ ${summary.map((s) => `  <div class="summary-box">
           if (r.__band) {
             return `<tr><td colspan="${sec.columns.length}" style="${esc(String(r.__bandStyle || ""))}">${esc(String(r.__band))}</td></tr>`;
           }
-          return `<tr>${sec.columns.map((c) => {
+          // تلوين السطر كاملاً حسب نوعه (شحن رصيد / سداد منه) مع بقاء الأعمدة
+          // في مواضعها — أوضح من شريط يمتد ويكسر قراءة الأعمدة رأسياً.
+          const rowStyle = r.__rowStyle ? ` style="${esc(String(r.__rowStyle))}"` : "";
+          return `<tr${rowStyle}>${sec.columns.map((c) => {
             const raw = r[c.key];
             // العمود الرقمي قد يستقبل نصاً («—» لخلية لا رقم لها). `Number("—")`
             // يعطي NaN فيُطبع NaN في وجه العميل — نعرض النص كما هو بدل ذلك.

@@ -115,10 +115,11 @@ describe("الجداول — نفس هوية قالب الطباعة", () => {
     expect(cssProp(pageBase, ".ps-table", "border")).toBe("2px solid #1a1a1a");
   });
 
-  it("صف المجاميع بنفس خلفية وحد .total-row", () => {
+  // الجدول المسطّح له سطر مجاميع واحد (.ps-closing-row) بدل سطرين.
+  it("سطر المجموع محاط بنفس حدّ .total-row في قالب الفاتورة", () => {
     expect(cssProp(printBase, ".total-row td", "background")).toBe("#f0f0f0");
-    expect(cssProp(pageBase, ".ps-by-invoice .ps-total-row td", "background")).toBe("#f0f0f0");
-    expect(cssProp(pageBase, ".ps-by-invoice .ps-total-row td", "border")).toBe("2px solid #1a1a1a");
+    expect(cssProp(pageBase, ".ps-by-invoice .ps-closing-row td", "border")).toBe("2px solid #1a1a1a");
+    expect(cssProp(pageBase, ".ps-by-invoice .ps-closing-row td", "background")).toBe("#e8eef7");
   });
 });
 

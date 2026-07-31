@@ -4,7 +4,7 @@ import { Printer, Share2, Copy, Check } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import { arQuoteStatus, arReturnStatus } from "@/utils/statusLabels";
 import { openWhatsApp } from "@/utils/whatsapp";
-import { buildCustomerAccountView, signedBalanceText, effectText } from "@/utils/buildCustomerAccountView";
+import { buildCustomerAccountView, signedAmountText } from "@/utils/buildCustomerAccountView";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 
 
@@ -101,20 +101,14 @@ function toneCell({ text, tone }: { text: string; tone: "debit" | "credit" | "se
   const color = tone === "credit" ? "#16a34a" : tone === "debit" ? "#c0392b" : "#666";
   return <span style={{ color, fontWeight: 800, whiteSpace: "nowrap" }}>{text}</span>;
 }
-/** رصيد بلغة «له/عليه» — للأرصدة والمتبقي. */
-const signedCell = (value: number) => toneCell(signedBalanceText(value));
+/** رقم موقّع مختصر لعمود «المتبقي»: «+300» أخضر / «−100» أحمر. */
+const amountCell = (shown: number) => toneCell(signedAmountText(shown));
 
-/** شرح الفاتورة بجملة يفهمها العميل مباشرة. */
-function invoicePlainText(b: { total: number; paid: number; remaining: number }): string {
-  const t = Number(b.total || 0).toLocaleString();
-  const p = Number(b.paid || 0).toLocaleString();
-  const rem = Math.abs(Number(b.remaining || 0)).toLocaleString();
-  if (b.remaining > 0.009) return `قيمتها ${t} · دفعتم منها ${p} · وبقي عليكم ${rem}`;
-  if (b.remaining < -0.009) return `قيمتها ${t} · دفعتم ${p} · ولكم زيادة ${rem} أُضيفت لرصيدكم`;
-  return `قيمتها ${t} · مسدّدة بالكامل`;
-}
-/** دلتا حركة موقّعة — لا تصف رصيداً فلا تستعمل «له/عليه». */
-const effectCell = (value: number) => toneCell(effectText(value));
+const DASH = "—";
+const ROW_CLASS: Record<string, string> = {
+  invoice: "ps-inv-row",
+  credit: "ps-credit-row",
+};
 
 export default function PublicCustomerStatementPage() {
   const { token } = useParams<{ token: string }>();
@@ -263,27 +257,23 @@ export default function PublicCustomerStatementPage() {
         .ps-table tbody tr:nth-child(even) { background: #f8f8f8; }
         .ps-empty { text-align: center; padding: 12px; color: #888; font-size: 13px; background: #fafafa; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 12px; }
 
-        /* === العرض المجمّع حسب الفاتورة === */
+        /* === الجدول المسطّح: ثلاثة أنواع أسطر متساوية الشكل ===
+           لا أسطر فرعية ولا شريط يمتد على الأعمدة — يميّزها اللون وحده حتى
+           تبقى الأعمدة مقروءة رأسياً من أعلى الجدول إلى أسفله. */
         .ps-by-invoice tbody tr:nth-child(even) { background: transparent; }
-        .ps-by-invoice .ps-inv-row td { background: #fff; border-top: 2px solid #1a1a1a; }
-        .ps-by-invoice .ps-settle-row td { background: #f6f8fb; font-size: 12px; color: #33475b; }
-        .ps-settle-arrow { color: #5b4cad; font-weight: 900; margin-left: 4px; }
-        /* شرح مبسّط تحت رقم الفاتورة لمن لا يقرأ لغة المحاسبة */
-        .ps-plain { font-size: 11px; font-weight: 400; color: #55606e; margin-top: 2px; }
-        /* شريط شحن الرصيد — يفصل الجدول في موضعه الزمني */
-        .ps-by-invoice .ps-credit-band td {
+        .ps-by-invoice tbody td { padding: 9px 10px; font-size: 13.5px; }
+        .ps-by-invoice .ps-inv-row td { background: #fff; }
+        /* شحن رصيد / دفعة زائدة — أخضر */
+        .ps-by-invoice .ps-credit-row td {
           background: #e7f8ee; border-top: 2px solid #16a34a; border-bottom: 2px solid #16a34a;
-          color: #14532d; font-weight: 800; font-size: 13px; text-align: right; padding: 9px 12px;
+          color: #14532d;
         }
         .ps-band-icon {
           display: inline-block; background: #16a34a; color: #fff; border-radius: 50%;
           width: 17px; height: 17px; line-height: 17px; text-align: center;
           font-size: 12px; font-weight: 900; margin-left: 6px;
         }
-        .ps-band-after { color: #166534; font-weight: 700; }
-        .ps-settle-surplus { color: #16a34a; font-weight: 700; }
-        /* صفوف المجاميع بنفس هوية .total-row في قالب طباعة الفاتورة */
-        .ps-by-invoice .ps-total-row td { background: #f0f0f0; font-weight: 800; font-size: 14px; border: 2px solid #1a1a1a; }
+        /* سطر المجموع بنفس هوية .total-row في قالب طباعة الفاتورة */
         .ps-by-invoice .ps-closing-row td { background: #e8eef7; font-weight: 900; font-size: 15px; border: 2px solid #1a1a1a; }
 
         /* === FINAL BALANCE — بألوان صف «رصيد العميل الحالي» في قالب الفاتورة === */
@@ -432,95 +422,65 @@ export default function PublicCustomerStatementPage() {
 
         {/* Summary boxes — same style as print template */}
         <div className="ps-summary-row">
+          {/* ثلاثة صناديق بنفس مسمّيات أعمدة الجدول — لا مصطلحات محاسبية */}
           <div className="ps-summary-box blue">
-            <div className="ps-summary-box-title">إجمالي المبيعات</div>
-            <div className="ps-summary-box-value">{fmt(account?.totalInvoiced ?? 0)}</div>
+            <div className="ps-summary-box-title">المجموع</div>
+            <div className="ps-summary-box-value">{fmt(account?.rowsValue ?? 0)}</div>
           </div>
           <div className="ps-summary-box green">
-            <div className="ps-summary-box-title">المدفوع على الفواتير</div>
-            <div className="ps-summary-box-value">{fmt(account?.totalPaid ?? 0)}</div>
+            <div className="ps-summary-box-title">المدفوع</div>
+            <div className="ps-summary-box-value">{fmt(account?.rowsPaid ?? 0)}</div>
           </div>
           <div className={`ps-summary-box ${accountNet > 0 ? "red" : accountNet < 0 ? "green" : ""}`}>
             <div className="ps-summary-box-title">
-              {accountNet > 0 ? "الصافي المستحق (عليه)" : accountNet < 0 ? "رصيد دائن (له)" : "الحساب خالص"}
+              {accountNet > 0 ? "المتبقي عليكم" : accountNet < 0 ? "رصيد لكم" : "الحساب خالص"}
             </div>
             <div className="ps-summary-box-value">{fmt(Math.abs(accountNet))}</div>
           </div>
-          <div className="ps-summary-box">
-            <div className="ps-summary-box-title">فواتير غير مسددة</div>
-            <div className="ps-summary-box-value">
-              {(account?.blocks || []).filter((b) => b.remaining > 0.009).length}
-            </div>
-          </div>
         </div>
 
-        {/* كل فاتورة سطر واحد: القيمة · دفع · المتبقي — بالشكل الذي يطلبه العميل */}
-        <div className="ps-section-title">الفواتير ({account?.blocks.length || 0})</div>
-        {account && account.blocks.length ? (
+        {/* جدول واحد مسطّح: كل الأسطر بنفس الشكل — فاتورة، شحن رصيد، سداد منه */}
+        <div className="ps-section-title">الحساب</div>
+        {account && account.rows.length ? (
           <div className="ps-table-scroll"><table className="ps-table ps-by-invoice">
             <thead>
               <tr>
-                <th style={{ width: 35 }}>#</th>
-                <th style={{ width: 130 }}>التاريخ والساعة</th>
+                <th style={{ width: 34 }}>#</th>
+                <th style={{ width: 128 }}>التاريخ والساعة</th>
                 <th>البيان</th>
-                <th style={{ width: 110 }}>القيمة</th>
-                <th style={{ width: 110 }}>دفع</th>
-                <th style={{ width: 130 }}>المتبقي</th>
+                <th style={{ width: 95 }}>القيمة</th>
+                <th style={{ width: 95 }}>المدفوع</th>
+                <th style={{ width: 105 }}>المتبقي</th>
               </tr>
             </thead>
             <tbody>
-              {(() => { let seq = 0; return account.timeline.map((node) =>
-                node.type === "credit_band" ? (
-                  <tr key={node.entry.id} className="ps-credit-band">
-                    <td colSpan={6}>
-                      <span className="ps-band-icon">＋</span>
-                      {node.entry.customerText} — {node.entry.date}
-                      {node.entry.time ? ` الساعة ${node.entry.time}` : ""}
-                      <span className="ps-band-after">
-                        {" "}· حسابكم بعدها: {signedBalanceText(node.entry.runningBalance).text}
-                      </span>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={node.block.invoiceId} className="ps-inv-row">
-                      {/* الترقيم يعدّ الفواتير وحدها — الأشرطة ليست بنوداً مرقّمة */}
-                      <td>{++seq}</td>
-                      <td>{stampText(node.block)}</td>
-                      <td style={{ textAlign: "right", fontWeight: 700 }}>
-                        فاتورة {node.block.invoiceNumber}
-                        <div className="ps-plain">{invoicePlainText(node.block)}</div>
-                      </td>
-                      <td style={{ fontWeight: 700 }}>{fmt(node.block.total)}</td>
-                      <td style={{ color: "#16a34a", fontWeight: 700 }}>
-                        {node.block.paid ? fmt(node.block.paid) : "—"}
-                      </td>
-                    <td>{signedCell(node.block.remaining)}</td>
-                  </tr>
-                ),
-              ); })()}
-
-              <tr className="ps-total-row">
-                <td colSpan={3} style={{ textAlign: "right", fontWeight: 800 }}>مجموع الفواتير</td>
-                <td style={{ fontWeight: 800 }}>{fmt(account.totalInvoiced)}</td>
-                <td style={{ fontWeight: 800, color: "#16a34a" }}>{fmt(account.totalPaid)}</td>
-                <td>{signedCell(account.totalRemaining)}</td>
-              </tr>
-              {account.creditPoolTotal > 0.009 && (
-                <tr className="ps-total-row">
-                  <td colSpan={5} style={{ textAlign: "right", fontWeight: 800 }}>
-                    شحن رصيد
+              {account.rows.map((row, i) => (
+                <tr key={row.id} className={ROW_CLASS[row.kind]}>
+                  <td>{i + 1}</td>
+                  <td>{stampText(row)}</td>
+                  <td style={{ textAlign: "right", fontWeight: row.kind === "invoice" ? 700 : 600 }}>
+                    {row.kind === "credit" && <span className="ps-band-icon">＋</span>}
+                    {row.label}
                   </td>
-                  <td style={{ fontWeight: 800, color: "#16a34a" }}>+{fmt(account.creditPoolTotal)}</td>
+                  <td style={{ fontWeight: 700 }}>{row.value == null ? DASH : fmt(row.value)}</td>
+                  <td style={{ fontWeight: 700, color: row.paid ? "#16a34a" : undefined }}>
+                    {row.paid == null || row.paid < 0.009 ? DASH : fmt(row.paid)}
+                  </td>
+                  <td>{amountCell(row.remaining)}</td>
                 </tr>
-              )}
+              ))}
+
+              {/* المجموع: القيمة والمدفوع يجمعان الأعمدة، والمتبقي صافي الحساب */}
               <tr className="ps-closing-row">
-                <td colSpan={5} style={{ textAlign: "right", fontWeight: 900 }}>الجملة</td>
-                <td>{signedCell(account.accountTotal)}</td>
+                <td colSpan={3} style={{ textAlign: "right", fontWeight: 900 }}>المجموع</td>
+                <td style={{ fontWeight: 900 }}>{fmt(account.rowsValue)}</td>
+                <td style={{ fontWeight: 900, color: "#16a34a" }}>{fmt(account.rowsPaid)}</td>
+                <td>{amountCell(-account.accountTotal)}</td>
               </tr>
             </tbody>
           </table></div>
         ) : (
-          <div className="ps-empty">لا توجد فواتير</div>
+          <div className="ps-empty">لا توجد حركات على الحساب</div>
         )}
 
         {/* Final balance */}

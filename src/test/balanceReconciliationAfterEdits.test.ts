@@ -144,7 +144,7 @@ describe("تعديل الدفعات", () => {
     expect(displayedNet(after.invoices, after.transactions)).toBe(netBalance(after.invoices, after.transactions));
   });
 
-  it("الفائض عبر splitPayment يظهر «له +» تحت فاتورته لا مديونية سالبة", () => {
+  it("الفائض عبر splitPayment يدخل صندوق الرصيد ولا يُخصم من فاتورته", () => {
     // دفع 400 على فاتورة C (300): 300 تُقيَّد عليها و100 تصير رصيداً دائناً
     const invoices = baseInvoices.map((i) => (i.id === "c" ? { ...i, paid_amount: 300, status: "paid" } : i));
     const txs = [
@@ -152,13 +152,16 @@ describe("تعديل الدفعات", () => {
       { id: "pc", customer_id: "c1", category: "customer_payment", amount: 300, reference_id: "c", method: "cash", date: "2026-03-02" },
       { id: "oc", customer_id: "c1", category: "customer_credit", amount: 100, reference_id: "c", date: "2026-03-02", description: "فائض دفعة على فاتورة C" },
     ];
-    const g = buildCustomerAccountView({
+    const view = buildCustomerAccountView({
       invoices,
       transactions: txs,
       netBalance: netBalance(invoices, txs),
-    }).blocks.find((x) => x.invoiceNumber === "C")!;
-    expect(g.remaining).toBe(-100);
+    });
+    const g = view.blocks.find((x) => x.invoiceNumber === "C")!;
+    // الفاتورة نفسها خالصة؛ الزيادة في الصندوق الواحد فلا تُحتسب مرّتين
+    expect(g.remaining).toBe(0);
     expect(g.linkedOverpay).toBe(100);
+    expect(view.creditPool.some((e) => e.kind === "overpay")).toBe(true);
     expect(displayedNet(invoices, txs)).toBe(netBalance(invoices, txs));
   });
 });

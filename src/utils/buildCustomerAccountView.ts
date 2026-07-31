@@ -88,7 +88,47 @@ export type TimelineNode =
   | { type: "invoice"; block: InvoiceBlock }
   | { type: "credit_band"; entry: AccountEntry };
 
+export type AccountRowKind = "invoice" | "credit";
+
+/**
+ * سطر واحد في جدول الكشف المسطّح — نوعان فقط: فاتورة، وشحن رصيد.
+ *
+ * **لا أسطر سداد.** السداد من الرصيد نقلٌ داخلي لا يغيّر صافي حساب العميل،
+ * فإظهاره يشوّش على العميل بلا فائدة: عمود «المتبقي» على سطر الشحن يُظهر
+ * أثره على الحساب مباشرةً. وتفاصيل الشحن نفسها مكانها شاشة المعاملات.
+ *
+ * ## الأعمدة
+ *   `value`  «القيمة»  — قيمة الفاتورة، و`null` لسطر الشحن
+ *   `paid`   «المدفوع» — المدفوع نقداً على الفاتورة، أو مبلغ الشحن
+ *   `remaining` «المتبقي» — بإشارة **العرض**: موجب لصالح العميل، سالب عليه
+ *
+ * ## قاعدة عمود «المتبقي»
+ *   سطر فاتورة → ما تبقّى منها بعد المدفوع نقداً وحده
+ *   سطر شحن   → صافي حساب العميل بعد الشحن
+ *
+ * ## الحساب يقفل بطرح بسيط يستطيع العميل التحقّق منه بنفسه
+ *   Σ القيمة − Σ المدفوع = −(المتبقي في سطر المجموع) = صافي الحساب.
+ * ولهذا يحمل سطر الفاتورة **النقد وحده**: ما سُدِّد من الرصيد محسوب أصلاً
+ * ضمن مبلغ الشحن في عموده، فاحتسابه مرّتين يكسر الطرح.
+ */
+export interface AccountRow {
+  id: string;
+  kind: AccountRowKind;
+  at: string;
+  date: string;
+  time: string;
+  /** «البيان» — نص واحد يقرأه العميل مباشرة */
+  label: string;
+  value: number | null;
+  paid: number | null;
+  remaining: number;
+  /** الفاتورة التي يخصّها السطر إن وُجدت — للفلترة في الشاشة الداخلية */
+  invoiceId?: string;
+}
+
 export interface CustomerAccountView {
+  /** الجدول المسطّح المعروض للعميل — كل الأسطر بنفس الشكل بترتيبها الزمني */
+  rows: AccountRow[];
   /** الفواتير وشحنات الرصيد بترتيبها الزمني الواحد */
   timeline: TimelineNode[];
   blocks: InvoiceBlock[];
@@ -99,6 +139,10 @@ export interface CustomerAccountView {
   totalPaid: number;
   /** Σ متبقي الفواتير بإشارته */
   totalRemaining: number;
+  /** مجموع عمود «القيمة» في الجدول المسطّح */
+  rowsValue: number;
+  /** مجموع عمود «المدفوع» في الجدول المسطّح: نقد الفواتير + الشحنات */
+  rowsPaid: number;
   /** إجمالي حساب العميل = totalRemaining − creditPoolTotal */
   accountTotal: number;
   /** فرق عن `net_balance` المخزَّن — يجب أن يكون 0 */
@@ -142,6 +186,18 @@ export function stampOf(row: { date?: any; created_at?: any }): {
 /** تنسيق مبلغ للعرض للعميل. */
 const money = (n: number) => Math.abs(r2(n)).toLocaleString();
 
+/**
+ * نصّ سطر الشحن — مختصر عمداً: المبلغ وحده بإشارته.
+ *
+ * أثر الشحن على الحساب مقروء أصلاً من عمودَي «المدفوع» و«المتبقي» على نفس
+ * السطر، فشرحه بالكلمات تكرار يُطيل السطر بلا فائدة. تفاصيل الشحن الكاملة
+ * (الطريقة، الحساب، رقم العملية، الملاحظة) مكانها شاشة المعاملات.
+ */
+function chargeLabel(entry: AccountEntry, amount: number): string {
+  const head = entry.kind === "overpay" ? "دفعة زائدة" : "تم شحن";
+  return `${head} +${money(amount)}`;
+}
+
 function accountOf(t: any, map?: Map<string, string>): string {
   if (t.method === "credit_balance") return "رصيد العميل";
   if (!t.account_id) return METHOD_LABEL[t.method] || "نقدًا";
@@ -182,10 +238,21 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
     if (match) mergedPaymentIds.add(match.id);
   }
 
+  // رقم الفاتورة من معرّفها — لتسمية أسطر السداد من الرصيد باسم فاتورتها
+  const invoiceNoById = new Map<string, string>(
+    liveInvoices.map((i) => [String(i.id), String(i.invoice_number || "—")]),
+  );
+
   // ===== 2) بناء الحركات =====
   const byInvoice = new Map<string, AccountEntry[]>();
   const pool: AccountEntry[] = [];
   const linkedOverpayByInvoice = new Map<string, number>();
+  /** كل عمليات السداد من الرصيد — أسطر مستقلة في الجدول المسطّح */
+  const settles: { entry: AccountEntry; amount: number; invoiceId: string | null }[] = [];
+  /** ما سُدِّد من الرصيد لكل فاتورة — يُستبعد من «المدفوع» على سطرها */
+  const settledByInvoice = new Map<string, number>();
+  /** كل إضافات الرصيد (شحن أو فائض) — صندوق واحد للفائض */
+  const creditAdds: { entry: AccountEntry; amount: number }[] = [];
 
   const push = (invoiceId: string | null, entry: AccountEntry) => {
     if (invoiceId && invoiceIds.has(invoiceId)) {
@@ -208,7 +275,8 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
 
     // (أ) استهلاك رصيد مُطبَّق على فاتورة — أثره صفر
     if (t.category === "customer_credit" && amt < 0) {
-      push(ref, {
+      const linked = ref && invoiceIds.has(ref) ? ref : null;
+      const entry: AccountEntry = {
         id: `settle:${t.id}`,
         kind: "credit_settle",
         ...st,
@@ -218,7 +286,12 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
         effect: 0,
         runningBalance: 0,
         raw: t,
-      });
+      };
+      push(ref, entry);
+      settles.push({ entry, amount: r2(Math.abs(amt)), invoiceId: linked });
+      if (linked) {
+        settledByInvoice.set(linked, r2((settledByInvoice.get(linked) || 0) + Math.abs(amt)));
+      }
       continue;
     }
 
@@ -239,12 +312,15 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
         runningBalance: 0,
         raw: t,
       };
+      // صندوق واحد للفائض: كل رصيد دائن — من شحن أو من دفعة زائدة — يدخل
+      // نفس الصندوق القابل للتوزيع اليدوي. لا يُخصم من متبقّي فاتورة بعينها،
+      // فلا يظهر المال نفسه مرّتين ولا يضيع الفائض إن حُذفت فاتورته.
       if (isOverpay && ref && invoiceIds.has(ref)) {
         linkedOverpayByInvoice.set(ref, r2((linkedOverpayByInvoice.get(ref) || 0) + amt));
-        push(ref, entry);
-      } else {
-        pool.push(entry);
+        entry.label = `دفعة زائدة على فاتورة ${invoiceNoById.get(ref)} → رصيد العميل`;
       }
+      pool.push(entry);
+      creditAdds.push({ entry, amount: r2(amt) });
       continue;
     }
 
@@ -294,8 +370,9 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
         ...st,
         total,
         paid,
-        // موجب «عليه»، سالب «له» — الفائض المرتبط بها يجعلها سالبة
-        remaining: r2(total - paid - overpay),
+        // موجب «عليه»، سالب «له». الفائض لم يعد يُخصم هنا — صار في صندوق
+        // الفائض الواحد، فلا يُحتسب المبلغ نفسه على الفاتورة وفي الصندوق معاً.
+        remaining: r2(total - paid),
         linkedOverpay: overpay,
         movements,
         runningAtCreation: 0,
@@ -338,21 +415,78 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
   const totalPaid = r2(blocks.reduce((s, b) => s + b.paid, 0));
   const totalRemaining = r2(blocks.reduce((s, b) => s + b.remaining, 0));
 
-  // الرصيد القابل للتوزيع = صافي الرصيد الدائن (`credit_balance`): مجموع كل
-  // قيود customer_credit — الشحنات موجبة وما استُهلك منها سالب — ناقص الفائض
-  // المنسوب لفاتورة بعينها لأنه محسوب أصلاً ضمن متبقّيها السالب.
-  const totalLinkedOverpay = r2(
-    [...linkedOverpayByInvoice.values()].reduce((s, v) => s + v, 0),
-  );
+  // الرصيد القابل للتوزيع = صافي الرصيد الدائن (`credit_balance`) كاملاً:
+  // مجموع كل قيود customer_credit — الشحنات والفوائض موجبة وما استُهلك سالب.
+  // صندوق واحد، فلا خصم للفائض المرتبط بفاتورة.
   const netCredit = r2(
     transactions
       .filter((t) => t.category === "customer_credit")
       .reduce((s, t) => s + num(t.amount), 0),
   );
-  const creditPoolTotal = r2(netCredit - totalLinkedOverpay);
+  const creditPoolTotal = netCredit;
   const accountTotal = r2(totalRemaining - creditPoolTotal);
 
+  // ===== 6) الجدول المسطّح =====
+  // نوعان من الأسطر فقط. «المتبقي» على سطر الشحن هو صافي حساب العميل بعده،
+  // فيرى العميل مباشرةً كم ابتلع الشحنُ من دَينه وكم بقي مخزّناً له.
+  type Seed = {
+    at: string;
+    /** أثر السطر على صافي الحساب بإشارة العرض (موجب لصالح العميل) */
+    delta: number;
+    make: (netAfter: number) => AccountRow;
+  };
+
+  const seeds: Seed[] = [
+    ...blocks.map((b) => {
+      // النقد وحده: ما سُدِّد من الرصيد داخل في مبلغ الشحن بعموده
+      const cashPaid = r2(b.paid - r2(settledByInvoice.get(b.invoiceId) || 0));
+      return {
+        at: b.at,
+        delta: r2(cashPaid - b.total),
+        make: (): AccountRow => ({
+          id: `inv:${b.invoiceId}`,
+          kind: "invoice" as const,
+          at: b.at, date: b.date, time: b.time,
+          label: `فاتورة ${b.invoiceNumber}`,
+          invoiceId: b.invoiceId,
+          value: b.total,
+          paid: cashPaid,
+          remaining: r2(cashPaid - b.total),
+        }),
+      };
+    }),
+    ...creditAdds.map(({ entry, amount }) => ({
+      at: entry.at,
+      delta: amount,
+      make: (netAfter: number): AccountRow => ({
+        id: entry.id,
+        kind: "credit" as const,
+        at: entry.at, date: entry.date, time: entry.time,
+        label: chargeLabel(entry, amount),
+        value: null,
+        paid: amount,
+        remaining: netAfter,
+      }),
+    })),
+  ];
+
+  let netRunning = 0;
+  const rows = seeds
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .map((s) => {
+      netRunning = r2(netRunning + s.delta);
+      return s.make(netRunning);
+    });
+
+  // مجاميع أعمدة الجدول المسطّح — يجب أن يقفل الطرح:
+  // Σ القيمة − Σ المدفوع = صافي الحساب. حارس في الاختبارات يمنع أي انحراف.
+  const rowsValue = r2(rows.reduce((s, r) => s + (r.value || 0), 0));
+  const rowsPaid = r2(rows.reduce((s, r) => s + (r.paid || 0), 0));
+
   return {
+    rows,
+    rowsValue,
+    rowsPaid,
     timeline,
     blocks,
     creditPool: poolSorted,
@@ -370,14 +504,31 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
 
 /**
  * نص أثر الحركة — دلتا موقّعة لا رصيد.
- * سالب يُنقص ما على العميل ⇒ «−X» أخضر؛ موجب يزيده ⇒ «+X» أحمر.
+ *
+ * الإشارة معروضة **بلغة العميل** لا بلغة الدفاتر، فتطابق `signedBalanceText`
+ * وتطابق ما يكتبه العميل نفسه («دفع 300 … متبقي -200 … شحن رصيد +300»):
+ *   ما يصبّ في مصلحته (دفعة/شحن) ⇒ «+X» **أخضر**
+ *   ما يزيد عليه (فاتورة)         ⇒ «−X» **أحمر**
+ * أي أن العلامة المعروضة عكس `effect` الداخلي الذي يقيس الدين علينا.
  * لا تُستعمل هنا لغة «له/عليه» لأنها تصف رصيداً لا حركة.
  */
 export function effectText(effect: number): { text: string; tone: "debit" | "credit" | "settled" } {
   const n = r2(effect);
   if (Math.abs(n) < 0.01) return { text: "لا أثر", tone: "settled" };
-  if (n < 0) return { text: `−${Math.abs(n).toLocaleString()}`, tone: "credit" };
-  return { text: `+${n.toLocaleString()}`, tone: "debit" };
+  if (n < 0) return { text: `+${Math.abs(n).toLocaleString()}`, tone: "credit" };
+  return { text: `−${n.toLocaleString()}`, tone: "debit" };
+}
+
+/**
+ * رقم موقّع بلغة العميل لعمود «المتبقي» — مختصر بلا كلمات:
+ * «+300» أخضر لما هو لصالحه، «−100» أحمر لما هو عليه، «خالص» عند الصفر.
+ * القيمة الداخلة **بإشارة العرض** (موجب لصالح العميل) لا بإشارة الدفاتر.
+ */
+export function signedAmountText(shown: number): { text: string; tone: "debit" | "credit" | "settled" } {
+  const n = r2(shown);
+  if (Math.abs(n) < 0.01) return { text: "خالص", tone: "settled" };
+  if (n > 0) return { text: `+${n.toLocaleString()}`, tone: "credit" };
+  return { text: `−${Math.abs(n).toLocaleString()}`, tone: "debit" };
 }
 
 /** نص الرصيد بإشارته: «له +X» أخضر، «عليه −X» أحمر، «خالص» محايد. */
