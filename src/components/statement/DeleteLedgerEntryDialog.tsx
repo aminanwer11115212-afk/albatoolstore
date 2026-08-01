@@ -18,7 +18,6 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { formatMoney } from "@/utils/balanceDisplay";
 import {
   classifyLedgerEntry,
-  creditChargeDeletability,
   projectDeleteImpact,
   DELETABILITY_MESSAGE,
   type LedgerTx,
@@ -85,10 +84,9 @@ export default function DeleteLedgerEntryDialog({
   const isCharge = kind === "credit_charge";
   const amount = Math.abs(Number(entry.amount || 0));
   const impact = projectDeleteImpact(entry, currentNet);
-  const guard = isCharge ? creditChargeDeletability(entry, transactions) : null;
-  // لم يعد الاستهلاك مانعاً: الـRPC تعكسه على الفواتير ثم تحذف الشحنة. يبقى
-  // تحذيراً صريحاً قبل التنفيذ لأن الحذف يُنقص `paid_amount` لفواتير أخرى.
-  const willReverse = !!guard && !guard.canDelete;
+  // لا تنبيه قبل الحذف: القاعدة ثابتة — الدفع والشحن يُحسبان في حساب العميل،
+  // فالحذف يردّ أثره إلى الرصيد التراكمي. وصندوق الأثر أسفله يعرض الرصيد قبل
+  // وبعد بالأرقام، وهو أنفع من تحذيرٍ على أمرٍ محسوم.
   const blocked = false;
 
   const title = isCharge ? "حذف شحن رصيد" : "حذف دفعة";
@@ -174,25 +172,6 @@ export default function DeleteLedgerEntryDialog({
             {!isAdmin && (
               <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-2">
                 الحذف مسموح لمدير النظام فقط.
-              </div>
-            )}
-
-            {willReverse && guard && (
-              <div
-                data-testid="delete-reverse-warning"
-                className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/40 rounded-md p-3 space-y-1"
-              >
-                <div className="font-semibold">تنبيه: هذه الشحنة استُهلك منها</div>
-                <div>
-                  سيُعكَس الاستهلاك أولاً — يُنقص المدفوع على الفواتير التي سُدِّدت منها
-                  وتعود حالتها، ثم تُحذف الشحنة.
-                </div>
-                {guard.linkedConsumed > 0 && (
-                  <div className="tabular-nums">
-                    المستهلَك منها: {formatMoney(guard.linkedConsumed)} · الرصيد الدائن المتبقي:{" "}
-                    {formatMoney(guard.availableCredit)}
-                  </div>
-                )}
               </div>
             )}
 

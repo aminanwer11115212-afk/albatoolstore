@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import { startsWithAny } from "@/utils/searchMatch";
@@ -54,7 +53,6 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
   const [accountId, setAccountId] = useState<string>("");
   const [bankAccountId, setBankAccountId] = useState<string>("");
   const [referenceNo, setReferenceNo] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [customerSearch, setCustomerSearch] = useState<string>("");
   const [showCustomerSugg, setShowCustomerSugg] = useState(false);
@@ -139,7 +137,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
           _method: method,
           _account_id: targetAccountId,
           _reference_no: method === "bank_transfer" ? referenceNo : null,
-          _notes: notes || null,
+          _notes: null,
         });
         if (error) throw error;
         if (data && data.ok === false) throw new Error(data.reason || "تعذّر حفظ الشحن");
@@ -160,7 +158,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
             date,
             customer_id: customerId,
             account_id: targetAccountId,
-            description: `شحن رصيد${notes ? ` - ${notes}` : ""}`,
+            description: "شحن رصيد",
           },
           label: "شحن رصيد عميل (أوفلاين)",
         });
@@ -211,12 +209,18 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent ref={dlgRef} style={{ ...dlgStyle, overflowY: "auto" }} dir="rtl">
+      {/* يسع شاشة اللابتوب كاملاً: سقف الارتفاع 92vh والتمرير داخلي عند
+          الضرورة وحدها، فلا تمتدّ النافذة خلف حافة الشاشة. */}
+      <DialogContent
+        ref={dlgRef}
+        style={{ ...dlgStyle, maxHeight: "92vh", overflowY: "auto" }}
+        dir="rtl"
+      >
         <DialogHeader>
           <DialogTitle>شحن رصيد العميل</DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {/* Customer */}
           <div>
             <Label>العميل</Label>
@@ -358,11 +362,6 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
               </div>
             </>
           )}
-
-          <div className="md:col-span-2">
-            <Label>ملاحظات</Label>
-            <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
 
           {/* Net balance preview */}
           {selectedCustomer && amt > 0 && (

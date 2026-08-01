@@ -279,15 +279,15 @@ describe("قدرات الحركة — المصدر الواحد الذي تقر�
     expect(caps.editBlockedBy).toBeNull();
   });
 
-  // لا منع بعد اليوم — والتحذير يبقى إخباراً بأن الحذف سيعكس استهلاكاً وقع
-  // فعلاً على فواتير، فيرى المستخدم أثر فعله قبل أن يفعله.
-  it("شحنة استُهلك منها: تُعدَّل وتُحذف، والتحذير يبقى إخباراً لا منعاً", () => {
+  // لا منع ولا تنبيه: الدفع والشحن يُحسبان في حساب العميل دائماً، فالحذف
+  // يردّ أثره إلى الرصيد التراكمي ولا شيء يُنبَّه عليه.
+  it("شحنة استُهلك منها: تُعدَّل وتُحذف بلا تنبيه", () => {
     const charge = t({ id: "c", category: "customer_credit", amount: 500, allocation: { group_id: "g1" } });
     const used = t({ id: "u", category: "customer_credit", amount: -200, allocation: { group_id: "g1" } });
     const caps = movementCapabilities(charge, [charge, used]);
     expect(caps.canDelete).toBe(true);
     expect(caps.deleteBlockedBy).toBeNull();
-    expect(caps.deleteWarning).toBe("explicit_consumption");
+    expect(caps.deleteWarning).toBeUndefined();
     expect(caps.canEdit).toBe(true);
     expect(caps.editBlockedBy).toBeNull();
   });

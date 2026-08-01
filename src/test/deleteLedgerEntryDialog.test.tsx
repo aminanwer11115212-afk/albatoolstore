@@ -92,16 +92,14 @@ describe("ملخّص ما قبل التنفيذ", () => {
   });
 });
 
-// الاستهلاك لم يعد مانعاً للحذف: `delete_customer_credit_entry` تعكسه على
-// الفواتير أولاً ثم تحذف الشحنة. يبقى تحذيراً صريحاً لأن الحذف يُنقص
-// `paid_amount` لفواتير أخرى — أثر يجب أن يراه المستخدم قبل التأكيد.
-describe("الشحنة المستهلَكة: تحذير لا منع", () => {
-  it("يظهر تحذير يشرح ما سيُعكَس قبل الحذف", () => {
+// لا تنبيه قبل الحذف: القاعدة ثابتة — الدفع والشحن يُحسبان في حساب العميل،
+// فالحذف يردّ أثره إلى الرصيد التراكمي. تنبيهٌ على أمرٍ محسوم يُعلّم المستخدم
+// تجاهل التنبيهات، وصندوق الأثر يعرض الرصيد قبل وبعد بالأرقام.
+describe("الشحنة المستهلَكة: تُحذف بلا تنبيه", () => {
+  it("لا تحذير استهلاك على الإطلاق", () => {
     renderDialog(charge, [charge, consumedCharge], -80);
-    expect(screen.getByTestId("delete-reverse-warning")).toBeTruthy();
-    expect(screen.getByText("تنبيه: هذه الشحنة استُهلك منها")).toBeTruthy();
-    expect(screen.getByText(/يُنقص المدفوع على الفواتير/)).toBeTruthy();
-    expect(screen.getByText(/المستهلَك منها: 120/)).toBeTruthy();
+    expect(screen.queryByTestId("delete-reverse-warning")).toBeNull();
+    expect(screen.queryByText(/استُهلك منها/)).toBeNull();
   });
 
   it("زر التأكيد مفعّل رغم الاستهلاك", () => {
