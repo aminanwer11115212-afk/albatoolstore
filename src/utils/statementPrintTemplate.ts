@@ -268,10 +268,6 @@ export function generateStatementHTML(data: StatementData): string {
     <div class="summary-box-title">المدفوع</div>
     <div class="summary-box-value" style="color:#16a34a;">${fmt(totals.paidTotal)}</div>
   </div>
-  <div class="summary-box" style="border-color:#dc2626;">
-    <div class="summary-box-title">المتبقي</div>
-    <div class="summary-box-value red" data-print-total>${fmt(totals.remaining)}</div>
-  </div>
 </div>`
       : `
 <div class="summary-row" data-section="summary" data-section-label="ملخص الحساب">

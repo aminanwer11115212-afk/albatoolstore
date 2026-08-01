@@ -4,7 +4,7 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 import { loadInvoiceExtras, loadQuoteExtras } from "@/utils/printExtras";
-import { ArrowRight, Loader2, Wallet } from "lucide-react";
+import { ArrowRight, Loader2, Wallet, Eye, EyeOff } from "lucide-react";
 import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 import InvoicePaymentHistory from "@/components/invoice/InvoicePaymentHistory";
 import DiscountInput from "@/components/shared/DiscountInput";
@@ -46,6 +46,14 @@ export default function DocumentPreviewPage({ docType }: Props) {
   } | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const [savingDisc, setSavingDisc] = useState(false);
+  /**
+   * تفاصيل الشريط (الخصم الحي وترتيب البنود) مطويّة على الهاتف: الشريطان معاً
+   * — هذا وشريط المستند البنفسجي — كانا يبتلعان أكثر من نصف الشاشة قبل أن
+   * تبدأ الفاتورة، والمعاينة وُجدت لرؤية الفاتورة لا لرؤية أدواتها.
+   */
+  const [toolsOpen, setToolsOpen] = useState(() =>
+    typeof window === "undefined" ? true : window.innerWidth > 640,
+  );
   const itemsSort = stocktakeSort;
 
   const variant = (search.get("variant") || "full") as
@@ -407,7 +415,21 @@ export default function DocumentPreviewPage({ docType }: Props) {
           <ArrowRight size={16} /> <span className="whitespace-nowrap">رجوع</span>
         </button>
         <div className="text-sm font-bold text-foreground whitespace-nowrap">{title}</div>
-        <div className="w-full sm:w-auto sm:ms-auto flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setToolsOpen((v) => !v)}
+          aria-expanded={toolsOpen}
+          data-testid="toggle-preview-tools"
+          className="sm:hidden shrink-0 ms-auto inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted/50"
+          title={toolsOpen ? "إخفاء الخصم والترتيب" : "إظهار الخصم والترتيب"}
+        >
+          {toolsOpen ? <EyeOff size={14} /> : <Eye size={14} />} تفاصيل
+        </button>
+        <div
+          className={`w-full sm:w-auto sm:ms-auto flex-wrap items-center gap-2 ${
+            toolsOpen ? "flex" : "hidden sm:flex"
+          }`}
+        >
           {docType === "invoice" && invMeta && (
             <div className="flex flex-1 sm:flex-none items-center gap-1.5 px-2 py-1 rounded-md border bg-muted/40" title="خصم حي — يُطبَّق فورًا على الإجمالي والمتبقي والحالة">
               <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">خصم حي</span>

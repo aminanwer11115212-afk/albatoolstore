@@ -268,6 +268,8 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
   const byInvoice = new Map<string, AccountEntry[]>();
   const pool: AccountEntry[] = [];
   const linkedOverpayByInvoice = new Map<string, number>();
+  /** قيود الفائض التي ضُمّت إلى سطر فاتورتها — لا سطر مستقل لها */
+  const overpayFoldedIds = new Set<string>();
   /** كل عمليات السداد من الرصيد — أسطر مستقلة في الجدول المسطّح */
   const settles: { entry: AccountEntry; amount: number; invoiceId: string | null }[] = [];
   /** ما سُدِّد من الرصيد لكل فاتورة — يُستبعد من «المدفوع» على سطرها */
@@ -338,6 +340,7 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
       // فلا يظهر المال نفسه مرّتين ولا يضيع الفائض إن حُذفت فاتورته.
       if (isOverpay && ref && invoiceIds.has(ref)) {
         linkedOverpayByInvoice.set(ref, r2((linkedOverpayByInvoice.get(ref) || 0) + amt));
+        overpayFoldedIds.add(entry.id);
         entry.label = `دفعة زائدة على فاتورة ${invoiceNoById.get(ref)} → رصيد العميل`;
       }
       pool.push(entry);
@@ -459,8 +462,17 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
 
   const seeds: Seed[] = [
     ...blocks.map((b) => {
-      // النقد وحده: ما سُدِّد من الرصيد داخل في مبلغ الشحن بعموده
-      const cashPaid = r2(b.paid - r2(settledByInvoice.get(b.invoiceId) || 0));
+      // النقد وحده: ما سُدِّد من الرصيد داخل في مبلغ الشحن بعموده.
+      //
+      // والفائض يعود إلى سطر فاتورته: من دفع 500 على فاتورة 400 دفعها كلها
+      // في عمليةٍ واحدة، فتفتيتها إلى «مدفوع 400» وسطرٍ ثانٍ «دفعة زائدة
+      // +100» يجعل حساب الفاتورة على سطرها خاطئاً — يقرأ العميل «خالص» وقد
+      // دفع أكثر. مضمومةً يصير السطر صادقاً بذاته: 400 · 500 · +100.
+      const cashPaid = r2(
+        b.paid
+        - r2(settledByInvoice.get(b.invoiceId) || 0)
+        + r2(linkedOverpayByInvoice.get(b.invoiceId) || 0),
+      );
       return {
         at: b.at,
         delta: r2(cashPaid - b.total),
@@ -476,7 +488,11 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
         }),
       };
     }),
-    ...creditAdds.map(({ entry, amount }) => ({
+    // الفائض المرتبط بفاتورة قائمة ضُمّ إلى سطرها أعلاه — فلا سطر مستقل له.
+    // ويبقى مستقلاً إن كانت فاتورته محذوفة، وإلا ضاع من الكشف.
+    ...creditAdds
+      .filter(({ entry }) => !(entry.kind === "overpay" && overpayFoldedIds.has(entry.id)))
+      .map(({ entry, amount }) => ({
       at: entry.at,
       delta: amount,
       make: (): AccountRow => ({

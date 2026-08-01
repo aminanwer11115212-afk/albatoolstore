@@ -537,7 +537,6 @@ export default function CustomerStatementPage() {
       summary: [
         { label: "إجمالي الفواتير", value: totalInvoices, color: "blue" },
         { label: "المدفوع", value: totalPaid, color: "green" },
-        { label: "المتبقي", value: remaining, color: remaining > 0 ? "red" : "green" },
         { label: `الرصيد الصافي (${netLabel})`, value: Math.abs(netBal), color: netColor },
       ],
       sections: [
