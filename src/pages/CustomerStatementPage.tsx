@@ -14,6 +14,7 @@ import CreditConsumptionOrderControl from "@/components/statement/CreditConsumpt
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
 import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
+import EditChargeDialog, { type EditableCharge } from "@/components/finance/EditChargeDialog";
 import DeleteLedgerEntryDialog, { type DeletableEntry } from "@/components/statement/DeleteLedgerEntryDialog";
 import FinancialMovementsDialog from "@/components/statement/FinancialMovementsDialog";
 import { classifyLedgerEntry, creditChargeDeletability, movementCapabilities } from "@/utils/ledgerEntryActions";
@@ -247,9 +248,13 @@ export default function CustomerStatementPage() {
     if (!t.account_id) return "نقدًا";
     return accountNameById.get(t.account_id) || "—";
   };
+  // دفعة قابلة للتعديل: قيد دفع نقدي/بنكي مرتبط بفاتورة (لا استهلاك رصيد دائن)
+  const isRevisablePayment = (t: any): boolean =>
+    t.category === "customer_payment" && t.method !== "credit_balance" && !!t.reference_id;
   const [reviseTx, setReviseTx] = useState<EditablePayment | null>(null);
   // شحن رصيد قابل للتعديل: يحتاج مجموعة (`allocation.group_id`) كي يعمل
   // `revise_customer_charge`؛ شحنات الفائض التلقائي بلا مجموعة تُحذف ولا تُعدَّل.
+  const [reviseCharge, setReviseCharge] = useState<EditableCharge | null>(null);
   const [deleteEntry, setDeleteEntry] = useState<DeletableEntry | null>(null);
   const invoiceNumberById = useMemo(() => {
     const m = new Map<string, string>();
@@ -263,13 +268,29 @@ export default function CustomerStatementPage() {
       accountLabel: accountLabel(t),
     });
   };
+  const openReviseCharge = (t: any) => {
+    const groupId = t.allocation?.group_id ? String(t.allocation.group_id) : null;
+    if (!groupId) {
+      toast.error("هذه الشحنة بلا مجموعة تخصيص — يمكن حذفها فقط");
+      return;
+    }
+    setReviseCharge({
+      groupId,
+      customerId: t.customer_id || selectedCustomerId,
+      amount: Number(t.amount || 0),
+      method: t.method,
+      accountId: t.account_id,
+      date: t.date,
+      hasConsumption: !creditChargeDeletability(t, (transactions as any[]) || []).canDelete,
+    });
+  };
   const [movementsOpen, setMovementsOpen] = useState(false);
   /**
    * موجّه التعديل الواحد: نافذة الحركات لا تعرف أي حوار يفتح لأي نوع — تنادي
    * هنا فيُختار الحوار حسب نوع الحركة. فيبقى قرار «ماذا يفتح» في مكان واحد.
    */
   const openEditMovement = (t: any) => {
-    // شحنات الرصيد لا تُعدَّل — تُحذف وتُعاد. القدرات تمنع الوصول هنا أصلاً.
+    if (classifyLedgerEntry(t) === "credit_charge") return openReviseCharge(t);
     setReviseTx({
       id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id,
       customer_id: t.customer_id, description: t.description,
@@ -1189,18 +1210,22 @@ export default function CustomerStatementPage() {
                           <td data-label="الوصف" className="px-5 py-3 text-muted-foreground text-xs">{t.description || "-"}</td>
                           <td data-label="تعديل" className="px-5 py-3 print:hidden">
                             {(() => {
-                              const caps = movementCapabilities(t, (transactions as any[]) || []);
-                              const canEdit = caps.canEdit;
-                              const canDelete = caps.canDelete;
+                              const entryKind = classifyLedgerEntry(t);
+                              const canEdit = isRevisablePayment(t) || entryKind === "credit_charge";
+                              const canDelete = isRevisablePayment(t) || entryKind === "credit_charge";
                               if (!canEdit && !canDelete) return <span className="text-muted-foreground text-xs">—</span>;
                               return (
                                 <div className="flex items-center gap-3">
                                   {canEdit && (
                                     <button
                                       type="button"
-                                      onClick={() => openEditMovement(t)}
+                                      onClick={() =>
+                                        entryKind === "credit_charge"
+                                          ? openReviseCharge(t)
+                                          : setReviseTx({ id: t.id, amount: Number(t.amount || 0), reference_id: t.reference_id, customer_id: t.customer_id, description: t.description, method: (t as any).method, account_id: (t as any).account_id, date: (t as any).date })
+                                      }
                                       className="text-xs text-primary hover:underline"
-                                      title="تعديل مبلغ/خصم هذه الدفعة"
+                                      title={entryKind === "credit_charge" ? "تعديل شحن الرصيد" : "تعديل مبلغ/خصم هذه الدفعة"}
                                     >
                                       تعديل
                                     </button>
@@ -1210,7 +1235,7 @@ export default function CustomerStatementPage() {
                                       type="button"
                                       onClick={() => openDeleteEntry(t)}
                                       className="text-xs text-destructive hover:underline"
-                                      title={caps.kind === "credit_charge" ? "حذف شحن الرصيد" : "حذف هذه الدفعة"}
+                                      title={entryKind === "credit_charge" ? "حذف شحن الرصيد" : "حذف هذه الدفعة"}
                                     >
                                       حذف
                                     </button>
@@ -1281,6 +1306,13 @@ export default function CustomerStatementPage() {
         open={!!reviseTx}
         tx={reviseTx}
         onClose={() => setReviseTx(null)}
+        onSaved={refreshAfterRevise}
+      />
+
+      <EditChargeDialog
+        open={!!reviseCharge}
+        charge={reviseCharge}
+        onClose={() => setReviseCharge(null)}
         onSaved={refreshAfterRevise}
       />
 

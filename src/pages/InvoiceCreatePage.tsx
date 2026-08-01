@@ -1075,7 +1075,16 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       // - كاش: مدفوع بالكامل
       // - غير ذلك: حافظ على paid_amount السابق (إن وُجد)، ثم احسب الحالة:
       //   paid >= total => paid، paid > 0 => partially_paid، وإلا pending
-      const prevPaid = effectiveEditId ? Math.max(0, Number(savedPaid) || 0) : 0;
+      // **المدفوع يُقرأ من القاعدة لا من حالة الواجهة.** كان يُؤخذ من `savedPaid`،
+      // وهي حالة React قد تكون قديمة (فتحُ الشاشة بلا تحميلها، أو حفظٌ بعد دفعة
+      // سُجِّلت في تبويب آخر) — فيُكتب `paid_amount = 0` فوق دفعة موجودة ويظهر
+      // المدفوع صفراً. القراءة الطازجة تُلغي هذا الاحتمال من أصله.
+      let prevPaid = 0;
+      if (effectiveEditId) {
+        const { data: freshRow } = await supabase
+          .from("invoices").select("paid_amount").eq("id", effectiveEditId).maybeSingle();
+        prevPaid = Math.max(0, Number((freshRow as any)?.paid_amount ?? savedPaid) || 0);
+      }
       const computedPaid = isCash ? totals.total : prevPaid;
       const computedDue = Math.max(0, Number(totals.total || 0) - computedPaid);
       // هامش تسامح 0.01 لمنع أخطاء التقريب في تحديد الحالة

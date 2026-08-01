@@ -555,3 +555,26 @@ describe("ملف الفحص والإصلاح", () => {
     expect(code).not.toMatch(/\bUPDATE\s+public\.(invoices|customers)\b/i);
   });
 });
+
+describe("حفظ الفاتورة لا يمحو المدفوع", () => {
+  const src = fs.readFileSync(
+    path.resolve(process.cwd(), "src/pages/InvoiceCreatePage.tsx"), "utf8");
+
+  /**
+   * العطل المُبلَّغ: تسجيل دفعة ثانية في شاشة تعديل الفاتورة يجعل المدفوع صفراً.
+   * السبب أن `saveInvoice` كان يكتب `paid_amount` من حالة React (`savedPaid`)،
+   * وهي قد تكون قديمة — فيُكتب صفر فوق دفعة موجودة. القراءة الطازجة من القاعدة
+   * تُلغي الاحتمال، وهذا الاختبار يمنع الرجوع للاشتقاق من الحالة.
+   */
+  it("المدفوع يُقرأ من القاعدة قبل الكتابة لا من حالة الواجهة", () => {
+    const at = src.indexOf("let prevPaid = 0;");
+    expect(at).toBeGreaterThan(0);
+    const block = src.slice(at, at + 400);
+    expect(block).toContain('.select("paid_amount")');
+    expect(block).toContain("eq(\"id\", effectiveEditId)");
+  });
+
+  it("لا اشتقاق مباشر لـ prevPaid من savedPaid وحدها", () => {
+    expect(src).not.toMatch(/const\s+prevPaid\s*=\s*effectiveEditId\s*\?\s*Math\.max\(0,\s*Number\(savedPaid\)/);
+  });
+});
