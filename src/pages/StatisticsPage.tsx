@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { totalInvoiceDue } from "@/utils/invoiceDue";
 import { useNavigate } from "react-router-dom";
 import { useInvoicesWithCustomers, useTransactionsWithAccounts, useProducts, useCustomers, useSuppliers, useCompanySettings } from "@/hooks/useData";
 import { BarChart3, TrendingUp, TrendingDown, ShoppingCart, FileText, Users, Package, DollarSign, Percent, AlertTriangle, Eye } from "lucide-react";
@@ -163,7 +164,7 @@ export default function StatisticsPage() {
 
   // Due amounts
   const totalDue = useMemo(() => {
-    return invoices.reduce((s, inv: any) => s + Number(inv.due_amount || 0), 0);
+    return totalInvoiceDue(invoices as any);
   }, [invoices]);
 
   const isLoading = loadingInv || loadingTx;

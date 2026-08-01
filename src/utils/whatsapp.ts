@@ -1,3 +1,5 @@
+import { invoiceDue } from "@/utils/invoiceDue";
+
 /**
  * Normalize phone to E.164 digits (no '+').
  */
@@ -125,7 +127,9 @@ export function generateWhatsAppMessage(type: WhatsAppMessageType, invoice: Invo
   const name = invoice.customerName || "عزيزي العميل";
   const total = Number(invoice.total).toLocaleString();
   const paid = Number(invoice.paid_amount).toLocaleString();
-  const due = Number(invoice.due_amount).toLocaleString();
+  // محسوب لا مقروء — العمود المخزَّن ينحرف، وهذا الرقم يصل العميل
+  const dueValue = invoiceDue(invoice);
+  const due = dueValue.toLocaleString();
 
   switch (type) {
     case "invoice_notification":
@@ -162,7 +166,7 @@ export function generateWhatsAppMessage(type: WhatsAppMessageType, invoice: Invo
         `✅ *تأكيد استلام الدفع*`,
         `📄 فاتورة رقم: ${invoice.invoice_number}`,
         `💰 المبلغ المدفوع: ${paid} ${currency}`,
-        Number(invoice.due_amount) > 0
+        dueValue > 0
           ? `⚠️ المتبقي: ${due} ${currency}`
           : `✅ تم سداد كامل المبلغ`,
         ``,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { invoiceDue } from "@/utils/invoiceDue";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
@@ -10,6 +11,7 @@ import DiscountInput from "@/components/shared/DiscountInput";
 import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
 import { toast } from "sonner";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { netBeforeInvoice } from "@/utils/customerNetBefore";
 
 /**
  * صفحة معاينة داخلية للمستندات (عرض سعر / فاتورة).
@@ -138,11 +140,36 @@ export default function DocumentPreviewPage({ docType }: Props) {
           }));
           const extras = await loadInvoiceExtras(invoice.id);
           const iCust: any = invoice.customers;
-          // اطرح متبقّي/فائض هذه الفاتورة من رصيد العميل الحالي حتى لا يُحسب مرتين
-          const invRemaining = Math.max(Number(invoice.total || 0) - Number(invoice.paid_amount || 0), 0);
-          const invSurplus   = Math.max(Number(invoice.paid_amount || 0) - Number(invoice.total || 0), 0);
-          const prevDebt   = Math.max(Number(iCust?.balance || 0) - invRemaining, 0);
-          const prevCredit = Math.max(Number(iCust?.credit_balance || 0) - invSurplus, 0);
+          // «الحساب القديم» تاريخياً — نفس مسار `printInvoiceDirect`. الطرح من
+          // الرصيد الحالي يُدخل في «القديم» فواتيرَ أُنشئت بعد هذه، ويقصّ عند
+          // الصفر فيشوّه الصافي حين يجتمع دَينٌ ورصيد.
+          const invCustomerId = (invoice as any).customer_id;
+          let prevNet: number | null = null;
+          if (invCustomerId) {
+            const [{ data: custInvoices }, { data: custTxs }] = await Promise.all([
+              (supabase as any)
+                .from("invoices")
+                .select("id, total, paid_amount, status, date, created_at")
+                .eq("customer_id", invCustomerId),
+              (supabase as any)
+                .from("transactions")
+                .select("id, category, amount, method, reference_id, date, created_at")
+                .eq("customer_id", invCustomerId)
+                .in("category", ["customer_payment", "customer_credit"]),
+            ]);
+            prevNet = netBeforeInvoice(String(invoice.id), {
+              invoices: custInvoices || [],
+              transactions: custTxs || [],
+            });
+          }
+          if (prevNet == null) {
+            const invRemaining = Math.max(Number(invoice.total || 0) - Number(invoice.paid_amount || 0), 0);
+            const invSurplus   = Math.max(Number(invoice.paid_amount || 0) - Number(invoice.total || 0), 0);
+            prevNet = Math.max(Number(iCust?.balance || 0) - invRemaining, 0)
+                    - Math.max(Number(iCust?.credit_balance || 0) - invSurplus, 0);
+          }
+          const prevDebt   = prevNet > 0 ? prevNet : 0;
+          const prevCredit = prevNet < 0 ? -prevNet : 0;
           docHtml = generatePrintHTML({
             type: "invoice",
             isCash: invoice.type === "cash",
@@ -166,7 +193,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
             shipping: Number(invoice.shipping || 0),
             grandTotal: Number(invoice.total || 0),
             paidAmount: Number(invoice.paid_amount || 0),
-            dueAmount: Number(invoice.due_amount || 0),
+            dueAmount: invoiceDue(invoice as any),
             notes: invoice.notes,
             company: company as any,
             status: invoice.status,
@@ -176,6 +203,8 @@ export default function DocumentPreviewPage({ docType }: Props) {
             oldBalance: netBalanceOf(iCust),
             previousDebt: prevDebt,
             previousCredit: prevCredit,
+            // الرصيد الفعلي — منه يُشتقّ «المدفوع» بدل قراءة توزيع الدفعة
+            currentNet: invCustomerId && iCust ? netBalanceOf(iCust) : null,
             hidePaidBox: false,
             ...extras,
           });
