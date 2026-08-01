@@ -135,23 +135,24 @@ export default function CustomerStatementsPage() {
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground w-12">#</th>
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground">الاسم</th>
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground">الهاتف</th>
-                <th className="text-right px-3 py-3 font-semibold text-muted-foreground">المديونية</th>
-                <th className="text-right px-3 py-3 font-semibold text-muted-foreground">رصيد دائن</th>
-                <th className="text-right px-3 py-3 font-semibold text-muted-foreground">الصافي</th>
+                {/* عمود واحد: الرصيد التراكمي «له / عليه / خالص». عرضُ المديونية
+                    والدائن منفصلَين يوحي بحسابين، والعميل حسابه واحد — ومجموعهما
+                    الجبري هو الرقم الوحيد الذي يعنيه. */}
+                <th className="text-right px-3 py-3 font-semibold text-muted-foreground">الرصيد</th>
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground">إجراءات</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-muted-foreground">
+                  <td colSpan={5} className="text-center py-10 text-muted-foreground">
                     <span className="inline-block h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin align-middle me-2" />
                     جاري تحميل بيانات العملاء...
                   </td>
                 </tr>
               ) : isError ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10">
+                  <td colSpan={5} className="text-center py-10">
                     <div className="inline-flex items-center gap-2 text-destructive">
                       <AlertTriangle size={18} />
                       <span>تعذّر جلب بيانات العملاء (netBalanceOf).</span>
@@ -168,15 +169,13 @@ export default function CustomerStatementsPage() {
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-muted-foreground">
+                  <td colSpan={5} className="text-center py-10 text-muted-foreground">
                     {q ? `لا يوجد عملاء مطابقون لـ "${q}"` : "لا يوجد عملاء بعد"}
                   </td>
                 </tr>
               ) : (
                 rows.map((c, i) => {
                   const net = c._net as number;
-                  const debt = Number(c.balance || 0);
-                  const credit = Number(c.credit_balance || 0);
                   const isActive = i === activeIdx;
                   return (
                     <tr
@@ -191,12 +190,6 @@ export default function CustomerStatementsPage() {
                       <td className="px-3 py-3 font-medium text-foreground">{c.name}</td>
                       <td className="px-3 py-3 text-muted-foreground tabular-nums">
                         {c.phone || "—"}
-                      </td>
-                      <td className="px-3 py-3 text-destructive tabular-nums">
-                        {debt > 0 ? formatMoney(debt) : "—"}
-                      </td>
-                      <td className="px-3 py-3 text-emerald-600 tabular-nums">
-                        {credit > 0 ? formatMoney(credit) : "—"}
                       </td>
                       <td
                         className={`px-3 py-3 font-bold tabular-nums ${

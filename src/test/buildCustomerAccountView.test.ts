@@ -51,12 +51,14 @@ describe("المثال المطلوب: دفع 5000 على فاتورة 4000", ()
     expect(signedBalanceText(view.blocks[0].remaining)).toEqual({ text: "خالص", tone: "settled" });
   });
 
-  it("الزيادة تدخل صندوق الفائض الواحد بسطر باسم فاتورتها", () => {
+  it("الفائض يعود إلى سطر فاتورته — لا سطر مستقل له", () => {
+    // من دفع 5000 على فاتورة 4000 دفعها كلها في عمليةٍ واحدة. تفتيتها إلى
+    // «مدفوع 4000» وسطرٍ ثانٍ يجعل حساب الفاتورة على سطرها خاطئاً.
     expect(view.creditPool.map((e) => e.kind)).toEqual(["overpay"]);
     expect(view.creditPoolTotal).toBe(1000);
-    const row = view.rows.find((r) => r.kind === "credit")!;
-    expect(row.label).toBe("دفعة زائدة +1,000");
-    expect(row.remaining).toBe(1000);
+    expect(view.rows.filter((r) => r.kind === "credit")).toEqual([]);
+    const row = view.rows.find((r) => r.kind === "invoice")!;
+    expect([row.value, row.paid, row.remaining]).toEqual([4000, 5000, 1000]);
   });
 
   it("إجمالي حساب العميل = net_balance", () => {
@@ -367,9 +369,11 @@ describe("صندوق الفائض الواحد", () => {
     expect(v.creditPoolTotal).toBe(1000);       // المال في الصندوق وحده
     expect(v.accountTotal).toBe(-1000);
     expect(v.drift).toBe(0);
-    const extra = v.rows.find((r) => r.kind === "credit")!;
-    expect(extra.label).toBe("دفعة زائدة +1,000");
-    expect(extra.remaining).toBe(1000);
+    // لا سطر «دفعة زائدة» — الفائض في سطر الفاتورة نفسها
+    expect(v.rows.filter((r) => r.kind === "credit")).toEqual([]);
+    const line = v.rows.find((r) => r.kind === "invoice")!;
+    expect([line.value, line.paid, line.remaining]).toEqual([4000, 5000, 1000]);
+    // والطرح ما يزال يقفل
     expect(v.rowsValue - v.rowsPaid).toBe(v.accountTotal);
   });
 });

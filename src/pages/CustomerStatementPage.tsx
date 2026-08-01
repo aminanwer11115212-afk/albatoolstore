@@ -280,13 +280,12 @@ export default function CustomerStatementPage() {
     });
   };
   const openReviseCharge = (t: any) => {
+    // شحنة بلا مجموعة تُعدَّل أيضاً: الحوار يُحدّث قيدها مباشرةً ثم يُعيد حساب
+    // الرصيد التراكمي. المنع القديم كان شرطَ آلةِ توزيعٍ لم تعد قائمة.
     const groupId = t.allocation?.group_id ? String(t.allocation.group_id) : null;
-    if (!groupId) {
-      toast.error("هذه الشحنة بلا مجموعة تخصيص — يمكن حذفها فقط");
-      return;
-    }
     setReviseCharge({
       groupId,
+      txId: t.id ? String(t.id) : null,
       customerId: t.customer_id || selectedCustomerId,
       amount: Number(t.amount || 0),
       method: t.method,
@@ -537,7 +536,6 @@ export default function CustomerStatementPage() {
       summary: [
         { label: "إجمالي الفواتير", value: totalInvoices, color: "blue" },
         { label: "المدفوع", value: totalPaid, color: "green" },
-        { label: "المتبقي", value: remaining, color: remaining > 0 ? "red" : "green" },
         { label: `الرصيد الصافي (${netLabel})`, value: Math.abs(netBal), color: netColor },
       ],
       sections: [

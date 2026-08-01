@@ -202,8 +202,9 @@ export interface MovementCapabilities {
   /** سبب منع الحذف — `null` إن كان متاحاً */
   deleteBlockedBy: BlockReason | null;
   /**
-   * الحذف مسموح لكنه يعكس عمليات أخرى معه — يُعرض تحذيراً قبل التنفيذ.
-   * يُستعمل لشحنة استُهلك منها: حذفها يُنقص `paid_amount` لفواتيرها.
+   * لم يعد يُستعمل: الدفع والشحن يُحسبان في حساب العميل دائماً، فالحذف يردّ
+   * أثره إلى الرصيد التراكمي ولا شيء يُنبَّه عليه. أُبقي الحقل اختيارياً
+   * ليُسقَط بلا كسر، ويُحذف حين يخلو منه كل مستدعٍ.
    */
   deleteWarning?: BlockReason | null;
 }
@@ -243,15 +244,10 @@ export function movementCapabilities(
     return { ...base, canEdit: true, canDelete: true, editBlockedBy: null, deleteBlockedBy: null };
   }
 
-  // الدفعة المستقلة: القاعدة تحذفها بلا مشكلة لكن التعديل يحتاج فاتورة مرتبطة.
+  // الدفعة المستقلة تُعدَّل وتُحذف كغيرها: أثرها ينزل على **الرصيد التراكمي**
+  // لا على فاتورةٍ بعينها، فلا معنى لاشتراط فاتورة مرتبطة لتعديلها.
   if (kind === "payment_standalone") {
-    return {
-      ...base,
-      canEdit: false,
-      canDelete: true,
-      editBlockedBy: "no_linked_invoice",
-      deleteBlockedBy: null,
-    };
+    return { ...base, canEdit: true, canDelete: true, editBlockedBy: null, deleteBlockedBy: null };
   }
 
   if (kind === "payment_from_credit" || kind === "credit_consume") {
@@ -265,25 +261,20 @@ export function movementCapabilities(
   }
 
   if (kind === "credit_charge") {
-    const guard = creditChargeDeletability(t, transactions);
-    const hasGroup = !!chargeGroupId(t);
-    // **الحذف متاح لأي شحنة** — `delete_customer_credit_entry` صارت تعكس
-    // استهلاكها على الفواتير أولاً ثم تحذفها، فالاستهلاك خطوة تسبق الحذف لا
-    // مانع له. أمّا التعديل فيبقى مشروطاً: يعيد إنشاء المجموعة، فيحتاج مجموعة
-    // وشحنة غير مستهلَكة معاً حتى لا يُعاد بناء ما استُهلك نصفه.
-    const editBlockedBy: BlockReason | null = !hasGroup
-      ? "no_charge_group"
-      : guard.canDelete
-        ? null
-        : (guard.reason as BlockReason);
+    // **الشحنة تُعدَّل وتُحذف بلا قيد ولا تنبيه.** كان التعديل مشروطاً بوجود
+    // مجموعة تخصيص وبألّا يكون استُهلك منها — وهي شروط آلةِ توزيعٍ لم تعد
+    // قائمة: الشحن يُخزَّن ولا يُوزَّع، فالشحنة قيدٌ واحد يُعدَّل مباشرةً ثم
+    // يُعاد حساب الرصيد التراكمي.
+    //
+    // ولا تحذير قبل الحذف: القاعدة ثابتة — الدفع والشحن يُحسبان في حساب
+    // العميل — فالحذف يردّ أثره إلى الرصيد التراكمي. تنبيهٌ على أمرٍ محسوم
+    // يُعلّم المستخدم تجاهل التنبيهات.
     return {
       ...base,
-      canEdit: editBlockedBy === null,
+      canEdit: true,
       canDelete: true,
-      editBlockedBy,
+      editBlockedBy: null,
       deleteBlockedBy: null,
-      /** تحذير يُعرض قبل الحذف — ليس منعاً */
-      deleteWarning: guard.canDelete ? null : (guard.reason as BlockReason),
     };
   }
 

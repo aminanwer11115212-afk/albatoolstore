@@ -241,12 +241,14 @@ describe("قدرات الحركة — المصدر الواحد الذي تقر�
   });
 
   // revise_invoice_payment يرفض بلا فاتورة، بينما cancel_invoice_payment يقبل
-  it("دفعة مستقلة: تُحذف ولا تُعدَّل — مطابقةً لحارسَي الـRPC", () => {
+  // أثر الدفعة ينزل على الرصيد التراكمي لا على فاتورةٍ بعينها، فلا معنى
+  // لاشتراط فاتورة مرتبطة لتعديلها.
+  it("دفعة مستقلة: تُعدَّل وتُحذف بلا قيد", () => {
     const caps = movementCapabilities(
       t({ category: "customer_payment", method: "cash", reference_id: null }), []);
     expect(caps.canDelete).toBe(true);
-    expect(caps.canEdit).toBe(false);
-    expect(caps.editBlockedBy).toBe("no_linked_invoice");
+    expect(caps.canEdit).toBe(true);
+    expect(caps.editBlockedBy).toBeNull();
   });
 
   it("قيد استهلاك الرصيد: لا يُعدَّل ولا يُحذف من هنا", () => {
@@ -267,25 +269,27 @@ describe("قدرات الحركة — المصدر الواحد الذي تقر�
     expect(caps).toMatchObject({ kind: "credit_charge", canEdit: true, canDelete: true });
   });
 
-  it("شحنة بلا مجموعة (فائض تلقائي): تُحذف ولا تُعدَّل", () => {
+  // الشحن يُخزَّن ولا يُوزَّع، فالشحنة قيدٌ واحد يُعدَّل مباشرةً ثم يُعاد
+  // حساب الرصيد التراكمي — لا حاجة لمجموعة تخصيص.
+  it("شحنة بلا مجموعة: تُعدَّل وتُحذف بلا قيد", () => {
     const charge = t({ category: "customer_credit", amount: 500 });
     const caps = movementCapabilities(charge, [charge]);
     expect(caps.canDelete).toBe(true);
-    expect(caps.canEdit).toBe(false);
-    expect(caps.editBlockedBy).toBe("no_charge_group");
+    expect(caps.canEdit).toBe(true);
+    expect(caps.editBlockedBy).toBeNull();
   });
 
-  // الحذف صار متاحاً لأي شحنة: الـRPC تعكس الاستهلاك أولاً ثم تحذف. أمّا
-  // التعديل فيبقى ممنوعاً لأنه يعيد بناء مجموعة استُهلك نصفها.
-  it("شحنة استُهلك منها: تُحذف مع تحذير ولا تُعدَّل", () => {
+  // لا منع ولا تنبيه: الدفع والشحن يُحسبان في حساب العميل دائماً، فالحذف
+  // يردّ أثره إلى الرصيد التراكمي ولا شيء يُنبَّه عليه.
+  it("شحنة استُهلك منها: تُعدَّل وتُحذف بلا تنبيه", () => {
     const charge = t({ id: "c", category: "customer_credit", amount: 500, allocation: { group_id: "g1" } });
     const used = t({ id: "u", category: "customer_credit", amount: -200, allocation: { group_id: "g1" } });
     const caps = movementCapabilities(charge, [charge, used]);
     expect(caps.canDelete).toBe(true);
     expect(caps.deleteBlockedBy).toBeNull();
-    expect(caps.deleteWarning).toBe("explicit_consumption");
-    expect(caps.canEdit).toBe(false);
-    expect(caps.editBlockedBy).toBe("explicit_consumption");
+    expect(caps.deleteWarning).toBeUndefined();
+    expect(caps.canEdit).toBe(true);
+    expect(caps.editBlockedBy).toBeNull();
   });
 
   it("لا شحنة مقفلة عن الحذف مهما كان استهلاكها", () => {

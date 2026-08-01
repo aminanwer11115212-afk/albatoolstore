@@ -51,8 +51,11 @@ export default function DiscountInput({
   return (
     <div className={className} dir="rtl">
       {label && <Label className="text-xs">{label}</Label>}
-      <div className={compact ? "flex gap-2" : "grid grid-cols-2 gap-2 mt-1"}>
-        <div>
+      {/* `flex-1 min-w-0` على كل حقل: بدونها ينكمش الحقلان إلى الصفر على
+          الهاتف، فتلتفّ عبارتا «نسبة %» و«مبلغ مقطوع» حرفاً في كل سطر
+          ويصير الشريط عموداً من حروف يبتلع نصف الشاشة. */}
+      <div className={compact ? "flex gap-2 min-w-0" : "grid grid-cols-2 gap-2 mt-1"}>
+        <div className="flex-1 min-w-0">
           <Input
             type="number"
             inputMode="decimal"
@@ -69,9 +72,9 @@ export default function DiscountInput({
             }}
             aria-label="نسبة الخصم"
           />
-          <div className="text-[10px] text-muted-foreground mt-0.5">نسبة %</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5 whitespace-nowrap">نسبة %</div>
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <Input
             type="number"
             inputMode="decimal"
@@ -91,7 +94,7 @@ export default function DiscountInput({
             }}
             aria-label="مبلغ الخصم"
           />
-          <div className="text-[10px] text-muted-foreground mt-0.5">مبلغ مقطوع</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5 whitespace-nowrap">مبلغ مقطوع</div>
         </div>
       </div>
     </div>

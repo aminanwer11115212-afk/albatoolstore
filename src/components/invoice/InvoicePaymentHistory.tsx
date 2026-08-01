@@ -167,6 +167,7 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0, float
                                 });
                                 setEditingCharge({
                                   groupId,
+                                  txId: String(t.id),
                                   customerId: t.customer_id,
                                   amount: totalAmount || Number(t.amount || 0),
                                   method: t.method,
