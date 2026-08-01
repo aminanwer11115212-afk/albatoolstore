@@ -112,9 +112,24 @@ export function customerNetBefore(at: string, input: NetBeforeInput): number {
 /**
  * صافي الحساب قبل إنشاء فاتورة بعينها.
  * تُعاد `null` إن لم تُوجد الفاتورة، فيميّز المستدعي «لا بيانات» عن «صفر».
+ *
+ * ## لماذا تُستبعد حركات الفاتورة نفسها بدل الاكتفاء بالطابع الزمني
+ * قيدٌ يحمل `date` بلا `created_at` — وبيانات مُرحَّلة كثيرة كذلك — يُعامَل
+ * كبداية اليوم، فيسبق فاتورةَ الساعة العاشرة من نفس اليوم ويُحسب ضمن
+ * «الحساب القديم». فتظهر دفعةُ الفاتورة كأنها رصيدٌ سابق لها، ويرى العميل
+ * في «القديم» مالاً دفعه على هذه الفاتورة نفسها.
+ *
+ * والحدّ هنا منطقي لا زمني: **دفعةٌ على فاتورة لا تسبق إنشاءها** مهما قال
+ * الطابع. فتُستبعد كل حركة تشير إليها، ثم يُطبَّق الترتيب الزمني على الباقي.
  */
 export function netBeforeInvoice(invoiceId: string, input: NetBeforeInput): number | null {
   const inv = (input.invoices || []).find((i) => String(i.id) === String(invoiceId));
   if (!inv) return null;
-  return customerNetBefore(stampKey(inv), input);
+  const id = String(invoiceId);
+  return customerNetBefore(stampKey(inv), {
+    invoices: input.invoices,
+    transactions: (input.transactions || []).filter(
+      (t) => String(t?.reference_id || "") !== id,
+    ),
+  });
 }

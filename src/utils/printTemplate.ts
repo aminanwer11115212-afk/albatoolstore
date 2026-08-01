@@ -52,11 +52,21 @@ interface PrintData {
   previousCredit?: number;
   /** إخفاء صندوق "المبلغ المدفوع" في قسم ملخّص الحساب (يُستخدم في المعاينة). */
   hidePaidBox?: boolean;
+  /**
+   * صافي حساب العميل **الآن** بإشارة الدفاتر (موجب = عليه).
+   *
+   * حين يُمرَّر، يصير هو «رصيد العميل الحالي» ويُشتقّ منه «المدفوع»:
+   *     المدفوع = جملة الحساب − الرصيد الحالي
+   * بدل أن يُؤخذ `paid_amount` الفاتورة وحده. راجع تعليق `paidValue` أدناه.
+   */
+  currentNet?: number | null;
 }
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
 import { computeDocumentBalance } from "@/utils/documentBalanceSummary";
 import { signedAmountText } from "@/utils/buildCustomerAccountView";
+
+const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
 /** ألوان الإشارة في الطباعة — مطابقة لألوان الكشف: أخضر للعميل، أحمر عليه. */
 const TONE_COLOR: Record<"debit" | "credit" | "settled", string> = {
@@ -89,7 +99,7 @@ export function generatePrintHTML(data: PrintData): string {
     subtotal, taxTotal, discountTotal, shipping = 0, grandTotal,
     paidAmount = 0, dueAmount = 0, notes, company, status, paymentMethod,
     variant = "full", noHeader = false, oldBalance = 0, packagingInfo, transportInfo, customTitle,
-    previousDebt = 0, previousCredit = 0, hidePaidBox = false,
+    previousDebt = 0, previousCredit = 0, hidePaidBox = false, currentNet = null,
   } = data;
 
   const balSum = computeDocumentBalance({
@@ -428,9 +438,26 @@ ${showAccount ? (() => {
   ); // قيمة الفاتورة قبل الخصم
   const netInvoiceValue = Number(grandTotal) || 0; // صافي الفاتورة بعد الخصم
   const jomlaHesab = netInvoiceValue + prevNet; // جملة الحساب
-  const hasPaid = !hidePaidBox && paidAmount > 0.01;
-  const paidValue = hasPaid ? paidAmount : 0;
-  const finalNet = jomlaHesab - paidAmount; // >0 عليه، <0 له
+  /**
+   * ## «المدفوع» يُشتقّ من الرصيد الفعلي لا من `paid_amount` الفاتورة
+   *
+   * دفعةُ 600,000 على فاتورة 500,000 وحسابٍ قديمٍ 200,000 كانت تُقسَّم:
+   * 500,000 تُكتب على الفاتورة و100,000 على الدَّين القديم. فيقرأ المستخدم
+   * «المدفوع 500,000» وقد دفع العميل 600,000، ويرى «الحساب القديم 100,000»
+   * وهو 200,000 — رقمان لا يعرفهما أحد، وصندوقٌ لا يقفل حسابه:
+   *     700,000 − 500,000 = 200,000  ≠  المستحق فعلاً 100,000
+   *
+   * المخرج ألّا يُقرأ التوزيع أصلاً. الرصيد الحالي حقيقةٌ مستقلّة عن كيفية
+   * تفتيت الدفعة، فيُؤخذ كما هو ويُشتقّ «المدفوع» منه:
+   *     المدفوع = جملة الحساب − الرصيد الحالي  =  700,000 − 100,000 = 600,000
+   * فيقفل الصندوق دائماً، ويظهر «القديم» كاملاً و«المدفوع» كما أُدخل —
+   * وهي نفس آلية «شحن الرصيد»: يُسجَّل على الحساب ولا يُوزَّع على بنوده.
+   */
+  const netProvided = currentNet != null && !Number.isNaN(Number(currentNet));
+  const finalNet = netProvided ? r2(Number(currentNet)) : jomlaHesab - paidAmount; // >0 عليه، <0 له
+  const derivedPaid = netProvided ? Math.max(0, r2(jomlaHesab - finalNet)) : paidAmount;
+  const hasPaid = !hidePaidBox && derivedPaid > 0.01;
+  const paidValue = hasPaid ? derivedPaid : 0;
   // الإشارة بلغة العميل — `signedAmountText` هي المصدر الواحد لها في النظام:
   // `+` أخضر لما في مصلحته، `−` أحمر لما عليه. ولأن دالتها تقرأ الموجبَ لصالح
   // العميل، نمرّر النتيجة معكوسة الإشارة (`finalNet > 0` = عليه).
@@ -581,7 +608,22 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
   #__lov_print_toolbar .divider {
     width: 100%; height: 1px; background: rgba(255,255,255,0.2);
   }
-  body { padding-top: 96px !important; }
+  /* صفّ الرؤية يُطوى — عشرة أزرار أو أكثر لا تليق بشاشة هاتف */
+  #__lov_print_toolbar.collapsed .divider,
+  #__lov_print_toolbar.collapsed #__lov_visibility_row { display: none; }
+  #__btn_toggle_vis[aria-expanded="true"] { background: rgba(255,255,255,0.3); }
+
+  /* الحشو يُضبط من الجافاسكربت على ارتفاع الشريط الفعلي — وهذه قيمة أوّلية
+     تمنع القفزة قبل أول قياس. الرقم الثابت كان يخفي المستند خلف الشريط على
+     الهاتف حيث يلتفّ إلى عدّة أسطر. */
+  body { padding-top: 96px; }
+
+  @media (max-width: 640px) {
+    #__lov_print_toolbar { padding: 6px 8px; font-size: 12px; gap: 4px; }
+    #__lov_print_toolbar .row { gap: 5px; }
+    #__lov_print_toolbar button { padding: 5px 9px; border-radius: 5px; gap: 4px; }
+    #__lov_print_toolbar .label { margin-inline-end: 4px; width: 100%; text-align: center; }
+  }
   /* hidden via toggle: hide on screen AND when printing/PDF */
   [data-section].__lov_hidden { display: none !important; }
   @media print {
@@ -597,11 +639,11 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     <button id="__btn_wa_pdf" title="مشاركة PDF عبر واتساب">📱 واتساب PDF</button>
     <button id="__btn_link_online" title="إنشاء رابط معاينة للعميل">🔗 رابط للعميل</button>
     <button id="__btn_wa_text" title="مشاركة نصياً عبر واتساب">💬 واتساب نص</button>
+    <button id="__btn_toggle_vis" aria-expanded="false" title="إظهار خيارات تخصيص الرؤية">👁️ تخصيص الرؤية</button>
     <button id="__btn_close" class="close" title="إغلاق">✕</button>
   </div>
   <div class="divider"></div>
   <div class="row" id="__lov_visibility_row">
-    <span class="label">👁️ تخصيص الرؤية:</span>
     <!-- يُملأ ديناميكياً -->
   </div>
 </div>
@@ -653,15 +695,19 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     var row = document.getElementById('__lov_visibility_row');
     if (!row) return;
     var seen = {};
+    var seenLabel = {};
     var sections = [];
     document.querySelectorAll('[data-section]').forEach(function(el){
       var key = el.getAttribute('data-section');
       if (!key || seen[key]) return;
+      var label = el.getAttribute('data-section-label') || key;
+      // قسمان بنفس العنوان زرّان لا يفرّق بينهما أحد — «رصيد العميل الحالي»
+      // كان يظهر مرّتين لأن الخلية داخل الصف تحمل عنوانه نفسه. الأوّل يفوز،
+      // وهو الأب في كل الحالات القائمة فإخفاؤه يُخفي ما بداخله.
+      if (seenLabel[label]) return;
       seen[key] = true;
-      sections.push({
-        key: key,
-        label: el.getAttribute('data-section-label') || key
-      });
+      seenLabel[label] = true;
+      sections.push({ key: key, label: label });
     });
     sections.forEach(function(s){
       var btn = document.createElement('button');
@@ -693,9 +739,47 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
   }
   buildVisibilityButtons();
 
+  // ===== الشريط والهاتف =====
+  // كان الحشو رقماً ثابتاً (96px) بينما يلتفّ الشريط على الهاتف إلى عدّة
+  // أسطر يتجاوز مجموعها نصف الشاشة، فيختفي المستند خلفه تماماً. الحشو الآن
+  // يتبع الارتفاع الفعلي، ويُعاد قياسه عند كل تغيّر (طيّ، دوران، تغيّر عرض).
+  var toolbarEl = document.getElementById('__lov_print_toolbar');
+  var visBtn = document.getElementById('__btn_toggle_vis');
+
+  function syncBarHeight(){
+    if (!toolbarEl) return;
+    document.body.style.paddingTop = Math.ceil(toolbarEl.getBoundingClientRect().height) + 'px';
+  }
+
+  function setVisRowOpen(open){
+    if (!toolbarEl || !visBtn) return;
+    toolbarEl.classList.toggle('collapsed', !open);
+    visBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    visBtn.title = open ? 'إخفاء خيارات تخصيص الرؤية' : 'إظهار خيارات تخصيص الرؤية';
+    syncBarHeight();
+  }
+
+  // مطويّ على الشاشات الضيّقة، مفتوح على الشاشة الواسعة حيث لا يزاحم شيئاً.
+  setVisRowOpen(window.innerWidth > 640);
+  if (visBtn) {
+    visBtn.onclick = function(){
+      setVisRowOpen(toolbarEl.classList.contains('collapsed'));
+    };
+  }
+
+  syncBarHeight();
+  window.addEventListener('resize', syncBarHeight);
+  window.addEventListener('orientationchange', syncBarHeight);
+  if (window.ResizeObserver && toolbarEl) {
+    new ResizeObserver(syncBarHeight).observe(toolbarEl);
+  }
+
   function contentEl(){
     // كل ما عدا شريط الأدوات + استبعاد الأقسام المخفية حالياً
     var clone = document.body.cloneNode(true);
+    // حشو الشريط يُزال من النسخة: الشريط نفسه محذوف منها، فبقاء حشوه يفتح
+    // فراغاً بارتفاعه في أعلى صفحة الـPDF.
+    clone.style.paddingTop = '0';
     var bar = clone.querySelector('#__lov_print_toolbar');
     if (bar) bar.remove();
     clone.querySelectorAll('.__lov_hidden').forEach(function(n){ n.remove(); });

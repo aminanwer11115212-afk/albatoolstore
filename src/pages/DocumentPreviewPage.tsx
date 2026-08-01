@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { invoiceDue } from "@/utils/invoiceDue";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
@@ -10,6 +11,7 @@ import DiscountInput from "@/components/shared/DiscountInput";
 import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
 import { toast } from "sonner";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { netBeforeInvoice } from "@/utils/customerNetBefore";
 
 /**
  * صفحة معاينة داخلية للمستندات (عرض سعر / فاتورة).
@@ -138,11 +140,36 @@ export default function DocumentPreviewPage({ docType }: Props) {
           }));
           const extras = await loadInvoiceExtras(invoice.id);
           const iCust: any = invoice.customers;
-          // اطرح متبقّي/فائض هذه الفاتورة من رصيد العميل الحالي حتى لا يُحسب مرتين
-          const invRemaining = Math.max(Number(invoice.total || 0) - Number(invoice.paid_amount || 0), 0);
-          const invSurplus   = Math.max(Number(invoice.paid_amount || 0) - Number(invoice.total || 0), 0);
-          const prevDebt   = Math.max(Number(iCust?.balance || 0) - invRemaining, 0);
-          const prevCredit = Math.max(Number(iCust?.credit_balance || 0) - invSurplus, 0);
+          // «الحساب القديم» تاريخياً — نفس مسار `printInvoiceDirect`. الطرح من
+          // الرصيد الحالي يُدخل في «القديم» فواتيرَ أُنشئت بعد هذه، ويقصّ عند
+          // الصفر فيشوّه الصافي حين يجتمع دَينٌ ورصيد.
+          const invCustomerId = (invoice as any).customer_id;
+          let prevNet: number | null = null;
+          if (invCustomerId) {
+            const [{ data: custInvoices }, { data: custTxs }] = await Promise.all([
+              (supabase as any)
+                .from("invoices")
+                .select("id, total, paid_amount, status, date, created_at")
+                .eq("customer_id", invCustomerId),
+              (supabase as any)
+                .from("transactions")
+                .select("id, category, amount, method, reference_id, date, created_at")
+                .eq("customer_id", invCustomerId)
+                .in("category", ["customer_payment", "customer_credit"]),
+            ]);
+            prevNet = netBeforeInvoice(String(invoice.id), {
+              invoices: custInvoices || [],
+              transactions: custTxs || [],
+            });
+          }
+          if (prevNet == null) {
+            const invRemaining = Math.max(Number(invoice.total || 0) - Number(invoice.paid_amount || 0), 0);
+            const invSurplus   = Math.max(Number(invoice.paid_amount || 0) - Number(invoice.total || 0), 0);
+            prevNet = Math.max(Number(iCust?.balance || 0) - invRemaining, 0)
+                    - Math.max(Number(iCust?.credit_balance || 0) - invSurplus, 0);
+          }
+          const prevDebt   = prevNet > 0 ? prevNet : 0;
+          const prevCredit = prevNet < 0 ? -prevNet : 0;
           docHtml = generatePrintHTML({
             type: "invoice",
             isCash: invoice.type === "cash",
@@ -166,7 +193,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
             shipping: Number(invoice.shipping || 0),
             grandTotal: Number(invoice.total || 0),
             paidAmount: Number(invoice.paid_amount || 0),
-            dueAmount: Number(invoice.due_amount || 0),
+            dueAmount: invoiceDue(invoice as any),
             notes: invoice.notes,
             company: company as any,
             status: invoice.status,
@@ -176,6 +203,8 @@ export default function DocumentPreviewPage({ docType }: Props) {
             oldBalance: netBalanceOf(iCust),
             previousDebt: prevDebt,
             previousCredit: prevCredit,
+            // الرصيد الفعلي — منه يُشتقّ «المدفوع» بدل قراءة توزيع الدفعة
+            currentNet: invCustomerId && iCust ? netBalanceOf(iCust) : null,
             hidePaidBox: false,
             ...extras,
           });
@@ -367,20 +396,22 @@ export default function DocumentPreviewPage({ docType }: Props) {
 
   return (
     <div dir="rtl" style={{ height: "calc(100vh - 80px)", display: "flex", flexDirection: "column" }}>
-      <div className="flex items-center gap-2 px-3 py-2 border-b bg-card">
+      {/* يلتفّ على الهاتف بدل أن ينضغط: بلا `flex-wrap` كانت العناصر تُعصر حتى
+          يصير «رجوع» عموداً من حروف وحقلُ الخصم بعرض حرف واحد. */}
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b bg-card">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold text-primary hover:bg-primary/10"
+          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold text-primary hover:bg-primary/10"
         >
-          <ArrowRight size={16} /> رجوع
+          <ArrowRight size={16} /> <span className="whitespace-nowrap">رجوع</span>
         </button>
-        <div className="text-sm font-bold text-foreground">{title}</div>
-        <div className="ms-auto flex items-center gap-2">
+        <div className="text-sm font-bold text-foreground whitespace-nowrap">{title}</div>
+        <div className="w-full sm:w-auto sm:ms-auto flex flex-wrap items-center gap-2">
           {docType === "invoice" && invMeta && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-muted/40" title="خصم حي — يُطبَّق فورًا على الإجمالي والمتبقي والحالة">
+            <div className="flex flex-1 sm:flex-none items-center gap-1.5 px-2 py-1 rounded-md border bg-muted/40" title="خصم حي — يُطبَّق فورًا على الإجمالي والمتبقي والحالة">
               <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">خصم حي</span>
-              <div style={{ width: 170 }}>
+              <div className="flex-1 min-w-[150px] sm:flex-none sm:w-[170px]">
                 <DiscountInput
                   label=""
                   value={invMeta.discount}
@@ -426,17 +457,17 @@ export default function DocumentPreviewPage({ docType }: Props) {
             <button
               type="button"
               onClick={() => setPayOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
               title="تسجيل دفعة من العميل على هذه الفاتورة"
             >
-              <Wallet size={16} /> سجّل دفعة
+              <Wallet size={16} /> <span className="whitespace-nowrap">سجّل دفعة</span>
             </button>
           )}
-          <label className="text-xs text-muted-foreground">ترتيب البنود:</label>
+          <label className="text-xs text-muted-foreground whitespace-nowrap">ترتيب البنود:</label>
           <select
             value={stocktakeSort}
             onChange={(e) => setStocktakeSort(e.target.value as any)}
-            className="text-xs border rounded px-2 py-1 bg-background"
+            className="flex-1 sm:flex-none min-w-0 text-xs border rounded px-2 py-1 bg-background"
             title="ترتيب بنود المستند في المعاينة والطباعة"
           >
             <option value="default">الترتيب الأصلي</option>

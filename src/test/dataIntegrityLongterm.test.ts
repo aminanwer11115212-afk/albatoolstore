@@ -514,11 +514,35 @@ describe("مسارا التوزيع من كشف الحساب — الطريق ا
     expect(sql).toContain("recompute_customer_balance");
   });
 
-  it("كلاهما يُستدعى من كشف الحساب لا من مسار الشحن", () => {
-    const apply = fs.readFileSync(
-      path.resolve(process.cwd(), "src/components/statement/ApplyCreditToInvoiceDialog.tsx"), "utf8");
-    expect(apply).toContain('rpc("apply_customer_credit_to_invoice"');
-    // حوار الشحن لا **يستدعي** أياً منهما (ذِكرهما في تعليق شرحاً مقبول)
+  /**
+   * الرصيد يُخصم من **التراكمي** لا من فاتورةٍ بعينها، فلا مسار في التطبيق
+   * يوزّعه — ولا حتى يدوياً. حُذفت شاشة «توزيع الرصيد على فاتورة» ومعها كل
+   * استدعاء لدالّتَي التوزيع. الدالّتان باقيتان في القاعدة لتاريخٍ سابق، لكن
+   * لا شيء في الواجهة ينادِيهما.
+   */
+  it("لا مسار في التطبيق يوزّع الرصيد على الفواتير", () => {
+    expect(fs.existsSync(path.resolve(process.cwd(),
+      "src/components/statement/ApplyCreditToInvoiceDialog.tsx"))).toBe(false);
+
+    const srcFiles: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) { if (e.name !== "test") walk(full); }
+        else if (/\.tsx?$/.test(e.name) && e.name !== "types.ts") srcFiles.push(full);
+      }
+    };
+    walk(path.resolve(process.cwd(), "src"));
+
+    const callers = srcFiles.filter((f) => {
+      const rpcs = [...fs.readFileSync(f, "utf8").matchAll(/rpc\(\s*"(\w+)"/g)].map((m) => m[1]);
+      return rpcs.includes("apply_customer_credit_to_invoice")
+          || rpcs.includes("settle_invoices_from_credit");
+    });
+    expect(callers).toEqual([]);
+  });
+
+  it("حوار الشحن يُسجّل ولا يوزّع", () => {
     const charge = fs.readFileSync(
       path.resolve(process.cwd(), "src/components/dashboard/ChargeBalanceDialog.tsx"), "utf8");
     const rpcs = [...charge.matchAll(/rpc\(\s*"(\w+)"/g)].map((m) => m[1]);

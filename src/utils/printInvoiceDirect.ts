@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { invoiceDue } from "@/utils/invoiceDue";
 import { generatePrintHTML } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
 import { netBalanceOf } from "@/utils/balanceDisplay";
@@ -85,7 +86,7 @@ export async function buildInvoicePrintHtml(invoiceId: string): Promise<string> 
     shipping: Number((invoice as any).shipping || 0),
     grandTotal: Number((invoice as any).total || 0),
     paidAmount: Number((invoice as any).paid_amount || 0),
-    dueAmount: Number((invoice as any).due_amount || 0),
+    dueAmount: invoiceDue(invoice as any),
     notes: (invoice as any).notes,
     company: company as any,
     status: (invoice as any).status,
@@ -93,6 +94,10 @@ export async function buildInvoicePrintHtml(invoiceId: string): Promise<string> 
     oldBalance: netBalanceOf(iCust),
     previousDebt: prevDebt,
     previousCredit: prevCredit,
+    // الرصيد الفعلي الآن — منه يُشتقّ «المدفوع» في ملخّص الحساب بدل قراءة
+    // توزيع الدفعة على الفواتير. يُمرَّر للعملاء المسجّلين وحدهم؛ فاتورة
+    // الكاش بلا عميل لا حساب لها فيبقى الاشتقاق من `paid_amount`.
+    currentNet: customerId && iCust ? netBalanceOf(iCust) : null,
     hidePaidBox: false,
     ...extras,
   } as any);

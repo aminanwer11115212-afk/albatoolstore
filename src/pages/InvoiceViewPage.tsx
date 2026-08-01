@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { invoiceDue } from "@/utils/invoiceDue";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -121,7 +122,7 @@ export default function InvoiceViewPage() {
       setInvoice(inv);
       setItems(itms || []);
       if (inv) {
-        setPayAmount(String(inv.due_amount || inv.total || 0));
+        setPayAmount(String(invoiceDue(inv as any) || inv.total || 0));
         setPayNote(`Payment for invoice #${inv.invoice_number}`);
         setNewStatus(inv.status || "pending");
       }
