@@ -52,11 +52,21 @@ interface PrintData {
   previousCredit?: number;
   /** إخفاء صندوق "المبلغ المدفوع" في قسم ملخّص الحساب (يُستخدم في المعاينة). */
   hidePaidBox?: boolean;
+  /**
+   * صافي حساب العميل **الآن** بإشارة الدفاتر (موجب = عليه).
+   *
+   * حين يُمرَّر، يصير هو «رصيد العميل الحالي» ويُشتقّ منه «المدفوع»:
+   *     المدفوع = جملة الحساب − الرصيد الحالي
+   * بدل أن يُؤخذ `paid_amount` الفاتورة وحده. راجع تعليق `paidValue` أدناه.
+   */
+  currentNet?: number | null;
 }
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
 import { computeDocumentBalance } from "@/utils/documentBalanceSummary";
 import { signedAmountText } from "@/utils/buildCustomerAccountView";
+
+const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
 /** ألوان الإشارة في الطباعة — مطابقة لألوان الكشف: أخضر للعميل، أحمر عليه. */
 const TONE_COLOR: Record<"debit" | "credit" | "settled", string> = {
@@ -89,7 +99,7 @@ export function generatePrintHTML(data: PrintData): string {
     subtotal, taxTotal, discountTotal, shipping = 0, grandTotal,
     paidAmount = 0, dueAmount = 0, notes, company, status, paymentMethod,
     variant = "full", noHeader = false, oldBalance = 0, packagingInfo, transportInfo, customTitle,
-    previousDebt = 0, previousCredit = 0, hidePaidBox = false,
+    previousDebt = 0, previousCredit = 0, hidePaidBox = false, currentNet = null,
   } = data;
 
   const balSum = computeDocumentBalance({
@@ -428,9 +438,26 @@ ${showAccount ? (() => {
   ); // قيمة الفاتورة قبل الخصم
   const netInvoiceValue = Number(grandTotal) || 0; // صافي الفاتورة بعد الخصم
   const jomlaHesab = netInvoiceValue + prevNet; // جملة الحساب
-  const hasPaid = !hidePaidBox && paidAmount > 0.01;
-  const paidValue = hasPaid ? paidAmount : 0;
-  const finalNet = jomlaHesab - paidAmount; // >0 عليه، <0 له
+  /**
+   * ## «المدفوع» يُشتقّ من الرصيد الفعلي لا من `paid_amount` الفاتورة
+   *
+   * دفعةُ 600,000 على فاتورة 500,000 وحسابٍ قديمٍ 200,000 كانت تُقسَّم:
+   * 500,000 تُكتب على الفاتورة و100,000 على الدَّين القديم. فيقرأ المستخدم
+   * «المدفوع 500,000» وقد دفع العميل 600,000، ويرى «الحساب القديم 100,000»
+   * وهو 200,000 — رقمان لا يعرفهما أحد، وصندوقٌ لا يقفل حسابه:
+   *     700,000 − 500,000 = 200,000  ≠  المستحق فعلاً 100,000
+   *
+   * المخرج ألّا يُقرأ التوزيع أصلاً. الرصيد الحالي حقيقةٌ مستقلّة عن كيفية
+   * تفتيت الدفعة، فيُؤخذ كما هو ويُشتقّ «المدفوع» منه:
+   *     المدفوع = جملة الحساب − الرصيد الحالي  =  700,000 − 100,000 = 600,000
+   * فيقفل الصندوق دائماً، ويظهر «القديم» كاملاً و«المدفوع» كما أُدخل —
+   * وهي نفس آلية «شحن الرصيد»: يُسجَّل على الحساب ولا يُوزَّع على بنوده.
+   */
+  const netProvided = currentNet != null && !Number.isNaN(Number(currentNet));
+  const finalNet = netProvided ? r2(Number(currentNet)) : jomlaHesab - paidAmount; // >0 عليه، <0 له
+  const derivedPaid = netProvided ? Math.max(0, r2(jomlaHesab - finalNet)) : paidAmount;
+  const hasPaid = !hidePaidBox && derivedPaid > 0.01;
+  const paidValue = hasPaid ? derivedPaid : 0;
   // الإشارة بلغة العميل — `signedAmountText` هي المصدر الواحد لها في النظام:
   // `+` أخضر لما في مصلحته، `−` أحمر لما عليه. ولأن دالتها تقرأ الموجبَ لصالح
   // العميل، نمرّر النتيجة معكوسة الإشارة (`finalNet > 0` = عليه).

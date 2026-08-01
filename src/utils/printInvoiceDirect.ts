@@ -93,6 +93,10 @@ export async function buildInvoicePrintHtml(invoiceId: string): Promise<string> 
     oldBalance: netBalanceOf(iCust),
     previousDebt: prevDebt,
     previousCredit: prevCredit,
+    // الرصيد الفعلي الآن — منه يُشتقّ «المدفوع» في ملخّص الحساب بدل قراءة
+    // توزيع الدفعة على الفواتير. يُمرَّر للعملاء المسجّلين وحدهم؛ فاتورة
+    // الكاش بلا عميل لا حساب لها فيبقى الاشتقاق من `paid_amount`.
+    currentNet: customerId && iCust ? netBalanceOf(iCust) : null,
     hidePaidBox: false,
     ...extras,
   } as any);
