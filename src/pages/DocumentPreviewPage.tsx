@@ -448,10 +448,10 @@ export default function DocumentPreviewPage({ docType }: Props) {
         </div>
       </div>
 
+      {/* معلّق فوق الورقة لا فوقها في التدفّق: المعاينة وُجدت ليرى المستخدم
+          الفاتورة كما ستُطبع، وشريطٌ يعلوها كان يزيحها عن الشاشة. */}
       {docType === "invoice" && invMeta && (
-        <div className="px-3 py-2 border-b border-border bg-muted/20">
-          <InvoicePaymentHistory invoiceId={invMeta.id} refreshKey={reloadTick} />
-        </div>
+        <InvoicePaymentHistory invoiceId={invMeta.id} refreshKey={reloadTick} floating />
       )}
 
       {invMeta && (
