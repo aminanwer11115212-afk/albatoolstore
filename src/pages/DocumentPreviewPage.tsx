@@ -367,20 +367,22 @@ export default function DocumentPreviewPage({ docType }: Props) {
 
   return (
     <div dir="rtl" style={{ height: "calc(100vh - 80px)", display: "flex", flexDirection: "column" }}>
-      <div className="flex items-center gap-2 px-3 py-2 border-b bg-card">
+      {/* يلتفّ على الهاتف بدل أن ينضغط: بلا `flex-wrap` كانت العناصر تُعصر حتى
+          يصير «رجوع» عموداً من حروف وحقلُ الخصم بعرض حرف واحد. */}
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b bg-card">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold text-primary hover:bg-primary/10"
+          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold text-primary hover:bg-primary/10"
         >
-          <ArrowRight size={16} /> رجوع
+          <ArrowRight size={16} /> <span className="whitespace-nowrap">رجوع</span>
         </button>
-        <div className="text-sm font-bold text-foreground">{title}</div>
-        <div className="ms-auto flex items-center gap-2">
+        <div className="text-sm font-bold text-foreground whitespace-nowrap">{title}</div>
+        <div className="w-full sm:w-auto sm:ms-auto flex flex-wrap items-center gap-2">
           {docType === "invoice" && invMeta && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-muted/40" title="خصم حي — يُطبَّق فورًا على الإجمالي والمتبقي والحالة">
+            <div className="flex flex-1 sm:flex-none items-center gap-1.5 px-2 py-1 rounded-md border bg-muted/40" title="خصم حي — يُطبَّق فورًا على الإجمالي والمتبقي والحالة">
               <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">خصم حي</span>
-              <div style={{ width: 170 }}>
+              <div className="flex-1 min-w-[150px] sm:flex-none sm:w-[170px]">
                 <DiscountInput
                   label=""
                   value={invMeta.discount}
@@ -426,17 +428,17 @@ export default function DocumentPreviewPage({ docType }: Props) {
             <button
               type="button"
               onClick={() => setPayOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
               title="تسجيل دفعة من العميل على هذه الفاتورة"
             >
-              <Wallet size={16} /> سجّل دفعة
+              <Wallet size={16} /> <span className="whitespace-nowrap">سجّل دفعة</span>
             </button>
           )}
-          <label className="text-xs text-muted-foreground">ترتيب البنود:</label>
+          <label className="text-xs text-muted-foreground whitespace-nowrap">ترتيب البنود:</label>
           <select
             value={stocktakeSort}
             onChange={(e) => setStocktakeSort(e.target.value as any)}
-            className="text-xs border rounded px-2 py-1 bg-background"
+            className="flex-1 sm:flex-none min-w-0 text-xs border rounded px-2 py-1 bg-background"
             title="ترتيب بنود المستند في المعاينة والطباعة"
           >
             <option value="default">الترتيب الأصلي</option>

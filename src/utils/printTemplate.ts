@@ -581,7 +581,22 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
   #__lov_print_toolbar .divider {
     width: 100%; height: 1px; background: rgba(255,255,255,0.2);
   }
-  body { padding-top: 96px !important; }
+  /* صفّ الرؤية يُطوى — عشرة أزرار أو أكثر لا تليق بشاشة هاتف */
+  #__lov_print_toolbar.collapsed .divider,
+  #__lov_print_toolbar.collapsed #__lov_visibility_row { display: none; }
+  #__btn_toggle_vis[aria-expanded="true"] { background: rgba(255,255,255,0.3); }
+
+  /* الحشو يُضبط من الجافاسكربت على ارتفاع الشريط الفعلي — وهذه قيمة أوّلية
+     تمنع القفزة قبل أول قياس. الرقم الثابت كان يخفي المستند خلف الشريط على
+     الهاتف حيث يلتفّ إلى عدّة أسطر. */
+  body { padding-top: 96px; }
+
+  @media (max-width: 640px) {
+    #__lov_print_toolbar { padding: 6px 8px; font-size: 12px; gap: 4px; }
+    #__lov_print_toolbar .row { gap: 5px; }
+    #__lov_print_toolbar button { padding: 5px 9px; border-radius: 5px; gap: 4px; }
+    #__lov_print_toolbar .label { margin-inline-end: 4px; width: 100%; text-align: center; }
+  }
   /* hidden via toggle: hide on screen AND when printing/PDF */
   [data-section].__lov_hidden { display: none !important; }
   @media print {
@@ -597,11 +612,11 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     <button id="__btn_wa_pdf" title="مشاركة PDF عبر واتساب">📱 واتساب PDF</button>
     <button id="__btn_link_online" title="إنشاء رابط معاينة للعميل">🔗 رابط للعميل</button>
     <button id="__btn_wa_text" title="مشاركة نصياً عبر واتساب">💬 واتساب نص</button>
+    <button id="__btn_toggle_vis" aria-expanded="false" title="إظهار خيارات تخصيص الرؤية">👁️ تخصيص الرؤية</button>
     <button id="__btn_close" class="close" title="إغلاق">✕</button>
   </div>
   <div class="divider"></div>
   <div class="row" id="__lov_visibility_row">
-    <span class="label">👁️ تخصيص الرؤية:</span>
     <!-- يُملأ ديناميكياً -->
   </div>
 </div>
@@ -653,15 +668,19 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     var row = document.getElementById('__lov_visibility_row');
     if (!row) return;
     var seen = {};
+    var seenLabel = {};
     var sections = [];
     document.querySelectorAll('[data-section]').forEach(function(el){
       var key = el.getAttribute('data-section');
       if (!key || seen[key]) return;
+      var label = el.getAttribute('data-section-label') || key;
+      // قسمان بنفس العنوان زرّان لا يفرّق بينهما أحد — «رصيد العميل الحالي»
+      // كان يظهر مرّتين لأن الخلية داخل الصف تحمل عنوانه نفسه. الأوّل يفوز،
+      // وهو الأب في كل الحالات القائمة فإخفاؤه يُخفي ما بداخله.
+      if (seenLabel[label]) return;
       seen[key] = true;
-      sections.push({
-        key: key,
-        label: el.getAttribute('data-section-label') || key
-      });
+      seenLabel[label] = true;
+      sections.push({ key: key, label: label });
     });
     sections.forEach(function(s){
       var btn = document.createElement('button');
@@ -693,9 +712,47 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
   }
   buildVisibilityButtons();
 
+  // ===== الشريط والهاتف =====
+  // كان الحشو رقماً ثابتاً (96px) بينما يلتفّ الشريط على الهاتف إلى عدّة
+  // أسطر يتجاوز مجموعها نصف الشاشة، فيختفي المستند خلفه تماماً. الحشو الآن
+  // يتبع الارتفاع الفعلي، ويُعاد قياسه عند كل تغيّر (طيّ، دوران، تغيّر عرض).
+  var toolbarEl = document.getElementById('__lov_print_toolbar');
+  var visBtn = document.getElementById('__btn_toggle_vis');
+
+  function syncBarHeight(){
+    if (!toolbarEl) return;
+    document.body.style.paddingTop = Math.ceil(toolbarEl.getBoundingClientRect().height) + 'px';
+  }
+
+  function setVisRowOpen(open){
+    if (!toolbarEl || !visBtn) return;
+    toolbarEl.classList.toggle('collapsed', !open);
+    visBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    visBtn.title = open ? 'إخفاء خيارات تخصيص الرؤية' : 'إظهار خيارات تخصيص الرؤية';
+    syncBarHeight();
+  }
+
+  // مطويّ على الشاشات الضيّقة، مفتوح على الشاشة الواسعة حيث لا يزاحم شيئاً.
+  setVisRowOpen(window.innerWidth > 640);
+  if (visBtn) {
+    visBtn.onclick = function(){
+      setVisRowOpen(toolbarEl.classList.contains('collapsed'));
+    };
+  }
+
+  syncBarHeight();
+  window.addEventListener('resize', syncBarHeight);
+  window.addEventListener('orientationchange', syncBarHeight);
+  if (window.ResizeObserver && toolbarEl) {
+    new ResizeObserver(syncBarHeight).observe(toolbarEl);
+  }
+
   function contentEl(){
     // كل ما عدا شريط الأدوات + استبعاد الأقسام المخفية حالياً
     var clone = document.body.cloneNode(true);
+    // حشو الشريط يُزال من النسخة: الشريط نفسه محذوف منها، فبقاء حشوه يفتح
+    // فراغاً بارتفاعه في أعلى صفحة الـPDF.
+    clone.style.paddingTop = '0';
     var bar = clone.querySelector('#__lov_print_toolbar');
     if (bar) bar.remove();
     clone.querySelectorAll('.__lov_hidden').forEach(function(n){ n.remove(); });

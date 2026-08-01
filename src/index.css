@@ -89,6 +89,38 @@
   }
 }
 
+/* شبكة أمان للجداول التي لم تُحوَّل إلى بطاقات.
+ *
+ * `mobile-stack-table` هو الحلّ الأفضل، لكنه اختياري — و29 صفحة لا تستعمله،
+ * فجداولها تمدّ الصفحة كلها أفقياً على الهاتف: تنزلق الأعمدة خارج الشاشة
+ * ويتحرّك جسم الصفحة يميناً وشمالاً فتضيع القراءة.
+ *
+ * الجدول هنا يصير حاوية تمرير بنفسه (`display:block` + `overflow-x:auto`)،
+ * فينزلق **داخل إطاره** وتبقى الصفحة ثابتة. الخلايا تحتفظ بعرضها الطبيعي
+ * فلا تنضغط الأرقام، والصفحات المُحوَّلة إلى بطاقات مستثناة صراحةً.
+ */
+/* `screen` صراحةً: الطباعة وتوليد الـPDF يجب ألّا يمسّهما التمرير الأفقي. */
+@media screen and (max-width: 640px) {
+  table:not(.mobile-stack-table) {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* بلا هذا تنكمش الأعمدة على أضيق محتوى بدل أن تنزلق */
+  table:not(.mobile-stack-table) > thead,
+  table:not(.mobile-stack-table) > tbody,
+  table:not(.mobile-stack-table) > tfoot {
+    display: table;
+    width: 100%;
+    min-width: max-content;
+  }
+  table:not(.mobile-stack-table) th,
+  table:not(.mobile-stack-table) td {
+    white-space: nowrap;
+  }
+}
+
 /* منع تداخل/التفاف/تراكب النصوص على شاشات الهاتف (≤640px) — يطبَّق على كل صفحات التطبيق */
 @media (max-width: 640px) {
   /* التسميات لا تكسر الكلمات حرفاً حرفاً (تجنّب ظاهرة "سج\nل") */
