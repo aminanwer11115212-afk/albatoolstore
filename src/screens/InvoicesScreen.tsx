@@ -298,11 +298,21 @@ export default function InvoicesScreen({ posOnly = false }: { posOnly?: boolean 
         .invoices-compact .workflow-select { height: 22px; font-size: 10px; padding: 1px 4px; }
         /* === Visual theme: regular invoices (blue/primary) === */
         .invoices-regular-theme .legacy-card { border-top: 3px solid hsl(var(--primary)); }
-        /* === Visual theme: cash invoices (amber) === */
-        .invoices-cash-theme .legacy-card { border-top: 3px solid hsl(38 92% 50%); background: hsl(38 92% 50% / 0.03); }
-        .invoices-cash-theme .legacy-table tbody tr:hover { background: hsl(38 92% 50% / 0.08) !important; }
+        /* === هوية الكاش: أحمر ===
+           كانت كهرمانية بينما شاشة إنشاء الكاش حمراء («pos-mode») — لونان
+           لقناةٍ واحدة يُضعفان التمييز بدل أن يقوّياه. الآن «--destructive»
+           في الشاشتين، فيتبع الوضعين الفاتح والداكن معاً. */
+        .invoices-cash-theme .legacy-card {
+          border-top: 3px solid hsl(var(--destructive));
+          background: hsl(var(--destructive) / 0.03);
+        }
+        .invoices-cash-theme .legacy-table tbody tr:hover { background: hsl(var(--destructive) / 0.08) !important; }
+        .invoices-cash-theme .legacy-table thead th {
+          background: hsl(var(--destructive)) !important;
+          color: hsl(var(--destructive-foreground)) !important;
+        }
         .invoices-cash-theme .page-badge {
-          background: hsl(38 92% 50%); color: hsl(0 0% 100%);
+          background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground));
           font-size: 10px; font-weight: 700; padding: 2px 8px;
           border-radius: 6px; letter-spacing: 0.5px;
         }

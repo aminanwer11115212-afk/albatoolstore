@@ -1692,9 +1692,20 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         .search-suggestions .suggestions-status[data-status="empty"] { color: hsl(var(--destructive)); }
         @keyframes sugg-spin { to { transform: rotate(360deg); } }
         .neo-quote-scope .item_header { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+        /* === هوية الكاش: أحمر يميّزها عن الفاتورة الآجلة ===
+           كانت ترويسة الجدول وحدها حمراء، وهي تختفي فور التمرير — فتضيع
+           العلامة في الشاشة التي يقضي فيها البائع وقته. الشريط العلوي ثابت
+           لا يتمرّر، والحدّ يؤطّر الشاشة كلها، فتبقى القناة معروفة دائماً. */
         .neo-quote-scope.pos-mode .item_header,
         .neo-quote-scope.pos-mode .item_header th,
         .neo-quote-scope.pos-mode .items-scroll thead th { background: hsl(var(--destructive)) !important; color: hsl(var(--destructive-foreground)) !important; }
+        .neo-quote-scope.pos-mode { box-shadow: inset 0 4px 0 0 hsl(var(--destructive)); }
+        .neo-quote-scope.pos-mode .panel { border-color: hsl(var(--destructive) / 0.35); }
+        .neo-quote-scope.pos-mode .items-table-wrap { border: 1px solid hsl(var(--destructive) / 0.35); border-radius: 6px; }
+        .neo-quote-scope.pos-mode .quick-add-row {
+          border-color: hsl(var(--destructive) / 0.4);
+          background: hsl(var(--destructive) / 0.05);
+        }
         .neo-quote-scope .item_header th { padding: 5px 4px; font-weight:600; font-size: 11px; text-align: center; }
         .neo-quote-scope .excel-table { width: 100%; border-collapse: collapse; }
         .neo-quote-scope .excel-row td { padding: 2px 3px; border-bottom: 1px solid hsl(var(--border)); font-size: 11px; }
