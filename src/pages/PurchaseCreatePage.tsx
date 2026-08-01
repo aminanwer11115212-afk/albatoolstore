@@ -25,6 +25,7 @@ import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLock
 import { useSuggestionsWidth, SuggestionsResizeHandle } from "@/hooks/useSuggestionsWidth";
 import { SuggestionsPortal } from "@/components/SuggestionsPortal";
 import { ItemsScroll } from "@/components/items/ItemsScroll";
+import { TableFiller } from "@/components/items/TableFiller";
 import { makeRowNavHandler } from "@/utils/itemTableNav";
 import { useCreatePageNav } from "@/utils/createPageNav";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
@@ -1226,6 +1227,13 @@ export default function PurchaseCreatePage() {
                     );
                     });
                   })()}
+                  {/* التسطير: صفوف فارغة تُكمل الجدول فلا يبقى فراغ أبيض بين
+                      آخر بند وأزرار الحفظ — نفس ما في الفواتير وعروض الأسعار. */}
+                  <TableFiller
+                    scrollRef={itemsScrollRef}
+                    realRowsCount={rows.length}
+                    columnsCount={colWidths.length}
+                  />
                 </tbody>
               </table>
             </ItemsScroll>
