@@ -4,7 +4,7 @@ import { Printer, Share2, Copy, Check } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import { arQuoteStatus, arReturnStatus } from "@/utils/statusLabels";
 import { openWhatsApp } from "@/utils/whatsapp";
-import { buildCustomerAccountView, signedAmountText } from "@/utils/buildCustomerAccountView";
+import { buildCustomerAccountView, signedAmountText, accountRowBand } from "@/utils/buildCustomerAccountView";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 
 
@@ -107,7 +107,8 @@ const amountCell = (shown: number) => toneCell(signedAmountText(shown));
 const DASH = "—";
 const ROW_CLASS: Record<string, string> = {
   invoice: "ps-inv-row",
-  credit: "ps-credit-row",
+  charge: "ps-credit-row",
+  overpay: "ps-overpay-row",
 };
 
 export default function PublicCustomerStatementPage() {
@@ -263,11 +264,14 @@ export default function PublicCustomerStatementPage() {
         .ps-by-invoice tbody tr:nth-child(even) { background: transparent; }
         .ps-by-invoice tbody td { padding: 9px 10px; font-size: 13.5px; }
         .ps-by-invoice .ps-inv-row td { background: #fff; }
-        /* شحن رصيد / دفعة زائدة — أخضر */
+        /* شحن رصيد — أخضر بارز: مالٌ جديد دخل الحساب، يستحق فاصلاً يقطع الجدول */
         .ps-by-invoice .ps-credit-row td {
           background: #e7f8ee; border-top: 2px solid #16a34a; border-bottom: 2px solid #16a34a;
           color: #14532d;
         }
+        /* فائض دفعة — بقيّةُ دفعةٍ على فاتورة قائمة لا مالٌ ثانٍ، فيُلمَّح إليه
+           بأخضر باهت بلا حدّ حتى لا يعدّه العميل مبلغاً جديداً */
+        .ps-by-invoice .ps-overpay-row td { background: #f4fbf7; color: #14532d; }
         .ps-band-icon {
           display: inline-block; background: #16a34a; color: #fff; border-radius: 50%;
           width: 17px; height: 17px; line-height: 17px; text-align: center;
@@ -454,12 +458,14 @@ export default function PublicCustomerStatementPage() {
               </tr>
             </thead>
             <tbody>
-              {account.rows.map((row, i) => (
-                <tr key={row.id} className={ROW_CLASS[row.kind]}>
+              {account.rows.map((row, i) => {
+                const band = accountRowBand(row);
+                return (
+                <tr key={row.id} className={ROW_CLASS[band]}>
                   <td>{i + 1}</td>
                   <td>{stampText(row)}</td>
                   <td style={{ textAlign: "right", fontWeight: row.kind === "invoice" ? 700 : 600 }}>
-                    {row.kind === "credit" && <span className="ps-band-icon">＋</span>}
+                    {band === "charge" && <span className="ps-band-icon">＋</span>}
                     {row.label}
                   </td>
                   <td style={{ fontWeight: 700 }}>{row.value == null ? DASH : fmt(row.value)}</td>
@@ -468,7 +474,8 @@ export default function PublicCustomerStatementPage() {
                   </td>
                   <td>{amountCell(row.remaining)}</td>
                 </tr>
-              ))}
+                );
+              })}
 
               {/* المجموع: القيمة والمدفوع يجمعان الأعمدة، والمتبقي صافي الحساب */}
               <tr className="ps-closing-row">

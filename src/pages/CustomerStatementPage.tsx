@@ -4,12 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useCompanySettings } from "@/hooks/useData";
-import { Search, X, Printer, Loader2, ArrowRight, Pencil } from "lucide-react";
+import { Search, X, Printer, Loader2, ArrowRight, Pencil, Eye, EyeOff } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { startsWithAny } from "@/utils/searchMatch";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
-import { buildCustomerAccountView, signedBalanceText, signedAmountText } from "@/utils/buildCustomerAccountView";
+import { buildCustomerAccountView, signedBalanceText, signedAmountText, accountRowBand } from "@/utils/buildCustomerAccountView";
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
 import CustomerBalanceHero from "@/components/statement/CustomerBalanceHero";
@@ -53,12 +53,15 @@ const AmountChip = ({ value }: { value: number }) => <Chip {...signedAmountText(
 /** تمييز أسطر الجدول المسطّح — الشاشة، ثم نفس المعنى في الطباعة. */
 const ROW_TONE: Record<string, string> = {
   invoice: "bg-card",
-  credit: "bg-success/10 border-y-2 border-success/50",
+  // الشحن وحده يقطع الجدول بشريط أخضر — الفائض بقيّةُ دفعةٍ لا مالٌ ثانٍ
+  charge: "bg-success/10 border-y-2 border-success/50",
+  overpay: "bg-success/[0.04]",
 };
-const ROW_MARK: Record<string, string> = { invoice: "", credit: "＋ " };
+const ROW_MARK: Record<string, string> = { invoice: "", charge: "＋ ", overpay: "" };
 const ROW_PRINT_STYLE: Record<string, string> = {
   invoice: "",
-  credit: "background:#e7f8ee;color:#14532d;font-weight:700;",
+  charge: "background:#e7f8ee;color:#14532d;font-weight:700;",
+  overpay: "background:#f4fbf7;color:#14532d;",
 };
 import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvoiceDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
@@ -99,6 +102,15 @@ export default function CustomerStatementPage() {
   // تبويبات صفحة كشف الحساب: الفواتير / محذوفة / حركات مالية.
   // حُذف تبويب «سجل الحركات — دفتر الأستاذ»: تفاصيل كل فاتورة صارت تحتها
   // مباشرة في تبويب الفواتير، بلا سجل مسطّح موازٍ.
+  /**
+   * البحث والإحصائيات مخفيّان افتراضياً: من يفتح كشف عميل بعينه جاء ليقرأ
+   * حركته، لا ليبحث عنه من جديد — فتُترك الشاشة للكشف نفسه.
+   * الاستثناء الوحيد أن لا يكون هناك عميل مختار، فالبحث حينها هو الطريق
+   * الوحيد للمتابعة ويُفرض ظهوره مهما كانت الحالة.
+   */
+  const [showTools, setShowTools] = useState(false);
+  /** البحث يُفرض ظهوره بلا عميل مختار — وإلا صارت الصفحة بابًا مغلقاً. */
+  const toolsVisible = showTools || !selectedCustomerId;
   const [tab, setTab] = useState<"invoices" | "deleted" | "transactions" | "audit">("invoices");
   const [exportingPdf, setExportingPdf] = useState(false);
   // مؤشر تصدير PDF: نستمع للحدث الذي يبعثه FinancialReportPreviewPage
@@ -542,15 +554,18 @@ export default function CustomerStatementPage() {
           ],
           // جدول مسطّح: فاتورة / شحن رصيد / سداد منه — كلها أسطر متساوية.
           // الأعمدة الرقمية تستقبل رقماً أو "—" فقط — لا نص يُحوَّل إلى NaN.
-          rows: accountView.rows.map((r, i) => ({
-            seq: String(i + 1),
-            when: stampText(r),
-            statement: `${ROW_MARK[r.kind]}${r.label}`,
-            total: r.value == null ? "—" : r.value,
-            paid: r.paid == null || r.paid < 0.009 ? "—" : r.paid,
-            remaining: signedAmountText(r.remaining).text,
-            __rowStyle: ROW_PRINT_STYLE[r.kind],
-          })),
+          rows: accountView.rows.map((r, i) => {
+            const band = accountRowBand(r);
+            return {
+              seq: String(i + 1),
+              when: stampText(r),
+              statement: `${ROW_MARK[band]}${r.label}`,
+              total: r.value == null ? "—" : r.value,
+              paid: r.paid == null || r.paid < 0.009 ? "—" : r.paid,
+              remaining: signedAmountText(r.remaining).text,
+              __rowStyle: ROW_PRINT_STYLE[band],
+            };
+          }),
           totals: {
             seq: "",
             when: "المجموع",
@@ -670,8 +685,22 @@ export default function CustomerStatementPage() {
       </div>
 
       <div className="printable-statement space-y-6">
-        <h1 data-section="header" data-section-label="العنوان" className="text-2xl font-bold text-foreground">كشف حساب عميل</h1>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h1 data-section="header" data-section-label="العنوان" className="text-2xl font-bold text-foreground">كشف حساب عميل</h1>
+          <button
+            type="button"
+            onClick={() => setShowTools((v) => !v)}
+            data-testid="toggle-statement-tools"
+            aria-pressed={showTools}
+            className="print:hidden inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            title={showTools ? "إخفاء البحث والإحصائيات" : "إظهار البحث والإحصائيات"}
+          >
+            {showTools ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {showTools ? "إخفاء البحث والإحصائيات" : "البحث والإحصائيات"}
+          </button>
+        </div>
 
+        {toolsVisible && (
         <div data-section="filters" data-section-label="الفلاتر" className="bg-card rounded-xl border border-border p-6 shadow-sm space-y-4">
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">ابحث عن العميل (بالاسم أو الهاتف)</label>
@@ -770,6 +799,7 @@ export default function CustomerStatementPage() {
           </div>
         )}
       </div>
+      )}
 
       {selectedCustomer && (() => {
         const netBalance = netBalanceOf(selectedCustomer);
@@ -794,6 +824,7 @@ export default function CustomerStatementPage() {
             totalPaid={totalPaid}
           />
 
+          {showTools && (
           <div data-section="summary" data-section-label="صناديق الملخص" className="grid grid-cols-2 md:grid-cols-5 gap-4 animate-in fade-in duration-500">
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <p className="text-sm text-muted-foreground">العميل</p>
@@ -829,6 +860,7 @@ export default function CustomerStatementPage() {
               )}
             </div>
           </div>
+          )}
 
           {reconciliation && (
             <div
@@ -930,12 +962,14 @@ export default function CustomerStatementPage() {
                 <tbody>
                   {isLoading ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
                   : !visibleRows.length ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">لا توجد حركات مطابقة</td></tr>
-                  : visibleRows.map((row, i) => (
-                    <tr key={row.id} className={`border-b border-border hover:bg-muted/50 ${ROW_TONE[row.kind]}`}>
+                  : visibleRows.map((row, i) => {
+                    const band = accountRowBand(row);
+                    return (
+                    <tr key={row.id} className={`border-b border-border hover:bg-muted/50 ${ROW_TONE[band]}`}>
                       <td data-label="#" className="px-3 py-3 text-muted-foreground tabular-nums">{i + 1}</td>
                       <td data-label="التاريخ" className="px-5 py-3 text-foreground tabular-nums whitespace-nowrap">{stampText(row)}</td>
                       <td data-label="البيان" className="px-5 py-3 text-foreground font-semibold">
-                        {row.kind === "credit" && <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-success text-success-foreground text-[10px] font-black ml-2">＋</span>}
+                        {band === "charge" && <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-success text-success-foreground text-[10px] font-black ml-2">＋</span>}
                         {row.label}
                       </td>
                       <td data-label="القيمة" className="px-5 py-3 text-foreground tabular-nums">{row.value == null ? "—" : row.value.toLocaleString()}</td>
@@ -944,7 +978,8 @@ export default function CustomerStatementPage() {
                       </td>
                       <td data-label="المتبقي" className="px-5 py-3"><AmountChip value={row.remaining} /></td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {!isLoading && visibleRows.length > 0 && (
                     <tr className="bg-muted font-bold border-t-2 border-border">
                       <td className="px-3 py-3" />

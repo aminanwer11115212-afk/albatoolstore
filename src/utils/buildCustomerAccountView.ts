@@ -124,6 +124,12 @@ export interface AccountRow {
   remaining: number;
   /** الفاتورة التي يخصّها السطر إن وُجدت — للفلترة في الشاشة الداخلية */
   invoiceId?: string;
+  /**
+   * مصدر الرصيد على أسطر `credit`. الشريط الأخضر الفاصل **للشحن وحده**:
+   * الشحن مالٌ جديد دخل الحساب فيستحق فاصلاً بارزاً، أمّا الفائض فهو بقيّة
+   * دفعةٍ على فاتورة قائمة — إبرازه بنفس القوّة يوحي بمالٍ ثانٍ لم يُدفع.
+   */
+  creditKind?: "charge" | "overpay";
 }
 
 export interface CustomerAccountView {
@@ -461,6 +467,7 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
       make: (netAfter: number): AccountRow => ({
         id: entry.id,
         kind: "credit" as const,
+        creditKind: entry.kind === "overpay" ? ("overpay" as const) : ("charge" as const),
         at: entry.at, date: entry.date, time: entry.time,
         label: chargeLabel(entry, amount),
         value: null,
@@ -524,6 +531,18 @@ export function effectText(effect: number): { text: string; tone: "debit" | "cre
  * «+300» أخضر لما هو لصالحه، «−100» أحمر لما هو عليه، «خالص» عند الصفر.
  * القيمة الداخلة **بإشارة العرض** (موجب لصالح العميل) لا بإشارة الدفاتر.
  */
+/**
+ * نوع السطر لأغراض التلوين — المصدر الواحد للشريط الأخضر في الكشفين والطباعة.
+ *
+ * الأخضر البارز **للشحن وحده**: مالٌ جديد دخل الحساب فيستحق فاصلاً يقطع
+ * الجدول. أمّا الفائض فبقيّةُ دفعةٍ على فاتورة قائمة، لا مال ثانٍ — تلوينه
+ * بنفس القوّة يجعل العميل يعدّ المبلغ مرّتين.
+ */
+export function accountRowBand(row: AccountRow): "invoice" | "charge" | "overpay" {
+  if (row.kind !== "credit") return "invoice";
+  return row.creditKind === "overpay" ? "overpay" : "charge";
+}
+
 export function signedAmountText(shown: number): { text: string; tone: "debit" | "credit" | "settled" } {
   const n = r2(shown);
   if (Math.abs(n) < 0.01) return { text: "خالص", tone: "settled" };

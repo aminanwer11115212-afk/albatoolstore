@@ -56,6 +56,14 @@ interface PrintData {
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
 import { computeDocumentBalance } from "@/utils/documentBalanceSummary";
+import { signedAmountText } from "@/utils/buildCustomerAccountView";
+
+/** ألوان الإشارة في الطباعة — مطابقة لألوان الكشف: أخضر للعميل، أحمر عليه. */
+const TONE_COLOR: Record<"debit" | "credit" | "settled", string> = {
+  credit: "#16a34a",
+  debit: "#c0392b",
+  settled: "#111",
+};
 
 function cleanExtraHTML(s?: string): string | undefined {
   if (!s) return undefined;
@@ -423,11 +431,14 @@ ${showAccount ? (() => {
   const hasPaid = !hidePaidBox && paidAmount > 0.01;
   const paidValue = hasPaid ? paidAmount : 0;
   const finalNet = jomlaHesab - paidAmount; // >0 عليه، <0 له
-  // رصيد العميل الحالي: موجب (عليه) بإشارة +، سالب (له) بإشارة −، صفر = خالص
+  // الإشارة بلغة العميل — `signedAmountText` هي المصدر الواحد لها في النظام:
+  // `+` أخضر لما في مصلحته، `−` أحمر لما عليه. ولأن دالتها تقرأ الموجبَ لصالح
+  // العميل، نمرّر النتيجة معكوسة الإشارة (`finalNet > 0` = عليه).
   const isSettled = Math.abs(finalNet) <= 0.01;
-  const finalDisplay = isSettled ? "خالص" : `${finalNet > 0 ? "+ " : "− "}${fmt(Math.abs(finalNet))}`;
+  const finalSigned = signedAmountText(-finalNet);
+  const finalDisplay = finalSigned.text;
   const finalBadge = isSettled ? "" : finalNet > 0 ? "عليه" : "له";
-  const finalColor = isSettled ? "#111" : finalNet > 0 ? "#c0392b" : "#16a34a";
+  const finalColor = TONE_COLOR[finalSigned.tone];
   // خلايا بنمط Excel: حدود رفيعة رمادية، خلفية عنوان فاتحة، خط رقمي أحادي المسافات، مضغوط في الأسفل.
   const cellR = "padding:3px 6px;text-align:right;font-weight:700;color:#111;background:#f4f6f8;border:1px solid #b8bcc4;line-height:1.1;font-size:10px;";
   const cellL = "padding:3px 6px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.1;font-family:'Consolas','Courier New',monospace;font-size:10.5px;letter-spacing:0.2px;";
@@ -447,14 +458,17 @@ ${showAccount ? (() => {
   <tbody>
     ${row({ section: "invoice-value", label: "قيمة الفاتورة", value: fmt(invoiceValue) })}
     ${generalDiscount > 0.01 ? row({ section: "discount-row", label: "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : ""}
-    ${hasPrev ? row({
-      section: "prev-account-row",
-      label: "الحساب القديم",
-      value: `${prevNet > 0 ? "+ " : "− "}${fmt(Math.abs(prevNet))}`,
-      valColor: prevNet > 0 ? "#c0392b" : "#16a34a",
-      sideBadge: prevNet > 0 ? "عليه" : "له",
-      badgeColor: prevNet > 0 ? "#c0392b" : "#16a34a",
-    }) : ""}
+    ${hasPrev ? (() => {
+      const prevSigned = signedAmountText(-prevNet);
+      return row({
+        section: "prev-account-row",
+        label: "الحساب القديم",
+        value: prevSigned.text,
+        valColor: TONE_COLOR[prevSigned.tone],
+        sideBadge: prevNet > 0 ? "عليه" : "له",
+        badgeColor: TONE_COLOR[prevSigned.tone],
+      });
+    })() : ""}
     ${row({ section: "majmoo-row", label: "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
     ${row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
     <tr data-section="final-status" data-section-label="رصيد العميل الحالي">

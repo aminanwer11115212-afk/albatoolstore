@@ -18,7 +18,16 @@ import { signedAmountText } from "@/utils/buildCustomerAccountView";
  *
  * الإشارة موحّدة مع كشف الحساب ورسائل الواتساب عبر `signedAmountText`:
  * «+» أخضر لصالح العميل، «−» أحمر عليه، والصفر «خالص».
+ *
+ * **انتبه لاتجاه الإشارة عند العبور بين الدالّتين** — فهما متعاكستان قصداً:
+ *   `netBalanceOf` و`netBeforeInvoice` تُرجعان بإشارة **الدفاتر**: موجب = عليه.
+ *   `signedAmountText` تقرأ بإشارة **العرض**: موجب = لصالح العميل.
+ * فالعبور بلا عكس يقلب الكشف على وجه العميل: من له 130,000 يراها ديناً أحمر.
+ * `toDisplaySign` هي نقطة العبور الوحيدة هنا.
  */
+
+/** من إشارة الدفاتر (موجب = عليه) إلى إشارة العرض (موجب = لصالحه). */
+export const toDisplaySign = (ledgerNet: number) => -ledgerNet;
 
 interface Props {
   invoiceId: string;
@@ -32,7 +41,7 @@ const TONE: Record<string, string> = {
 };
 
 function Box({ title, hint, value }: { title: string; hint: string; value: number | null }) {
-  const shown = value == null ? null : signedAmountText(value);
+  const shown = value == null ? null : signedAmountText(toDisplaySign(value));
   return (
     <div className="flex-1 min-w-[150px] rounded-lg border-2 border-border bg-card px-4 py-3 text-center">
       <div className="text-xs font-bold text-foreground">{title}</div>

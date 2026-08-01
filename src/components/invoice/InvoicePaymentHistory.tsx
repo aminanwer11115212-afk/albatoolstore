@@ -10,6 +10,12 @@ import { useUserRole } from "@/hooks/useUserRole";
 interface Props {
   invoiceId: string;
   refreshKey?: number;
+  /**
+   * في صفحة المعاينة يُعلَّق السجلّ فوق الورقة بدل أن يدفعها لأسفل: المعاينة
+   * وُجدت ليرى المستخدم الفاتورة كما ستُطبع، وشريطٌ يعلوها يزيح ذلك عن الشاشة.
+   * معلّقاً يبقى في المتناول ولا يأخذ من مساحة الورقة شيئاً — ومطويّاً افتراضياً.
+   */
+  floating?: boolean;
 }
 
 interface Revision {
@@ -39,11 +45,11 @@ interface LiveTx {
 /**
  * سجل تدقيق دفعات الفاتورة — snapshots + الدفعات النشطة القابلة للتعديل.
  */
-export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0 }: Props) {
+export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0, floating = false }: Props) {
   const [rows, setRows] = useState<Revision[]>([]);
   const [live, setLive] = useState<LiveTx[]>([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(!floating);
   const [editing, setEditing] = useState<EditablePayment | null>(null);
   const [editingCharge, setEditingCharge] = useState<EditableCharge | null>(null);
   const [bump, setBump] = useState(0);
@@ -87,22 +93,34 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0 }: Pro
   if (!invoiceId) return null;
 
   return (
-    <div dir="rtl" className="rounded-md border border-border bg-background/60 text-xs">
+    <div
+      dir="rtl"
+      data-testid="invoice-payment-history"
+      data-floating={floating ? "true" : "false"}
+      className={
+        floating
+          ? "fixed bottom-4 left-4 z-40 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-border bg-card/95 backdrop-blur shadow-lg text-[11px] print:hidden"
+          : "rounded-md border border-border bg-background/60 text-xs"
+      }
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/40"
+        className={`w-full flex items-center justify-between hover:bg-muted/40 ${
+          floating ? "px-2.5 py-1.5 rounded-lg" : "px-3 py-2"
+        }`}
+        title={open ? "طيّ سجل الدفعات" : "عرض سجل الدفعات"}
       >
         <span className="flex items-center gap-1.5 font-semibold">
-          <History size={14} /> سجل الدفعات
+          <History size={floating ? 12 : 14} /> سجل الدفعات
           {rows.length > 0 && (
             <span className="text-muted-foreground font-normal">({rows.length})</span>
           )}
         </span>
-        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        {open ? <ChevronUp size={floating ? 12 : 14} /> : <ChevronDown size={floating ? 12 : 14} />}
       </button>
       {open && (
-        <div className="border-t border-border">
+        <div className={`border-t border-border ${floating ? "max-h-[55vh] overflow-auto" : ""}`}>
           {loading ? (
             <div className="flex items-center gap-1 p-3 text-muted-foreground">
               <Loader2 size={14} className="animate-spin" /> جارٍ التحميل…
