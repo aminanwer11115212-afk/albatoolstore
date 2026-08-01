@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { GripHorizontal } from "lucide-react";
+import { GripHorizontal, Columns3 } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -7,6 +7,13 @@ interface Props {
   onSaveDefault: () => void;
   onReset: () => void;
   onSave: () => void;
+  /**
+   * فتح وضع تعديل الأعمدة. زرّ الفتح الأصلي مدفونٌ في **آخر عمود من ترويسة
+   * الجدول** بحجم خطّ 7 — وعلى الهاتف ينزلق الجدول أفقياً فيبقى ذلك العمود
+   * خارج الشاشة، فيتعذّر الوصول إليه أصلاً. حين تُمرَّر هذه الدالّة يظهر زرّ
+   * عائم على الشاشات الضيّقة وحدها يفتح الوضع نفسه.
+   */
+  onOpen?: () => void;
 }
 
 const STORAGE_PREFIX = "cols-edit-panel-pos:";
@@ -27,7 +34,7 @@ function clamp(val: number, min: number, max: number) {
   return Math.max(min, Math.min(max, val));
 }
 
-export default function ColumnsEditFloatingPanel({ open, pageKey, onSaveDefault, onReset, onSave }: Props) {
+export default function ColumnsEditFloatingPanel({ open, pageKey, onSaveDefault, onReset, onSave, onOpen }: Props) {
   const [pos, setPos] = useState<{ x: number; y: number }>(() => readPos(pageKey));
   const dragging = useRef(false);
   const startMouse = useRef({ x: 0, y: 0 });
@@ -102,7 +109,21 @@ export default function ColumnsEditFloatingPanel({ open, pageKey, onSaveDefault,
     window.addEventListener("touchend", onEnd);
   }
 
-  if (!open) return null;
+  // مقفلاً: زرّ فتحٍ عائم على الهاتف وحده — الديسكتوب يبلغ زرّ الترويسة بلا عناء.
+  if (!open) {
+    if (!onOpen) return null;
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        data-testid="cols-edit-mobile-trigger"
+        title="تعديل عرض الأعمدة"
+        className="md:hidden fixed bottom-20 left-3 z-40 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/95 backdrop-blur px-3 py-2 text-xs font-semibold shadow-lg print:hidden"
+      >
+        <Columns3 size={14} /> الأعمدة
+      </button>
+    );
+  }
 
   return (
     <div
