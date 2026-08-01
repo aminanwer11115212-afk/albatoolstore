@@ -149,11 +149,27 @@ describe("زرّا «معاينة» و«واتساب PDF» في شاشات ال�
   // شاشة الفاتورة واحدة للإنشاء والتعديل (`editId`)، فالزران يظهران في الحالتين.
   const pages = ["src/pages/InvoiceCreatePage.tsx", "src/pages/QuoteCreatePage.tsx"];
 
-  it.each(pages)("%s فيه زر معاينة يفتح نافذة المعاينة", (page) => {
+  /**
+   * زر «معاينة» يجب أن ينادي **نفس** مسار F9 لا مساراً موازياً: مساران
+   * يختلف ناتجهما يجعلان ما يراه المستخدم بالزر غير ما يراه بالاختصار.
+   */
+  it.each(pages)("%s: زر المعاينة و F9 ينادِيان openPreview نفسها", (page) => {
     const src = read(page);
     expect(src).toContain('id: "preview"');
-    expect(src).toContain("معاينة");
-    expect(src).toMatch(/openPrintWindow\(\s*(await\s+)?buildCurrentPrintHTML/);
+    expect(src).toContain("onClick={() => openPreview()}");
+    expect(src).toContain("onPreview: openPreview,");
+    // نافذة الطباعة تبقى لمسار «طباعة» و«واتساب PDF» — لكن لا يجوز أن يفتحها
+    // زرّ المعاينة نفسه، فذاك هو المسار الموازي الذي نمنعه.
+    expect(src).not.toMatch(/onClick=\{\(\)\s*=>\s*openPrintWindow/);
+  });
+
+  it.each(pages)("%s: openPreview تحفظ ثم تنتقل لشاشة المعاينة العامة", (page) => {
+    const src = read(page);
+    const at = src.indexOf("const openPreview");
+    expect(at).toBeGreaterThan(0);
+    const body = src.slice(at, at + 500);
+    expect(body).toContain("saveThen");
+    expect(body).toMatch(/navigate\(`\/preview\/(invoice|quote)\/\$\{id\}`\)/);
   });
 
   it.each(pages)("%s فيه زر واتساب PDF يمرّ من المسار الموحّد", (page) => {

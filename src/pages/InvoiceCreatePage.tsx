@@ -1460,6 +1460,23 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     openPrintWindow(buildCurrentPrintHTML(variant, noHeader));
   }
 
+  /**
+   * المعاينة العامة في النظام: تحفظ ثم تنتقل لشاشة `/preview/invoice/:id`.
+   * زر «معاينة» و F9 ينادِيانها معاً — مسار واحد لا مساران يختلف ناتجهما.
+   */
+  const openPreview = async () => {
+    await saveThen(async (id) => {
+      try {
+        await supabase.rpc("advance_invoice_workflow" as any, {
+          _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
+        });
+        invalidateWorkflowAutoCache(id);
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch { /* noop */ }
+      } catch { /* noop */ }
+      navigate(`/preview/invoice/${id}`);
+    });
+  };
+
   /** يمنع نقرتين متتاليتين تولّدان ملفين */
   const [sharingPdf, setSharingPdf] = useState(false);
 
@@ -1626,18 +1643,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
 
   // ---------- F9 = معاينة الطباعة، F10 = طباعة مباشرة (تُرقّي الحالة إلى "قيد التجهيز") ----------
   useDocPrintShortcuts({
-    onPreview: async () => {
-      await saveThen(async (id) => {
-        try {
-          await supabase.rpc("advance_invoice_workflow" as any, {
-            _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
-          });
-          invalidateWorkflowAutoCache(id);
-          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
-        } catch {}
-        navigate(`/preview/invoice/${id}`);
-      });
-    },
+    onPreview: openPreview,
     onPrint: async () => {
       // طباعة مباشرة دون الرجوع لصفحة المعاينة
       await printInvoiceNow();
@@ -2438,9 +2444,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                   node: (
                     <button
                       type="button"
-                      onClick={() => openPrintWindow(buildCurrentPrintHTML("full", false))}
+                      onClick={() => openPreview()}
                       style={btnStyle("#6366f1")}
-                      title="معاينة الفاتورة كما ستصل العميل — تعمل قبل الحفظ أيضاً"
+                      title="معاينة الفاتورة (F9) — تحفظ ثم تفتح شاشة المعاينة"
                     >
                       <Eye size={14} /> معاينة
                     </button>

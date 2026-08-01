@@ -15,6 +15,8 @@ import ChargeBalanceDialog from "@/components/dashboard/ChargeBalanceDialog";
 import CustomerNetBalanceCard from "@/components/CustomerNetBalanceCard";
 import CustomerChargeHistory from "@/components/CustomerChargeHistory";
 import CustomerAuditLog from "@/components/customer/CustomerAuditLog";
+import { getWorkflowStatus } from "@/components/invoice/WorkflowStatusBadge";
+import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
 
 
 interface Props {
@@ -215,7 +217,7 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
           <DataTable
             loading={loadingInv}
             empty="لا توجد فواتير"
-            cols={["رقم", "التاريخ", "الإجمالي", "المدفوع", "المتبقي", "الحالة", ""]}
+            cols={["رقم", "التاريخ", "الإجمالي", "المدفوع", "المتبقي", "التجهيز", "الدفع", ""]}
             rows={invoices.slice(0, 100).map((inv: any) => {
               const due = Number(inv.total || 0) - Number(inv.paid_amount || 0);
               return {
@@ -226,7 +228,8 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
                   <span className="text-foreground font-medium">{fmt(inv.total)}</span>,
                   <span className="text-green-600">{fmt(inv.paid_amount)}</span>,
                   <span className={`font-semibold ${due > 0.01 ? "text-destructive" : "text-foreground"}`}>{fmt(due)}</span>,
-                  <StatusBadge value={inv.workflow_status || inv.status} />,
+                  <WorkflowChip value={inv.workflow_status} />,
+                  <PaymentChip total={inv.total} paid={inv.paid_amount} status={inv.status} />,
                   <Link to={`/invoices/view/${inv.id}`} className="text-muted-foreground hover:text-primary inline-flex"><ExternalLink size={14} /></Link>,
                 ],
               };
@@ -310,6 +313,39 @@ function TabBtn({ active, onClick, icon, label, count }: { active: boolean; onCl
     </button>
   );
 }
+
+/**
+ * حالة التجهيز (workflow_status) بالعربية وبألوان النظام.
+ *
+ * كانت تُعرض بقيمتها الخام في عمود اسمه «الحالة»، فيقرأ المستخدم `done`
+ * بخلفية خضراء بعد رفع صورة الإيصال ويظنّها «مدفوعة». التجهيز شيء والدفع
+ * شيء آخر: رفع الإيصال يُنهي التجهيز ولا يسدّد قرشاً.
+ */
+const WorkflowChip = forwardRef<HTMLSpanElement, { value?: string | null }>(({ value }, ref) => {
+  const s = getWorkflowStatus(value);
+  return (
+    <span ref={ref} className={`text-xs px-2 py-1 rounded border ${s.bg} ${s.color}`}>{s.label}</span>
+  );
+});
+WorkflowChip.displayName = "WorkflowChip";
+
+/** حالة الدفع مشتقّة من المدفوع/الإجمالي — لا من التجهيز ولا من أي مرفق. */
+const PaymentChip = forwardRef<HTMLSpanElement, { total?: number | null; paid?: number | null; status?: string | null }>(
+  ({ total, paid, status }, ref) => {
+    if (status === "cancelled") {
+      return <span ref={ref} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive">ملغاة</span>;
+    }
+    const st = computeInvoiceStatusAfterPayment({ total: Number(total) || 0, paidAfter: Number(paid) || 0 });
+    const map = {
+      paid: ["مدفوعة", "bg-green-500/10 text-green-600"],
+      partial: ["مدفوعة جزئياً", "bg-yellow-500/10 text-yellow-700"],
+      pending: ["غير مدفوعة", "bg-muted text-muted-foreground"],
+    } as const;
+    const [label, cls] = map[st as keyof typeof map] ?? map.pending;
+    return <span ref={ref} className={`text-xs px-2 py-1 rounded ${cls}`}>{label}</span>;
+  },
+);
+PaymentChip.displayName = "PaymentChip";
 
 const StatusBadge = forwardRef<HTMLSpanElement, { value?: string }>(({ value }, ref) => {
   const v = (value || "").toLowerCase();
