@@ -1,0 +1,2927 @@
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { notifyDuplicateItem } from "@/utils/duplicateItemToast";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePageRenderCount } from "@/hooks/usePageRenderCount";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchAllProducts } from "@/lib/fetchAllProducts";
+import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
+import { toast } from "sonner";
+import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
+import { Plus, Edit, Printer, MessageCircle, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet, Eye, FileDown } from "lucide-react";
+import StatusButton, { WORKFLOW_STATUS_OPTIONS, INVOICE_STATUS_OPTIONS } from "@/components/StatusButton";
+import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
+import RecentItemsSidebar from "@/components/RecentItemsSidebar";
+import { useDocPrintShortcuts } from "@/hooks/useDocPrintShortcuts";
+import PanelResizer from "@/components/PanelResizer";
+import RowResizer from "@/components/RowResizer";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
+import { loadInvoiceExtras } from "@/utils/printExtras";
+import { deductStockForLines, applyStockDeltaForLines } from "@/utils/stockDeduction";
+import { checkDuplicateBeforeInsert } from "@/utils/duplicateSaveToast";
+import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
+import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils/whatsapp";
+import { useDocumentCurrency } from "@/hooks/document/useDocumentCurrency";
+import { useDocumentItems } from "@/hooks/document/useDocumentItems";
+import { useDocumentCustomer } from "@/hooks/document/useDocumentCustomer";
+import { useDocumentPayment } from "@/hooks/document/useDocumentPayment";
+import { useDocumentForm } from "@/hooks/document/useDocumentForm";
+import { useDocumentSave } from "@/hooks/document/useDocumentSave";
+
+import { useScreenZoom } from "@/hooks/useScreenZoom";
+import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLocked, screenColWidthsKey, migrateScreenColKeys, COLS_TOAST_SAVED, COLS_TOAST_SAVE_FAILED, COLS_TOAST_EDIT_MODE, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE } from "@/hooks/useColumnWidths";
+import { useSuggestionsWidth, SuggestionsResizeHandle } from "@/hooks/useSuggestionsWidth";
+import { SuggestionsPortal } from "@/components/SuggestionsPortal";
+import { ItemsScroll } from "@/components/items/ItemsScroll";
+import { TableFiller } from "@/components/items/TableFiller";
+import { useQuickRowWidths, ExpandFieldButton } from "@/hooks/useQuickRowWidths";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { makeRowNavHandler } from "@/utils/itemTableNav";
+import { useCreatePageNav } from "@/utils/createPageNav";
+import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
+import { useUserRole } from "@/hooks/useUserRole";
+
+import { recordInvoiceRevision } from "@/utils/invoiceRevisions";
+import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
+import InvoicePaymentHistory from "@/components/invoice/InvoicePaymentHistory";
+import PackagingDialog from "@/components/packaging/PackagingDialog";
+import InvoiceAttachmentsDialog from "@/components/invoice/InvoiceAttachmentsDialog";
+import TransportDialog from "@/components/transport/TransportDialog";
+import QuickAddProductDialog from "@/components/product/QuickAddProductDialog";
+import ItemNoteDialog from "@/components/invoice/ItemNoteDialog";
+import FreePositionToolbar from "@/components/toolbar/FreePositionToolbar";
+import SummaryChip from "@/components/toolbar/SummaryChip";
+import { ToolbarCustomizationProvider } from "@/components/toolbar/ToolbarCustomizationContext";
+import { productMatches as sharedProductMatches } from "@/utils/productMatches";
+import MessageImportDialog, { MessageImportButton } from "@/components/MessageImportDialog";
+import type { ParsedLine } from "@/hooks/useMessageImport";
+import { ALLOWED_INVOICE_STATUSES, computeInvoiceStatusAfterPayment, isAllowedInvoiceStatus } from "@/utils/invoiceStatus";
+import { splitPayment } from "@/utils/overpayment";
+import CustomerFormDialog from "@/components/CustomerFormDialog";
+import { CustomerInfoStrip, netBalanceOf } from "@/utils/balanceDisplay";
+import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
+
+import { useInvoiceKeyboardNav } from "@/hooks/document/useInvoiceKeyboardNav";
+import {
+  type Customer,
+  type Product,
+  type InvRow,
+  newRow,
+  calcTotal,
+  btnStyle,
+  invoiceItemsHash,
+  resolveDefaultRate,
+  deriveRateFromRows,
+  priceFromProduct,
+  backfillForeignPrice,
+  applyRateToRow,
+} from "@/utils/invoiceCreateHelpers";
+
+
+/**
+ * شاشة إنشاء/تعديل الفاتورة — **المنطق المشترك** بين الفاتورة الآجلة وفاتورة
+ * الكاش. لا تُوصَل بمسارٍ مباشرةً؛ فوقها صفحتان رفيعتان تفصلان الشاشتين في
+ * الواجهة والمسار: `InvoiceCreatePage` و`CashInvoiceCreatePage`.
+ *
+ * الفصل هنا في **الصفحة لا في المنطق** قصداً. نسخُ الملف كان يعني صيانة
+ * نسختين من ثلاثة آلاف سطر: كل إصلاح يُطبَّق مرّتين، وأوّل مرّة يُنسى فيها
+ * تتباعد الشاشتان صامتتين — وهو ما وقع فعلاً حين حملت الطباعة والمعاينة
+ * منطقَي «الحساب القديم» متوازيين، فبقي أحدهما مقلوباً شهوراً.
+ */
+export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } = {}) {
+  usePageRenderCount("/invoices/create");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const { zoom: itemsZoom, inc: itemsZoomInc, dec: itemsZoomDec } = useScreenZoom("invoice-create");
+  // Unified item-table columns: [action, product(flex), qty, foreign$, price, total, dup, trailing]
+  const colsScreenId = "invoice-create";
+  if (typeof window !== "undefined") migrateScreenColKeys(colsScreenId);
+  const [colsLocked, setColsLocked] = useScreenColsLocked(colsScreenId);
+  const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, reset: resetColWidths, saveAsUserDefault: saveColsAsDefault, tableProps, clampWidthsToContainer } = useColumnWidths(
+    screenColWidthsKey(colsScreenId),
+    [36, null, 80, 100, 100, 100, 36, 40],
+    colsLocked,
+  );
+  const { width: suggWidth, startDrag: startSuggDrag } = useSuggestionsWidth("invoice-create:suggWidth");
+  const QUICK_BASE_INVOICE = ["4fr", "70px", "1fr", "1fr", "1fr", "auto"];
+  const { extras: quickExtras, setExtra: quickSetExtra, reset: quickReset, getGridTemplate: quickGrid } = useQuickRowWidths("invoice-create:quickRowWidths", 5);
+  const CUSTOMER_FIELD_BASE = 260;
+  const { extras: custExtras, setExtra: custSetExtra, reset: custReset } = useQuickRowWidths("invoice-create:customerFieldWidth", 1);
+  // Header field widths (date, warehouse, customer-info)
+  const HEADER_FIELD_BASES = [130, 140, 130, 120];
+  const { extras: hdrExtras, setExtra: hdrSetExtra, reset: hdrReset } = useQuickRowWidths("invoice-create:headerFieldsWidth", 3);
+  const { id: editId } = useParams();
+  const isCash = location.pathname.includes("/cash");
+  const isEdit = !!editId;
+
+  // Data
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState<boolean>(true);
+  const [company, setCompany] = useState<any>(null);
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
+  const [warehouseId, setWarehouseId] = useState<string>("");
+  const [lastPayment, setLastPayment] = useState<{ amount: number; status: string; currency?: string } | null>(null);
+  // customer state moved to useDocumentCustomer hook (see below)
+
+  // Header (مُستخرج إلى hook موحّد: رقم/تاريخ/استحقاق/خصم/شحن/ملاحظات)
+  const {
+    invoiceNumber, setInvoiceNumber,
+    invoiceDate, setInvoiceDate,
+    dueDate, setDueDate,
+    generalDiscount, setGeneralDiscount,
+    shipping, setShipping,
+    notes, setNotes,
+    internalNote, setInternalNote,
+  } = useDocumentForm();
+  const {
+    customer, setCustomer,
+    customerSearch, setCustomerSearch,
+    showCustomerSugg, setShowCustomerSugg,
+    customerBalances, setCustomerBalances,
+    selectedCustomerIdRef,
+  } = useDocumentCustomer();
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+
+  // Add customer dialog
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+
+  // Currency (مُستخرج إلى hook موحّد)
+  const {
+    currencies, setCurrencies,
+    currencyCode, setCurrencyCode,
+    exchangeRateToBase, setExchangeRateToBase,
+    loadCurrencies,
+  } = useDocumentCurrency();
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [itemNoteEditing, setItemNoteEditing] = useState<{ uid: string; productName?: string; value: string } | null>(null);
+  const [packagingDialogOpen, setPackagingDialogOpen] = useState(false);
+  const [walkInName, setWalkInName] = useState("");
+  const [attachmentsDialogOpen, setAttachmentsDialogOpen] = useState(false);
+  const [transportDialogOpen, setTransportDialogOpen] = useState(false);
+
+  // Default exchange rate
+  const [defaultRate, setDefaultRate] = useState<number>(1);
+  // آخر سعر صرف عام من قاعدة البيانات، والمشتقّ من بنود الفاتورة المفتوحة.
+  // الاثنان في refs لأن تأثيري التحميل (الفاتورة/السعر) يتسابقان بأي ترتيب.
+  const globalRateRef = useRef<number>(0);
+  const derivedRateRef = useRef<number>(0);
+  // يُرفع عند تعديل المستخدم لسعر الصرف يدوياً فلا يُستبدَل باللاحق آلياً.
+  const rateTouchedRef = useRef(false);
+
+  // Quick add row + table rows (مُستخرج إلى hook موحّد)
+  const { quickRow, setQuickRow, rows, setRows } = useDocumentItems();
+
+  const itemsScrollRef = useRef<HTMLDivElement>(null);
+  const {
+    savedRef,
+    lastSavedIdRef,
+    savedInvoiceId, setSavedInvoiceId,
+    isSavingRef,
+    originalItemsHashRef,
+  } = useDocumentSave();
+  // يُرفع بعد "+ حفظ وجديد" لتجاهل editId القادم من useParams في الجلسة الجديدة.
+  const newSessionRef = useRef(false);
+  useContainerFit(itemsScrollRef, clampWidthsToContainer, { locked: colsLocked });
+  const prevRowsLen = useRef(1);
+  useEffect(() => {
+    if (rows.length > prevRowsLen.current && itemsScrollRef.current) {
+      const el = itemsScrollRef.current;
+      requestAnimationFrame(() => {
+        if (el.scrollHeight > el.clientHeight) el.scrollTop = el.scrollHeight;
+        else el.scrollTop = 0;
+      });
+    }
+    prevRowsLen.current = rows.length;
+  }, [rows.length]);
+  // Restore scroll position after returning from packaging/transport
+  useEffect(() => {
+    if (!editId || rows.length === 0) return;
+    const raw = sessionStorage.getItem(`invoice-edit-scroll:${editId}`);
+    if (!raw) return;
+    try {
+      const { page, items } = JSON.parse(raw);
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: page || 0, behavior: 'auto' });
+        if (itemsScrollRef.current) itemsScrollRef.current.scrollTop = items || 0;
+      });
+      sessionStorage.removeItem(`invoice-edit-scroll:${editId}`);
+    } catch {}
+  }, [editId, rows.length === 0]);
+  const [tableSearch, setTableSearch] = useState("");
+  const [productHeaderSearch, setProductHeaderSearch] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+  const [workflowStatus, setWorkflowStatus] = useState<string>("new");
+  const [invoiceStatus, setInvoiceStatus] = useState<string>("pending");
+
+  // ---------- Payment dialog state (extracted to useDocumentPayment) ----------
+  const {
+    paymentDialogOpen, setPaymentDialogOpen,
+    savedTotal, setSavedTotal,
+    savedPaid, setSavedPaid,
+    savedDue, setSavedDue,
+    accounts, setAccounts,
+    payAmount, setPayAmount,
+    payMethod, setPayMethod,
+    payAccount, setPayAccount,
+    payDate, setPayDate,
+    payNote, setPayNote,
+    payRef, setPayRef,
+    payDiscount, setPayDiscount,
+    savingPayment, setSavingPayment,
+  } = useDocumentPayment();
+  const [savedCustomerId, setSavedCustomerId] = useState<string | null>(null);
+  const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
+  const [showMessageImport, setShowMessageImport] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  // بعد حذف الفاتورة نمنع أي حفظ تلقائي لاحق (unsaved-guard) قد يعيد إنشائها.
+  const deletedRef = useRef(false);
+  const { isAdmin } = useUserRole();
+  const customerInputRef = useRef<HTMLInputElement>(null);
+  const quickProductRef = useRef<HTMLInputElement>(null);
+  const quickQtyRef = useRef<HTMLInputElement>(null);
+  const quickRateRef = useRef<HTMLInputElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  useInvoiceKeyboardNav(pageRef);
+  useCreatePageNav({ rootRef: pageRef, customerRef: customerInputRef, itemsTableId: "invoice-items" });
+
+  // ---------- Initial load ----------
+  useEffect(() => {
+    (async () => {
+      setProductsLoading(true);
+      try {
+        const [cs, ps, cfg] = await Promise.all([
+          supabase.from("customers").select("id,name,phone,balance,company").order("name"),
+          fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
+          supabase.from("company_settings").select("*").maybeSingle(),
+        ]);
+        if (cs.error) throw cs.error;
+        if (cfg.error) throw cfg.error;
+        if (cs.data) setCustomers(cs.data as Customer[]);
+        setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
+        if (cfg.data) setCompany(cfg.data);
+        if (!editId) {
+          const prefix = pos
+            ? ((cfg.data as any)?.pos_invoice_prefix || "POS-")
+            : (cfg.data?.invoice_prefix || "INV-");
+          const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+          const candidate = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
+            scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+          });
+          setInvoiceNumber(candidate);
+        }
+      } catch (e: any) {
+        console.error("initial load failed:", e);
+        try { const { toast } = await import("sonner"); toast.error(e?.message || "تعذّر تحميل البيانات الأولية"); } catch {}
+      } finally {
+        setProductsLoading(false);
+      }
+    })();
+
+    supabase.from("accounts").select("id,name,bank_name,account_type").order("name").then(({ data, error }) => {
+      if (error) { console.warn("accounts load failed:", error); return; }
+      if (data) setAccounts(data);
+    });
+
+    supabase.from("warehouses").select("id,name").order("name").then(({ data, error }) => {
+      if (error) { console.warn("warehouses load failed:", error); return; }
+      if (data) setWarehouses(data as any);
+    });
+
+    loadCurrencies(editId);
+
+
+    // Refetch products when stock changes elsewhere (purchase receipt,
+    // invoice creation/edit) or when the user returns to this tab.
+    const refetchProducts = async () => {
+      setProductsLoading(true);
+      const ps = await fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id");
+      setProducts((ps as any[]).filter((x:any)=>!x.is_frozen) as any);
+      setProductsLoading(false);
+    };
+    // Refetch customers when they change elsewhere or when user returns to this tab.
+    const refetchCustomers = async () => {
+      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      if (data) {
+        setCustomers(data as Customer[]);
+        const currentId = selectedCustomerIdRef.current;
+        if (currentId) {
+          const { data: bal } = await supabase
+            .from("customers")
+            .select("balance, credit_balance, net_balance")
+            .eq("id", currentId)
+            .maybeSingle();
+          if (bal) {
+            setCustomerBalances({
+              debt: Number((bal as any).balance || 0),
+              credit: Number((bal as any).credit_balance || 0),
+              net: (bal as any).net_balance != null ? Number((bal as any).net_balance) : undefined,
+            });
+          }
+        }
+      }
+    };
+    const handleFocus = () => {
+      refetchProducts();
+      refetchCustomers();
+    };
+    const onCustomersChanged = async () => {
+      const tid = toast.loading("جارٍ تحديث الرصيد…", { id: "balance-refresh" });
+      try {
+        await refetchCustomers();
+        toast.success("تم تحديث الرصيد", { id: tid, duration: 1200 });
+      } catch { toast.dismiss(tid); }
+    };
+    window.addEventListener("products:changed", refetchProducts);
+    window.addEventListener("customers:changed", onCustomersChanged);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("products:changed", refetchProducts);
+      window.removeEventListener("customers:changed", onCustomersChanged);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [editId]);
+
+
+
+
+  // جلب آخر دفعة للعميل المختار
+  useEffect(() => {
+    if (!customer?.id) { setLastPayment(null); setCustomerBalances(null); return; }
+    (async () => {
+      const { data: bal } = await supabase
+        .from("customers")
+        .select("balance, credit_balance, net_balance")
+        .eq("id", customer.id)
+        .maybeSingle();
+      if (bal) setCustomerBalances({
+        debt: Number((bal as any).balance || 0),
+        credit: Number((bal as any).credit_balance || 0),
+        net: (bal as any).net_balance != null ? Number((bal as any).net_balance) : undefined,
+      });
+      else setCustomerBalances(null);
+    })();
+    (async () => {
+      const { data } = await supabase
+        .from("transactions")
+        .select("amount, reference_id, date")
+        .eq("customer_id", customer.id)
+        .eq("type", "income")
+        .in("category", ["invoice_payment", "customer_credit"])
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const t: any = (data || [])[0];
+      if (!t) { setLastPayment(null); return; }
+      let status = "—";
+      if (t.reference_id) {
+        const { data: inv } = await supabase
+          .from("invoices")
+          .select("total, paid_amount, currency_code")
+          .eq("id", t.reference_id)
+          .maybeSingle();
+        if (inv) {
+          const total = Number((inv as any).total || 0);
+          const paid = Number((inv as any).paid_amount || 0);
+          if (paid >= total && total > 0) status = "كاملة";
+          else if (paid > 0) status = "جزئية";
+          setLastPayment({ amount: Number(t.amount || 0), status, currency: (inv as any).currency_code });
+          return;
+        }
+      }
+      setLastPayment({ amount: Number(t.amount || 0), status });
+    })();
+  }, [customer?.id]);
+
+  // سعر الصرف العام يُقرأ في الحالتين (إنشاء وتعديل). كان مقصوراً على الإنشاء،
+  // فكانت الفاتورة القديمة التي لا يحمل أي بند فيها سعراً أجنبياً تبقى على معدّل 1
+  // ويُدرَج الصنف الجديد بسعره الأجنبي الخام كسعر محلي.
+  useEffect(() => {
+    (async () => {
+      const { data: er } = await supabase
+        .from("exchange_rates")
+        .select("rate_to_base")
+        .order("effective_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const rate = Number(er?.rate_to_base || 0);
+      if (!(rate > 0)) return;
+      globalRateRef.current = rate;
+      // في وضع التعديل: لا نتجاوز المعدّل المشتقّ من بنود الفاتورة نفسها إن وُجد.
+      const effective = resolveDefaultRate(editId ? derivedRateRef.current : 0, rate);
+      if (effective === 1) return;
+      setDefaultRate(effective);
+      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: r.foreign_price * effective }));
+      setRows((prev) => prev.map((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: r.foreign_price * effective })));
+    })();
+  }, [editId]);
+
+  // ---------- Load invoice for edit ----------
+  useEffect(() => {
+    if (!editId) return;
+    (async () => {
+      const { data: inv } = await supabase
+        .from("invoices").select("*").eq("id", editId).maybeSingle();
+      if (!inv) { toast.error("الفاتورة غير موجودة"); navigate("/invoices"); return; }
+      setInvoiceNumber(inv.invoice_number);
+      setInvoiceDate(inv.date);
+      setDueDate(inv.due_date || "");
+      setNotes(inv.notes || "");
+      setInternalNote(inv.internal_note || "");
+      setGeneralDiscount(Number(inv.discount) || 0);
+      setShipping(Number(inv.shipping) || 0);
+      setPaymentMethod(inv.payment_method || "cash");
+      setWorkflowStatus((inv as any).workflow_status || "new");
+      setInvoiceStatus((inv as any).status || "pending");
+      setSavedCustomerId(inv.customer_id || null);
+      setSavedTotal(Number(inv.total) || 0);
+      setSavedPaid(Number(inv.paid_amount) || 0);
+      setSavedDue(Number(inv.due_amount) || 0);
+      if (inv.currency_code) setCurrencyCode(inv.currency_code);
+      if (inv.exchange_rate_to_base) setExchangeRateToBase(Number(inv.exchange_rate_to_base));
+      if (inv.customer_id) {
+        const { data: c } = await supabase.from("customers")
+          .select("id,name,phone,balance,company").eq("id", inv.customer_id).maybeSingle();
+        if (c) { setCustomer(c as Customer); setCustomerSearch((c as Customer).name); }
+      }
+      const { data: items } = await supabase.from("invoice_items").select("*").eq("invoice_id", editId);
+      if (items?.length) {
+        const firstWh = (items as any[]).find((i: any) => i.warehouse_id)?.warehouse_id;
+        if (firstWh) setWarehouseId(firstWh);
+        const mapped = items.map((it: any) => {
+          const fp = Number(it.foreign_price) || 0;
+          const up = Number(it.unit_price) || 0;
+          const er = fp > 0 ? Math.round((up / fp) * 1000) / 1000 : 1;
+          return {
+            uid: crypto.randomUUID(),
+            dbId: it.id,
+            product_id: it.product_id,
+            product_name: it.product_name,
+            productSearch: it.product_name,
+            quantity: Number(it.quantity) || 1,
+            foreign_price: fp,
+            exchange_rate: er,
+            unit_price: up,
+            discount: Number(it.discount) || 0,
+            total: Number(it.total) || 0,
+            unit: it.unit,
+            showSuggestions: false,
+            selected: false,
+            note: "",
+          };
+        });
+        const itemDiscounts = mapped.reduce((s: number, r: any) => s + ((Number(r.quantity) || 0) * (Number(r.unit_price) || 0) * (Number(r.discount) || 0) / 100), 0);
+        setGeneralDiscount(Math.max(0, (Number(inv.discount) || 0) - itemDiscounts));
+        setRows(mapped);
+        // اضبط معدل الصرف الافتراضي للبنود الجديدة على معدل الفاتورة نفسه
+        // (مشتقّاً من بنودها)، فإن لم يحمل أي بند سعراً أجنبياً فعلى السعر العام
+        // — لا على 1، وإلا أُدرج الصنف الجديد بالسعر الأجنبي الخام.
+        derivedRateRef.current = deriveRateFromRows(mapped);
+        const effectiveRate = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
+        if (effectiveRate > 0 && !rateTouchedRef.current) {
+          setDefaultRate(effectiveRate);
+          setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effectiveRate, unit_price: r.foreign_price * effectiveRate }));
+        }
+        // احفظ بصمة البنود الأصلية لتخطّي إعادة الكتابة وعمليات المخزون لاحقاً إن لم تتغيّر
+        originalItemsHashRef.current = invoiceItemsHash(mapped);
+      } else {
+        setGeneralDiscount(Number(inv.discount) || 0);
+        originalItemsHashRef.current = "";
+      }
+    })();
+  }, [editId, navigate]);
+
+  // ---------- Backfill: سعر أجنبي مفقود في بنود فاتورة قديمة ----------
+  // بنود حُفظت قبل تفعيل السعر الأجنبي تصل بـ foreign_price فارغ رغم وجوده في
+  // بطاقة المنتج، بينما مسار الإضافة يقرأه دائماً — فيختلف المساران. نملأه من
+  // البطاقة ونشتقّ سعر الصرف منه بحيث يبقى السعر المحلي والإجمالي كما هما تماماً.
+  const backfilledForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!editId || productsLoading || products.length === 0) return;
+    if (backfilledForRef.current === editId) return;
+    setRows((prev) => {
+      if (prev.length === 0) return prev;
+      let changed = false;
+      const next = prev.map((r) => {
+        if (!r.dbId || !r.product_id) return r;
+        const patch = backfillForeignPrice(r, products.find((p) => p.id === r.product_id));
+        if (!patch) return r;
+        changed = true;
+        return { ...r, ...patch };
+      });
+      if (!changed) return prev;
+      backfilledForRef.current = editId;
+      derivedRateRef.current = deriveRateFromRows(next);
+      // البصمة تتغيّر بتغيّر السعر الأجنبي — حدّثها حتى لا يُحسب هذا الملء
+      // "تعديلاً للبنود" فتُعاد كتابتها وتُطبَّق حركات مخزون بلا سبب.
+      originalItemsHashRef.current = invoiceItemsHash(next);
+      return next;
+    });
+  }, [editId, products, productsLoading]);
+
+  // بعد الملء أعلاه قد يصبح للفاتورة معدّل مشتق — اعتمده للبنود الجديدة.
+  useEffect(() => {
+    if (!editId || rateTouchedRef.current) return;
+    const effective = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
+    if (effective > 0 && effective !== defaultRate) {
+      setDefaultRate(effective);
+      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: r.foreign_price * effective }));
+    }
+  }, [editId, rows.length, defaultRate]);
+
+  // ---------- Search ----------
+  const customerMatches = useMemo(() => {
+    if (!customerSearch.trim()) return [];
+    return customers
+      .filter((c) => startsWithAny([c.name, c.phone], customerSearch))
+      .slice(0, 8);
+  }, [customerSearch, customers]);
+
+  function pickCustomer(c: Customer) {
+    setCustomer(c);
+    setCustomerSearch(c.name);
+    setShowCustomerSugg(false);
+    setTimeout(() => quickProductRef.current?.focus(), 0);
+  }
+
+  function handleCustomerSaved(saved: any) {
+    const created: Customer = {
+      id: saved.id,
+      name: saved.name,
+      phone: saved.phone,
+      balance: saved.balance,
+      company: saved.company,
+    } as Customer;
+    setCustomers((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
+    pickCustomer(created);
+    setShowAddCustomer(false);
+  }
+
+  function productMatches(query: string, _excludeRowUid?: string): Product[] {
+    return sharedProductMatches(products, query, warehouseId) as Product[];
+  }
+
+  function focusRowSearch(rowUid: string) {
+    setTimeout(() => {
+      const el = document.querySelector<HTMLInputElement>(`input[data-row-search="${rowUid}"]`);
+      el?.focus();
+      el?.select();
+    }, 50);
+  }
+
+  function pickProductIntoRow(rowUid: string, p: Product) {
+    const exists = rows.some((r) => r.product_id === p.id && r.uid !== rowUid);
+    if (exists) {
+      notifyDuplicateItem(p.name);
+      setRows((prev) => prev.map((r) => (r.uid === rowUid ? { ...r, productSearch: "", showSuggestions: false } : r)));
+      focusRowSearch(rowUid);
+      return;
+    }
+    setRows((prev) => prev.map((r) => {
+      if (r.uid !== rowUid) return r;
+      // صف الجدول قد يكون قديماً بمعدّل 1 — استخدم معدّل الفاتورة الافتراضي
+      // حتى يتطابق التسعير مع مسار الفاتورة الجديدة.
+      const rate = (Number(r.exchange_rate) || 0) > 0 ? r.exchange_rate : defaultRate;
+      const { foreign_price: fp, unit_price: up } = priceFromProduct(p, rate);
+      const updated: InvRow = {
+        ...r,
+        exchange_rate: rate,
+        product_id: p.id,
+        product_name: p.name,
+        productSearch: p.name,
+        foreign_price: fp,
+        unit_price: up,
+        unit: p.unit,
+        showSuggestions: false,
+      };
+      updated.total = calcTotal(updated);
+      return updated;
+    }));
+  }
+
+  function pickProductIntoQuick(p: Product) {
+    const exists = rows.some((r) => r.product_id === p.id);
+    if (exists) {
+      notifyDuplicateItem(p.name);
+      setQuickRow((r) => ({ ...r, productSearch: "", showSuggestions: false }));
+      setTimeout(() => quickProductRef.current?.focus(), 50);
+      return;
+    }
+    setQuickRow((r) => {
+      const rate = (Number(r.exchange_rate) || 0) > 0 ? r.exchange_rate : defaultRate;
+      const { foreign_price: fp, unit_price: up } = priceFromProduct(p, rate);
+      const updated: InvRow = {
+        ...r,
+        exchange_rate: rate,
+        product_id: p.id,
+        product_name: p.name,
+        productSearch: p.name,
+        foreign_price: fp,
+        unit_price: up,
+        quantity: 0,
+        unit: p.unit,
+        showSuggestions: false,
+      };
+      updated.total = calcTotal(updated);
+      return updated;
+    });
+    setTimeout(() => quickQtyRef.current?.focus(), 0);
+  }
+
+  function updateRow(uid: string, patch: Partial<InvRow>) {
+    setRows((prev) => prev.map((r) => {
+      if (r.uid !== uid) return r;
+      const merged = { ...r, ...patch };
+      if ("foreign_price" in patch || "exchange_rate" in patch) {
+        merged.unit_price = merged.foreign_price * merged.exchange_rate;
+      }
+      merged.total = calcTotal(merged);
+      return merged;
+    }));
+  }
+
+  async function removeRow(uid: string) {
+    const target = rows.find((r) => r.uid === uid);
+    if (!target) return;
+    // إذا كان البند محفوظاً في قاعدة البيانات: احذفه أولاً، ثم أرجع الكمية إلى المخزون فقط بعد نجاح الحذف
+    // (كان الترتيب معكوساً وقد يُضاف المخزون قبل نجاح الحذف فيتضاعف)
+    if (target.dbId && editId) {
+      try {
+        const { error } = await supabase.from("invoice_items").delete().eq("id", target.dbId);
+        if (error) throw error;
+        if (target.product_id && Number(target.quantity) > 0) {
+          try {
+            await applyStockDeltaForLines(
+              [{ product_id: target.product_id, quantity: Number(target.quantity) }],
+              [],
+            );
+          } catch (stockErr: any) {
+            console.error("stock restore after delete failed:", stockErr);
+            toast.error("تم حذف البند لكن تعذّر إرجاع الكمية للمخزون: " + (stockErr?.message || ""));
+          }
+        }
+        toast.success("تم حذف البند");
+      } catch (e: any) {
+        console.error("remove row failed:", e);
+        toast.error(e?.message || "فشل حذف البند");
+        return;
+      }
+    }
+    setRows((prev) => prev.filter((r) => r.uid !== uid));
+  }
+  const { isPending: isSpacePending, handleRowKeyDown: handleSpaceDelete } = useSpaceToDelete(removeRow);
+
+  function deleteSelectedRows() {
+    setRows((prev) => prev.filter((r) => !r.selected));
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    setRows((prev) => prev.map((r) => ({ ...r, selected: checked })));
+  }
+
+  function openPaymentDialog() {
+    if (!editId) { toast.info("احفظ الفاتورة أولاً"); return; }
+    setPayAmount(String(savedDue || savedTotal || 0));
+    setPayMethod(paymentMethod || "cash");
+    setPayAccount(accounts[0]?.id || "");
+    setPayDate(new Date().toISOString().slice(0, 10));
+    setPayNote(`دفعة لفاتورة رقم ${invoiceNumber}`);
+    setPayRef("");
+    setPayDiscount("");
+    setPaymentDialogOpen(true);
+  }
+
+  const isBankMethod = (m: string) => m === "bank_transfer" || m === "bank";
+
+  async function handleRecordPayment() {
+    if (!editId) return;
+    const amount = parseFloat(payAmount) || 0;
+    const discount = Math.max(0, parseFloat(payDiscount) || 0);
+    if (amount <= 0 && discount <= 0) { toast.error("أدخل مبلغ دفعة أو خصم صحيح"); return; }
+    if (isBankMethod(payMethod) && amount > 0) {
+      const selectedAcc = (accounts as any[])?.find((a: any) => a.id === payAccount);
+      const err = validateBankTransferPayment({ method: payMethod, account: selectedAcc, referenceNo: payRef });
+      if (err) { toast.error(err); return; }
+    }
+    setSavingPayment(true);
+    try {
+      // اقرأ القيم الطازجة من قاعدة البيانات لتجنّب حالة قديمة في state
+      const { data: freshInv, error: readErr } = await supabase
+        .from("invoices")
+        .select("total, paid_amount, discount")
+        .eq("id", editId)
+        .maybeSingle();
+      if (readErr) throw readErr;
+
+      const prevTotal = Number((freshInv as any)?.total ?? savedTotal) || 0;
+      const prevPaid = Number((freshInv as any)?.paid_amount ?? savedPaid) || 0;
+      const prevDiscount = Number((freshInv as any)?.discount || 0);
+
+      // 1) الخصم يُطبَّق على الفاتورة نفسها (يقلّل total ويرفع discount) — لا يُضاف للمدفوع.
+      const nextDiscount = Math.max(0, prevDiscount + discount);
+      const nextTotal = Math.max(0, prevTotal - discount);
+      const remainingOnInvoice = Math.max(0, nextTotal - prevPaid);
+
+      // 2) المبلغ النقدي يُقسَّم: جزء يقفل الفاتورة + الفائض سلفة عميل
+      const cashApplied = Math.min(amount, remainingOnInvoice);
+      const cashOver = Math.max(0, amount - cashApplied);
+      const newPaid = prevPaid + cashApplied;
+      const newDue = Math.max(0, nextTotal - newPaid);
+      const newSt = computeInvoiceStatusAfterPayment({ total: nextTotal, paidAfter: newPaid });
+
+      // فحص جهة العميل: تأكد أن status ضمن القيم المسموحة في قاعدة البيانات
+      if (!isAllowedInvoiceStatus(newSt)) {
+        toast.error(`قيمة حالة الفاتورة غير مسموحة: "${newSt}". القيم المسموحة: ${ALLOWED_INVOICE_STATUSES.join("، ")}`);
+        setSavingPayment(false);
+        return;
+      }
+
+      const refSuffix = isBankMethod(payMethod) && payRef.trim() ? ` - رقم العملية: ${payRef.trim()}` : "";
+      const discountSuffix = discount > 0 ? ` - خصم: ${discount.toLocaleString()}` : "";
+      const finalNote = `${payNote || ""}${refSuffix}${discountSuffix}`.trim();
+
+      const updatePayload: any = {
+        paid_amount: newPaid,
+        due_amount: newDue,
+        status: newSt,
+        payment_method: payMethod || paymentMethod,
+      };
+      if (discount > 0) {
+        updatePayload.discount = nextDiscount;
+        updatePayload.total = nextTotal;
+      }
+
+      const { error: upErr } = await supabase.from("invoices").update(updatePayload).eq("id", editId);
+      if (upErr) throw upErr;
+
+      // 1) قيد الدفعة المطبَّقة على الفاتورة
+      if (payAccount && cashApplied > 0) {
+        await supabase.from("transactions").insert({
+          type: "income",
+          category: "customer_payment",
+          amount: cashApplied,
+          date: payDate,
+          description: finalNote,
+          account_id: payAccount,
+          customer_id: savedCustomerId,
+          reference_id: editId,
+        } as any);
+      }
+      // 2) قيد الفائض كسلفة/دائن للعميل
+      if (payAccount && cashOver > 0 && savedCustomerId) {
+        await supabase.from("transactions").insert({
+          type: "income",
+          amount: cashOver,
+          date: payDate,
+          description: `فائض دفعة فاتورة - سلفة عميل${refSuffix}`,
+          account_id: payAccount,
+          customer_id: savedCustomerId,
+          reference_id: editId,
+          category: "customer_credit",
+        } as any);
+      }
+
+      await recordInvoiceRevision({
+        invoiceId: editId,
+        action: "payment",
+        changes: {
+          paid_amount: { before: prevPaid, after: newPaid },
+          status: { before: invoiceStatus, after: newSt },
+          ...(discount > 0
+            ? {
+                discount: { before: prevDiscount, after: nextDiscount },
+                total: { before: prevTotal, after: nextTotal },
+              }
+            : {}),
+          ...(cashOver > 0 ? { customer_credit: { before: 0, after: cashOver } } : {}),
+        },
+        note: `دفعة بقيمة ${amount}${discount > 0 ? ` + خصم ${discount}` : ""}${cashOver > 0 ? ` (مطبَّق ${cashApplied} + سلفة ${cashOver})` : ""} - ${payMethod || ""}${refSuffix}`,
+      });
+
+      setSavedPaid(newPaid);
+      setSavedDue(newDue);
+      setSavedTotal(nextTotal);
+      setInvoiceStatus(newSt);
+      // إبلاغ باقي الشاشات (كشف الحساب، إدارة العملاء، معاينة الفاتورة) بالتحديث فوراً
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+      try { window.dispatchEvent(new Event("transactions:changed")); } catch {}
+      const paidParts: string[] = [];
+      if (cashApplied > 0) paidParts.push(`${cashApplied.toLocaleString()} على الفاتورة`);
+      if (discount > 0) paidParts.push(`خصم ${discount.toLocaleString()}`);
+      if (cashOver > 0) paidParts.push(`${cashOver.toLocaleString()} كسلفة`);
+      // اقرأ الرصيد الجديد للعميل لعرضه في رسالة النجاح — بعد أن ينتهي recompute من الـtriggers
+      let balanceDesc = "تم تحديث كشف الحساب والمعاينة وإدارة العملاء تلقائياً.";
+      if (savedCustomerId) {
+        try {
+          const { data: cust } = await supabase
+            .from("customers")
+            .select("balance, credit_balance")
+            .eq("id", savedCustomerId)
+            .maybeSingle();
+          const bal = Number((cust as any)?.balance ?? 0);
+          const cred = Number((cust as any)?.credit_balance ?? 0);
+          const bits: string[] = [];
+          bits.push(bal > 0.01 ? `عليه ${bal.toLocaleString()}` : "الرصيد مسدَّد");
+          if (cred > 0.01) bits.push(`له ${cred.toLocaleString()}`);
+          balanceDesc = `الرصيد الجديد للعميل: ${bits.join(" · ")} — كشف الحساب مُحدَّث.`;
+        } catch {}
+      }
+      toast.success(
+        `تم تسجيل الدفعة: ${paidParts.join(" + ") || "دفعة"} — الحالة: ${
+          newSt === "paid" ? "مدفوعة" : newSt === "partial" ? "جزئية" : "معلّقة"
+        }`,
+        { description: balanceDesc, duration: 6000 },
+      );
+      setPaymentDialogOpen(false);
+    } catch (e: any) {
+      const raw = String(e?.message || "تعذر تسجيل الدفعة");
+      const isConstraint =
+        e?.code === "23514" ||
+        /violates check constraint/i.test(raw) ||
+        /invoices_status_check/i.test(raw);
+
+      if (isConstraint) {
+        const isStatusConstraint = /invoices_status_check/i.test(raw);
+        const fixHint = isStatusConstraint
+          ? `قيمة حالة الفاتورة غير مقبولة. المسموح فقط: ${ALLOWED_INVOICE_STATUSES.join("، ")}. تحقق من المبلغ والإجمالي ثم أعد المحاولة.`
+          : "البيانات المُرسَلة لا تستوفي قيود قاعدة البيانات. راجع القيم المُدخلة ثم أعد المحاولة.";
+
+        toast.error("فشل حفظ الدفعة", {
+          description: `${fixHint}\n\nتفاصيل تقنية: ${raw}`,
+          duration: 15000,
+          action: {
+            label: "إعادة المحاولة",
+            onClick: () => { void handleRecordPayment(); },
+          },
+        });
+      } else {
+        toast.error(raw, {
+          action: {
+            label: "إعادة المحاولة",
+            onClick: () => { void handleRecordPayment(); },
+          },
+        });
+      }
+    } finally {
+      setSavingPayment(false);
+    }
+  }
+
+  function addQuickRowToTable() {
+    if (!quickRow.product_id) {
+      toast.error("اختر منتجاً أولاً");
+      quickProductRef.current?.focus();
+      return;
+    }
+    const addQty = Number(quickRow.quantity) || 1;
+    setRows((prev) => {
+      const filtered = prev.filter((r) => r.product_id);
+      const existingIdx = filtered.findIndex((r) => r.product_id === quickRow.product_id);
+      if (existingIdx >= 0) {
+        const copy = [...filtered];
+        const ex = { ...copy[existingIdx] };
+        ex.quantity = (Number(ex.quantity) || 0) + addQty;
+        ex.total = calcTotal(ex);
+        copy[existingIdx] = ex;
+        toast.info("تم زيادة الكمية للمنتج الموجود");
+        return copy;
+      }
+      const newItem = { ...quickRow, uid: crypto.randomUUID(), quantity: addQty };
+      newItem.total = calcTotal(newItem);
+      return [...filtered, newItem];
+    });
+    setQuickRow(newRow(defaultRate));
+    setTimeout(() => quickProductRef.current?.focus(), 0);
+  }
+
+  // ---------- Totals ----------
+  const totals = useMemo(() => {
+    const validRows = rows.filter((r) => r.product_id);
+    const subtotal = validRows.reduce((s, r) => s + (r.quantity * r.unit_price), 0);
+    const itemDiscounts = validRows.reduce((s, r) => s + (r.quantity * r.unit_price * (r.discount / 100)), 0);
+    const afterGeneral = subtotal - itemDiscounts - generalDiscount;
+    const total = afterGeneral + shipping;
+    return { subtotal, itemDiscounts, taxAmount: 0, total: Math.round(total * 100) / 100 };
+  }, [rows, generalDiscount, shipping]);
+
+  // ---------- Save ----------
+  async function saveInvoice(opts: { andNew?: boolean; skipNavigate?: boolean; silent?: boolean } = {}): Promise<boolean> {
+    // بعد الحذف: لا نسمح بأي حفظ تلقائي/يدوي حتى لا نُعيد إنشاء الفاتورة المحذوفة.
+    if (deletedRef.current) return false;
+    // حارس متزامن لمنع الإدراج المتوازي/المكرر (نقر مزدوج، saveThen + نقر يدوي، StrictMode...)
+    if (isSavingRef.current) return false;
+    isSavingRef.current = true;
+    // إعادة تعيين آمنة لأي مسار خروج مبكر لا يمر عبر try/finally الرئيسي أدناه
+    const releaseGuard = () => { isSavingRef.current = false; setSaving(false); };
+    let activeCustomer = customer;
+    // إن لم يُختَر عميل من القائمة لكن يوجد اسم/رقم نصي حر، أنشئ/طابق العميل تلقائياً (للآجل والكاش)
+    if (!activeCustomer) {
+      const freeText = (customerSearch || "").trim();
+      const isCashMode = isCash;
+      if (!freeText) {
+        if (!isCashMode) { toast.error("اختر عميلاً أو اكتب اسمه"); releaseGuard(); return false; }
+        // كاش بدون أي اسم/رقم → ضيف مجهول
+      } else {
+        // تطبيع رقم الهاتف: إزالة المسافات/الشرطات/الأقواس/النقاط، وتحويل 00 البادئة إلى +
+        const normalizePhone = (s: string) =>
+          s.replace(/[\s\-()._]/g, "").replace(/^00/, "+");
+        // استخراج رقم الهاتف من داخل النص الحر (مثل: "أحمد 0912345678")
+        const phoneMatch = freeText.match(/\+?[\d\s\-()._]{6,}/);
+        const extractedPhone = phoneMatch ? normalizePhone(phoneMatch[0]) : "";
+        const hasEmbeddedPhone = /^\+?\d{6,}$/.test(extractedPhone);
+        const namePart = hasEmbeddedPhone
+          ? freeText.replace(phoneMatch![0], "").trim().replace(/[,،\-]+$/g, "").trim()
+          : freeText;
+        const phoneCandidate = normalizePhone(freeText);
+        const looksLikePhone = /^\+?\d{4,}$/.test(phoneCandidate);
+
+        // ابحث بالاسم أولاً (الجزء الاسمي إن وُجد، وإلا النص كاملاً)
+        const { findExistingCustomerByName } = await import("@/utils/customerMatch");
+        let existing: any = namePart ? await findExistingCustomerByName(namePart) : null;
+
+        // مطابقة بالهاتف (سواء النص بالكامل رقم، أو رقم مُستخرَج من داخل النص)
+        const phoneToMatch = looksLikePhone ? phoneCandidate : (hasEmbeddedPhone ? extractedPhone : "");
+        if (!existing && phoneToMatch) {
+          const variants = new Set<string>([phoneToMatch]);
+          if (phoneToMatch.startsWith("+")) variants.add(phoneToMatch.slice(1));
+          else variants.add("+" + phoneToMatch);
+          // أضِف صيغة الإدخال الخام لتغطية المخزَّن بمسافات/شرطات
+          if (phoneMatch) variants.add(phoneMatch[0].trim());
+          const { data: byPhone } = await supabase
+            .from("customers")
+            .select("*")
+            .in("phone", Array.from(variants))
+            .limit(1)
+            .maybeSingle();
+          if (byPhone) existing = byPhone;
+        }
+
+        // مطابقة مركّبة: اسم + هاتف (إن لم يطابق أيٌّ منهما منفرداً، جرّب التركيبة عبر LIKE على الهاتف)
+        if (!existing && namePart && phoneToMatch) {
+          const last = phoneToMatch.replace(/^\+/, "").slice(-7); // آخر 7 أرقام
+          if (last.length >= 6) {
+            const { data: combos } = await supabase
+              .from("customers")
+              .select("*")
+              .ilike("phone", `%${last}%`)
+              .limit(20);
+            const { normalizeCustomerName } = await import("@/utils/customerMatch");
+            const targetName = normalizeCustomerName(namePart);
+            const match = (combos || []).find(
+              (c: any) => normalizeCustomerName(c.name || "") === targetName
+            );
+            if (match) existing = match;
+          }
+        }
+
+        if (existing) {
+          activeCustomer = existing as any;
+          toast.message(`تم استخدام العميل الموجود: ${existing.name}`);
+        } else {
+          const { data: { user: _cu } } = await supabase.auth.getUser();
+          const insertPayload: any = {
+            name: hasEmbeddedPhone && namePart
+              ? namePart
+              : (looksLikePhone ? `عميل ${phoneCandidate}` : freeText),
+            phone: hasEmbeddedPhone ? extractedPhone : (looksLikePhone ? phoneCandidate : null),
+            created_by_uid: _cu?.id || null,
+          };
+          const { data: created, error: cErr } = await supabase
+            .from("customers")
+            .insert(insertPayload)
+            .select("*")
+            .single();
+          if (cErr) { toast.error(`تعذّر إنشاء العميل: ${cErr.message}`); releaseGuard(); return false; }
+          activeCustomer = created as any;
+          toast.message(`تم إنشاء عميل جديد: ${insertPayload.name}`);
+          // إخطار الشاشات الأخرى بالعميل الجديد
+          try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+        }
+        // مزامنة الواجهة
+        setCustomer(activeCustomer as any);
+        setCustomerSearch((activeCustomer as any).name || freeText);
+        setSavedCustomerId((activeCustomer as any).id);
+        setCustomers((prev) =>
+          prev.some((p) => p.id === (activeCustomer as any).id)
+            ? prev
+            : [activeCustomer as any, ...prev]
+        );
+      }
+    }
+    const validRows = rows.filter((r) => r.product_id);
+    if (!validRows.length) { toast.error("أضف منتجاً واحداً على الأقل"); releaseGuard(); return false; }
+
+    // ============================================================
+    // ميزة موحّدة: "تحديث بدل التكرار" + "رقم عشوائي عند تغيّر العميل"
+    //   - إذا سبق حفظ المستند في هذه الجلسة (lastSavedIdRef مضبوط)
+    //     ولم يتغيّر العميل عمّا حُفظ → عاملها كتعديل (UPDATE) لنفس السجل.
+    //   - إذا تغيّر العميل عن المحفوظ → أنشئ سجلاً جديداً برقم عشوائي جديد
+    //     لتفادي أي خلط/تكرار. (يشمل POS عند تغيّر walk-in name).
+    // هذا يمنع تكرار الإدراج عند الضغط المتكرر على زر الحفظ بعد replaceState.
+    // ============================================================
+    let effectiveEditId: string | undefined = newSessionRef.current ? undefined : editId;
+    let effectiveInvoiceNumber = invoiceNumber;
+    const newCustomerKey = pos
+      ? `pos:${(walkInName || "").trim() || "_"}`
+      : (activeCustomer ? `c:${activeCustomer.id}` : "_none_");
+    const savedCustomerKey = pos
+      ? `pos:${(walkInName || "").trim() || "_"}` // POS: المفتاح هو اسم walk-in
+      : (savedCustomerId ? `c:${savedCustomerId}` : "_none_");
+    if (!effectiveEditId && lastSavedIdRef.current) {
+      if (savedCustomerKey === newCustomerKey) {
+        effectiveEditId = lastSavedIdRef.current;
+      } else {
+        // عميل مختلف → فاتورة جديدة برقم عشوائي جديد
+        lastSavedIdRef.current = null;
+        setSavedInvoiceId(null);
+        savedRef.current = false;
+        const _prefix = pos
+          ? ((company as any)?.pos_invoice_prefix || "POS-")
+          : (company?.invoice_prefix || "INV-");
+        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+        effectiveInvoiceNumber = await generateRandomDocNumber("invoices", "invoice_number", _prefix, {
+          scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+        });
+        setInvoiceNumber(effectiveInvoiceNumber);
+      }
+    }
+
+    // ── Duplicate-save guard (طبقة قاعدة البيانات، عبر الأجهزة/الجلسات) ──
+    // إذا لم نكن في وضع تعديل ولا سبق حفظ في الجلسة، ابحث عن فاتورة موجودة
+    // بنفس (العميل + التاريخ + توقيع البنود) خلال آخر 24 ساعة → حوّل إلى UPDATE.
+    if (!effectiveEditId && !pos) {
+      const partyId = activeCustomer?.id || null;
+      const dup = await checkDuplicateBeforeInsert({
+        table: "invoices",
+        partyColumn: "customer_id",
+        partyId,
+        dateISO: invoiceDate,
+        items: validRows.map((r) => ({ product_id: r.product_id, quantity: r.quantity })),
+        excludeId: lastSavedIdRef.current,
+        docLabel: "الفاتورة",
+      });
+      if (dup?.existingId) {
+        effectiveEditId = dup.existingId;
+        effectiveInvoiceNumber = dup.existingNumber || effectiveInvoiceNumber;
+        lastSavedIdRef.current = dup.existingId;
+        setSavedInvoiceId(dup.existingId);
+        setInvoiceNumber(effectiveInvoiceNumber);
+      }
+    }
+
+    setSaving(true);
+    try {
+      // احسب حالة الدفع بناءً على المبلغ المدفوع المحفوظ والإجمالي الجديد
+      // - كاش: مدفوع بالكامل
+      // - غير ذلك: حافظ على paid_amount السابق (إن وُجد)، ثم احسب الحالة:
+      //   paid >= total => paid، paid > 0 => partially_paid، وإلا pending
+      // **المدفوع يُقرأ من القاعدة لا من حالة الواجهة.** كان يُؤخذ من `savedPaid`،
+      // وهي حالة React قد تكون قديمة (فتحُ الشاشة بلا تحميلها، أو حفظٌ بعد دفعة
+      // سُجِّلت في تبويب آخر) — فيُكتب `paid_amount = 0` فوق دفعة موجودة ويظهر
+      // المدفوع صفراً. القراءة الطازجة تُلغي هذا الاحتمال من أصله.
+      let prevPaid = 0;
+      if (effectiveEditId) {
+        const { data: freshRow } = await supabase
+          .from("invoices").select("paid_amount").eq("id", effectiveEditId).maybeSingle();
+        prevPaid = Math.max(0, Number((freshRow as any)?.paid_amount ?? savedPaid) || 0);
+      }
+      const computedPaid = isCash ? totals.total : prevPaid;
+      const computedDue = Math.max(0, Number(totals.total || 0) - computedPaid);
+      // هامش تسامح 0.01 لمنع أخطاء التقريب في تحديد الحالة
+      const _totalNum = Number(totals.total || 0);
+      const computedStatus = (_totalNum > 0 && computedPaid >= _totalNum - 0.01)
+        ? "paid"
+        : computedPaid > 0.01 ? "partial" : "pending";
+
+      const payload: any = {
+        invoice_number: effectiveInvoiceNumber,
+        customer_id: pos ? null : (activeCustomer ? activeCustomer.id : null),
+        type: (isCash || pos) ? "cash" : "sale",
+        date: invoiceDate,
+        due_date: dueDate || null,
+        subtotal: totals.subtotal,
+        discount: generalDiscount + totals.itemDiscounts,
+        shipping,
+        total: totals.total,
+        due_amount: pos ? 0 : computedDue,
+        paid_amount: pos ? totals.total : computedPaid,
+        status: pos ? "paid" : computedStatus,
+        payment_method: pos ? "cash" : paymentMethod,
+        currency_code: currencyCode,
+        exchange_rate_to_base: exchangeRateToBase,
+        notes,
+        internal_note: internalNote,
+        ...(pos ? { source: "pos", walk_in_customer_name: walkInName.trim() || "عميل نقدي" } : {}),
+      };
+
+      let invId = effectiveEditId;
+      let oldItems: Array<{ product_id: string | null; quantity: number }> = [];
+      // احسب البصمة الحالية للبنود وقارنها بالأصلية المحمَّلة من قاعدة البيانات
+      const currentItemsHash = invoiceItemsHash(validRows);
+      const itemsUnchanged = !!effectiveEditId && originalItemsHashRef.current !== null && originalItemsHashRef.current === currentItemsHash;
+      let recordExisted = true;
+
+      if (effectiveEditId) {
+        // منع التكرار في وضع التعديل: لو التعديل يطابق فاتورة أخرى لنفس العميل/اليوم/البنود
+        if (activeCustomer?.id) {
+          const itemsForHash = validRows.map((r) => ({
+            product_id: r.product_id || null,
+            quantity: Number(r.quantity || 0),
+          }));
+          try {
+            const { data: dup } = await (supabase as any).rpc("find_duplicate_invoice", {
+              _customer_id: activeCustomer.id,
+              _date: invoiceDate,
+              _items: itemsForHash,
+              _exclude_invoice_id: effectiveEditId,
+            });
+            const dupRow = Array.isArray(dup) ? dup[0] : dup;
+            if (dupRow?.id) {
+              toast.error(
+                `هذا التعديل يطابق فاتورة موجودة (${dupRow.invoice_number}) — سيتم فتح الفاتورة الأصلية لتطبيق التعديل عليها بدلاً من تكرارها.`,
+                { duration: 6000 }
+              );
+              setSaving(false);
+              navigate(`/invoices/edit/${dupRow.id}`);
+              return false;
+            }
+          } catch (e) {
+            console.warn("[duplicate-check:edit] failed", e);
+          }
+        }
+
+        // UPDATE مباشر بدون SELECT وقائي مسبق؛ نتحقق من العدد المُعاد لمعرفة إن كان السجل موجوداً
+        const { data: updated, error } = await supabase
+          .from("invoices")
+          .update(payload)
+          .eq("id", effectiveEditId)
+          .select("id");
+        if (error) throw error;
+        if (!updated || updated.length === 0) {
+          toast.message("الفاتورة السابقة غير موجودة — سيتم إنشاء فاتورة جديدة");
+          invId = undefined;
+          recordExisted = false;
+        } else if (!itemsUnchanged) {
+          // البنود تغيّرت — اقرأ القديمة لحساب فرق المخزون ثم احذف مع فحص الخطأ
+          const { data: prev } = await supabase
+            .from("invoice_items")
+            .select("product_id, quantity")
+            .eq("invoice_id", effectiveEditId);
+          oldItems = (prev || []).map((p: any) => ({ product_id: p.product_id, quantity: p.quantity }));
+          // Full sync: احذف كل البنود المرتبطة بهذه الفاتورة قبل إعادة الإدراج.
+          // نستخدم DELETE مباشر مع فحص الخطأ — لو فشل الحذف كنّا سنكرِّر البنود.
+          // Bypass archive trigger for full-replace saves (not user-intent deletion).
+          const { error: delErr } = await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: effectiveEditId });
+          if (delErr) throw delErr;
+        }
+      }
+
+      if (!invId) {
+        // منع تكرار: نفس العميل + نفس اليوم + نفس المنتجات والكميات
+        if (activeCustomer?.id) {
+          const itemsForHash = validRows.map((r) => ({
+            product_id: r.product_id || null,
+            quantity: Number(r.quantity || 0),
+          }));
+          try {
+            const { data: dup } = await (supabase as any).rpc("find_duplicate_invoice", {
+              _customer_id: activeCustomer.id,
+              _date: invoiceDate,
+              _items: itemsForHash,
+              _exclude_invoice_id: null,
+            });
+            const dupRow = Array.isArray(dup) ? dup[0] : dup;
+            if (dupRow?.id) {
+              toast.error(
+                `هذه الفاتورة موجودة بالفعل (${dupRow.invoice_number}) — سيتم فتحها للتعديل بدلاً من إنشاء نسخة جديدة.`,
+                { duration: 5000 }
+              );
+              setSaving(false);
+              navigate(`/invoices/edit/${dupRow.id}`);
+              return false;
+            }
+          } catch (e) {
+            // لا نوقف الحفظ إذا فشل فحص التكرار، فقط نسجّل في الكونسول
+            console.warn("[duplicate-check] failed", e);
+          }
+        }
+        // attach creator for RLS / staff filtering
+        const { data: { user: _u } } = await supabase.auth.getUser();
+        (payload as any).created_by_uid = _u?.id || null;
+        // محاولة الإدراج مع إعادة توليد الرقم تلقائياً عند تعارض المفتاح الفريد
+        const prefix = pos
+          ? ((company as any)?.pos_invoice_prefix || "POS-")
+          : (company?.invoice_prefix || "INV-");
+        const padLen = (() => {
+          const m = invoiceNumber.match(/(\d+)$/);
+          return m ? m[1].length : 4;
+        })();
+        let attempt = 0;
+        let lastError: any = null;
+        let currentNumber = effectiveInvoiceNumber;
+        while (attempt < 5) {
+          const tryPayload = { ...payload, invoice_number: currentNumber };
+          const { data, error } = await supabase.from("invoices").insert(tryPayload).select("id,invoice_number").single();
+          if (!error) {
+            invId = data.id;
+            if (data.invoice_number !== effectiveInvoiceNumber) {
+              setInvoiceNumber(data.invoice_number);
+              toast.message(`تم تعديل رقم الفاتورة إلى ${data.invoice_number} لتفادي التكرار`);
+            }
+            lastError = null;
+            break;
+          }
+          lastError = error;
+          // إذا كان الخطأ تكرار رقم الفاتورة — رقم الفاتورة هو المفتاح،
+          // نبحث عن الفاتورة الموجودة ونعمل UPDATE بدل إنشاء نسخة مكررة.
+          const isDup = (error as any).code === "23505" || /duplicate key|invoices_invoice_number_key/i.test(error.message || "");
+          if (!isDup) throw error;
+          const { data: existing } = await supabase
+            .from("invoices")
+            .select("id")
+            .eq("invoice_number", currentNumber)
+            .maybeSingle();
+          if (existing?.id) {
+            const { error: upErr } = await supabase
+              .from("invoices")
+              .update(payload)
+              .eq("id", existing.id);
+            if (upErr) throw upErr;
+            // احذف البنود القديمة لإعادة إدراج الحالية
+            const { data: prev } = await supabase
+              .from("invoice_items")
+              .select("product_id, quantity")
+              .eq("invoice_id", existing.id);
+            oldItems = (prev || []).map((p: any) => ({ product_id: p.product_id, quantity: p.quantity }));
+            const { error: delErr } = await (supabase as any).rpc("delete_invoice_items_silent", { p_invoice_id: existing.id });
+            if (delErr) throw delErr;
+            invId = existing.id;
+            recordExisted = true;
+            effectiveEditId = existing.id;
+            lastError = null;
+            break;
+          }
+          // حالة سباق نادرة — ولّد رقماً جديداً وأعد المحاولة
+          const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+          currentNumber = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
+            scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+            digits: 5 + Math.min(attempt, 2),
+          });
+          attempt++;
+        }
+        if (lastError) throw lastError;
+      }
+
+      // إعادة كتابة البنود وعمليات المخزون فقط إن تغيّرت البنود أو كنا أنشأنا سجلاً جديداً
+      let deductionInfo: { name: string; delta: number }[] = [];
+      let didDeduct = false;
+      const skipItemsWrite = recordExisted && itemsUnchanged;
+      if (!skipItemsWrite) {
+        const rawItemsPayload = validRows.map((r) => {
+          const prod = products.find((p) => p.id === r.product_id);
+          const wid = (prod?.warehouse_id) || warehouseId || null;
+          return {
+            invoice_id: invId!,
+            product_id: r.product_id,
+            product_name: r.product_name,
+            quantity: r.quantity,
+            unit_price: r.unit_price,
+            foreign_price: r.foreign_price,
+            discount: r.discount,
+            total: r.total,
+            unit: r.unit,
+            warehouse_id: wid,
+          };
+        });
+        // دفاع ثانٍ: إزالة الأسطر المتطابقة تماماً (product_id + quantity + unit_price + discount)
+        const seenKeys = new Set<string>();
+        const itemsPayload = rawItemsPayload.filter((it) => {
+          const key = `${it.product_id}|${it.quantity}|${it.unit_price}|${it.discount}`;
+          if (seenKeys.has(key)) return false;
+          seenKeys.add(key);
+          return true;
+        });
+        const { error: itemsErr } = await supabase.from("invoice_items").insert(itemsPayload);
+        if (itemsErr) throw itemsErr;
+
+        // خصم المخزون: عند الإنشاء نخصم الكميات الجديدة بالكامل،
+        // وعند التعديل نطبّق الفرق فقط (delta = old - new) لتجنّب الخصم المكرر.
+        const newLines = validRows.map((r) => ({ product_id: r.product_id, quantity: r.quantity }));
+        if (recordExisted) {
+          // حساب الفرق لكل منتج لعرضه في الإشعار
+          const oldMap = new Map<string, number>();
+          (oldItems || []).forEach((it: any) => {
+            if (it.product_id) oldMap.set(it.product_id, (oldMap.get(it.product_id) || 0) + Number(it.quantity || 0));
+          });
+          const newMap = new Map<string, number>();
+          validRows.forEach((r: any) => {
+            if (r.product_id) newMap.set(r.product_id, (newMap.get(r.product_id) || 0) + Number(r.quantity || 0));
+          });
+          const allIds = new Set<string>([...oldMap.keys(), ...newMap.keys()]);
+          const nameById = new Map<string, string>();
+          validRows.forEach((r: any) => { if (r.product_id) nameById.set(r.product_id, r.product_name); });
+          (oldItems || []).forEach((it: any) => { if (it.product_id && !nameById.has(it.product_id)) nameById.set(it.product_id, it.product_name); });
+          allIds.forEach((pid) => {
+            const delta = (newMap.get(pid) || 0) - (oldMap.get(pid) || 0);
+            if (delta !== 0) deductionInfo.push({ name: nameById.get(pid) || "—", delta });
+          });
+          await applyStockDeltaForLines(oldItems, newLines);
+          didDeduct = deductionInfo.length > 0;
+        } else {
+          const { deductStockForInvoiceOnce } = await import("@/utils/stockDeduction");
+          const result = await deductStockForInvoiceOnce(invId!, newLines);
+          if (result.deducted) {
+            didDeduct = true;
+            deductionInfo = validRows
+              .filter((r: any) => r.product_id && Number(r.quantity || 0) > 0)
+              .map((r: any) => ({ name: r.product_name, delta: Number(r.quantity || 0) }));
+          }
+        }
+        // حدِّث البصمة المرجعية لتعكس آخر حفظ ناجح للبنود
+        originalItemsHashRef.current = currentItemsHash;
+      }
+
+      if (!pos && activeCustomer?.id) {
+        await (supabase as any).rpc("recompute_customer_balance", { _customer_id: activeCustomer.id });
+      }
+
+      if (!opts.silent) {
+        toast.success(effectiveEditId ? "تم تحديث الفاتورة" : "تم حفظ الفاتورة");
+      }
+      savedRef.current = true;
+      lastSavedIdRef.current = invId!;
+      setSavedInvoiceId(invId!);
+      // بث حدث لتحديث الشاشات المرتبطة (الترحيلات، قائمة الفواتير، كشف العميل، المعاينة، إدارة العملاء)
+      try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      try { window.dispatchEvent(new Event("customers:changed")); } catch {}
+      // حدّث الشريط الجانبي (آخر الفواتير) فوراً حتى تظهر الفاتورة المحفوظة
+      queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices-full"] });
+      // تحديث كشف حساب العميل + إدارة العملاء فوراً بعد الحفظ
+      queryClient.invalidateQueries({ queryKey: ["customer-statement"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["customer_balance_stats"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      // تحديث بيانات الدفع المحفوظة لتعكس القيم الجديدة بعد الحفظ
+      setSavedTotal(Number(totals.total) || 0);
+      setSavedPaid(computedPaid);
+      setSavedDue(computedDue);
+      setSavedCustomerId(activeCustomer ? activeCustomer.id : null);
+      // إذا كنّا في وضع الإنشاء وتم الحفظ بنجاح، بدّل العنوان لوضع التعديل
+      // حتى لا يُنشئ الضغط على "حفظ" مجدداً فاتورة جديدة
+      if (!effectiveEditId && invId) {
+        const editPath = isCash ? `/invoices/cash/edit/${invId}` : `/invoices/edit/${invId}`;
+        // نستخدم navigate بـ replace حتى يتزامن React Router مع الرابط الجديد،
+        // وإلا سيبقى يعتقد أننا في المسار السابق ولن يستجيب للنقر على نفس الفاتورة لاحقاً.
+        navigate(editPath, { replace: true });
+      }
+      // تحديث dbId للصفوف المحلية لتتوافق مع الواقع في قاعدة البيانات
+      if (!effectiveEditId && invId) {
+        // بعد الإنشاء: اقرأ البنود المحفوظة لتحديث dbId
+        supabase.from("invoice_items").select("id,product_id").eq("invoice_id", invId).then(({ data: dbItems }) => {
+          if (dbItems) {
+            setRows((prev) => prev.map((r) => {
+              const match = dbItems.find((di: any) => di.product_id === r.product_id);
+              return match ? { ...r, dbId: match.id } : r;
+            }));
+          }
+        });
+      }
+      if (opts.skipNavigate) {
+        return true;
+      }
+      if (opts.andNew) {
+        newSessionRef.current = true;
+        setRows([]);
+        setCustomer(null);
+        setCustomerSearch("");
+        setNotes("");
+        setGeneralDiscount(0);
+        setShipping(0);
+        setSavedInvoiceId(null);
+        savedRef.current = false;
+        lastSavedIdRef.current = null;
+        // رقم افتراضي عشوائي جديد للفاتورة التالية (مفصول حسب POS/Regular)
+        const prefix = pos
+          ? ((company as any)?.pos_invoice_prefix || "POS-")
+          : (company?.invoice_prefix || "INV-");
+        const { generateRandomDocNumber } = await import("@/utils/randomDocNumber");
+        const nextCandidate = await generateRandomDocNumber("invoices", "invoice_number", prefix, {
+          scope: (q) => (pos ? q.eq("source", "pos") : q.neq("source", "pos")),
+        });
+        setInvoiceNumber(nextCandidate);
+        // أعد الرابط لوضع الإنشاء عبر React Router حتى يتزامن (useParams) مع الرابط
+        // الجديد، فينفتح النقر على أي فاتورة في الشريط الجانبي بشكل صحيح.
+        const createPath = isCash ? "/invoices/cash/new" : "/invoices/create";
+        navigate(createPath, { replace: true });
+        if (!opts.silent) {
+          toast.success("تم فتح فاتورة جديدة — جاهزة للإدخال");
+        }
+      }
+      return true;
+    } catch (e: any) {
+      console.error("[InvoiceCreatePage] saveInvoice failed", e);
+      const { reportCriticalError } = await import("@/utils/errorReporter");
+      reportCriticalError({
+        title: "فشل حفظ الفاتورة",
+        error: e,
+        context: "InvoiceCreatePage.saveInvoice",
+        fallbackMessage: "تعذّر حفظ الفاتورة — تحقّق من الاتصال والبيانات ثم أعد المحاولة",
+      });
+      return false;
+    } finally {
+      setSaving(false);
+      isSavingRef.current = false;
+    }
+  }
+
+  async function handlePrint(variant: PrintVariant = "full", noHeader: boolean = false) {
+    // إذا كانت الفاتورة محفوظة → ننتقل للمعاينة الداخلية (نفس النافذة).
+    if (editId) {
+      const qs = new URLSearchParams();
+      if (variant !== "full") qs.set("variant", variant);
+      if (noHeader) qs.set("noHeader", "1");
+      const suffix = qs.toString() ? `?${qs.toString()}` : "";
+      // أتمتة: أي طباعة (فاتورة أو كشف جرد) → الحالة تصبح "قيد التجهيز" على الأقل
+      try {
+        await supabase.rpc("advance_invoice_workflow" as any, {
+          _invoice_id: editId,
+          _target: "preparing",
+          _reason: variant === "stocktake" ? "طباعة كشف جرد" : "طباعة الفاتورة",
+        });
+        invalidateWorkflowAutoCache(editId);
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+      } catch {}
+      navigate(`/preview/invoice/${editId}${suffix}`);
+      return;
+    }
+    // غير محفوظة بعد → نُبقي النافذة المنبثقة بالبيانات الحالية في الذاكرة.
+    openPrintWindow(buildCurrentPrintHTML(variant, noHeader));
+  }
+
+  /**
+   * المعاينة العامة في النظام: تحفظ ثم تنتقل لشاشة `/preview/invoice/:id`.
+   * زر «معاينة» و F9 ينادِيانها معاً — مسار واحد لا مساران يختلف ناتجهما.
+   */
+  const openPreview = async () => {
+    await saveThen(async (id) => {
+      try {
+        await supabase.rpc("advance_invoice_workflow" as any, {
+          _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
+        });
+        invalidateWorkflowAutoCache(id);
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch { /* noop */ }
+      } catch { /* noop */ }
+      navigate(`/preview/invoice/${id}`);
+    });
+  };
+
+  /** يمنع نقرتين متتاليتين تولّدان ملفين */
+  const [sharingPdf, setSharingPdf] = useState(false);
+
+  /** يولّد PDF من الشاشة الحالية ويشاركه عبر واتساب. */
+  async function shareCurrentPdf() {
+    if (sharingPdf) return;
+    setSharingPdf(true);
+    try {
+      const { shareDocumentPdf } = await import("@/utils/shareDocumentPdf");
+      const label = pos ? "فاتورة كاش" : "فاتورة مبيعات";
+      const out = await shareDocumentPdf({
+        html: buildCurrentPrintHTML("full", false),
+        docLabel: label,
+        customerName: customer?.name || (pos ? (walkInName?.trim() || "عميل نقدي") : null),
+        docNumber: invoiceNumber,
+        total: totals.total,
+        message: `${label} رقم ${invoiceNumber} — الإجمالي ${totals.total.toLocaleString()} ${currencyCode}`,
+        phone: pickCustomerWhatsApp(customer),
+      });
+      toast.success(
+        out.via === "web-share" ? "تمت المشاركة" : `تم تنزيل «${out.fileName}» — أرفقه في واتساب`,
+      );
+    } catch (e: any) {
+      toast.error(e?.message || "تعذّر توليد PDF");
+    } finally {
+      setSharingPdf(false);
+    }
+  }
+
+  /**
+   * HTML الطباعة من بيانات الشاشة الحالية — تعمل قبل الحفظ وبعده، فتعكس أي
+   * تعديل لم يُحفظ بعد. تستعملها «معاينة» و«واتساب PDF» و«طباعة» معاً حتى لا
+   * يختلف ما يراه المستخدم عمّا يصل العميل.
+   */
+  function buildCurrentPrintHTML(variant: PrintVariant = "full", noHeader: boolean = false): string {
+    return generatePrintHTML({
+      type: "invoice",
+      // رقم الفاتورة لازم في الترويسة وفي اسم ملف الـPDF المُصدَّر — كان ساقطاً
+      // هنا وحده (صفحة عرض السعر تمرّره) فيخرج الملف بلا رقم.
+      number: invoiceNumber,
+      isCash,
+      date: invoiceDate,
+      customer,
+      items: rows.filter(r => r.product_id).map(r => ({
+        product_name: r.product_name,
+        quantity: r.quantity,
+        unit_price: r.unit_price,
+        foreign_price: r.foreign_price,
+        tax_amount: 0,
+        discount: r.discount,
+        total: r.total,
+        note: r.note || "",
+        product_id: r.product_id || "",
+      })),
+      subtotal: totals.subtotal,
+      taxTotal: totals.taxAmount,
+      discountTotal: totals.itemDiscounts + generalDiscount,
+      shipping,
+      grandTotal: totals.total,
+      notes,
+      company,
+      variant,
+      noHeader,
+    } as any);
+  }
+
+
+  // Re-arm the guard whenever inputs change after a save
+  useEffect(() => {
+    savedRef.current = false;
+  }, [rows, customer, notes, internalNote, generalDiscount, shipping]);
+
+  // Detect unsaved changes
+  const isDirty = useMemo(() => {
+    if (savedRef.current) return false;
+    if (rows.some((r) => r.product_id)) return true;
+    if (!isCash && customer) return true;
+    if ((notes || "").trim().length > 0) return true;
+    if ((internalNote || "").trim().length > 0) return true;
+    if (Number(generalDiscount) > 0) return true;
+    if (Number(shipping) > 0) return true;
+    return false;
+  }, [rows, customer, isCash, notes, internalNote, generalDiscount, shipping]);
+
+  useUnsavedChangesGuard({
+    isDirty,
+    onSave: () => saveInvoice({ skipNavigate: true, silent: true }),
+  });
+
+  // Auto-save then run an action (open dialog / navigate) in a single click.
+  const saveThen = async (action: (invId: string) => void) => {
+    let id = editId;
+    if (isDirty || !id) {
+      const ok = await saveInvoice({ skipNavigate: true, silent: true });
+      if (!ok) return;
+      id = lastSavedIdRef.current || id;
+      if (!id) return;
+      // If we just created a new invoice, switch the URL to edit mode so subsequent saves update it.
+      if (!editId) {
+        window.history.replaceState({}, "", `/invoices/edit/${id}`);
+      }
+    }
+    action(id);
+  };
+
+  // طباعة مباشرة (F10 / زر الطباعة): تحفظ الفاتورة ثم تطبع عبر iframe مخفي
+  // دون الانتقال لصفحة المعاينة.
+  const printInvoiceNow = async () => {
+    await saveThen(async (id) => {
+      try {
+        await supabase.rpc("advance_invoice_workflow" as any, {
+          _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
+        });
+        invalidateWorkflowAutoCache(id);
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch { /* noop */ }
+      } catch { /* غير حرِج */ }
+      try {
+        const { printInvoiceDirect } = await import("@/utils/printInvoiceDirect");
+        await printInvoiceDirect(id);
+      } catch (e: any) {
+        toast.error(e?.message || "تعذّرت الطباعة");
+      }
+    });
+  };
+
+  // ---------- POS: اختصارات لوحة المفاتيح للكاشير ----------
+  // F2 = حفظ، F4 = حفظ + طباعة، F6 = تركيز حقل العميل، F3 = تركيز حقل المنتج، F8 = حفظ + جديد
+  useEffect(() => {
+    if (!pos) return;
+    const handler = (e: KeyboardEvent) => {
+      // تجاهل لو المستخدم ضاغط Ctrl/Meta/Alt مع F-key لتفادي اختصارات النظام
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      switch (e.key) {
+        case "F2":
+          e.preventDefault();
+          void saveInvoice({ skipNavigate: true });
+          break;
+        case "F4":
+          e.preventDefault();
+          (async () => {
+            const ok = await saveInvoice({ skipNavigate: true, silent: true });
+            const id = lastSavedIdRef.current;
+            if (ok && id) navigate(`/preview/invoice/${id}`);
+          })();
+          break;
+        case "F8":
+          e.preventDefault();
+          void saveInvoice({ andNew: true });
+          break;
+        case "F3":
+          e.preventDefault();
+          quickProductRef.current?.focus();
+          break;
+        case "F6":
+          e.preventDefault();
+          customerInputRef.current?.focus();
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos]);
+
+  // ---------- F9 = معاينة الطباعة، F10 = طباعة مباشرة (تُرقّي الحالة إلى "قيد التجهيز") ----------
+  useDocPrintShortcuts({
+    onPreview: openPreview,
+    onPrint: async () => {
+      // طباعة مباشرة دون الرجوع لصفحة المعاينة
+      await printInvoiceNow();
+    },
+  });
+
+
+
+
+  // ---------- Render ----------
+  return (
+    <div ref={pageRef} className={`neo-quote-scope${pos ? " pos-mode" : ""}`} dir="rtl" style={{ position: "relative" }}>
+      <style>{`
+        .neo-quote-scope { background: hsl(var(--background)); color: hsl(var(--foreground)); font-size: 12px; height: calc(100vh - 64px); overflow: hidden; container-type: inline-size; }
+        .neo-quote-scope .panel { background: hsl(var(--card)); border-radius: 6px; padding: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.04); border: 1px solid hsl(var(--border)); }
+        .neo-quote-scope .quick-add-row { background: hsl(var(--muted)); padding:2px 4px; border-radius:6px; border:1px solid hsl(var(--border)); margin-bottom: 6px; display: grid; grid-template-columns: 4fr 70px 1fr 1fr 1fr 1fr auto; gap: 4px; align-items: center; }
+        .neo-quote-scope .quick-add-row .form-control,
+        .neo-quote-scope .quick-add-row input,
+        .neo-quote-scope .quick-add-row select { height: 28px !important; font-size: 12px !important; padding: 2px 8px !important; }
+        .neo-quote-scope .product-search-container { position: relative; }
+        .neo-quote-scope .search-suggestions { position:absolute; top:100%; left:0; right:0; background: hsl(var(--popover)); color: hsl(var(--popover-foreground)); border:1px solid hsl(var(--border)); border-radius:6px; max-height:220px; overflow-y:auto; z-index:50; box-shadow:0 4px 12px rgba(0,0,0,.12); }
+        .neo-quote-scope .search-suggestions .item { padding:5px 8px; cursor:pointer; border-bottom:1px solid hsl(var(--border)); display:flex; justify-content:space-between; gap:6px; font-size:11px; font-weight:700; }
+        .neo-quote-scope .search-suggestions .item:hover,
+        .neo-quote-scope .search-suggestions .item[data-active="true"] { background: hsl(var(--primary) / 0.22); color: hsl(var(--primary)); font-weight: 900; box-shadow: inset 3px 0 0 hsl(var(--primary)); }
+        .neo-quote-scope .customer-suggestions .customer-item[data-active="true"],
+        .neo-quote-scope .customer-suggestions .customer-item:hover { background: hsl(var(--accent) / 0.18); }
+        .neo-quote-scope .search-suggestions .price-badge { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding:1px 6px; border-radius:10px; font-size:10px; font-weight:600; }
+        /* Global styles for product suggestions portal (renders to document.body) */
+        .search-suggestions { background: hsl(var(--popover)); color: hsl(var(--popover-foreground)); border:1px solid hsl(var(--border)); border-radius:6px; max-height:220px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,.12); font-size:12px; }
+        .search-suggestions .item { padding:5px 8px; cursor:pointer; border-bottom:1px solid hsl(var(--border)); display:flex; justify-content:space-between; gap:6px; font-size:11px; font-weight:700; }
+        .search-suggestions .item:hover,
+        .search-suggestions .item[data-active="true"] { background: hsl(var(--accent) / 0.18); outline: 2px solid hsl(var(--primary) / 0.4); outline-offset: -2px; }
+        .search-suggestions .price-badge { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding:1px 6px; border-radius:10px; font-size:10px; font-weight:600; white-space:nowrap; }
+        .search-suggestions .suggestions-status { cursor: default; justify-content: center; font-size: 11px; color: hsl(var(--muted-foreground)); padding: 8px; font-style: italic;  font-weight: 700;}
+        .search-suggestions .suggestions-status[data-status="loading"]::before { content: ""; display: inline-block; width: 10px; height: 10px; border: 2px solid hsl(var(--primary)); border-top-color: transparent; border-radius: 50%; margin-inline-end: 6px; animation: sugg-spin 0.7s linear infinite; vertical-align: middle; }
+        .search-suggestions .suggestions-status[data-status="empty"] { color: hsl(var(--destructive)); }
+        @keyframes sugg-spin { to { transform: rotate(360deg); } }
+        .neo-quote-scope .item_header { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+        .neo-quote-scope.pos-mode .item_header,
+        .neo-quote-scope.pos-mode .item_header th,
+        .neo-quote-scope.pos-mode .items-scroll thead th { background: hsl(var(--destructive)) !important; color: hsl(var(--destructive-foreground)) !important; }
+        .neo-quote-scope .item_header th { padding: 5px 4px; font-weight:600; font-size: 11px; text-align: center; }
+        .neo-quote-scope .excel-table { width: 100%; border-collapse: collapse; }
+        .neo-quote-scope .excel-row td { padding: 2px 3px; border-bottom: 1px solid hsl(var(--border)); font-size: 11px; }
+        .neo-quote-scope .excel-row:nth-child(even) td { background: hsl(var(--muted) / 0.5); }
+        .neo-quote-scope .form-control { width:100%; padding: 3px 6px; height: 26px; border:1px solid hsl(var(--input)); border-radius:4px; font-size:11px; background: hsl(var(--card)); color: hsl(var(--foreground)); }
+        .neo-quote-scope .form-control:focus { outline: none; border-color: hsl(var(--ring)); box-shadow: 0 0 0 2px hsl(var(--ring) / 0.25); }
+        .neo-quote-scope .text-center { text-align:center; }
+        .neo-quote-scope .btn { padding: 4px 10px; border-radius:4px; border:none; cursor:pointer; font-size:11px; font-weight:500; height: 26px; transition: opacity .15s; }
+        .neo-quote-scope .btn:hover { opacity: 0.9; }
+        .neo-quote-scope .btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+        .neo-quote-scope .btn-success { background: hsl(var(--success)); color: hsl(var(--success-foreground)); }
+        .neo-quote-scope .btn-danger { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
+        .neo-quote-scope .btn-warning { background: hsl(38 92% 50%); color:#fff; }
+        .neo-quote-scope .btn-info { background: hsl(199 89% 48%); color:#fff; }
+        .neo-quote-scope .btn-ghost { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+        .neo-quote-scope .btn-sm { padding: 2px 6px; font-size:10px; height: 22px; }
+        .neo-quote-scope .customer-suggestions { position:absolute; top:100%; left:0; right:0; background: hsl(var(--popover)); color: hsl(var(--popover-foreground)); border:2px solid hsl(var(--primary)); border-radius:6px; max-height:220px; overflow-y:auto; z-index:1000; box-shadow:0 8px 25px rgba(0,0,0,.15); margin-top:2px; }
+        .neo-quote-scope .customer-item { padding:6px 8px; border-bottom:1px solid hsl(var(--border)); cursor:pointer; font-size:11px; }
+        .neo-quote-scope label { font-size:10px; color: hsl(var(--muted-foreground)); margin-bottom:2px; display:block; }
+        .neo-quote-scope .actions-grid { display:flex; gap:4px; justify-content:flex-end; }
+        .neo-quote-scope .header-bar { display:flex; flex-wrap:wrap; gap:6px; align-items:flex-end; background: hsl(var(--card)); border:1px solid hsl(var(--border)); border-radius:6px; padding:5px 8px; margin-bottom: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.04); overflow: visible; }
+        .neo-quote-scope .header-bar .field { display:flex; flex-direction:column; position: relative; }
+        .neo-quote-scope .header-bar .field label { font-size:10px; margin-bottom:1px; }
+        .neo-quote-scope .header-bar .field .form-control { height:24px; font-size:11px; padding:2px 5px; }
+        .neo-quote-scope .header-bar .customer-pill { font-size:10px; color: hsl(var(--foreground)); padding:1px 6px; background: hsl(var(--muted)); border-radius:3px; white-space:nowrap; }
+        .neo-quote-scope .header-bar .field .form-control.customer-name-input { font-size: 14px; }
+        @media (max-width: 1024px) { .neo-quote-scope .header-bar .field .form-control.customer-name-input { font-size: 13px; } }
+        @media (max-width: 768px)  { .neo-quote-scope .header-bar .field .form-control.customer-name-input { font-size: 12px; } }
+        @media (max-width: 480px)  { .neo-quote-scope .header-bar .field .form-control.customer-name-input { font-size: 11px; } }
+        .neo-quote-scope .quote-layout { display: grid; grid-template-columns: minmax(0, 1fr) 14px minmax(180px, var(--sidebar-width, 260px)); grid-auto-flow: column; gap: 4px; align-items: stretch; height: 100%; }
+        .neo-quote-scope .quote-layout > * { min-width: 0; min-height: 0; }
+        .neo-quote-scope .form-column { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+        .neo-quote-scope .excel-table { table-layout: fixed; }
+        @media (max-width: 767px) {
+          .neo-quote-scope { height: auto !important; min-height: calc(100vh - 64px); overflow: auto !important; }
+          .neo-quote-scope .quote-layout { display: flex !important; flex-direction: column !important; height: auto !important; min-height: calc(100vh - 80px); }
+          .neo-quote-scope .quote-layout > aside { width: 100% !important; max-width: 100% !important; min-height: 280px; }
+          .neo-quote-scope .form-column { min-height: 70vh; height: auto; }
+          /* ارتفاع ثابت لجدول البنود على الجوال حتى تظهر صفوف TableFiller الفارغة دائماً قبل الأزرار */
+          .neo-quote-scope .items-table-wrap { height: 55vh !important; min-height: 360px !important; max-height: 60vh !important; flex: 0 0 auto !important; }
+          .neo-quote-scope .items-scroll { height: 100% !important; min-height: 0 !important; max-height: none !important; }
+
+          /* === Header bar محسّن للجوال: صفّان — اسم العميل+زر إضافة، ثم المستودع+تفاصيل العميل === */
+          .neo-quote-scope .header-bar {
+            display: grid !important;
+            grid-template-columns: 1fr auto !important;
+            grid-auto-rows: auto !important;
+            gap: 6px 6px !important;
+            padding: 8px !important;
+          }
+          .neo-quote-scope .header-bar > .field { flex: unset !important; width: 100% !important; min-width: 0 !important; }
+          /* حقل العميل (walk-in / بحث) في العمود الأول من الصف الأول */
+          .neo-quote-scope .header-bar > .field:nth-of-type(1) { grid-column: 1 / 2; }
+          /* زر إضافة العميل الأخضر بجانبه */
+          .neo-quote-scope .header-bar > .field:nth-of-type(2) { grid-column: 2 / 3; width: 40px !important; }
+          .neo-quote-scope .header-bar > .field:nth-of-type(2) button { width: 40px !important; min-width: 40px !important; height: 32px !important; font-size: 20px !important; border-radius: 6px !important; }
+          /* المستودع وتفاصيل العميل في صف كامل بعمودين متساويين */
+          .neo-quote-scope .header-bar > .field:nth-of-type(3),
+          .neo-quote-scope .header-bar > .field:nth-of-type(4) {
+            grid-column: span 1 !important;
+            grid-row: 2 !important;
+          }
+          .neo-quote-scope .header-bar > .field:nth-of-type(3) { grid-column: 1 / 2 !important; }
+          .neo-quote-scope .header-bar > .field:nth-of-type(4) { grid-column: 2 / 3 !important; }
+          .neo-quote-scope .header-bar .field .form-control { height: 34px !important; font-size: 13px !important; padding: 4px 8px !important; }
+          .neo-quote-scope .header-bar .field label { font-size: 11px !important; margin-bottom: 3px !important; font-weight: 600; color: hsl(var(--foreground)); }
+          /* إخفاء مقابض توسيع الأعمدة على الجوال */
+          .neo-quote-scope .header-bar .field-expand-btn,
+          .neo-quote-scope .quick-add-row .field-expand-btn { display: none !important; }
+
+          /* === Quick-add row: اجعل حقل المنتج وزر + في صف مستقل، ثم بقية الحقول في شبكة === */
+          .neo-quote-scope .quick-add-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 6px !important;
+            padding: 6px !important;
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: 6px;
+          }
+          .neo-quote-scope .quick-add-row .quick-add-field:nth-of-type(1) { grid-column: 1 / -1; }
+          .neo-quote-scope .quick-add-row > button:last-child {
+            grid-column: 1 / -1;
+            height: 40px !important;
+            font-size: 14px !important;
+            font-weight: 700;
+            border-radius: 6px !important;
+          }
+          .neo-quote-scope .quick-add-row .form-control { height: 36px !important; font-size: 13px !important; }
+
+          /* === شريط الأزرار السفلي: توحيد الأحجام ومسافات نظيفة === */
+          .neo-quote-scope .toolbar-item button,
+          .neo-quote-scope [data-toolbar] button,
+          .neo-quote-scope [data-toolbar-item] button {
+            min-height: 40px !important;
+            min-width: 72px !important;
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+            border-radius: 6px !important;
+          }
+        }
+        /* .items-scroll layout موحّد في ItemsScroll */
+      `}</style>
+
+      <div className="quote-layout" style={{ padding: 3, height: "100%" }}>
+        {/* ============ المحتوى الرئيسي ============ */}
+        <div className="form-column">
+          {/* ============ Header bar ============ */}
+          <div className="header-bar" style={{ flexShrink: 0, height: "auto" }}>
+            {/* hidden marker للاختبارات E2E لقراءة الرقم المُولَّد */}
+            <span data-testid="doc-number" data-doc-kind={pos ? "pos-invoice" : (isCash ? "cash-invoice" : "invoice")} style={{ display: "none" }}>{invoiceNumber}</span>
+            {pos ? (
+              <div className="field" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
+                <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                  <span>اسم العميل (اختياري)</span>
+                  <input
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    title="تاريخ الفاتورة"
+                    style={{ fontSize: 10, height: 18, padding: "0 4px", border: "1px solid hsl(var(--border))", borderRadius: 3, background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontWeight: 600 }}
+                  />
+                </label>
+                <input
+                  ref={customerInputRef}
+                  type="text"
+                  className="form-control customer-name-input"
+                  placeholder="عميل نقدي"
+                  value={walkInName}
+                  onChange={(e) => setWalkInName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickProductRef.current?.focus(); } }}
+                  style={{ fontWeight: 600, width: "100%" }}
+                />
+              </div>
+            ) : (
+              <div className="field product-search-container" style={{ position: "relative", flex: `0 0 ${CUSTOMER_FIELD_BASE + (custExtras[0] || 0)}px`, minWidth: 0 }}>
+                <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                  <span>{isCash ? "عميل (اختياري)" : "العميل"}</span>
+                  <input
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    title="تاريخ الفاتورة"
+                    style={{ fontSize: 10, height: 18, padding: "0 4px", border: "1px solid hsl(var(--border))", borderRadius: 3, background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontWeight: 600 }}
+                  />
+                </label>
+                {!colsLocked && <ExpandFieldButton currentExtra={custExtras[0] || 0} onDrag={(v) => custSetExtra(0, v)} onReset={() => custReset(0)} title="اسحب لتغيير عرض حقل العميل · نقرة مزدوجة لإعادة الضبط" />}
+                <input
+                  ref={customerInputRef}
+                  type="text"
+                  className="form-control customer-name-input"
+                  placeholder="اسم العميل أو رقم الهاتف"
+                  value={customerSearch}
+                  onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerSugg(true); if (customer) setCustomer(null); }}
+                  onFocus={() => setShowCustomerSugg(true)}
+                  onBlur={() => setTimeout(() => setShowCustomerSugg(false), 150)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (customerMatches[0] && !customer) pickCustomer(customerMatches[0]);
+                      else quickProductRef.current?.focus();
+                    }
+                  }}
+                  style={{ fontWeight: 600, width: "100%" }}
+                />
+                {showCustomerSugg && customerMatches.length > 0 && (
+                  <div className="customer-suggestions">
+                    {customerMatches.map((c, i) => (
+                      <div key={c.id} className="customer-item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickCustomer(c)}>
+                        <strong>{c.name}</strong>
+                        <span style={{ color: "hsl(var(--muted-foreground))", marginRight: 8 }}>{c.phone}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Add new customer button — hidden in POS mode */}
+            {!pos && (
+              <div className="field" style={{ flex: "0 0 auto", width: 28 }}>
+                <label>&nbsp;</label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustomer(true)}
+                  className="form-control"
+                  title="إضافة عميل جديد"
+                  aria-label="إضافة عميل جديد"
+                  style={{
+                    background: "#28a745", color: "#fff", border: "none", cursor: "pointer",
+                    padding: 0, width: 28, minWidth: 28,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontWeight: 700, fontSize: 16, lineHeight: 1,
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            )}
+
+
+
+
+            <div className="field" style={{ width: HEADER_FIELD_BASES[1] + (hdrExtras[1] || 0) }}>
+              <label>المستودع</label>
+              <select
+                className="form-control"
+                value={warehouseId}
+                onChange={(e) => setWarehouseId(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickProductRef.current?.focus(); } }}
+                style={{ minWidth: 0, width: "100%" }}
+              >
+                <option value="">— اختر مستودع —</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+              {!colsLocked && <ExpandFieldButton currentExtra={hdrExtras[1] || 0} onDrag={(v) => hdrSetExtra(1, v)} onReset={() => hdrReset(1)} />}
+            </div>
+
+            {/* حقل label رابع: تفاصيل العميل — نفس ارتفاع باقي الحقول */}
+            <div className="field" style={{ width: HEADER_FIELD_BASES[2] + (hdrExtras[2] || 0), minWidth: 80, flexShrink: 0 }}>
+              <label>تفاصيل العميل</label>
+              {!colsLocked && <ExpandFieldButton currentExtra={hdrExtras[2] || 0} onDrag={(v) => hdrSetExtra(2, v)} onReset={() => hdrReset(2)} />}
+              <div className="form-control" style={{
+                display: "flex", flexDirection: "row", alignItems: "center", flexWrap: "nowrap",
+                overflow: "hidden", gap: 5,
+                background: "hsl(var(--muted) / 0.5)", cursor: "default", userSelect: "text",
+                height: 28, padding: "0 8px", fontSize: 11, whiteSpace: "nowrap",
+              }}>
+                {!customer ? (
+                  <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>—</span>
+                ) : (
+                  <>
+                    {customer.phone && (
+                      <span style={{ color: "hsl(var(--foreground))", fontWeight: 600, fontSize: 11, flexShrink: 0 }}>
+                        📞 {customer.phone}
+                      </span>
+                    )}
+                    {(() => {
+                      // مصدر الحقيقة الموحّد: netBalanceOf (يفضّل net_balance المحسوب من DB)
+                      const net = netBalanceOf({
+                        balance: Number(customerBalances?.debt || 0),
+                        credit_balance: Number(customerBalances?.credit || 0),
+                        net_balance: customerBalances?.net,
+                      });
+                      if (Math.abs(net) < 0.01) {
+                        if (!customer.phone) {
+                          return <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 10 }}>خالص</span>;
+                        }
+                        return null;
+                      }
+                      if (net > 0) {
+                        return (
+                          <>
+                            {customer.phone && <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 9, flexShrink: 0 }}>·</span>}
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/customers/${customer.id}/statement`)}
+                              title="فتح كشف الحساب"
+                              style={{ color: "hsl(var(--destructive))", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(var(--destructive)/0.08)", borderRadius: 3, padding: "0 3px", border: "none", cursor: "pointer" }}
+                            >
+                              عليه {net.toLocaleString()}
+                            </button>
+                          </>
+                        );
+                      }
+                      return (
+                        <>
+                          {customer.phone && <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 9, flexShrink: 0 }}>·</span>}
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/customers/${customer.id}/statement`)}
+                            title="فتح كشف الحساب"
+                            style={{ color: "hsl(142 70% 35%)", fontWeight: 700, fontSize: 11, flexShrink: 0, background: "hsl(142 70% 35% / 0.08)", borderRadius: 3, padding: "0 3px", border: "none", cursor: "pointer" }}
+                          >
+                            له {Math.abs(net).toLocaleString()}
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* رسالة العميل - مربع أيقونة فقط */}
+            <div className="field" style={{ flex: "0 0 auto", width: 28, alignSelf: "flex-end" }}>
+              <MessageImportButton onClick={() => setShowMessageImport(true)} />
+            </div>
+          </div>
+          
+
+          {/* ============ Quick-add row ============ */}
+          <div className="quick-add-row" style={{ marginTop: 6, flexShrink: 0, gridTemplateColumns: quickGrid(QUICK_BASE_INVOICE) }}>
+            <div className="product-search-container quick-add-field" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <button
+                type="button"
+                onClick={() => setShowQuickAddProduct(true)}
+                title="إضافة منتج جديد"
+                aria-label="إضافة منتج جديد"
+                style={{ flex: "0 0 auto", width: 28, height: 28, background: "#f97316", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 18, fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}
+              >+</button>
+              <input
+                ref={quickProductRef}
+                data-nav-col="product"
+                type="text"
+                className="form-control"
+                placeholder="ابحث عن منتج..."
+                data-quick-search="invoice"
+                value={quickRow.productSearch}
+                onChange={(e) => setQuickRow((r) => ({ ...r, productSearch: e.target.value, showSuggestions: true, product_id: null }))}
+                onFocus={() => setQuickRow((r) => ({ ...r, showSuggestions: true }))}
+                onBlur={() => setTimeout(() => setQuickRow((r) => ({ ...r, showSuggestions: false })), 150)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const matches = productMatches(quickRow.productSearch);
+                    if (matches[0]) pickProductIntoQuick(matches[0]);
+                  }
+                }}
+              />
+              <ExpandFieldButton currentExtra={quickExtras[0] || 0} onDrag={(v) => quickSetExtra(0, v)} onReset={() => quickReset(0)} />
+              <SuggestionsPortal anchorSelector='[data-quick-search="invoice"]' open={quickRow.showSuggestions} width={suggWidth}>
+                <div className="search-suggestions" style={{ position: "relative", top: "auto", left: "auto", right: "auto" }}>
+                  <SuggestionsResizeHandle onMouseDown={startSuggDrag} />
+                  {(() => {
+                    const matches = productMatches(quickRow.productSearch);
+                    if (productsLoading) return <div className="item suggestions-status" data-status="loading">جارٍ تحميل المنتجات…</div>;
+                    if (!quickRow.productSearch.trim()) return <div className="item suggestions-status" data-status="hint">اكتب للبحث ({products.length} منتج)</div>;
+                    if (matches.length === 0) return <div className="item suggestions-status" data-status="empty">لا توجد نتائج</div>;
+                    return matches.map((p, i) => (
+                      <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoQuick(p)}>
+                        <span>{p.name}</span>
+                        <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                          {Number(p.stock_quantity).toLocaleString()}
+                        </span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </SuggestionsPortal>
+            </div>
+
+            <div className="quick-add-field">
+              <input ref={quickQtyRef} data-nav-col="quantity" type="number" className="form-control text-center" placeholder="الكمية"
+                value={quickRow.quantity || ""}
+                onChange={(e) => setQuickRow((r) => { const q = Number(e.target.value) || 0; const u = { ...r, quantity: q }; u.total = calcTotal(u); return u; })}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addQuickRowToTable(); } }} />
+              <ExpandFieldButton currentExtra={quickExtras[1] || 0} onDrag={(v) => quickSetExtra(1, v)} onReset={() => quickReset(1)} />
+            </div>
+
+            <div className="quick-add-field">
+              <input step="any" data-nav-col="unit_price" type="number" className="form-control text-center" placeholder="المحلي"
+                value={quickRow.unit_price || ""}
+                onChange={(e) => setQuickRow((r) => { const up = Number(e.target.value) || 0; const u = { ...r, unit_price: up }; u.total = calcTotal(u); return u; })} />
+              <ExpandFieldButton currentExtra={quickExtras[2] || 0} onDrag={(v) => quickSetExtra(2, v)} onReset={() => quickReset(2)} />
+            </div>
+
+            <div className="quick-add-field">
+              <input step="any" data-nav-col="foreign_price" type="number" className="form-control text-center" placeholder="$ السعر الأجنبي"
+                value={quickRow.foreign_price || ""}
+                onChange={(e) => setQuickRow((r) => { const fp = Number(e.target.value) || 0; const u = { ...r, foreign_price: fp, unit_price: fp * r.exchange_rate }; u.total = calcTotal(u); return u; })} />
+              <ExpandFieldButton currentExtra={quickExtras[3] || 0} onDrag={(v) => quickSetExtra(3, v)} onReset={() => quickReset(3)} />
+            </div>
+
+            <div className="quick-add-field">
+              <input ref={quickRateRef} data-nav-col="exchange_rate" type="number" step="0.01" className="form-control text-center" placeholder="معدل التحويل"
+                value={quickRow.exchange_rate}
+                onChange={(e) => { const er = Number(e.target.value) || 1; rateTouchedRef.current = true; setDefaultRate(er); setQuickRow((r) => { const u = { ...r, exchange_rate: er, unit_price: r.foreign_price * er }; u.total = calcTotal(u); return u; }); setRows((prev) => prev.map((row) => { const u = applyRateToRow(row, er); if (u === row) return row; u.total = calcTotal(u); return u; })); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addQuickRowToTable(); } }} />
+              <ExpandFieldButton currentExtra={quickExtras[4] || 0} onDrag={(v) => quickSetExtra(4, v)} onReset={() => quickReset(4)} />
+            </div>
+
+            <button type="button" className="btn btn-primary btn-sm" onClick={addQuickRowToTable}>+ إضافة</button>
+          </div>
+
+          {/* ============ Bulk actions toolbar ============ */}
+          {rows.some((r) => r.selected) && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "6px 10px", background: "#fff3cd",
+              border: "1px solid #ffeeba", borderRadius: 6,
+              marginBottom: 6, flexShrink: 0,
+            }}>
+              <span style={{ fontWeight: 600 }}>
+                تم تحديد {rows.filter((r) => r.selected).length} بند
+              </span>
+              <button type="button" className="btn btn-danger btn-sm" onClick={deleteSelectedRows}>
+                حذف المحدد
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => toggleSelectAll(false)}>
+                إلغاء التحديد
+              </button>
+            </div>
+          )}
+
+          {/* ============ Items table ============ */}
+          <div className="items-table-wrap" style={{ background: "hsl(var(--card))", borderRadius: 8, overflow: "hidden", border: "1px solid hsl(var(--border))", flex: "1 1 0", minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <ItemsScroll ref={itemsScrollRef}>
+              <table className="excel-table" style={{ width: "100%", tableLayout: "fixed" }} {...tableProps}>
+                <colgroup>
+                  {colWidths.map((w, i) => (
+                    <col key={i} style={w != null ? { width: w } : (colMinWidths[i] != null ? { minWidth: colMinWidths[i]! } : undefined)} />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr className="item_header">
+                    <th style={{ position: "relative" }}>
+                      <input type="checkbox"
+                        checked={rows.length > 0 && rows.every((r) => r.selected)}
+                        onChange={(e) => toggleSelectAll(e.target.checked)}
+                        title="تحديد الكل" />
+                      <ColumnResizeHandle onMouseDown={(e) => startColDrag(0, e)} hidden={colsLocked} />
+                    </th>
+                    <th style={{ position: "relative", padding: 0 }}>
+                      {productHeaderSearch ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          dir="auto"
+                          placeholder="🔎 ابحث..."
+                          value={tableSearch}
+                          onChange={(e) => setTableSearch(e.target.value)}
+                          onBlur={() => { if (!tableSearch.trim()) setProductHeaderSearch(false); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              setTableSearch("");
+                              setProductHeaderSearch(false);
+                            }
+                          }}
+                          style={{ width: "100%", height: 22, fontSize: 11, border: "none", background: "hsl(var(--background))", color: "hsl(var(--foreground))", padding: "0 6px", boxSizing: "border-box" }}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setProductHeaderSearch(true)}
+                          style={{ width: "100%", height: "100%", background: "transparent", border: "none", color: "inherit", font: "inherit", cursor: "pointer", padding: "4px 8px" }}
+                          title="اضغط للبحث داخل المنتجات المضافة"
+                        >
+                          المنتج {tableSearch ? `(${tableSearch})` : ""}
+                        </button>
+                      )}
+                      <ColumnResizeHandle onMouseDown={(e) => startColDrag(1, e)} hidden={colsLocked} />
+                    </th>
+                    <th style={{ position: "relative" }}>الكمية<ColumnResizeHandle onMouseDown={(e) => startColDrag(2, e)} hidden={colsLocked} /></th>
+                    <th style={{ position: "relative" }}>السعر<ColumnResizeHandle onMouseDown={(e) => startColDrag(3, e)} hidden={colsLocked} /></th>
+                    <th style={{ position: "relative" }}>السعر الأجنبي $<ColumnResizeHandle onMouseDown={(e) => startColDrag(4, e)} hidden={colsLocked} /></th>
+                    <th style={{ position: "relative" }}>الإجمالي<ColumnResizeHandle onMouseDown={(e) => startColDrag(5, e)} hidden={colsLocked} /></th>
+                    <th colSpan={2} style={{ position: "relative", padding: 0, height: 10, minWidth: 40 }}>
+                      <button
+                        type="button"
+                        title={COLS_BTN_EDIT_TITLE}
+                        onClick={() => { setColsLocked(false); toast(COLS_TOAST_EDIT_MODE); }}
+                        style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", fontSize: 7, lineHeight: 1, padding: 0, margin: 0, border: "none", background: "hsl(var(--muted))", color: "hsl(var(--foreground))", cursor: "pointer", whiteSpace: "nowrap", boxSizing: "border-box", userSelect: "none" }}
+                      >
+                        {COLS_BTN_EDIT_LABEL}
+                      </button>
+                      <ColumnResizeHandle onMouseDown={(e) => startColDrag(6, e)} hidden={colsLocked} />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const visibleRows = rows.filter((r) => {
+                      const q = tableSearch.trim();
+                      if (!q) return true;
+                      return startsWithAny([r.product_name, r.productSearch], q);
+                    });
+                    const NAV_COLS = ["product", "quantity", "unit_price", "foreign_price", "total"];
+                    const handleNav = makeRowNavHandler({
+                      tableId: "invoice-items",
+                      cols: NAV_COLS,
+                      getRowCount: () => visibleRows.length,
+                    });
+                    return visibleRows.map((r, idx, arr) => {
+                    return (
+                    <React.Fragment key={r.uid}>
+                      <tr className={`excel-row ${r.selected ? "row-selected-danger" : ""} ${isSpacePending(r.uid) ? "row-pending-delete" : ""}`} data-row-uid={r.uid} onKeyDown={(e) => handleSpaceDelete(r.uid, e)}>
+                        <td className="text-center">
+                          <input type="checkbox" checked={r.selected}
+                            onChange={(e) => updateRow(r.uid, { selected: e.target.checked })} />
+                        </td>
+                        <td>
+                          <div className="product-search-container">
+                            <input type="text" className="form-control" placeholder="اكتب اسم المنتج..."
+                              data-row-search={r.uid}
+                              data-nav-table="invoice-items"
+                              data-nav-row={idx}
+                              data-nav-col="product"
+                              value={r.productSearch}
+                              onChange={(e) => updateRow(r.uid, { productSearch: e.target.value, showSuggestions: true, product_id: null })}
+                              
+                              onBlur={() => setTimeout(() => updateRow(r.uid, { showSuggestions: false }), 150)}
+                              onKeyDown={(e) => handleNav(idx, "product", e, { skipVertical: !!r.showSuggestions })} />
+                            <SuggestionsPortal anchorSelector={`[data-row-search="${r.uid}"]`} open={r.showSuggestions} width={suggWidth}>
+                              <div className="search-suggestions" style={{ position: "relative", top: "auto", left: "auto", right: "auto" }}>
+                                <SuggestionsResizeHandle onMouseDown={startSuggDrag} />
+                                {r.showSuggestions && (() => {
+                                  const matches = productMatches(r.productSearch, r.uid);
+                                  if (productsLoading) return <div className="item suggestions-status" data-status="loading">جارٍ تحميل المنتجات…</div>;
+                                  if (!r.productSearch.trim()) return <div className="item suggestions-status" data-status="hint">اكتب للبحث ({products.length} منتج)</div>;
+                                  if (matches.length === 0) return <div className="item suggestions-status" data-status="empty">لا توجد نتائج</div>;
+                                  return matches.map((p, i) => (
+                                    <div key={p.id} className="item" data-sugg-item data-active={i === 0 ? "true" : "false"} onMouseDown={() => pickProductIntoRow(r.uid, p)}>
+                                      <span>{p.name}</span>
+                                      <span style={{ marginRight: 4, padding: "1px 6px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.15)" : "hsl(0 84% 60% / 0.12)", color: Number(p.stock_quantity) > 0 ? "hsl(142 71% 35%)" : "hsl(0 84% 50%)", border: `1px solid ${Number(p.stock_quantity) > 0 ? "hsl(142 71% 45% / 0.35)" : "hsl(0 84% 60% / 0.3)"}`, flexShrink: 0 }}>
+                                        {Number(p.stock_quantity).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  ));
+                                })()}
+                              </div>
+                            </SuggestionsPortal>
+                          </div>
+                        </td>
+                        <td>
+                          <input type="number" className="form-control text-center" value={r.quantity}
+                            data-nav-table="invoice-items" data-nav-row={idx} data-nav-col="quantity"
+                            onKeyDown={(e) => handleNav(idx, "quantity", e)}
+                            onChange={(e) => updateRow(r.uid, { quantity: Number(e.target.value) || 0 })} />
+                        </td>
+                        <td>
+                          <input step="any" type="number" className="form-control text-center" value={r.unit_price || ""}
+                            data-nav-table="invoice-items" data-nav-row={idx} data-nav-col="unit_price"
+                            onKeyDown={(e) => handleNav(idx, "unit_price", e)}
+                            onChange={(e) => {
+                              setRows((prev) => prev.map((row) => {
+                                if (row.uid !== r.uid) return row;
+                                const up = Number(e.target.value) || 0;
+                                const merged = { ...row, unit_price: up };
+                                // أبقِ سعر الصرف متسقاً مع (المحلي ÷ الأجنبي) — وهو
+                                // نفس ما يُشتق عند إعادة فتح الفاتورة، فلا يختلف العرض
+                                // قبل الحفظ وبعده.
+                                if ((Number(row.foreign_price) || 0) > 0 && up > 0) {
+                                  merged.exchange_rate = Math.round((up / row.foreign_price) * 1000) / 1000;
+                                }
+                                merged.total = calcTotal(merged);
+                                return merged;
+                              }));
+                            }}
+                            style={{ background: "#fff8e6" }} />
+                        </td>
+                        <td>
+                          <input step="any" type="number" className="form-control text-center" value={r.foreign_price || ""}
+                            data-nav-table="invoice-items" data-nav-row={idx} data-nav-col="foreign_price"
+                            onKeyDown={(e) => handleNav(idx, "foreign_price", e)}
+                            onChange={(e) => updateRow(r.uid, { foreign_price: Number(e.target.value) || 0 })} />
+                        </td>
+                        <td className="text-center" style={{ fontWeight: 700, color: "#28a745", outline: "none" }}
+                            tabIndex={0}
+                            data-nav-table="invoice-items" data-nav-row={idx} data-nav-col="total"
+                            onKeyDown={(e) => handleNav(idx, "total", e)}>
+                          {r.total.toLocaleString()}
+                        </td>
+                        <td className="text-center">
+                          <button type="button"
+                            className="btn btn-sm"
+                            onClick={() => setItemNoteEditing({ uid: r.uid, productName: r.product_name, value: r.note || "" })}
+                            title={r.note || "إضافة ملاحظة"}
+                            style={{
+                              padding: "2px 8px",
+                              background: r.note ? "#2563eb" : "#ffffff",
+                              color: r.note ? "#ffffff" : "#475569",
+                              border: r.note ? "1px solid #1d4ed8" : "1px solid #cbd5e1",
+                              borderRadius: 4,
+                            }}>
+                            📝
+                          </button>
+                        </td>
+                        <td className="text-center">
+                          <button type="button" className="btn btn-danger btn-sm" onClick={() => removeRow(r.uid)}>×</button>
+                        </td>
+                      </tr>
+                      {r.note && (
+                        <tr className="excel-row" style={{ background: "#eff6ff" }}>
+                          <td colSpan={8} style={{ padding: "4px 12px", fontSize: 11, color: "#1d4ed8", whiteSpace: "pre-wrap" }}>
+                            📝 <strong>ملاحظة:</strong> {r.note}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                    );
+                    });
+                  })()}
+                  <TableFiller scrollRef={itemsScrollRef} realRowsCount={rows.length} columnsCount={colWidths.length} />
+                </tbody>
+              </table>
+            </ItemsScroll>
+          </div>
+
+          {/* ============ Bottom action bar (summary + buttons، كل عنصر قابل للسحب والتخصيص) ============ */}
+          <ToolbarCustomizationProvider storageKey={isEdit ? "invoice-edit" : "invoice-create"}>
+          <div dir="rtl" style={{ marginTop: 6, flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>
+            <FreePositionToolbar
+              screenKey={isEdit ? "invoice-edit-toolbar" : "invoice-create-toolbar"}
+              withCustomizeButtons
+              zoom={{ value: itemsZoom, inc: itemsZoomInc, dec: itemsZoomDec }}
+              items={[
+                // === Group 0: Summary chips (قابلة للنقل والتسمية والإخفاء) ===
+                // ملاحظة: تم نقل إدخال الخصم (نسبة/مبلغ) إلى شاشة «تسجيل الدفعة»
+                // ليظهر تلقائياً عند استلام دفعة العميل، ويُحسب على الرصيد المتبقي.
+                {
+                  id: "sum-total",
+                  group: "0-summary",
+                  useHandle: true,
+                  defaultLabel: "المجموع",
+                  node: (
+                    <SummaryChip
+                      screenKey={isEdit ? "invoice-edit-toolbar" : "invoice-create-toolbar"}
+                      id="sum-total"
+                      defaultLabel="المجموع"
+                      value={`${totals.total.toLocaleString()} ${currencyCode}`}
+                      valueStyle={{
+                        display: "inline-block",
+                        minWidth: 120,
+                        height: 24,
+                        padding: "2px 8px",
+                        textAlign: "center",
+                        border: "1px solid #16a34a",
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        background: "#dcfce7",
+                        color: "#15803d",
+                      }}
+                    />
+                  ),
+                },
+                // === Group 1: Primary actions (save / edit / payment) ===
+                {
+                  id: "save",
+                  group: "1-primary",
+                  node: (
+                    <button className="btn btn-success btn-sm" onClick={() => saveInvoice()} disabled={saving}>
+                      {saving ? "جاري الحفظ..." : (isEdit ? "تحديث الفاتورة" : "حفظ الفاتورة")}
+                    </button>
+                  ),
+                },
+                ...(!editId ? [{
+                  id: "save-and-new",
+                  group: "1-primary",
+                  node: (
+                    <button className="btn btn-info btn-sm" onClick={() => saveInvoice({ andNew: true })} disabled={saving}>
+                      + حفظ وجديد
+                    </button>
+                  ),
+                }] : []),
+                ...(editId ? [{
+                  id: "edit-save",
+                  group: "1-primary",
+                  node: (
+                    <button onClick={() => saveInvoice({ andNew: true })} disabled={saving} title="حفظ التعديلات وفتح فاتورة جديدة" style={btnStyle("#f97316")}>
+                      <Plus size={14} /> حفظ وجديد
+                    </button>
+                  ),
+                }] : []),
+                {
+                  id: "record-payment",
+                  group: "1-primary",
+                  node: (
+                    <button
+                      type="button"
+                      onClick={openPaymentDialog}
+                      disabled={!editId}
+                      title={editId ? "تسجيل دفعة" : "احفظ الفاتورة أولاً"}
+                      style={{ ...btnStyle("#0891b2"), opacity: editId ? 1 : 0.55, cursor: editId ? "pointer" : "not-allowed" }}
+                    >
+                      <Wallet size={14} /> تسجيل دفعة
+                    </button>
+                  ),
+                },
+
+                // === Group 2: Files & attachments ===
+                ...([
+                {
+                  id: "packaging",
+                  group: "2-files",
+                  node: (
+                    <button
+                      onClick={() => saveThen(() => setPackagingDialogOpen(true))}
+                      title="إضافة تغليف"
+                      style={btnStyle("#f59e0b")}
+                    >
+                      <Package size={14} />
+                    </button>
+                  ),
+                },
+                {
+                  id: "transport",
+                  group: "2-files",
+                  node: (
+                    <button
+                      onClick={() => saveThen(() => setTransportDialogOpen(true))}
+                      title="إضافة ترحيل" style={btnStyle("#16a34a")}>
+                      <Truck size={14} />
+                    </button>
+                  ),
+                },
+                // (تم حذف زرّي "تقرير الترحيل" و"تقرير التغليف" بناءً على طلب المالك)
+                ...(!pos ? [{
+                  id: "dispatch-page",
+                  group: "2-files",
+                  node: (
+                    <button
+                      onClick={() => navigate("/dispatch")}
+                      title="صفحة إدارة الترحيلات الكاملة"
+                      style={btnStyle("#7c3aed")}
+                    >
+                      <Truck size={14} /> الترحيلات
+                    </button>
+                  ),
+                }] : []),
+                ]),
+                {
+                  id: "attachments",
+                  group: "2-files",
+                  node: (
+                    <button
+                      onClick={() => saveThen(() => setAttachmentsDialogOpen(true))}
+                      title="المستندات (إيصال الدفع، الجرد، التفاصيل)"
+                      style={btnStyle("#7c3aed")}>
+                      <FileText size={14} /> المستندات
+                    </button>
+                  ),
+                },
+                {
+                  id: "notes",
+                  group: "2-files",
+                  node: (
+                    <button type="button"
+                      onClick={() => { setNotesDraft(notes || ""); setNotesDialogOpen(true); }}
+                      title={notes ? "تعديل الملاحظة" : "إضافة ملاحظة"}
+                      style={{
+                        ...btnStyle(notes ? "#2563eb" : "#ffffff"),
+                        color: notes ? "#ffffff" : "#475569",
+                        border: notes ? "1px solid #2563eb" : "1px solid #cbd5e1",
+                      }}>
+                      <StickyNote size={16} />
+                    </button>
+                  ),
+                },
+
+                // === Group 3: Print & sharing ===
+                {
+                  id: "print",
+                  group: "3-share",
+                  node: (
+                    <button type="button" onClick={() => printInvoiceNow()} style={btnStyle("#ef4444")} title="طباعة مباشرة (F10)">
+                      <Printer size={14} /> طباعة
+                    </button>
+                  ),
+                },
+                {
+                  id: "preview",
+                  group: "3-share",
+                  node: (
+                    <button
+                      type="button"
+                      onClick={() => openPreview()}
+                      style={btnStyle("#6366f1")}
+                      title="معاينة الفاتورة (F9) — تحفظ ثم تفتح شاشة المعاينة"
+                    >
+                      <Eye size={14} /> معاينة
+                    </button>
+                  ),
+                },
+                {
+                  id: "wa-pdf",
+                  group: "3-share",
+                  node: (
+                    <button
+                      type="button"
+                      disabled={sharingPdf}
+                      onClick={() => shareCurrentPdf()}
+                      style={btnStyle("#0ea5e9")}
+                      title="توليد PDF ومشاركته عبر واتساب"
+                    >
+                      <FileDown size={14} /> {sharingPdf ? "جاري التجهيز..." : "واتساب PDF"}
+                    </button>
+                  ),
+                },
+                {
+                  id: "stocktake",
+                  group: "3-share",
+                  node: (
+                    <button type="button" onClick={() => handlePrint("stocktake", false)} style={btnStyle("#f97316")} title="كشف جرد">
+                      <FileText size={14} /> كشف جرد
+                    </button>
+                  ),
+                },
+                {
+                  id: "whatsapp",
+                  group: "3-share",
+                  node: (
+                    <button
+                      onClick={async () => {
+                        if (!editId) { toast.error("احفظ الفاتورة أولاً لإرسال رابطها"); return; }
+                        // POS: قد لا يوجد عميل برقم هاتف — نفتح واتساب بدون مرسل
+                        // ليختار المستخدم جهة الاتصال يدوياً.
+                        if (!pos && !customer?.phone) {
+                          toast.error("لا يوجد رقم هاتف للعميل");
+                          return;
+                        }
+                        const { shareDocumentViaWhatsApp } = await import("@/utils/shareDocumentWhatsApp");
+                        await shareDocumentViaWhatsApp({
+                          docType: "invoice",
+                          docId: editId,
+                          phone: pickCustomerWhatsApp(customer),
+                          customerName: customer?.name || (pos ? (walkInName?.trim() || "عميل نقدي") : null),
+                          docNumber: invoiceNumber,
+                          total: totals.total,
+                          currency: currencyCode,
+                          docLabel: pos ? "فاتورة كاش" : "فاتورة",
+                        });
+                      }}
+                      title="إرسال رابط الفاتورة للعميل عبر واتساب" style={btnStyle("#10b981")}>
+                      <MessageCircle size={14} /> إرسال للعميل
+                    </button>
+                  ),
+                },
+
+                // === Group 4: Status & navigation ===
+                {
+                  id: "workflow-status",
+                  group: "4-meta",
+                  node: (
+                    <StatusButton
+                      statuses={WORKFLOW_STATUS_OPTIONS}
+                      current={workflowStatus}
+                      disabled={!editId}
+                      disabledTitle="احفظ الفاتورة أولاً"
+                      onChange={async (v) => {
+                        if (!editId) return;
+                        const prev = workflowStatus;
+                        if (v === prev) return;
+                        const rankOf = (s: string) => WORKFLOW_STATUS_OPTIONS.findIndex(x => x.value === s);
+                        if (rankOf(v) < rankOf(prev)) {
+                          toast.error("لا يمكن تخفيض حالة التجهيز");
+                          return;
+                        }
+                        setWorkflowStatus(v);
+                        const { error } = await supabase.rpc("advance_invoice_workflow" as any, {
+                          _invoice_id: editId,
+                          _target: v,
+                          _reason: `تغيير يدوي للحالة من شاشة الفاتورة: ${prev} → ${v}`,
+                        });
+                        if (error) { setWorkflowStatus(prev); toast.error(error.message); return; }
+                        // Stock deduction: only when leaving "new" for the first time
+                        if (prev === "new" && v !== "new") {
+                          try {
+                            const { data: items } = await supabase
+                              .from("invoice_items")
+                              .select("product_id, product_name, quantity")
+                              .eq("invoice_id", editId);
+                            const { deductStockForInvoiceOnce } = await import("@/utils/stockDeduction");
+                            const result = await deductStockForInvoiceOnce(
+                              editId,
+                              (items || []).map((it: any) => ({ product_id: it.product_id, quantity: it.quantity })),
+                            );
+                            if (result.deducted) {
+                              const lines = (items || [])
+                                .filter((it: any) => it.product_id && Number(it.quantity || 0) > 0)
+                                .slice(0, 8)
+                                .map((it: any) => `• ${it.product_name}: -${it.quantity} خصم`)
+                                .join("\n");
+                              const more = (items || []).length > 8 ? `\n… و${(items || []).length - 8} منتج آخر` : "";
+                              if (lines) {
+                                toast.success("تم خصم المخزون", {
+                                  description: lines + more,
+                                  duration: 6000,
+                                });
+                              }
+                            }
+                          } catch (stockErr) { console.error("[InvoiceCreatePage] stock deduction failed", stockErr); }
+                        }
+                        invalidateWorkflowAutoCache(editId);
+                        try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
+                        toast.success("تم تحديث الحالة");
+                      }}
+                    />
+                  ),
+                },
+                // Financial invoice status button removed — invoices now use workflow_status only.
+                {
+                  id: "clear",
+                  group: "4-meta",
+                  node: isAdmin ? (
+                    <button
+                      className="btn btn-sm"
+                      style={{
+                        background: "hsl(var(--destructive))",
+                        color: "hsl(var(--destructive-foreground))",
+                        borderColor: "hsl(var(--destructive))",
+                        fontWeight: 700,
+                      }}
+                      onClick={() => setClearConfirmOpen(true)}
+                      title="مسح بيانات الفاتورة الحالية بالكامل"
+                    >
+                      مسح
+                    </button>
+                  ) : null,
+                },
+              ]}
+            />
+          </div>
+          </ToolbarCustomizationProvider>
+        </div>
+
+        <PanelResizer storageKey="panels:invoice-create:sidebar" scopeSelector=".neo-quote-scope" />
+        <aside className="recent-invoices-scope" style={{ alignSelf: "stretch", height: "100%", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          {pos ? <RecentItemsSidebar type="invoices" compact sourceFilter="pos" /> : <RecentItemsSidebar type="invoices" compact />}
+          <RowResizer storageKey="rows:invoice-create:recent-density" scopeSelector=".recent-invoices-scope" cssVar="recent-density" mode="scale" defaultHeight={1.0} min={0.6} max={2.5} />
+        </aside>
+      </div>
+
+      {/* ============ Notes Dialog ============ */}
+      <ItemNoteDialog
+        open={!!itemNoteEditing}
+        initialValue={itemNoteEditing?.value || ""}
+        productName={itemNoteEditing?.productName}
+        onSave={(text) => { if (itemNoteEditing) updateRow(itemNoteEditing.uid, { note: text }); }}
+        onClose={() => setItemNoteEditing(null)}
+      />
+
+      <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
+        <DialogContent dir="rtl" className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>ملاحظات للعميل</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            placeholder="ملاحظات تظهر في الفاتورة المطبوعة..."
+            rows={6}
+            className="resize-none"
+          />
+          <DialogFooter className="gap-2">
+            {notes && (
+              <Button variant="destructive" onClick={() => { setNotes(""); setNotesDraft(""); setNotesDialogOpen(false); }}>
+                حذف
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setNotesDialogOpen(false)}>
+              إلغاء
+            </Button>
+            <Button onClick={() => { setNotes(notesDraft); setNotesDialogOpen(false); }}>
+              حفظ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============ Record Payment Dialog ============ */}
+      {/* ============ Record Payment Dialog (shared) ============ */}
+      {editId && (
+        <CustomerPaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          invoiceId={editId}
+          invoiceNumber={invoiceNumber}
+          customerId={customer?.id || savedCustomerId || null}
+          customerName={customer?.name || null}
+          total={Number(savedTotal || 0)}
+          paidBefore={Number(savedPaid || 0)}
+          isPos={pos}
+          onSaved={async () => {
+            try {
+              const { data } = await supabase
+                .from("invoices")
+                .select("total, paid_amount, due_amount, discount")
+                .eq("id", editId)
+                .maybeSingle();
+              if (data) {
+                setSavedTotal(Number((data as any).total || 0));
+                setSavedPaid(Number((data as any).paid_amount || 0));
+                setSavedDue(Number((data as any).due_amount || 0));
+                const itemDiscounts = rows.reduce((s: number, r: any) => s + ((Number(r.quantity) || 0) * (Number(r.unit_price) || 0) * (Number(r.discount) || 0) / 100), 0);
+                setGeneralDiscount(Math.max(0, Number((data as any).discount || 0) - itemDiscounts));
+              }
+              queryClient.invalidateQueries({ queryKey: ["invoices"] });
+            } catch { /* noop */ }
+          }}
+        />
+      )}
+
+
+      {/* ============ Clear/Delete Confirmation ============ */}
+      <AlertDialog open={clearConfirmOpen} onOpenChange={(o) => !clearing && setClearConfirmOpen(o)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ color: "hsl(var(--destructive))" }}>
+              مسح الفاتورة الحالية
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {editId
+                ? `هل تريد حذف الفاتورة ${invoiceNumber || ""} بالكامل من قاعدة البيانات؟ سيتم إرجاع الكميات إلى المخزون. لا يمكن التراجع عن هذا الإجراء.`
+                : "هل تريد مسح جميع بيانات الفاتورة الحالية؟"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clearing}>لا</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={clearing}
+              style={{ background: "hsl(var(--destructive))", color: "hsl(var(--destructive-foreground))" }}
+              onClick={async (e) => {
+                e.preventDefault();
+                setClearing(true);
+                try {
+                  const targetId = editId || savedInvoiceId;
+                  if (targetId) {
+                    // حذف موحّد عبر deleteInvoiceWithStockRestore:
+                    // يُرجع المخزون فقط إن كانت الفاتورة مُخصومة (stock_deduction_id موجود)،
+                    // ثم يحذف كل التوابع والفاتورة. أي فشل يوقف العملية.
+                    let deleteRes: any = null;
+                    try {
+                      const { deleteInvoiceWithStockRestore } = await import("@/utils/deleteInvoice");
+                      deleteRes = await deleteInvoiceWithStockRestore(targetId);
+                    } catch (delErr: any) {
+                      console.error("[InvoiceCreatePage] delete failed", delErr);
+                      toast.error(`فشل الحذف: ${delErr?.message || "خطأ غير معروف"}`, { duration: 8000 });
+                      setClearing(false);
+                      return;
+                    }
+
+                    // بعد نجاح الحذف: أوقف أي إعادة حفظ تلقائي من حارس التعديلات غير المحفوظة،
+                    // وامسح الحقول محلياً حتى لا يعتبر isDirty الصفحة "بحاجة للحفظ".
+                    deletedRef.current = true;
+                    setRows([]);
+                    setCustomer(null);
+                    setCustomerSearch("");
+                    setNotes("");
+                    setInternalNote("");
+                    setGeneralDiscount(0);
+                    setShipping(0);
+                    setSavedInvoiceId(null);
+
+                    try {
+                      const { showInvoiceDeletedToast } = await import("@/utils/deleteInvoiceToast");
+                      showInvoiceDeletedToast(deleteRes, { isPos: !!pos, extraSuffix: "جارٍ فتح فاتورة جديدة" });
+                    } catch {}
+
+                    queryClient.setQueriesData<any>(
+                      { predicate: (q) => {
+                        const key = q.queryKey[0];
+                        return key === "invoices-with-customers" || key === "invoices" || key === "invoices-full";
+                      }},
+                      (old: any) => {
+                        if (!Array.isArray(old)) return old;
+                        return old.filter((row: any) => row.id !== targetId);
+                      }
+                    );
+                    queryClient.invalidateQueries({ queryKey: ["invoices-with-customers"] });
+                    queryClient.invalidateQueries({ queryKey: ["invoices-full"] });
+                    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+
+                    setClearConfirmOpen(false);
+                    setClearing(false);
+                    // نؤجل الملاحة تكة واحدة حتى يُحدَّث isDirtyRef داخل حارس التعديلات
+                    // إلى false (بعد إفراغ الحقول)، فلا يعترض pushState ويطلق حفظاً وهمياً.
+                    setTimeout(() => {
+                      deletedRef.current = false;
+                      navigate(pos ? "/invoices/cash/list" : "/invoices/create", { replace: true });
+                    }, 0);
+                    return;
+                  }
+
+                  // الحالة: لم يتم الحفظ بعد — مسح الحقول فقط
+                  setRows([]);
+                  setCustomer(null);
+                  setCustomerSearch("");
+                  setNotes("");
+                  setInternalNote("");
+                  setGeneralDiscount(0);
+                  setShipping(0);
+                  setInvoiceDate(new Date().toISOString().slice(0, 10));
+                  setInvoiceNumber("");
+                  setQuickRow(newRow(defaultRate));
+                  setTableSearch("");
+                  setWorkflowStatus("new");
+                  toast.success("تم مسح بيانات الفاتورة — سيتم استخدام رقم جديد عند الحفظ");
+                  setClearConfirmOpen(false);
+                } catch (err: any) {
+                  console.error("[InvoiceCreatePage] clear failed", err);
+                  toast.error(`فشل المسح: ${err?.message || "خطأ غير معروف"}`, { duration: 8000 });
+                } finally {
+                  setClearing(false);
+                }
+              }}
+            >
+              {clearing ? "جارٍ الحذف..." : "نعم، احذف"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <CustomerFormDialog
+        open={showAddCustomer}
+        onClose={() => setShowAddCustomer(false)}
+        onSaved={handleCustomerSaved}
+      />
+
+      
+
+      {(() => {
+        const effectiveId = editId || savedInvoiceId;
+        if (!effectiveId) return null;
+        return (
+          <>
+            <PackagingDialog
+              open={packagingDialogOpen}
+              onOpenChange={setPackagingDialogOpen}
+              parentType="invoice"
+              parentId={effectiveId}
+            />
+            <TransportDialog
+              open={transportDialogOpen}
+              onOpenChange={setTransportDialogOpen}
+              parentType="invoice"
+              parentId={effectiveId}
+              customerId={customer?.id || null}
+              showAllReady={false}
+            />
+            <InvoiceAttachmentsDialog
+              invoiceId={effectiveId}
+              open={attachmentsDialogOpen}
+              onClose={() => setAttachmentsDialogOpen(false)}
+              onWorkflowAdvanced={async () => {
+                if (!effectiveId) return;
+                const { data: inv } = await supabase
+                  .from("invoices")
+                  .select("workflow_status,status,paid_amount,due_amount,total")
+                  .eq("id", effectiveId)
+                  .maybeSingle();
+                if (inv) {
+                  setWorkflowStatus((inv as any).workflow_status || "new");
+                  setInvoiceStatus((inv as any).status || "pending");
+                  setSavedPaid(Number((inv as any).paid_amount) || 0);
+                  setSavedDue(Number((inv as any).due_amount) || 0);
+                  setSavedTotal(Number((inv as any).total) || 0);
+                }
+              }}
+            />
+          </>
+        );
+      })()}
+
+      <QuickAddProductDialog
+        open={showQuickAddProduct}
+        onOpenChange={setShowQuickAddProduct}
+        initialName={quickRow.productSearch}
+        onCreated={(p: any) => {
+          const exists = rows.some((r) => r.product_id === p.id);
+          if (exists) {
+            notifyDuplicateItem(p.name);
+            return;
+          }
+          const fp = Number(p.foreign_price) || Number(p.sale_price) || 0;
+          const base = newRow(defaultRate);
+          const item: InvRow = {
+            ...base,
+            uid: crypto.randomUUID(),
+            product_id: p.id,
+            product_name: p.name,
+            productSearch: p.name,
+            foreign_price: fp,
+            unit_price: fp * base.exchange_rate,
+            quantity: Number(p.stock_quantity) || 1,
+            unit: p.unit,
+            showSuggestions: false,
+          };
+          item.total = calcTotal(item);
+          setRows((prev) => [...prev.filter((r) => r.product_id), item]);
+          setQuickRow(newRow(defaultRate));
+          setTimeout(() => quickProductRef.current?.focus(), 0);
+        }}
+      />
+
+      <MessageImportDialog
+        open={showMessageImport}
+        onClose={() => setShowMessageImport(false)}
+        products={products}
+        warehouseId={warehouseId}
+        onImport={(lines: ParsedLine[]) => {
+          setRows((prev) => {
+            const next = [...prev.filter((r) => r.product_id)];
+            for (const line of lines) {
+              if (!line.matched) continue;
+              const p = line.matched;
+              const existingIdx = next.findIndex((r) => r.product_id === p.id);
+              if (existingIdx >= 0) {
+                const ex = { ...next[existingIdx] };
+                ex.quantity = ex.quantity + line.qty;
+                ex.total = calcTotal(ex);
+                next[existingIdx] = ex;
+                continue;
+              }
+              const fp = Number(p.foreign_price) || Number(p.sale_price) || 0;
+              const base = newRow(defaultRate);
+              const item: InvRow = {
+                ...base,
+                uid: crypto.randomUUID(),
+                product_id: p.id,
+                product_name: p.name,
+                productSearch: p.name,
+                foreign_price: fp,
+                unit_price: fp * base.exchange_rate,
+                quantity: line.qty || 1,
+                unit: (p as any).unit || null,
+                showSuggestions: false,
+              };
+              item.total = calcTotal(item);
+              next.push(item);
+            }
+            return next;
+          });
+          toast.success(`تم استيراد ${lines.filter((l) => l.matched).length} منتج من الرسالة`);
+        }}
+      />
+      <ColumnsEditFloatingPanel
+        open={!colsLocked}
+        pageKey="invoice-create"
+        onSaveDefault={() => { saveColsAsDefault(); toast.success("تم تعيين عرض الأعمدة كافتراضي"); }}
+        onReset={() => { resetColWidths(); toast.success("تم إعادة عرض الأعمدة"); }}
+        onSave={() => { try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); } catch { toast.error(COLS_TOAST_SAVE_FAILED); } }}
+        onOpen={() => { setColsLocked(false); toast(COLS_TOAST_EDIT_MODE); }}
+      />
+    </div>
+  );
+}

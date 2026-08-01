@@ -52,6 +52,8 @@ const CustomerDebtReportPage = lazy(() => import("./pages/CustomerDebtReportPage
 const TransactionsPage = lazy(() => import("./pages/TransactionsPage"));
 const InvoicesPage = lazy(() => import("./pages/InvoicesPage"));
 const InvoiceCreatePage = lazy(() => import("./pages/InvoiceCreatePage"));
+const CashInvoiceCreatePage = lazy(() => import("./pages/CashInvoiceCreatePage"));
+const CashInvoicesPage = lazy(() => import("./pages/CashInvoicesPage"));
 
 const MigratePosNumbersPage = lazy(() => import("./pages/MigratePosNumbersPage"));
 const InvoiceViewPage = lazy(() => import("./pages/InvoiceViewPage"));
@@ -355,10 +357,10 @@ const App = () => {
             <Route path="/invoices/create" element={lazyEl(<InvoiceCreatePage />, "فاتورة جديدة")} />
             <Route path="/invoices/view/:id" element={lazyEl(<InvoiceViewPage />, "عرض الفاتورة")} />
             <Route path="/invoices/edit/:id" element={lazyEl(<InvoiceEditWrapper />, "تعديل الفاتورة")} />
-            <Route path="/invoices/cash" element={lazyEl(<InvoiceCreatePage pos />, "مبيعات كاش (نقطة بيع)")} />
-            <Route path="/invoices/cash/new" element={lazyEl(<InvoiceCreatePage pos />, "فاتورة كاش جديدة")} />
-            <Route path="/invoices/cash/edit/:id" element={lazyEl(<InvoiceCreatePage pos />, "تعديل فاتورة كاش")} />
-            <Route path="/invoices/cash/list" element={lazyEl(<InvoicesPage posOnly />, "إدارة فواتير الكاش")} />
+            <Route path="/invoices/cash" element={lazyEl(<CashInvoiceCreatePage />, "مبيعات كاش (نقطة بيع)")} />
+            <Route path="/invoices/cash/new" element={lazyEl(<CashInvoiceCreatePage />, "فاتورة كاش جديدة")} />
+            <Route path="/invoices/cash/edit/:id" element={lazyEl(<CashInvoiceCreatePage />, "تعديل فاتورة كاش")} />
+            <Route path="/invoices/cash/list" element={lazyEl(<CashInvoicesPage />, "إدارة فواتير الكاش")} />
             <Route path="/invoices/cash/migrate-numbers" element={lazyEl(<MigratePosNumbersPage />, "ترحيل ترقيم فواتير الكاش")} />
             <Route path="/invoices/:id/packaging" element={lazyEl(<InvoicePackagingPage />, "تغليف الفاتورة")} />
             <Route path="/invoices/:id/transport" element={lazyEl(<InvoiceTransportPage />, "ترحيل الفاتورة")} />
