@@ -66,10 +66,12 @@ describe("الأزرار تطابق قدرات الحركة حرفياً", () =>
     expect(rowOf("pay").textContent).toContain("INV-900");
   });
 
-  it("الدفعة المستقلة: الحذف مفعّل والتعديل مقفل", () => {
+  // أثر الدفعة ينزل على الرصيد التراكمي لا على فاتورةٍ بعينها، فلا معنى
+  // لاشتراط فاتورة مرتبطة لتعديلها.
+  it("الدفعة المستقلة: الحذف والتعديل كلاهما مفعّل", () => {
     renderDialog();
     expect((btn("solo", /^حذف/) as HTMLButtonElement).disabled).toBe(false);
-    expect((btn("solo", /^تعديل/) as HTMLButtonElement).disabled).toBe(true);
+    expect((btn("solo", /^تعديل/) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("قيد الاستهلاك مقفل بالكامل ويظهر سببه مكتوباً لا مختفياً", () => {
@@ -108,9 +110,10 @@ describe("العدّاد والتصفية والبحث", () => {
   it("العدّاد يحصي ما تسمح به القدرات لا رقماً مكتوباً يدوياً", () => {
     renderDialog();
     const caps = ALL.map((t) => movementCapabilities(t, ALL));
-    const editable = caps.filter((c) => c.canEdit).length;   // الدفعة + شحنتان = 3
-    const deletable = caps.filter((c) => c.canDelete).length; // + المستقلة = 4
-    expect(editable).toBe(3);
+    // كل دفعة وكل شحنة تُعدَّل وتُحذف — القيد الوحيد الباقي على قيد الاستهلاك
+    const editable = caps.filter((c) => c.canEdit).length;
+    const deletable = caps.filter((c) => c.canDelete).length;
+    expect(editable).toBe(4);
     expect(deletable).toBe(4);
     const text = screen.getByTestId("movements-counts").textContent || "";
     expect(text).toContain(`${editable} قابلة للتعديل`);

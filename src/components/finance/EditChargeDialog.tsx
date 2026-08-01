@@ -12,7 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUserRole } from "@/hooks/useUserRole";
 
 export type EditableCharge = {
-  groupId: string;
+  /**
+   * مجموعة التخصيص إن وُجدت. الشحنة صارت **تُخزَّن ولا تُوزَّع**، فأكثرها بلا
+   * مجموعة — ولهذا يقبل الحوار `null` ويعدّل القيد مباشرةً حينها.
+   */
+  groupId: string | null;
+  /** معرّف قيد الشحنة — المسار البديل حين لا مجموعة لها */
+  txId?: string | null;
   customerId: string;
   amount: number;
   method?: string | null;
@@ -97,6 +103,34 @@ export default function EditChargeDialog({ open, charge, onClose, onSaved }: Pro
     if (num <= 0) return toast.error("المبلغ غير صالح");
     setSaving(true);
     try {
+      // شحنة بلا مجموعة: قيدٌ واحد لا أكثر، فيُعدَّل مباشرةً ثم يُعاد حساب
+      // الرصيد التراكمي. لا توزيع يُعاد بناؤه، فلا حاجة لآلة المجموعات.
+      if (!charge.groupId) {
+        if (!charge.txId) {
+          toast.error("لا يمكن تحديد قيد الشحنة");
+          return;
+        }
+        const { error: upErr } = await (supabase as any)
+          .from("transactions")
+          .update({
+            amount: num,
+            method: method || null,
+            account_id: accountId === "none" ? null : accountId,
+            date: date || null,
+            reference_no: referenceNo || null,
+          })
+          .eq("id", charge.txId);
+        if (upErr) throw upErr;
+        await (supabase as any).rpc("recompute_customer_balance", {
+          _customer_id: charge.customerId,
+        });
+        await invalidateAll();
+        toast.success("تم تعديل الشحنة وتحديث رصيد العميل");
+        onSaved?.();
+        onClose();
+        return;
+      }
+
       const { data, error } = await (supabase as any).rpc("revise_customer_charge", {
         _group_id: charge.groupId,
         _new_amount: num,
