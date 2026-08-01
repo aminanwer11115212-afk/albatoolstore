@@ -63,7 +63,6 @@ const ROW_PRINT_STYLE: Record<string, string> = {
   charge: "background:#e7f8ee;color:#14532d;font-weight:700;",
   overpay: "background:#f4fbf7;color:#14532d;",
 };
-import ApplyCreditToInvoiceDialog from "@/components/statement/ApplyCreditToInvoiceDialog";
 import { useDeletedInvoicesForCustomer } from "@/hooks/useDeletedInvoicesForCustomer";
 import CustomerBalanceAuditTab from "@/components/customer/CustomerBalanceAuditTab";
 
@@ -95,7 +94,7 @@ export default function CustomerStatementPage() {
   const [invSortKey, setInvSortKey] = useState<"invoice_number" | "date" | "total" | "paid_amount" | "remaining">("date");
   const [invSortDir, setInvSortDir] = useState<"asc" | "desc">("desc");
   // Transactions table: type filter + sort
-  const [txTypeFilter, setTxTypeFilter] = useState<"all" | "payment" | "credit" | "credit_consume" | "other">("all");
+  const [txTypeFilter, setTxTypeFilter] = useState<"all" | "payment" | "credit" | "credit_consume">("all");
   const [txSortKey, setTxSortKey] = useState<"date" | "amount" | "type">("date");
   const [txSortDir, setTxSortDir] = useState<"asc" | "desc">("desc");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -309,7 +308,6 @@ export default function CustomerStatementPage() {
       method: (t as any).method, account_id: (t as any).account_id, date: (t as any).date,
     });
   };
-  const [applyCreditOpen, setApplyCreditOpen] = useState(false);
   const refreshAfterRevise = () => {
     qc.invalidateQueries({ queryKey: ["customer-transactions", selectedCustomerId] });
     qc.invalidateQueries({ queryKey: ["customer-fresh", selectedCustomerId] });
@@ -359,14 +357,16 @@ export default function CustomerStatementPage() {
     else { setInvSortKey(k); setInvSortDir("desc"); }
   };
 
-  const classifyTx = (t: any): "payment" | "credit" | "credit_consume" | "other" => {
+  const classifyTx = (t: any): "payment" | "credit" | "credit_consume" => {
     if (t.category === "customer_payment") return "payment";
-    if (t.category === "customer_credit") return Number(t.amount || 0) < 0 ? "credit_consume" : "credit";
-    return "other";
+    return Number(t.amount || 0) < 0 ? "credit_consume" : "credit";
   };
 
   const filteredTransactions = useMemo(() => {
     let rows = (transactions || []).filter((t: any) => {
+      // دفعاتٌ وشحناتٌ فقط. المصروفات وسائر القيود لا تخصّ حساب العميل —
+      // ظهورها هنا يوحي بأنها تحرّكه، وهي لا تدخل في `net_balance` أصلاً.
+      if (t.category !== "customer_payment" && t.category !== "customer_credit") return false;
       if (fromDate && t.date < fromDate) return false;
       if (toDate && t.date > toDate) return false;
       const amt = Math.abs(Number(t.amount || 0));
@@ -635,17 +635,6 @@ export default function CustomerStatementPage() {
         </button>
       {selectedCustomer && (
         <div className="flex justify-end gap-2 flex-wrap">
-          {Number((selectedCustomer as any)?.credit_balance || 0) > 0.01 && (
-            <button
-              type="button"
-              onClick={() => setApplyCreditOpen(true)}
-              data-testid="apply-credit-btn"
-              className="inline-flex items-center gap-2 bg-success text-success-foreground hover:opacity-90 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
-              title="توزيع رصيد العميل على فاتورة تختارها — لا توزيع تلقائي"
-            >
-              💳 توزيع الرصيد على فاتورة
-            </button>
-          )}
           <button
             type="button"
             onClick={() => setMovementsOpen(true)}
@@ -838,26 +827,11 @@ export default function CustomerStatementPage() {
               <p className="text-sm text-muted-foreground">المدفوع</p>
               <p className="text-lg font-bold text-success tabular-nums">{totalPaid.toLocaleString()}</p>
             </div>
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-              <p className="text-sm text-muted-foreground">المتبقي</p>
-              <p className="text-lg font-bold text-destructive tabular-nums">{(totalInvoices - totalPaid).toLocaleString()}</p>
-            </div>
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-col justify-between gap-2">
               <div>
                 <p className="text-sm text-muted-foreground">الرصيد الحالي ({balanceLabel})</p>
                 <p className={`text-lg font-bold tabular-nums ${balanceColor}`}>{balanceDisplay}</p>
               </div>
-              {Number((selectedCustomer as any)?.credit_balance || 0) > 0.01 && (
-                <div className="flex flex-col gap-1 items-end">
-                  <button
-                    type="button"
-                    onClick={() => setApplyCreditOpen(true)}
-                    className="text-xs font-semibold text-primary hover:underline text-right"
-                  >
-                    تطبيق الرصيد على فاتورة واحدة ←
-                  </button>
-                </div>
-              )}
             </div>
           </div>
           )}
@@ -1102,7 +1076,6 @@ export default function CustomerStatementPage() {
                     <option value="payment">دفعة</option>
                     <option value="credit">رصيد دائن</option>
                     <option value="credit_consume">استهلاك رصيد</option>
-                    <option value="other">أخرى</option>
                   </select>
                   <button
                     type="button"
@@ -1368,15 +1341,6 @@ export default function CustomerStatementPage() {
         currentNet={netBalanceOf(selectedCustomer)}
         onClose={() => setDeleteEntry(null)}
         onDeleted={refreshAfterRevise}
-      />
-
-      <ApplyCreditToInvoiceDialog
-        open={applyCreditOpen}
-        customerId={selectedCustomerId || null}
-        customerName={selectedCustomer?.name || null}
-        availableCredit={Number((selectedCustomer as any)?.credit_balance || 0)}
-        onClose={() => setApplyCreditOpen(false)}
-        onApplied={refreshAfterRevise}
       />
 
     </div>

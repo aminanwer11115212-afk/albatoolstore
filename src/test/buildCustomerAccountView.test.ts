@@ -261,13 +261,16 @@ describe("الجدول المسطّح — الشكل الذي طلبه العم�
   ];
   const view = () => buildCustomerAccountView({ invoices, transactions, netBalance: -100 });
 
-  it("ثلاثة أسطر: فاتورتان وسطر شحن يقول كم خُصم وكم بقي", () => {
-    const rows = view().rows.map((r) => [r.label, r.value, r.paid, signedAmountText(r.remaining).text]);
+  it("ثلاثة أسطر: فاتورتان وسطر شحن بمبلغه — والعمود يُجمع", () => {
+    const v = view();
+    const rows = v.rows.map((r) => [r.label, r.value, r.paid, signedAmountText(r.remaining).text]);
     expect(rows).toEqual([
       ["فاتورة A", 200, 0, "\u2212200"],
       ["فاتورة B", 200, 0, "\u2212200"],
-      ["تم شحن +500", null, 500, "+100"],
+      ["تم شحن +500", null, 500, "+500"],
     ]);
+    // ‎−200 ‎−200 ‎+500 = ‎+100 وهو صافي الحساب: له 100
+    expect(v.rows.reduce((s, r) => s + r.remaining, 0)).toBe(100);
   });
 
   it("لا أسطر سداد من الرصيد إطلاقاً", () => {
@@ -314,7 +317,35 @@ describe("الجدول المسطّح — الشكل الذي طلبه العم�
       netBalance: 600,
     });
     expect(v.rows[1].label).toBe("تم شحن +400");
-    expect(signedAmountText(v.rows[1].remaining).text).toBe("\u2212600");
+    // مبلغ الشحن نفسه — لا الرصيد الجاري بعده. العمود يُجمع رأسياً:
+    // −1000 (الفاتورة) + 400 (الشحن) = −600 وهو صافي الحساب.
+    expect(signedAmountText(v.rows[1].remaining).text).toBe("+400");
+    expect(v.rows.reduce((s, r) => s + r.remaining, 0)).toBe(-600);
+  });
+
+  /**
+   * كل صف يُحسب وحده، ومجموع العمود = صافي الحساب — بالأرقام التي رسمها
+   * صاحب المستودع بنفسه. هذا ما يجعل الكشف قابلاً للتحقّق بجمعٍ بسيط.
+   */
+  it("عمود «المتبقي» يُجمع رأسياً فيعطي صافي الحساب", () => {
+    const inv = (n: number, total: number, paid: number) => ({
+      id: `i${n}`, invoice_number: `INV-${n}`,
+      date: `2026-01-0${n}`, created_at: `2026-01-0${n}T09:00:00`,
+      total, paid_amount: paid, status: "pending",
+    });
+    const v = buildCustomerAccountView({
+      invoices: [
+        inv(1, 500, 300), inv(2, 600, 400), inv(3, 300, 200),
+        inv(4, 500, 1000), inv(5, 500, 100),
+      ],
+      transactions: [{
+        id: "ch", category: "customer_credit", amount: 300,
+        date: "2026-01-06", created_at: "2026-01-06T09:00:00", description: "شحن رصيد",
+      }],
+      netBalance: 100,
+    });
+    expect(v.rows.map((r) => r.remaining)).toEqual([-200, -200, -100, 500, -400, 300]);
+    expect(v.rows.reduce((s, r) => s + r.remaining, 0)).toBe(-100);
   });
 
   it("البيان لا يحمل أي شرح للخصم — مكانه الأعمدة لا الكلمات", () => {
