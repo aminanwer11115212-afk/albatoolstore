@@ -55,14 +55,20 @@ function pickBox(html: string, section: "paid-amount" | "final-total"): number {
   return Number(pickRaw(html, section).replace(/,/g, ""));
 }
 
-// قالب الطباعة يعرض «رصيد العميل الحالي» موقّعاً: "+ X" (عليه) / "− X" (له) /
-// "خالص" (صفر). نحوّله إلى رقم موقّع للمقارنة.
-function parseNet(raw: string): number {
+/**
+ * «رصيد العميل الحالي» يُعرض بإشارة **العميل** لا بإشارة الدفتر:
+ * `−X` أحمر = عليه، `+X` أخضر = له، «خالص» = صفر — كما في كشف الحساب
+ * ورسائل الواتساب سواء. المصدر الواحد `signedAmountText`.
+ *
+ * تُرجع هذه الدالة **ما على العميل** لتبقى التوقّعات مقروءة كما هي:
+ * دَينٌ قدره ٧٠٠ يُكتب `700` هنا ويُعرض `−700` على الورق.
+ */
+function parseOwed(raw: string): number {
   const t = raw.replace(/,/g, "").trim();
   if (t.includes("خالص")) return 0;
-  if (/^[−-]/.test(t)) return -Number(t.replace(/^[−-]\s*/, ""));
-  if (/^\+/.test(t)) return Number(t.replace(/^\+\s*/, ""));
-  return Number(t);
+  if (/^[−-]/.test(t)) return Number(t.replace(/^[−-]\s*/, ""));
+  if (/^\+/.test(t)) return -Number(t.replace(/^\+\s*/, ""));
+  return -Number(t);
 }
 
 describe("printTemplate account-summary contract (current-balance semantics)", () => {
@@ -70,7 +76,7 @@ describe("printTemplate account-summary contract (current-balance semantics)", (
   it("partial payment: paid + net balance = grandTotal", () => {
     const html = generatePrintHTML({ ...base, paidAmount: 300 });
     const paid = pickBox(html, "paid-amount");
-    const net = parseNet(pickRaw(html, "final-total"));
+    const net = parseOwed(pickRaw(html, "final-total"));
     expect(paid).toBe(300);
     expect(net).toBe(700); // ما زال عليه 700
     expect(paid + net).toBe(base.grandTotal);
@@ -79,17 +85,39 @@ describe("printTemplate account-summary contract (current-balance semantics)", (
   it("no payment: net balance = grandTotal", () => {
     const html = generatePrintHTML({ ...base, paidAmount: 0 });
     expect(pickBox(html, "paid-amount")).toBe(0);
-    expect(parseNet(pickRaw(html, "final-total"))).toBe(base.grandTotal);
+    expect(parseOwed(pickRaw(html, "final-total"))).toBe(base.grandTotal);
   });
 
   it("fully paid: net balance = 0 (خالص)", () => {
     const html = generatePrintHTML({ ...base, paidAmount: 1000 });
-    expect(parseNet(pickRaw(html, "final-total"))).toBe(0);
+    expect(parseOwed(pickRaw(html, "final-total"))).toBe(0);
   });
 
   it("overpayment: shows customer credit (له), not clamped", () => {
     const html = generatePrintHTML({ ...base, paidAmount: 1500 });
-    expect(parseNet(pickRaw(html, "final-total"))).toBe(-500);
+    expect(parseOwed(pickRaw(html, "final-total"))).toBe(-500);
+  });
+
+  /**
+   * الإشارة على الورق هي إشارة العميل نفسها التي في الكشف والواتساب.
+   * كانت الطباعة تعكسها — تكتب `+` أحمر لما **عليه** — فيقرأ العميل زائداً
+   * بلون الدَّين ويظنّه رصيداً له. هذا الاختبار يمنع عودتها.
+   */
+  it("الدَّين يُعرض بإشارة سالبة والفائض بموجبة — لا العكس", () => {
+    const owes = generatePrintHTML({ ...base, paidAmount: 300 });
+    expect(pickRaw(owes, "final-total")).toMatch(/^−/);
+    expect(pickRaw(owes, "final-total")).not.toMatch(/^\+/);
+
+    const credit = generatePrintHTML({ ...base, paidAmount: 1500 });
+    expect(pickRaw(credit, "final-total")).toMatch(/^\+/);
+  });
+
+  it("لون الإشارة يطابق معناها: الدَّين أحمر والفائض أخضر", () => {
+    const owes = generatePrintHTML({ ...base, paidAmount: 300 });
+    expect(owes).toMatch(/data-section="final-total"[^>]*color:#c0392b/);
+
+    const credit = generatePrintHTML({ ...base, paidAmount: 1500 });
+    expect(credit).toMatch(/data-section="final-total"[^>]*color:#16a34a/);
   });
 
   it("exposes lov-doc-label / lov-doc-number / lov-customer-name meta for unified PDF naming", () => {
@@ -134,7 +162,7 @@ describe("share vs print: equivalent numeric output", () => {
       // قالب المشاركة: المتبقي المطلوب مقصوصاً عند 0
       expect(pickBox(shareHtml, "final-total")).toBe(Math.max(0, due));
       // قالب الطباعة: رصيد العميل الحالي موقّعاً (غير مقصوص)
-      expect(parseNet(pickRaw(printHtml, "final-total"))).toBe(due);
+      expect(parseOwed(pickRaw(printHtml, "final-total"))).toBe(due);
     });
   }
 
