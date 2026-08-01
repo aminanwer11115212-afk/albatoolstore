@@ -182,62 +182,52 @@ describe("الحارس المنطقي في الواجهة يطابق حارس ا
   });
 });
 
-describe("شحن الرصيد يُوزَّع تلقائياً على الأقدم أولاً", () => {
-  const auto =
-    allMigrations.find((m) => m.name.includes("auto_distribute_charge"))?.sql || "";
-  /** الكود التنفيذي وحده — التعليقات تشرح السياسة القديمة أيضاً. */
-  const code = auto.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+describe("شحن الرصيد لا يسدّد أي فاتورة تلقائياً", () => {
+  const forced =
+    allMigrations.find((m) => m.name.includes("force_charge_store_only"))?.sql || "";
+  /** الكود التنفيذي وحده — التعليقات تذكر paid_amount شرحاً لا تنفيذاً. */
+  const forcedCode = forced
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("--"))
+    .join("\n");
 
-  it("الهجرة موجودة وتُعيد تعريف مسار الشحن", () => {
-    expect(auto).not.toBe("");
-    expect(auto).toContain("CREATE OR REPLACE FUNCTION public.record_customer_charge");
+  it("هجرة الإجبار موجودة وتُعيد تعريف الدالتين", () => {
+    expect(forced).not.toBe("");
+    expect(forced).toContain("CREATE OR REPLACE FUNCTION public.record_customer_charge");
+    expect(forced).toContain("CREATE OR REPLACE FUNCTION public.allocate_customer_charge");
   });
 
-  it("يوزّع على الفواتير الأقدم أولاً", () => {
-    expect(code).toContain("ORDER BY date ASC");
-    expect(code).toContain("UPDATE public.invoices");
-    expect(code).toContain("paid_amount = v_new_paid");
+  it("لا تلمس invoices ولا paid_amount", () => {
+    expect(forcedCode).not.toMatch(/UPDATE\s+public\.invoices/i);
+    expect(forcedCode).not.toMatch(/paid_amount/i);
   });
 
-  it("يستثني الملغاة وفواتير الكاش", () => {
-    expect(code).toMatch(/status, ''\) <> 'cancelled'/);
-    expect(code).toMatch(/source, ''\) <> 'pos'/);
+  it("لا تُدرج قيد سداد من الرصيد (customer_credit سالب أو دفعة credit_balance)", () => {
+    expect(forcedCode).not.toMatch(/credit_balance/i);
+    // القيد الوحيد المُدرَج موجب بكامل المبلغ
+    const inserts = forcedCode.match(/INSERT INTO public\.transactions/g) || [];
+    expect(inserts).toHaveLength(1);
+    expect(forced).toContain("'stored_only', true");
   });
 
-  it("كل تخصيص زوج كامل: دفعة credit_balance + استهلاك سالب", () => {
-    const inserts = code.match(/INSERT INTO public\.transactions/g) || [];
-    expect(inserts.length).toBe(3); // قيد الشحن + زوج التخصيص
-    expect(code).toContain("'credit_balance'");
-    expect(code).toContain("-v_apply");
-  });
-
-  it("الفائض يبقى مخزّناً ولا يُجبَر على التوزيع", () => {
-    expect(code).toContain("EXIT WHEN v_remaining <= 0.01");
-    expect(code).toContain("'surplus', v_remaining");
-  });
-
-  it("حارس الصافي يُلغي العملية عند أي انحراف", () => {
-    // التوزيع نقل داخلي: أثر العملية كلّها هو الشحن وحده
-    expect(code).toContain("v_net_before - v_amount");
-    expect(code).toContain("RAISE EXCEPTION 'charge_failed:net_drift");
-  });
-
-  it("لا يكتب يدوياً على customers.balance", () => {
-    expect(code).not.toMatch(/UPDATE\s+public\.customers\s+SET[^;]*\bbalance\b/i);
-    expect(code).toContain("recompute_customer_balance");
-  });
-
-  it("يفحص تناسق كل فاتورة مسّها", () => {
-    expect(code).toContain("assert_invoice_payment_consistency");
-  });
-
-  it("مسار توزيع واحد: القديم يفوّض للجديد", () => {
-    const body = auto.slice(auto.indexOf("FUNCTION public.allocate_customer_charge"));
+  it("المسار القديم الموزِّع صار يفوّض للتخزين فقط", () => {
+    const body = forced.slice(forced.indexOf("FUNCTION public.allocate_customer_charge"));
     expect(body).toContain("RETURN public.record_customer_charge(");
+    // ولا يحتوي أي منطق توزيع
+    expect(body).not.toMatch(/FOR\s+\w+\s+IN\s+SELECT/i);
+  });
+
+  it("الواجهة تستدعي مسار التخزين وحده", () => {
+    const dialog = fs.readFileSync(
+      path.resolve(process.cwd(), "src/components/dashboard/ChargeBalanceDialog.tsx"),
+      "utf8",
+    );
+    expect(dialog).toContain('rpc("record_customer_charge"');
+    expect(dialog).not.toContain('rpc("allocate_customer_charge"');
   });
 });
 
-describe("الواجهة لا تطبّق الرصيد من تلقاء نفسها عند فتح حوار الدفع", () => {
+describe("لا تطبيق تلقائي لرصيد العميل في أي مسار بالنظام", () => {
   const read = (rel: string) => fs.readFileSync(path.resolve(process.cwd(), rel), "utf8");
 
   it("حوار الدفع لا يملأ «استخدام الرصيد» من تلقاء نفسه عند الفتح", () => {
@@ -264,7 +254,7 @@ describe("الواجهة لا تطبّق الرصيد من تلقاء نفسها
     }
   });
 
-  it("المسارات التي تمسّ paid_amount من الرصيد معروفة ومحصورة", () => {
+  it("المسارات الوحيدة التي تمسّ paid_amount من الرصيد صريحة ويدوية", () => {
     // كلتاهما تُستدعى من نافذة يفتحها المستخدم بنفسه، لا من شحن أو فتح حوار.
     const manual = ["apply_customer_credit_to_invoice", "settle_invoices_from_credit"];
     for (const fn of manual) {
@@ -280,22 +270,22 @@ describe("الواجهة لا تطبّق الرصيد من تلقاء نفسها
       "refund_payment_to_customer_credit",
       // تحذف الشحنة وتعكس استهلاكها على الفواتير — عكسٌ لا إنشاء سداد
       "delete_customer_credit_entry",
-      // التوزيع التلقائي عند الشحن — بطلب صاحب المستودع، بحارس صافٍ
-      "record_customer_charge",
     ];
     // نقسم كل ملف إلى أجسام دوال ونفحص كل جسم وحده — الفحص على مستوى الملف
     // يوقع دوالَّ بريئة تصادف وجودها في نفس الهجرة.
-    const owners: string[] = [];
-    for (const { sql } of allMigrations) {
+    // التعريف الأخير زمنياً وحده هو الحيّ — الهجرات مرتّبة بالطابع الزمني
+    const latestDef = new Map<string, string>();
+    for (const { sql } of [...allMigrations].sort((a, b) => a.name.localeCompare(b.name))) {
       const parts = sql.split(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\./i).slice(1);
       for (const part of parts) {
         const name = part.match(/^(\w+)/)?.[1];
         if (!name) continue;
-        const body = part.slice(0, part.search(/\n\$\$;/) + 1 || undefined);
-        if (/'credit_balance'/.test(body) && /UPDATE\s+public\.invoices/i.test(body)) {
-          owners.push(name);
-        }
+        latestDef.set(name, part.slice(0, part.search(/\n\$\$;/) + 1 || undefined));
       }
+    }
+    const owners: string[] = [];
+    for (const [name, body] of latestDef) {
+      if (/'credit_balance'/.test(body) && /UPDATE\s+public\.invoices/i.test(body)) owners.push(name);
     }
     expect(owners.length).toBeGreaterThan(0); // الفحص فعّال لا فارغ
     for (const fn of new Set(owners)) {
@@ -369,12 +359,13 @@ describe("ملف التطبيق المجمّع", () => {
     }
   });
 
-  it("النسخة الأخيرة من record_customer_charge هي الموزِّعة تلقائياً", () => {
+  it("النسخة الأخيرة من record_customer_charge هي المخزِّنة بلا توزيع", () => {
     const sql = fs.readFileSync(applyPath, "utf8");
-    // التعريف الأخير هو الذي يبقى في القاعدة — يجب أن يكون التوزيع لا التخزين
+    // التعريف الأخير هو الذي يبقى في القاعدة — يجب ألا يمسّ أي فاتورة
     const last = sql.lastIndexOf("CREATE OR REPLACE FUNCTION public.record_customer_charge");
-    expect(sql.slice(last)).toContain("ORDER BY date ASC");
-    expect(sql.slice(last)).toContain("charge_failed:net_drift");
+    const body = sql.slice(last).split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+    expect(body).toContain("'stored_only', true");
+    expect(body.slice(0, body.indexOf("$$;"))).not.toMatch(/UPDATE\s+public\.invoices/i);
   });
 
   it("آمن التكرار: لا CREATE بلا OR REPLACE ولا DROP", () => {
@@ -382,5 +373,210 @@ describe("ملف التطبيق المجمّع", () => {
     const code = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
     expect(code).not.toMatch(/DROP\s+(TABLE|FUNCTION|COLUMN)/i);
     expect(code).not.toMatch(/CREATE\s+FUNCTION\s/i);
+  });
+});
+
+describe("مُعرِّف مشروع Supabase موحّد", () => {
+  /**
+   * كان `config.toml` يحمل مشروعاً آخر لا صلة له بالبيانات، فأي رابط لوحة أو
+   * `supabase link` يُبنى منه يذهب للمكان الخطأ — وقد ضلّل فعلاً.
+   */
+  it("config.toml يطابق المشروع الذي يستعمله التطبيق في .env", () => {
+    const toml = fs.readFileSync(path.resolve(process.cwd(), "supabase/config.toml"), "utf8");
+    const env = fs.readFileSync(path.resolve(process.cwd(), ".env"), "utf8");
+    const fromToml = toml.match(/^project_id\s*=\s*"([^"]+)"/m)?.[1];
+    const fromEnv = env.match(/VITE_SUPABASE_URL\s*=\s*"?https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    expect(fromToml).toBeTruthy();
+    expect(fromEnv).toBeTruthy();
+    expect(fromToml).toBe(fromEnv);
+  });
+});
+
+describe("لا مراجع لمشروع Supabase القديم في الكود الحيّ", () => {
+  /**
+   * المستودع انتقل من مشروع `vifrecsqxdbwqtcfkdyb` إلى `exmasfdcjgwapmobefne`،
+   * لكن روابط شعار مثبّتة في دوال Edge بقيت تشير للقديم — فتصل العميل صورة
+   * ميتة في المستند المشارَك. الهجرات التاريخية مستثناة: هي سجلّ لا يُعاد.
+   */
+  const OLD_REF = "vifrecsqxdbwqtcfkdyb";
+
+  const walk = (dir: string): string[] => {
+    const abs = path.resolve(process.cwd(), dir);
+    if (!fs.existsSync(abs)) return [];
+    return fs.readdirSync(abs, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) return e.name === "test" ? [] : walk(full);
+      // الاختبارات نفسها تذكر المُعرِّف القديم شرحاً — وليست كوداً يُشحن
+      if (/\.test\.(ts|tsx)$/.test(e.name)) return [];
+      return /\.(ts|tsx|sql|toml|json)$/.test(e.name) ? [full] : [];
+    });
+  };
+
+  it("الكود الحيّ يشير للمشروع الحالي وحده", () => {
+    const offenders = walk("supabase/functions")
+      .concat(walk("supabase/apply"), walk("src"))
+      .filter((f) => fs.readFileSync(path.resolve(process.cwd(), f), "utf8").includes(OLD_REF));
+    expect(offenders).toEqual([]);
+  });
+
+  it("رابط ملف التطبيق يشير للمشروع الصحيح", () => {
+    const sql = fs.readFileSync(
+      path.resolve(process.cwd(), "supabase/apply/APPLY_PENDING_MIGRATIONS.sql"), "utf8");
+    const env = fs.readFileSync(path.resolve(process.cwd(), ".env"), "utf8");
+    const ref = env.match(/VITE_SUPABASE_URL\s*=\s*"?https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    expect(sql).toContain(`dashboard/project/${ref}/sql/new`);
+  });
+});
+
+/**
+ * القاعدة: **حالة الفاتورة لا تتغيّر بشحن الرصيد — إلا بعد التوزيع من كشف
+ * الحساب.** أي أن المسار الوحيد الذي يُغيّر الحالة بسبب الرصيد هو توزيع
+ * يدوي صريح يفتحه المستخدم من كشف حساب العميل:
+ *   `apply_customer_credit_to_invoice` (فاتورة واحدة)
+ *   `settle_invoices_from_credit`      (عدة فواتير دفعةً واحدة)
+ */
+describe("حالة الفاتورة لا تتغيّر بشحن الرصيد إلا بتوزيع يدوي من كشف الحساب", () => {
+  const forced =
+    allMigrations.find((m) => m.name.includes("force_charge_store_only"))?.sql || "";
+  const code = forced.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+
+  it("دالة الشحن لا تكتب status ولا تلمس invoices إطلاقاً", () => {
+    expect(code).not.toMatch(/UPDATE\s+public\.invoices/i);
+    expect(code).not.toMatch(/\bstatus\b\s*=/i);
+    expect(code).not.toMatch(/paid_amount/i);
+  });
+
+  /**
+   * التريغر الوحيد على `transactions` يعيد حساب رصيد **العميل** فقط. لو أُضيف
+   * يوماً تريغر يشتقّ حالة الفاتورة من الحركات، لتغيّرت الحالة بمجرّد الشحن
+   * دون أن يمرّ أحد بمسار سداد — وهذا ما يمنعه هذا الاختبار.
+   */
+  it("لا تريغر على transactions يكتب على invoices", () => {
+    for (const { sql } of allMigrations) {
+      const triggers = [...sql.matchAll(
+        /CREATE\s+(?:OR REPLACE\s+)?TRIGGER\s+(\w+)[\s\S]{0,200}?ON\s+public\.transactions[\s\S]{0,200}?EXECUTE\s+FUNCTION\s+public\.(\w+)/gi,
+      )];
+      for (const [, , fnName] of triggers) {
+        // جسم الدالة التي يستدعيها التريغر
+        const at = sql.indexOf(`FUNCTION public.${fnName}(`);
+        if (at < 0) continue;
+        const body = sql.slice(at, sql.indexOf("$$;", at) + 3)
+          .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+        expect(body).not.toMatch(/UPDATE\s+public\.invoices/i);
+      }
+    }
+  });
+
+  it("تغيير حالة الفاتورة محصور بدوال يستدعيها المستخدم صراحةً", () => {
+    // **التعريف الأخير وحده هو الحيّ**: الهجرات مرتّبة بالطابع الزمني، وكل
+    // `CREATE OR REPLACE` لاحق يستبدل ما قبله. فحص التعريفات المُستبدَلة يوقع
+    // دوالَّ صُلِحت فعلاً — مثل `allocate_customer_charge` التي كانت توزّع
+    // ثم صارت تفوّض للتخزين.
+    const latest = new Map<string, string>();
+    for (const { sql } of [...allMigrations].sort((a, b) => a.name.localeCompare(b.name))) {
+      const parts = sql.split(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\./i).slice(1);
+      for (const part of parts) {
+        const name = part.match(/^(\w+)/)?.[1];
+        if (!name) continue;
+        latest.set(name, part.slice(0, part.search(/\n\$\$;/) + 1 || undefined));
+      }
+    }
+    const owners = new Set<string>();
+    for (const [name, body] of latest) {
+      if (/UPDATE\s+public\.invoices[\s\S]{0,300}?\bstatus\b\s*=/i.test(body)) owners.add(name);
+    }
+    // المسارات المسموحة كلها يفتحها المستخدم صراحةً. أوّلان منها هما
+    // **التوزيع من كشف الحساب** — الطريق الوحيد الذي يُغيّر الحالة بسبب الرصيد.
+    const allowed = [
+      "apply_customer_credit_to_invoice", "settle_invoices_from_credit",
+      "revise_invoice_payment", "cancel_invoice_payment",
+      "delete_invoice_with_reconciliation", "refund_payment_to_customer_credit",
+      "delete_customer_credit_entry", "mark_overdue_invoices",
+      "advance_invoice_workflow", "recalc_invoice_payment_state",
+      // تصفير إداري صريح يطلبه المدير من شاشة الصيانة — لا علاقة له بالشحن
+      "admin_reset_stock_and_ledgers",
+    ];
+    for (const fn of owners) expect(allowed).toContain(fn);
+  });
+});
+
+describe("مسارا التوزيع من كشف الحساب — الطريق الوحيد لتغيير الحالة بالرصيد", () => {
+  const bodyOf = (fn: string) =>
+    allMigrations.find((m) => m.sql.includes(`FUNCTION public.${fn}`))?.sql || "";
+
+  it.each([
+    ["apply_customer_credit_to_invoice", "توزيع على فاتورة واحدة"],
+    ["settle_invoices_from_credit", "توزيع على عدة فواتير"],
+  ])("%s موجود ويكتب الحالة (%s)", (fn) => {
+    const sql = bodyOf(fn);
+    expect(sql).not.toBe("");
+    expect(sql).toMatch(/UPDATE\s+public\.invoices/i);
+    expect(sql).toContain("recompute_customer_balance");
+  });
+
+  it("كلاهما يُستدعى من كشف الحساب لا من مسار الشحن", () => {
+    const apply = fs.readFileSync(
+      path.resolve(process.cwd(), "src/components/statement/ApplyCreditToInvoiceDialog.tsx"), "utf8");
+    expect(apply).toContain('rpc("apply_customer_credit_to_invoice"');
+    // حوار الشحن لا **يستدعي** أياً منهما (ذِكرهما في تعليق شرحاً مقبول)
+    const charge = fs.readFileSync(
+      path.resolve(process.cwd(), "src/components/dashboard/ChargeBalanceDialog.tsx"), "utf8");
+    const rpcs = [...charge.matchAll(/rpc\(\s*"(\w+)"/g)].map((m) => m[1]);
+    expect(rpcs).toEqual(["record_customer_charge"]);
+  });
+});
+
+describe("ملف الفحص والإصلاح", () => {
+  const p = path.resolve(process.cwd(), "supabase/apply/VERIFY_AND_REPAIR.sql");
+
+  it("موجود ويكشف النسخة الحيّة", () => {
+    expect(fs.existsSync(p)).toBe(true);
+    const sql = fs.readFileSync(p, "utf8");
+    expect(sql).toContain("pg_get_functiondef");
+    expect(sql).toContain("AUTO_DISTRIBUTE");
+    expect(sql).toContain("STORE_ONLY");
+  });
+
+  it("نسخة الإصلاح مطابقة لهجرة «تخزين فقط» — لا تلمس الفواتير", () => {
+    const sql = fs.readFileSync(p, "utf8");
+    const fix = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION public.record_customer_charge"));
+    const code = fix.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+    expect(code).toContain("'stored_only', true");
+    expect(code).not.toMatch(/UPDATE\s+public\.invoices/i);
+    expect(code).not.toMatch(/paid_amount/i);
+  });
+
+  it("لا يحذف بيانات بجملة عامة — الحذف يمرّ بمسار العكس", () => {
+    const sql = fs.readFileSync(p, "utf8");
+    const code = sql
+      .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n")
+      // النصوص المقتبسة ليست جُملاً: استعلام الكشف يبحث عن 'UPDATE public.invoices'
+      // داخل تعريف الدالة، فلا يُعدّ تنفيذاً
+      .replace(/'[^']*'/g, "''");
+    expect(code).not.toMatch(/DELETE\s+FROM/i);
+    expect(code).not.toMatch(/\bUPDATE\s+public\.(invoices|customers)\b/i);
+  });
+});
+
+describe("حفظ الفاتورة لا يمحو المدفوع", () => {
+  const src = fs.readFileSync(
+    path.resolve(process.cwd(), "src/pages/InvoiceCreatePage.tsx"), "utf8");
+
+  /**
+   * العطل المُبلَّغ: تسجيل دفعة ثانية في شاشة تعديل الفاتورة يجعل المدفوع صفراً.
+   * السبب أن `saveInvoice` كان يكتب `paid_amount` من حالة React (`savedPaid`)،
+   * وهي قد تكون قديمة — فيُكتب صفر فوق دفعة موجودة. القراءة الطازجة من القاعدة
+   * تُلغي الاحتمال، وهذا الاختبار يمنع الرجوع للاشتقاق من الحالة.
+   */
+  it("المدفوع يُقرأ من القاعدة قبل الكتابة لا من حالة الواجهة", () => {
+    const at = src.indexOf("let prevPaid = 0;");
+    expect(at).toBeGreaterThan(0);
+    const block = src.slice(at, at + 400);
+    expect(block).toContain('.select("paid_amount")');
+    expect(block).toContain("eq(\"id\", effectiveEditId)");
+  });
+
+  it("لا اشتقاق مباشر لـ prevPaid من savedPaid وحدها", () => {
+    expect(src).not.toMatch(/const\s+prevPaid\s*=\s*effectiveEditId\s*\?\s*Math\.max\(0,\s*Number\(savedPaid\)/);
   });
 });

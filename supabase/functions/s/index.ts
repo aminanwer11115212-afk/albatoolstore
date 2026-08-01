@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
   // Bots → render OG preview HTML with company branding.
   let companyName = "كشف حساب";
   let logoUrl =
-    "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png";
+    "https://exmasfdcjgwapmobefne.supabase.co/storage/v1/object/public/company-assets/logo.png";
   let description = "كشف حساب العميل";
 
   try {

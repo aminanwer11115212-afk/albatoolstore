@@ -4,6 +4,7 @@ import { Pencil, Trash2, Search, Lock } from "lucide-react";
 import {
   actionableMovements,
   movementCapabilities,
+  consumptionOrigin,
   BLOCK_MESSAGE,
   type LedgerTx,
 } from "@/utils/ledgerEntryActions";
@@ -22,6 +23,45 @@ import {
  */
 
 const fmt = (n: number) => Math.abs(Number(n || 0)).toLocaleString();
+
+/**
+ * سبب القفل بصيغة **تدلّ على الخطوة التالية** لا تصف المنع وحده.
+ *
+ * «يُعكَس بحذف شحنته» بلا تحديد أيّ شحنة طريقٌ مسدود: المستخدم يقرأ الجملة
+ * ولا يعرف أين يذهب. هنا نسمّي الشحنة بمبلغها وتاريخها، والفاتورة برقمها —
+ * وإن لم تُوجد الشحنة أصلاً نقول ذلك صراحةً لأنه خلل يستحق المراجعة.
+ */
+function lockReason(
+  tx: LedgerTx,
+  reason: string,
+  all: LedgerTx[],
+  invoiceNumbers: Map<string, string>,
+): string {
+  if (reason !== "credit_consumption") return BLOCK_MESSAGE[reason as keyof typeof BLOCK_MESSAGE];
+
+  const { charge, invoiceId, orphan } = consumptionOrigin(tx, all);
+  const invNo = invoiceId ? invoiceNumbers.get(invoiceId) : null;
+  const onInvoice = invNo ? `طُبِّق على الفاتورة ${invNo}. ` : "";
+
+  if (orphan) {
+    return (
+      onInvoice +
+      "هذا القيد نصف عملية: شحنة الرصيد التي خُصم منها غير موجودة في القائمة — " +
+      "إمّا حُذفت وبقي هو، وإمّا أنشأه توزيع تلقائي قديم. " +
+      (invNo
+        ? `لعكسه: افتح الفاتورة ${invNo} وألغِ سدادها من الرصيد.`
+        : "راجع تدقيق الرصيد لتحديد أصله.")
+    );
+  }
+
+  const when = charge?.date ? ` بتاريخ ${charge.date}` : "";
+  const howMuch = charge?.amount ? ` بمبلغ ${fmt(Number(charge.amount))}` : "";
+  return (
+    onInvoice +
+    `لا يُحذف وحده حتى لا يبقى نصف عملية. لعكسه: احذف شحنة الرصيد${howMuch}${when} ` +
+    "من هذه القائمة — يُعاد عندها المدفوع على الفاتورة وحالتها معاً."
+  );
+}
 
 export interface Props {
   open: boolean;
@@ -160,7 +200,9 @@ export default function FinancialMovementsDialog({
                       {locked && caps.deleteBlockedBy && (
                         <div className="text-[11px] text-amber-700 dark:text-amber-500 mt-1 flex items-start gap-1">
                           <Lock size={11} className="mt-0.5 shrink-0" />
-                          <span>{BLOCK_MESSAGE[caps.deleteBlockedBy]}</span>
+                          <span>
+                            {lockReason(tx, caps.deleteBlockedBy, transactions, invoiceNumberById)}
+                          </span>
                         </div>
                       )}
                     </div>

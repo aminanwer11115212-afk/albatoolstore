@@ -176,8 +176,17 @@ export function buildDocHTML(args: {
   }
   var __parts = [__cleanName(__docLabel) || 'مستند', __cleanName(__customer) || 'بدون اسم'];
   if (__cleanName(__docNumber)) __parts.push(__cleanName(__docNumber));
+  // تنسيق المبلغ مطابق حرفياً لـ formatAmountPart في الواجهة: الصحيح بلا كسور،
+  // وغيره بخانتين. كان هنا toLocaleString الافتراضي (ثلاث خانات)، فيخرج الملف
+  // من صفحة المشاركة باسم يختلف عن اسمه من التطبيق للمبلغ نفسه.
   var __amt = Number(__docTotal);
-  if (isFinite(__amt) && __amt > 0) __parts.push(__amt.toLocaleString('en-US'));
+  if (isFinite(__amt) && __amt > 0) {
+    __parts.push(
+      Math.round(__amt * 100) / 100 === Math.round(__amt)
+        ? Math.round(__amt).toLocaleString('en-US')
+        : __amt.toLocaleString('en-US', { maximumFractionDigits: 2 })
+    );
+  }
   var fileName = __parts.join(' - ').slice(0, 120) + '.pdf';
   // اسم الملف يتوفر أيضاً في DOM لاختبارات e2e (data-attr على زر التحميل).
   var __btnEl = document.getElementById('__btn_pdf');

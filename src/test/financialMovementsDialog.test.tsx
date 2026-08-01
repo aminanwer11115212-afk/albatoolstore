@@ -76,7 +76,9 @@ describe("الأزرار تطابق قدرات الحركة حرفياً", () =>
     renderDialog();
     const row = rowOf("use");
     expect(row.getAttribute("data-locked")).toBe("true");
-    expect(row.textContent).toContain("يُعكَس بحذف شحنته");
+    // السبب صار محدَّداً بالفاتورة والخطوة التالية بدل جملة عامة
+    expect(row.textContent).toContain("طُبِّق على الفاتورة INV-900");
+    expect(row.textContent).toContain("نصف عملية");
   });
 });
 
@@ -155,5 +157,44 @@ describe("حالات الحافة", () => {
   it("الحركات غير المتعلّقة بحساب العميل لا تُعرض إطلاقاً", () => {
     renderDialog({ transactions: [...ALL, tx({ id: "misc", category: "expense", amount: 40 })] });
     expect(rowOf("misc")).toBeNull();
+  });
+});
+
+describe("سبب القفل يدلّ على الخطوة التالية لا يصف المنع وحده", () => {
+  it("الاستهلاك الذي تُعرف شحنته: يسمّيها بمبلغها وتاريخها", () => {
+    // CONSUME بلا مجموعة، فنربطه بشحنة صراحةً عبر charge_tx_id
+    const linked = tx({
+      id: "use2", category: "customer_credit", amount: -200, reference_id: "inv-1",
+      date: "2026-02-01", allocation: { charge_tx_id: "chg" },
+    });
+    renderDialog({ transactions: [CHARGE, linked] });
+    const row = rowOf("use2");
+    expect(row.textContent).toContain("طُبِّق على الفاتورة INV-900");
+    expect(row.textContent).toContain("احذف شحنة الرصيد بمبلغ 500");
+    expect(row.textContent).toContain("بتاريخ 2026-01-15");
+    expect(row.textContent).toContain("يُعاد عندها المدفوع على الفاتورة وحالتها معاً");
+  });
+
+  it("الاستهلاك اليتيم: يقول صراحةً إن شحنته غير موجودة ويدلّ على الفاتورة", () => {
+    const orphan = tx({
+      id: "orph", category: "customer_credit", amount: -400, reference_id: "inv-1", date: "2026-07-29",
+    });
+    renderDialog({ transactions: [orphan] });
+    const row = rowOf("orph");
+    expect(row.textContent).toContain("نصف عملية");
+    expect(row.textContent).toContain("غير موجودة في القائمة");
+    expect(row.textContent).toContain("افتح الفاتورة INV-900 وألغِ سدادها من الرصيد");
+  });
+
+  it("يتيم بلا فاتورة: يوجّه لتدقيق الرصيد بدل رسالة عامة", () => {
+    const orphan = tx({ id: "o2", category: "customer_credit", amount: -50, reference_id: null });
+    renderDialog({ transactions: [orphan] });
+    expect(rowOf("o2").textContent).toContain("راجع تدقيق الرصيد");
+  });
+
+  it("أسباب القفل الأخرى تبقى بنصّها المعتاد", () => {
+    renderDialog();
+    // الدفعة المستقلة مقفلة عن التعديل فقط، فلا سطر قفل لها
+    expect(rowOf("solo").getAttribute("data-locked")).toBe("false");
   });
 });

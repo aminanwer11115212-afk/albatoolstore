@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const LOGO_URL =
-  "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/albatool-logo.png";
+  "https://exmasfdcjgwapmobefne.supabase.co/storage/v1/object/public/company-assets/albatool-logo.png";
 
 const DEFAULT_APP_ORIGIN = "https://albatoolstore.lovable.app";
 

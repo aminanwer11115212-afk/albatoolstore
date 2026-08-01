@@ -815,6 +815,12 @@ export default function QuoteCreatePage() {
     });
   }
 
+  /**
+   * المعاينة العامة في النظام: تحفظ ثم تنتقل لشاشة `/preview/quote/:id`.
+   * زر «معاينة» و F9 ينادِيانها معاً — مسار واحد لا مساران يختلف ناتجهما.
+   */
+  const openPreview = () => saveThen((id) => navigate(`/preview/quote/${id}`));
+
   /** يمنع نقرتين متتاليتين تولّدان ملفين */
   const [sharingPdf, setSharingPdf] = useState(false);
 
@@ -1154,7 +1160,7 @@ export default function QuoteCreatePage() {
 
   // F9 = معاينة الطباعة، F10 = طباعة مباشرة (بدون تغيير حالة عرض السعر)
   useDocPrintShortcuts({
-    onPreview: () => saveThen((id) => navigate(isSideMode ? `/preview/quote/${id}` : `/preview/quote/${id}`)),
+    onPreview: openPreview,
     onPrint: () => saveThen((id) => navigate(`/preview/quote/${id}?autoprint=1`)),
   });
 
@@ -2155,9 +2161,9 @@ export default function QuoteCreatePage() {
                   node: (
                     <button
                       type="button"
-                      onClick={async () => openPrintWindow(await buildCurrentPrintHTML("full", false))}
+                      onClick={() => openPreview()}
                       style={btnStyle("#6366f1")}
-                      title="معاينة عرض السعر كما سيصل العميل — تعمل قبل الحفظ أيضاً"
+                      title="معاينة عرض السعر (F9) — تحفظ ثم تفتح شاشة المعاينة"
                     >
                       <Eye size={14} /> معاينة
                     </button>

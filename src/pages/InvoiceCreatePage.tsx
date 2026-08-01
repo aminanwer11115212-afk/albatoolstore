@@ -1075,7 +1075,16 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
       // - كاش: مدفوع بالكامل
       // - غير ذلك: حافظ على paid_amount السابق (إن وُجد)، ثم احسب الحالة:
       //   paid >= total => paid، paid > 0 => partially_paid، وإلا pending
-      const prevPaid = effectiveEditId ? Math.max(0, Number(savedPaid) || 0) : 0;
+      // **المدفوع يُقرأ من القاعدة لا من حالة الواجهة.** كان يُؤخذ من `savedPaid`،
+      // وهي حالة React قد تكون قديمة (فتحُ الشاشة بلا تحميلها، أو حفظٌ بعد دفعة
+      // سُجِّلت في تبويب آخر) — فيُكتب `paid_amount = 0` فوق دفعة موجودة ويظهر
+      // المدفوع صفراً. القراءة الطازجة تُلغي هذا الاحتمال من أصله.
+      let prevPaid = 0;
+      if (effectiveEditId) {
+        const { data: freshRow } = await supabase
+          .from("invoices").select("paid_amount").eq("id", effectiveEditId).maybeSingle();
+        prevPaid = Math.max(0, Number((freshRow as any)?.paid_amount ?? savedPaid) || 0);
+      }
       const computedPaid = isCash ? totals.total : prevPaid;
       const computedDue = Math.max(0, Number(totals.total || 0) - computedPaid);
       // هامش تسامح 0.01 لمنع أخطاء التقريب في تحديد الحالة
@@ -1451,6 +1460,23 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
     openPrintWindow(buildCurrentPrintHTML(variant, noHeader));
   }
 
+  /**
+   * المعاينة العامة في النظام: تحفظ ثم تنتقل لشاشة `/preview/invoice/:id`.
+   * زر «معاينة» و F9 ينادِيانها معاً — مسار واحد لا مساران يختلف ناتجهما.
+   */
+  const openPreview = async () => {
+    await saveThen(async (id) => {
+      try {
+        await supabase.rpc("advance_invoice_workflow" as any, {
+          _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
+        });
+        invalidateWorkflowAutoCache(id);
+        try { window.dispatchEvent(new Event("invoices:changed")); } catch { /* noop */ }
+      } catch { /* noop */ }
+      navigate(`/preview/invoice/${id}`);
+    });
+  };
+
   /** يمنع نقرتين متتاليتين تولّدان ملفين */
   const [sharingPdf, setSharingPdf] = useState(false);
 
@@ -1617,18 +1643,7 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
 
   // ---------- F9 = معاينة الطباعة، F10 = طباعة مباشرة (تُرقّي الحالة إلى "قيد التجهيز") ----------
   useDocPrintShortcuts({
-    onPreview: async () => {
-      await saveThen(async (id) => {
-        try {
-          await supabase.rpc("advance_invoice_workflow" as any, {
-            _invoice_id: id, _target: "preparing", _reason: "طباعة الفاتورة",
-          });
-          invalidateWorkflowAutoCache(id);
-          try { window.dispatchEvent(new Event("invoices:changed")); } catch {}
-        } catch {}
-        navigate(`/preview/invoice/${id}`);
-      });
-    },
+    onPreview: openPreview,
     onPrint: async () => {
       // طباعة مباشرة دون الرجوع لصفحة المعاينة
       await printInvoiceNow();
@@ -2429,9 +2444,9 @@ export default function InvoiceCreatePage({ pos = false }: { pos?: boolean } = {
                   node: (
                     <button
                       type="button"
-                      onClick={() => openPrintWindow(buildCurrentPrintHTML("full", false))}
+                      onClick={() => openPreview()}
                       style={btnStyle("#6366f1")}
-                      title="معاينة الفاتورة كما ستصل العميل — تعمل قبل الحفظ أيضاً"
+                      title="معاينة الفاتورة (F9) — تحفظ ثم تفتح شاشة المعاينة"
                     >
                       <Eye size={14} /> معاينة
                     </button>

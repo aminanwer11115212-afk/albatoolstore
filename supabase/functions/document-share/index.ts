@@ -387,7 +387,7 @@ function buildPackagingHTML(args: {
   const totalQty = rows.reduce((s, r) => s + (r.quantity || 0), 0);
   const totalCost = rows.reduce((s, r) => s + Number(r.cost || 0), 0);
   const accent = "#0d9488";
-  const LOGO_FALLBACK = "https://vifrecsqxdbwqtcfkdyb.supabase.co/storage/v1/object/public/company-assets/logo.png";
+  const LOGO_FALLBACK = "https://exmasfdcjgwapmobefne.supabase.co/storage/v1/object/public/company-assets/logo.png";
   const logoURL = company?.logo_url || LOGO_FALLBACK;
 
   const hasVal = (v: any) => v !== null && v !== undefined && String(v).trim() !== "" && String(v).trim() !== "-" && Number(v) !== 0;

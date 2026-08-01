@@ -130,8 +130,8 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       let surplus = 0;
 
       if (online) {
-        // RPC: يقيّد الشحن رصيداً دائناً ثم يوزّعه على الفواتير غير المسدَّدة
-        // (الأقدم أولاً)، ويترك ما زاد فائضاً يوزّعه المستخدم يدوياً لاحقاً.
+        // RPC: يخزّن الشحن كرصيد دائن كامل للعميل — لا يُوزَّع على أي فاتورة.
+        // تسوية المتبقي تتم يدوياً من كشف الحساب (apply_customer_credit_to_invoice).
         const { data, error } = await (supabase as any).rpc("record_customer_charge", {
           _customer_id: customerId,
           _amount: amt,
@@ -147,9 +147,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
         allocatedSum = Number(data?.allocated || 0);
         surplus = Number(data?.surplus ?? data?.credited ?? amt);
       } else {
-        // أوفلاين: يُحفظ رصيداً دائناً كاملاً بلا توزيع — التوزيع يحتاج قراءة
-        // الفواتير وقفلها، وكلاهما متعذّر بلا اتصال. يوزّعه المستخدم من كشف
-        // الحساب بعد المزامنة، أو يوزّعه الشحن التالي.
+        // أوفلاين: احفظ الشحن كرصيد دائن كامل (نفس سلوك الأونلاين — بلا توزيع).
         const { queued, error: txErr } = await runOrQueue({
           table: "transactions",
           op: "insert",
@@ -167,7 +165,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
           label: "شحن رصيد عميل (أوفلاين)",
         });
         if (txErr) throw txErr;
-        if (queued) toast.info("تم الحفظ محلياً كرصيد دائن بلا توزيع — وزّعه من كشف الحساب بعد المزامنة");
+        if (queued) toast.info("تم الحفظ محلياً كرصيد دائن — سيُزامَن عند عودة الاتصال");
         surplus = amt;
       }
 
@@ -177,14 +175,10 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       try { localStorage.setItem("lov:last-method:charge", method); } catch {}
 
       const parts: string[] = [`تم شحن ${amt.toLocaleString()}`];
-      if (allocatedSum > 0) {
-        parts.push(`سُدِّد ${allocatedSum.toLocaleString()} على ${allocations.length} فاتورة (الأقدم أولاً)`);
-      }
-      if (surplus > 0.01) {
-        parts.push(`وبقي ${surplus.toLocaleString()} فائضاً — وزّعه يدوياً من كشف الحساب`);
-      } else if (allocatedSum <= 0) {
-        parts.push("أُضيف كاملاً كرصيد دائن — لا فواتير غير مسدَّدة");
-      }
+      // في الخطة الجديدة لا يُوزَّع الشحن على الفواتير — يُخزَّن كاملاً كرصيد دائن.
+      if (allocatedSum > 0) parts.push(`سُدِّد ${allocatedSum.toLocaleString()} على ${allocations.length} فاتورة`);
+      const credited = surplus > 0.01 ? surplus : amt;
+      parts.push(`أُضيف ${credited.toLocaleString()} كرصيد دائن للعميل — سدِّد المتبقي يدوياً من كشف الحساب`);
       toast.success(parts.join(" • "));
 
       if (sendWhatsApp) {
