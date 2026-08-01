@@ -319,12 +319,28 @@ export default function PurchaseCreatePage() {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
     };
+    /**
+     * رسالة «جارٍ تحديث الرصيد…» كانت تعلّق إلى الأبد.
+     *
+     * `invalidateQueries` تُرجع وعداً لا يُحلّ إلا بانتهاء إعادة الجلب النشطة.
+     * فإن تعثّرت الشبكة — أو غادر المستخدم الشاشة قبل أن تنتهي — بقيت الرسالة
+     * معلّقة بلا نهاية، فتوحي بأن الحفظ نفسه لم يتمّ وهو قد تمّ.
+     *
+     * فلها الآن مهلة، وتُغلق عند مغادرة الشاشة. والرصيد يُعاد حسابه في
+     * القاعدة بتريغر `po_recompute_supplier_balance` لا بهذه الرسالة — فتأخّر
+     * الواجهة لا يعني تأخّر الحساب.
+     */
     const onSuppliersChanged = async () => {
       const tid = toast.loading("جارٍ تحديث الرصيد…", { id: "balance-refresh" });
       try {
-        await queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+        await Promise.race([
+          queryClient.invalidateQueries({ queryKey: ["suppliers"] }),
+          new Promise((resolve) => setTimeout(resolve, 5000)),
+        ]);
         toast.success("تم تحديث الرصيد", { id: tid, duration: 1200 });
-      } catch { toast.dismiss(tid); }
+      } catch {
+        toast.dismiss(tid);
+      }
     };
     window.addEventListener("products:changed", handleSync);
     window.addEventListener("suppliers:changed", onSuppliersChanged);
@@ -333,6 +349,8 @@ export default function PurchaseCreatePage() {
       window.removeEventListener("products:changed", handleSync);
       window.removeEventListener("suppliers:changed", onSuppliersChanged);
       window.removeEventListener("focus", handleSync);
+      // لا تُترك رسالة معلّقة على شاشة غادرها المستخدم
+      toast.dismiss("balance-refresh");
     };
   }, [queryClient]);
 
@@ -551,8 +569,8 @@ export default function PurchaseCreatePage() {
     selectSupplier(data);
     setAddSupplierOpen(false);
     setNewSupplier(emptySupplierForm);
-    // إبطال كاش الموردين + إخطار الشاشات الأخرى
-    queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+    // الحدث وحده يُبطل الكاش. النداء المباشر هنا كان يبدأ إعادة جلبٍ ثم
+    // ينتظرها مستمعُ الحدث نفسه — تسابقٌ يُطيل تعليق الرسالة بلا فائدة.
     try { window.dispatchEvent(new Event("suppliers:changed")); } catch {}
     toast.success("تم إضافة المورد");
   }
