@@ -273,17 +273,19 @@ describe("لا تطبيق تلقائي لرصيد العميل في أي مسا�
     ];
     // نقسم كل ملف إلى أجسام دوال ونفحص كل جسم وحده — الفحص على مستوى الملف
     // يوقع دوالَّ بريئة تصادف وجودها في نفس الهجرة.
-    const owners: string[] = [];
-    for (const { sql } of allMigrations) {
+    // التعريف الأخير زمنياً وحده هو الحيّ — الهجرات مرتّبة بالطابع الزمني
+    const latestDef = new Map<string, string>();
+    for (const { sql } of [...allMigrations].sort((a, b) => a.name.localeCompare(b.name))) {
       const parts = sql.split(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\./i).slice(1);
       for (const part of parts) {
         const name = part.match(/^(\w+)/)?.[1];
         if (!name) continue;
-        const body = part.slice(0, part.search(/\n\$\$;/) + 1 || undefined);
-        if (/'credit_balance'/.test(body) && /UPDATE\s+public\.invoices/i.test(body)) {
-          owners.push(name);
-        }
+        latestDef.set(name, part.slice(0, part.search(/\n\$\$;/) + 1 || undefined));
       }
+    }
+    const owners: string[] = [];
+    for (const [name, body] of latestDef) {
+      if (/'credit_balance'/.test(body) && /UPDATE\s+public\.invoices/i.test(body)) owners.push(name);
     }
     expect(owners.length).toBeGreaterThan(0); // الفحص فعّال لا فارغ
     for (const fn of new Set(owners)) {
