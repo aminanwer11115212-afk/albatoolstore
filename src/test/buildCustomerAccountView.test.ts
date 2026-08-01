@@ -269,7 +269,7 @@ describe("الجدول المسطّح — الشكل الذي طلبه العم�
     expect(rows).toEqual([
       ["فاتورة A", 200, 0, "\u2212200"],
       ["فاتورة B", 200, 0, "\u2212200"],
-      ["تم شحن +500", null, 500, "+500"],
+      ["تم شحن +500 — نقدًا — رقم العملية OP-7", null, 500, "+500"],
     ]);
     // ‎−200 ‎−200 ‎+500 = ‎+100 وهو صافي الحساب: له 100
     expect(v.rows.reduce((s, r) => s + r.remaining, 0)).toBe(100);
@@ -308,7 +308,7 @@ describe("الجدول المسطّح — الشكل الذي طلبه العم�
       transactions: [{ id: "ch", category: "customer_credit", amount: 500, date: "2026-07-25", created_at: "2026-07-25T12:00:00", description: "شحن رصيد" }],
       netBalance: -500,
     });
-    expect(v.rows[0].label).toBe("تم شحن +500");
+    expect(v.rows[0].label).toBe("تم شحن +500 — نقدًا");
     expect(v.rows[0].remaining).toBe(500);
   });
 
@@ -318,7 +318,7 @@ describe("الجدول المسطّح — الشكل الذي طلبه العم�
       transactions: [{ id: "ch", category: "customer_credit", amount: 400, date: "2026-01-02", created_at: "2026-01-02T09:00:00", description: "شحن رصيد" }],
       netBalance: 600,
     });
-    expect(v.rows[1].label).toBe("تم شحن +400");
+    expect(v.rows[1].label).toBe("تم شحن +400 — نقدًا");
     // مبلغ الشحن نفسه — لا الرصيد الجاري بعده. العمود يُجمع رأسياً:
     // −1000 (الفاتورة) + 400 (الشحن) = −600 وهو صافي الحساب.
     expect(signedAmountText(v.rows[1].remaining).text).toBe("+400");
