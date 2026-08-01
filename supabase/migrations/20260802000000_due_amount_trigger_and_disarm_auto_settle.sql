@@ -69,6 +69,23 @@ BEGIN
   END LOOP;
 END $$;
 
-UPDATE public.company_settings
-   SET auto_settle_credit_enabled = false
- WHERE COALESCE(auto_settle_credit_enabled, false) IS DISTINCT FROM false;
+-- إطفاء المفتاح مشروطٌ بوجود عموده: مشاريع أخرى بنفس المخطّط لا تحمله، وغيابه
+-- كان سيُسقط الهجرة كلها بعد أن نجحت أجزاؤها الأولى — فتبقى القاعدة في نصف
+-- حال. الشرط يجعلها تنجح كاملةً أو لا تبدأ.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'company_settings'
+       AND column_name = 'auto_settle_credit_enabled'
+  ) THEN
+    EXECUTE $q$
+      UPDATE public.company_settings
+         SET auto_settle_credit_enabled = false
+       WHERE COALESCE(auto_settle_credit_enabled, false) IS DISTINCT FROM false
+    $q$;
+  ELSE
+    RAISE NOTICE 'company_settings.auto_settle_credit_enabled غير موجود — تُخطّى';
+  END IF;
+END $$;
