@@ -7,6 +7,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { startsWithAny } from "@/utils/searchMatch";
+import { effectiveRowRate } from "@/utils/invoiceCreateHelpers";
 import { toast } from "sonner";
 import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck, Eye, FileDown } from "lucide-react";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";
@@ -642,9 +643,14 @@ export default function QuoteCreatePage() {
       prev.map((r) => {
         if (r.uid !== rowUid) return r;
         const fp = Number(p.foreign_price) || Number(p.sale_price) || 0;
-        const up = fp * r.exchange_rate;
+        // كان بلا حارس البتّة: صفٌّ بمعدّل 1 يُنزل السعر الأجنبي مكان المحلي.
+        const rate = effectiveRowRate(r.exchange_rate, defaultRate);
+        const up = Math.round(fp * rate * 100) / 100;
         const updated: QuoteItem = {
           ...r,
+          // يُحفظ المعدّل المصحَّح على الصفّ أيضاً: لولاه لبقي 1 في الصفّ،
+          // فأيّ إعادة حساب لاحقة (تغيير كمية أو معدّل) تُرجع السعر الخطأ.
+          exchange_rate: rate,
           product_id: p.id,
           product_name: p.name,
           productSearch: p.name,

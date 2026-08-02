@@ -84,6 +84,32 @@ export function deriveRateFromRows(rows: Array<{ foreign_price?: any; exchange_r
  * قيم السعر عند اختيار منتج لصف — مسار واحد للفاتورة الجديدة والقديمة.
  * يُفضَّل السعر الأجنبي من بطاقة المنتج، ويُستخدم سعر البيع كبديل.
  */
+/**
+ * سعر الصرف الفعلي لصفٍّ عند اختيار منتج له.
+ *
+ * ## العطل الذي عالجَته
+ * الصفّ الفارغ يُنشأ بـ`exchange_rate: 1` قيمةً أوّلية لا اختياراً. والحارس
+ * القديم كان `rate > 0 ? rowRate : defaultRate` — والواحد أكبر من صفر، فيمرّ.
+ *
+ * فمن يستدعي فاتورة قديمة ويضيف صنفاً يحصل على:
+ *
+ *     unit_price = 763.63 × 1 = 763.63     بدل   763.63 × 67.8 = 51,800
+ *
+ * أي أن **السعر الأجنبي ينزل مكان المحلي** — ولا يبدو خطأً صارخاً، بل رقماً
+ * بكسورٍ صغير، فيمرّ على من لا يحفظ السعر.
+ *
+ * ## القاعدة
+ * معدّل الصفّ يُحترم إلا أن يكون `1` بينما للمستند معدّلٌ حقيقي غيره — فالواحد
+ * حينها بقيّةُ التهيئة لا قراراً. ومستندٌ معدّله 1 فعلاً يبقى على 1 لأن
+ * `defaultRate` يساويه.
+ */
+export function effectiveRowRate(rowRate: unknown, defaultRate: unknown): number {
+  const r = Number(rowRate) || 0;
+  const d = Number(defaultRate) || 0;
+  if (d > 0 && (r <= 0 || r === 1)) return d;
+  return r > 0 ? r : 1;
+}
+
 export function priceFromProduct(
   p: { foreign_price?: number | null; sale_price?: number | null },
   exchangeRate: number,
