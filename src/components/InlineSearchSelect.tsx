@@ -91,7 +91,20 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     };
   }, [open]);
 
-  // (تم حذف capture-listener القديم — القائمة الآن داخل شجرة DOM لا تتسرّب لـ Radix)
+  // إعادة حساب موضع القائمة عند التمرير أو تغيير حجم النافذة (القائمة portaled
+  // إلى body لذا موضعها fixed محسوب من إحداثيات الزر).
+  useEffect(() => {
+    if (!open) return;
+    const onMove = () => setPosTick((t) => t + 1);
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [open]);
+
+
 
   const openMenu = () => {
     if (disabled) return;
