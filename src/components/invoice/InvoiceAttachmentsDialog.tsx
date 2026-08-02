@@ -7,6 +7,7 @@ import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import { useDialogSize } from "@/hooks/useDialogSize";
 import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
+import ShareFileButton from "@/components/shared/ShareFileButton";
 import { useCropQueue } from "@/hooks/useCropQueue";
 import { useRecropImage } from "@/hooks/useRecropImage";
 
@@ -425,6 +426,13 @@ export default function InvoiceAttachmentsDialog({ invoiceId, open, onClose, onW
                             <Scissors size={15} />
                           </button>
                         )}
+                        <ShareFileButton
+                          url={att.file_url}
+                          fileName={att.file_name}
+                          mimeType={att.file_type}
+                          text={att.file_name}
+                          title="مشاركة مستند"
+                        />
                         <a
                           href={att.file_url}
                           target="_blank"
