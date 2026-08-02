@@ -114,7 +114,14 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
     if (!amt || amt <= 0) return toast.error("أدخل مبلغاً صحيحاً");
     if (method === "bank_transfer") {
       const selectedAcc = bankAccounts.find((a) => a.id === bankAccountId);
-      const err = validateBankTransferPayment({ method: "bank_transfer", account: selectedAcc, referenceNo });
+      // رقم العملية اختياري في الشحن: المبلغ والحساب هما ما يحرّك الرصيد،
+      // والرقم إثباتٌ يُضاف لاحقاً من التعديل. منعُ الحفظ لغيابه يوقف عملاً
+      // قائماً لأجل حقلٍ مرجعيّ — والحساب البنكي يبقى مطلوباً لأنه يحدّد
+      // إلى أين دخل المال.
+      const err = validateBankTransferPayment({
+        method: "bank_transfer", account: selectedAcc, referenceNo,
+        requireReferenceNo: false,
+      });
       if (err) return toast.error(err);
     }
 
@@ -357,7 +364,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
                 </Select>
               </div>
               <div>
-                <Label>رقم العملية *</Label>
+                <Label>رقم العملية</Label>
                 <Input value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} placeholder="رقم العملية" />
               </div>
             </>

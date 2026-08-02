@@ -78,6 +78,7 @@ import {
   resolveDefaultRate,
   deriveRateFromRows,
   priceFromProduct,
+  effectiveRowRate,
   backfillForeignPrice,
   applyRateToRow,
 } from "@/utils/invoiceCreateHelpers";
@@ -589,9 +590,8 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
     }
     setRows((prev) => prev.map((r) => {
       if (r.uid !== rowUid) return r;
-      // صف الجدول قد يكون قديماً بمعدّل 1 — استخدم معدّل الفاتورة الافتراضي
-      // حتى يتطابق التسعير مع مسار الفاتورة الجديدة.
-      const rate = (Number(r.exchange_rate) || 0) > 0 ? r.exchange_rate : defaultRate;
+      // معدّل الصفّ يُحترم إلا أن يكون بقيّةَ تهيئة — راجع `effectiveRowRate`.
+      const rate = effectiveRowRate(r.exchange_rate, defaultRate);
       const { foreign_price: fp, unit_price: up } = priceFromProduct(p, rate);
       const updated: InvRow = {
         ...r,
@@ -618,7 +618,8 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       return;
     }
     setQuickRow((r) => {
-      const rate = (Number(r.exchange_rate) || 0) > 0 ? r.exchange_rate : defaultRate;
+      // نفس قاعدة صفّ الجدول — راجع `effectiveRowRate`.
+      const rate = effectiveRowRate(r.exchange_rate, defaultRate);
       const { foreign_price: fp, unit_price: up } = priceFromProduct(p, rate);
       const updated: InvRow = {
         ...r,

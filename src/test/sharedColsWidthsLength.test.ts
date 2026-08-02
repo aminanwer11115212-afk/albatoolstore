@@ -73,8 +73,8 @@ describe("useColumnWidths — طول المصفوفة دائماً 8 وnull آم
     });
 
     it("5) مخزَّن يحوي قيماً غير صالحة → تُحوَّل إلى null والطول 8", () => {
-      // قيم غير صالحة لكل فهرس بحسب floor الخاص به.
-      const bad: any[] = ["abc", NaN, -5, null, 10 /* <60 */, 0, 20 /* <36 */, 30 /* <40 */];
+      // قيم غير صالحة لكل فهرس بحسب floor الخاص به (الأرضية الآن 24px).
+      const bad: any[] = ["abc", NaN, -5, null, 10 /* <24 */, 0, 20 /* <24 */, 23 /* <24 */];
       localStorage.setItem(SHARED_COLS_WIDTHS_KEY, JSON.stringify(bad));
       const { result } = renderHook(() =>
         useColumnWidths(SHARED_COLS_WIDTHS_KEY, DEFAULTS)

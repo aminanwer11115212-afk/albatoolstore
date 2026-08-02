@@ -61,11 +61,14 @@ describe("useColumnWidths — drag/resize after city/locality columns added", ()
     expect(w[7]).not.toBe(w[6]);
   });
 
+  // الأرضية 24px لا 60: عمودٌ عريض كان لا يُضيَّق ولو لم يُستعمل. و24 تكفي
+  // ليبقى مقبض السحب ملموساً فلا يضيع العمود بلا رجعة.
   it("respects min width floor when shrinking", () => {
     const { result } = renderHook(() => useColumnWidths(KEY, DEFAULTS));
     fireDrag(6, -9999, result.current.startDrag);
     const w = result.current.widths;
-    expect((w[6] as number) >= 60).toBe(true);
+    expect((w[6] as number) >= 24).toBe(true);
+    expect((w[6] as number) < 60).toBe(true);   // التضييق صار ممكناً فعلاً
   });
 
   it("reset() clears widths and userResized flag", () => {

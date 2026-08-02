@@ -235,10 +235,24 @@ export interface BuildAccountViewInput {
   accountNameById?: Map<string, string>;
   /** `net_balance` المخزَّن — للتحقّق من عدم الانحراف */
   netBalance?: number | null;
+  /**
+   * رصيد الحساب **قبل بداية الفترة**، بإشارة الدفاتر (موجب = عليه).
+   *
+   * كشفُ شهرٍ بعينه يُبنى من حركات ذلك الشهر وحده، فيبدأ من صفرٍ كأن العميل
+   * وُلد أوّل الشهر — ولا يقفل: مجموع العمود يعطي حركةَ الفترة لا رصيدَ
+   * العميل. فيُمرَّر الرصيد السابق ويظهر سطراً أوّلَ يحمله، فيقفل الحساب
+   * ويقرأ العميل من أين بدأ.
+   *
+   * يُترك فارغاً في الكشف الكامل — لا شيء قبله.
+   */
+  openingBalance?: number | null;
+  /** بداية الفترة — تُعرض على سطر الرصيد السابق */
+  periodFrom?: string | null;
 }
 
 export function buildCustomerAccountView(input: BuildAccountViewInput): CustomerAccountView {
-  const { invoices = [], transactions = [], accountNameById, netBalance } = input;
+  const { invoices = [], transactions = [], accountNameById, netBalance,
+          openingBalance = null, periodFrom = null } = input;
 
   const liveInvoices = invoices.filter((i) => i.status !== "cancelled");
   const invoiceIds = new Set(liveInvoices.map((i) => String(i.id)));
@@ -513,13 +527,39 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
     })),
   ];
 
-  let netRunning = 0;
+  /**
+   * سطر «رصيد سابق» — أوّل الكشف حين تُطلب فترة بعينها.
+   *
+   * `openingBalance` بإشارة الدفاتر (موجب = عليه)، وعمود «المتبقي» بإشارة
+   * العرض (موجب = لصالحه)، فيُعكس عند الوضع. ويُحسب في `remaining` وحده:
+   * `value` و`paid` فارغان لأنه ليس فاتورةً ولا دفعة، بل نقطةُ بداية —
+   * ولو دخل عمودَي القيمة والمدفوع لكسر الطرح الذي يقفل الحساب.
+   */
+  const opening = openingBalance != null && Math.abs(r2(openingBalance)) > 0.009
+    ? r2(-Number(openingBalance))
+    : 0;
+
+  let netRunning = opening;
   const rows = seeds
     .sort((a, b) => a.at.localeCompare(b.at))
     .map((s) => {
       netRunning = r2(netRunning + s.delta);
       return s.make(netRunning);
     });
+
+  if (opening !== 0) {
+    rows.unshift({
+      id: "opening",
+      kind: "invoice",
+      at: periodFrom || "",
+      date: periodFrom || "",
+      time: "",
+      label: periodFrom ? `رصيد سابق حتى ${periodFrom}` : "رصيد سابق",
+      value: null,
+      paid: null,
+      remaining: opening,
+    });
+  }
 
   // مجاميع أعمدة الجدول المسطّح — يجب أن يقفل الطرح:
   // Σ القيمة − Σ المدفوع = صافي الحساب. حارس في الاختبارات يمنع أي انحراف.

@@ -7,6 +7,7 @@ import { useCustomers, useCompanySettings } from "@/hooks/useData";
 import { Search, X, Printer, Loader2, ArrowRight, Pencil, Eye, EyeOff } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { startsWithAny } from "@/utils/searchMatch";
+import { customerNetBefore } from "@/utils/customerNetBefore";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
 import { buildCustomerAccountView, signedBalanceText, signedAmountText, accountRowBand } from "@/utils/buildCustomerAccountView";
@@ -461,11 +462,28 @@ export default function CustomerStatementPage() {
       if (toDate && (d || "") > toDate) return false;
       return true;
     };
+    /**
+     * كشف الفترة يحتاج **رصيداً افتتاحياً** وإلا لم يقفل: التصفية تُسقط ما قبل
+     * `fromDate`، فيبدأ الكشف من صفرٍ كأن العميل وُلد ذلك اليوم — ومجموع
+     * العمود يعطي حركةَ الفترة لا رصيدَ العميل.
+     *
+     * `customerNetBefore` تُعيد تشغيل الأحداث حتى بداية الفترة، فيظهر السطر
+     * الأوّل حاملاً ما كان عليه، ويقفل الحساب على رصيده الحقيقي.
+     */
+    const opening = fromDate
+      ? customerNetBefore(`${fromDate}T00:00:00.000Z`, {
+          invoices: invoices || [],
+          transactions: transactions || [],
+        })
+      : null;
+
     return buildCustomerAccountView({
       invoices: (invoices || []).filter((i: any) => inRange(i.date)),
       transactions: (transactions || []).filter((t: any) => inRange(t.date)),
       accountNameById,
       netBalance: selectedCustomer ? netBalanceOf(selectedCustomer) : null,
+      openingBalance: opening,
+      periodFrom: fromDate || null,
     });
   }, [invoices, transactions, accountNameById, fromDate, toDate, selectedCustomer]);
 
