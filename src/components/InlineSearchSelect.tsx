@@ -419,8 +419,10 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
                   {listBody}
                 </div>
               </div>
-            </>
+            </>,
+            document.body,
           );
+
         }
 
         // ─── فرع الديسكتوب: popover عائم بجانب الزر (كما كان) ───
