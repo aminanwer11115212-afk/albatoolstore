@@ -445,7 +445,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
           zIndex: 10000,
           pointerEvents: "auto",
         };
-        return (
+        return createPortal(
           <div
             ref={menuRef}
             className="bg-popover text-popover-foreground border border-border rounded-lg shadow-xl overflow-hidden flex flex-col"
