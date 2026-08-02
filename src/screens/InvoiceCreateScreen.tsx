@@ -618,7 +618,8 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       return;
     }
     setQuickRow((r) => {
-      const rate = (Number(r.exchange_rate) || 0) > 0 ? r.exchange_rate : defaultRate;
+      // نفس قاعدة صفّ الجدول — راجع `effectiveRowRate`.
+      const rate = effectiveRowRate(r.exchange_rate, defaultRate);
       const { foreign_price: fp, unit_price: up } = priceFromProduct(p, rate);
       const updated: InvRow = {
         ...r,

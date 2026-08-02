@@ -675,9 +675,12 @@ export default function QuoteCreatePage() {
     }
     setQuickRow((r) => {
       const fp = Number(p.foreign_price) || Number(p.sale_price) || 0;
-      const up = fp * r.exchange_rate;
+      // نفس قاعدة صفّ الجدول — كان هذا المسار بلا حارس أيضاً.
+      const rate = effectiveRowRate(r.exchange_rate, defaultRate);
+      const up = Math.round(fp * rate * 100) / 100;
       const updated: QuoteItem = {
         ...r,
+        exchange_rate: rate,
         product_id: p.id,
         product_name: p.name,
         productSearch: p.name,
