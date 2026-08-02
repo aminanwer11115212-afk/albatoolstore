@@ -472,7 +472,8 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
             <div className="flex-1 overflow-y-auto overscroll-contain">
               {listBody}
             </div>
-          </div>
+          </div>,
+          document.body,
         );
       })()}
     </div>
