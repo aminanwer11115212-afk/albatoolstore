@@ -45,6 +45,9 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
   const [adding, setAdding] = useState(false);
+  // يُستخدم لإعادة حساب موضع القائمة عند التمرير/تغيير حجم النافذة
+  const [posTick, setPosTick] = useState(0);
+
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
