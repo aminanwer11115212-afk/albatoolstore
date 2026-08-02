@@ -160,7 +160,7 @@ function buildLogDetails(r: any): { title?: string; desc?: string; path?: string
       return {
         title: `${aLbl} أمر شراء ${num}`.trim(),
         desc: `الإجمالي ${fmtMoney(total)} • الحالة ${data.status || "—"}`,
-        path: "/purchases",
+        path: "/purchase",
       };
     }
     case "stock_returns": {
@@ -168,7 +168,7 @@ function buildLogDetails(r: any): { title?: string; desc?: string; path?: string
       return {
         title: `${aLbl} مرتجع`,
         desc: `الإجمالي ${fmtMoney(total)} • ${fmtDate(data.date)}`,
-        path: "/stock-returns",
+        path: "/stock-return",
       };
     }
     case "invoice_items":
@@ -395,7 +395,7 @@ export default function NotificationsPage() {
           time: r.updated_at ? timeAgo(r.updated_at) : "",
           ts: new Date(r.due_date).getTime(),
           read: readIds.has(id),
-          path: "/todos",
+          path: "/tools/todo",
           severity: overdue ? "out" : "low",
         });
       });

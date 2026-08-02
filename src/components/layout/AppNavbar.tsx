@@ -243,7 +243,7 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
           time: "",
           ts: new Date(r.due_date).getTime(),
           read: readIds.has(id),
-          path: "/todos",
+          path: "/tools/todo",
           severity: overdue ? "out" : "low",
         });
       });
