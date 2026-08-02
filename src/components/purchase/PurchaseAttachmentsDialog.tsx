@@ -381,7 +381,9 @@ export default function PurchaseAttachmentsDialog({ purchaseOrderId, open, onClo
                             <Scissors size={15} />
                           </button>
                         )}
+                        <ShareFileButton url={att.file_url} fileName={att.file_name} mimeType={att.file_type} text={att.file_name} title="مشاركة مستند" />
                         <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded hover:bg-muted text-primary" title="فتح/تنزيل">
+
                           <Download size={15} />
                         </a>
                         <button onClick={() => softDelete(att)} className="p-1.5 rounded hover:bg-destructive/10 text-destructive" title="نقل للسلة">
