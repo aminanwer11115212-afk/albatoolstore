@@ -1,8 +1,12 @@
-// سطر الإيراد يحمل معرّفه كما تحمل الفاتورة رقمها.
+// بيان سطر الإيراد مختصر — والتفاصيل محفوظة لقسم «المعاملات».
 //
-// كان «تم شحن +500» بلا معرّف: شحنتان بنفس المبلغ لا يُميَّزان، ولا يستطيع
-// العميل مطابقة السطر بإيصال تحويله. صار يحمل حسابه ورقم عمليته — والأرقام
-// تبقى في أعمدتها لا في النصّ.
+// جُرِّب إلحاق الحساب ورقم العملية بالبيان ليتمايز شحنان بنفس المبلغ، فصار
+// السطر أربعة أسطر على الهاتف: «تم شحن +3,000 — اولاد جابر — بنك الخرطوم —
+// رقم العملية 6080». وعمود البيان ضيّق، فابتلع الطولُ الصفَّ.
+//
+// فالكشف موضعٌ للأرقام: كم دخل وكم بقي، مقروءان من عمودَيهما. أمّا الحساب
+// ورقم العملية فمكانها «المعاملات» حيث لكلٍّ عمودُه — وهي **لا تضيع**: تبقى
+// في `detail` على القيد، وهذه الاختبارات تحرس بقاءها.
 import { describe, it, expect } from "vitest";
 import { buildCustomerAccountView } from "@/utils/buildCustomerAccountView";
 
@@ -15,39 +19,47 @@ const charge = (id: string, amount: number, extra: Record<string, any> = {}) => 
 const build = (transactions: any[], accounts?: Map<string, string>) =>
   buildCustomerAccountView({ invoices: [], transactions, accountNameById: accounts });
 
-describe("سطر الإيراد يحمل معرّفه", () => {
-  it("رقم العملية يظهر في البيان", () => {
+describe("بيان سطر الإيراد مختصر", () => {
+  it("المبلغ وحده — لا حساب ولا رقم عملية يُطيلان العمود", () => {
     const v = build([charge("a", 500, { reference_no: "OP-77", method: "bank" })]);
-    expect(v.rows[0].label).toContain("رقم العملية OP-77");
+    expect(v.rows[0].label).toBe("تم شحن +500");
+    expect(v.rows[0].label).not.toContain("رقم العملية");
   });
 
-  it("اسم الحساب يظهر معه", () => {
+  it("اسم الحساب لا يظهر في البيان ولو كان معرَّفاً", () => {
     const v = build(
       [charge("a", 500, { reference_no: "OP-9", account_id: "acc-1" })],
       new Map([["acc-1", "بنك الخرطوم"]]),
     );
-    expect(v.rows[0].label).toBe("تم شحن +500 — بنك الخرطوم — رقم العملية OP-9");
+    expect(v.rows[0].label).toBe("تم شحن +500");
   });
 
-  it("شحنتان بنفس المبلغ تتمايزان برقم العملية", () => {
+  it("الأرقام في أعمدتها: المدفوع والمتبقي على نفس السطر", () => {
+    const [row] = build([charge("a", 500, { reference_no: "OP-5" })]).rows;
+    expect([row.value, row.paid, row.remaining]).toEqual([null, 500, 500]);
+  });
+});
+
+describe("التفاصيل لا تضيع — تبقى للمعاملات", () => {
+  it("رقم العملية واسم الحساب محفوظان في القيد", () => {
+    const v = build(
+      [charge("a", 500, { reference_no: "OP-9", account_id: "acc-1" })],
+      new Map([["acc-1", "بنك الخرطوم"]]),
+    );
+    const entry = v.creditPool[0];
+    expect(entry.detail).toContain("بنك الخرطوم");
+    expect(entry.detail).toContain("رقم العملية OP-9");
+  });
+
+  it("شحنتان بنفس المبلغ تتمايزان في المعاملات لا في البيان", () => {
     const v = build([
       charge("a", 500, { reference_no: "OP-1" }),
       charge("bb", 500, { reference_no: "OP-2" }),
     ]);
-    const labels = v.rows.map((r) => r.label);
-    expect(new Set(labels).size).toBe(2);
-    expect(labels.some((l) => l.includes("OP-1"))).toBe(true);
-    expect(labels.some((l) => l.includes("OP-2"))).toBe(true);
-  });
-
-  it("بلا رقم عملية يبقى اسم الحساب وحده — لا نصّ فارغ معلّق", () => {
-    const v = build([charge("a", 300, { method: "cash" })]);
-    expect(v.rows[0].label).toBe("تم شحن +300 — نقدًا");
-  });
-
-  it("الأرقام تبقى في أعمدتها: المدفوع والمتبقي على نفس السطر", () => {
-    const v = build([charge("a", 500, { reference_no: "OP-5" })]);
-    const [row] = v.rows;
-    expect([row.value, row.paid, row.remaining]).toEqual([null, 500, 500]);
+    // البيان واحد — والتمييز في تفاصيل القيد
+    expect(new Set(v.rows.map((r) => r.label)).size).toBe(1);
+    const details = v.creditPool.map((e) => e.detail);
+    expect(details.some((d) => d.includes("OP-1"))).toBe(true);
+    expect(details.some((d) => d.includes("OP-2"))).toBe(true);
   });
 });

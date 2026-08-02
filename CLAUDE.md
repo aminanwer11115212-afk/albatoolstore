@@ -24,10 +24,21 @@ git push --force-with-lease -u origin <branch>
 لا تدفع قبل أن تنجح الثلاثة:
 
 ```bash
-npx vitest run      # كل الاختبارات
-npx tsc --noEmit    # لا أخطاء أنواع
-npm run build       # البناء ينجح
+npx vitest run                          # كل الاختبارات
+npx tsc -p tsconfig.app.json --noEmit   # لا أخطاء أنواع
+npm run build                           # البناء ينجح
 ```
+
+### ⚠️ `npx tsc --noEmit` وحده **لا يفحص شيئاً**
+
+`tsconfig.json` ملفُّ حلٍّ لا مشروع: `"files": []` مع `references` فقط. فالأمر
+المجرَّد يُصرِّف صفر ملف ويخرج ناجحاً دائماً — ولو كان في الكود اسمٌ غير معرَّف.
+
+ثبت ذلك بالتجربة: ملفٌ فيه `undefinedIdentifierXyz()` يمرّ من `tsc --noEmit`
+ويسقط من `tsc -p tsconfig.app.json --noEmit` بـ`TS2304`. واستدعاءٌ يتيم لدالّة
+`setNotes` محذوفة عاش في `ChargeBalanceDialog` حتى انفجر عند المستخدم.
+
+استعمل `-p tsconfig.app.json` دائماً، أو `npx tsc -b`.
 
 ## قاعدة البيانات
 
