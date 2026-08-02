@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { runOrQueue } from "@/lib/offlineQueue";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
+import ShareFileButton from "@/components/shared/ShareFileButton";
 import { useCropQueue } from "@/hooks/useCropQueue";
 import { useRecropImage } from "@/hooks/useRecropImage";
 
