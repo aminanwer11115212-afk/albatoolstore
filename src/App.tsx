@@ -105,6 +105,7 @@ const CustomerStatementPage = lazy(() => import("./pages/CustomerStatementPage")
 const CustomerStatementsPage = lazy(() => import("./pages/CustomerStatementsPage"));
 const SignUpPage = lazy(() => import("./pages/SignUpPage"));
 const SupplierStatementPage = lazy(() => import("./pages/SupplierStatementPage"));
+const SupplierStatementsPage = lazy(() => import("./pages/SupplierStatementsPage"));
 const StatementPreviewPage = lazy(() => import("./pages/StatementPreviewPage"));
 const DocumentPreviewPage = lazy(() => import("./pages/DocumentPreviewPage"));
 const PackagingReportPreviewPage = lazy(() => import("./pages/PackagingReportPreviewPage"));
@@ -459,6 +460,7 @@ const App = () => {
             <Route path="/customers/:id/statement" element={lazyEl(<CustomerStatementPage />, "كشف حساب العميل")} />
             <Route path="/customers/statements" element={lazyEl(<CustomerStatementsPage />, "كشوفات حسابات العملاء")} />
             <Route path="/reports/supplier-statement" element={lazyEl(<SupplierStatementPage />, "كشف حساب المورد")} />
+            <Route path="/suppliers/statements" element={lazyEl(<SupplierStatementsPage />, "كشوفات حسابات الموردين")} />
             <Route path="/reports/statement-preview" element={lazyEl(<StatementPreviewPage />, "معاينة كشف الحساب")} />
             <Route path="/reports/bank-transfers" element={lazyEl(<BankTransfersReportPage />, "تقرير التحويلات البنكية")} />
             {/* Transactions - filtered */}

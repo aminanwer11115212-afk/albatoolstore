@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +11,12 @@ export default function SupplierStatementPage() {
   const { data: suppliers } = useSuppliers();
   const { data: companyArr } = useCompanySettings();
   const company = (companyArr as any)?.[0] || null;
-  const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  // يُقبل `?supplier=<id>` حتى تفتح «كشوفات حسابات الموردين» الكشفَ على
+  // مورّده مباشرةً بدل أن تُسقط المستخدم في شاشة فارغة يختار فيها من جديد.
+  const [searchParams] = useSearchParams();
+  const [selectedSupplierId, setSelectedSupplierId] = useState(
+    () => searchParams.get("supplier") || "",
+  );
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["supplier-orders", selectedSupplierId],

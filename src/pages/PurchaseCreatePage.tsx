@@ -580,12 +580,21 @@ export default function PurchaseCreatePage() {
     const valid = rows.filter((r) => r.product_id);
     if (valid.length === 0) { toast.error("أضف منتج واحد على الأقل"); return; }
 
-    // حارس متزامن: يمنع الإدراج المضاعف عند الضغط المتكرر على زر الحفظ
+    // حارس متزامن: يمنع الإدراج المضاعف عند الضغط المتكرر على زر الحفظ.
+    //
+    // **يُرفع داخل `try` لا قبله.** كان يُرفع هنا ثم يمرّ التنفيذ على
+    // `await` — الاستيراد الديناميكي وفحص التكرار — خارج أي `try`. فإن رمى
+    // أحدهما (شبكة متعثّرة مثلاً) لم يبلغ `finally` أبداً وبقي الحارس مرفوعاً
+    // إلى الأبد: كل ضغطة حفظ بعدها تردّ «يتم حفظ الأمر بالفعل» ولا تحفظ شيئاً،
+    // فيبدو الأمر كأنه لم يُسجَّل ولا رسالة خطأ تدلّ على السبب.
     if (isSavingRef.current) {
       toast.info("يتم حفظ الأمر بالفعل — انتظر لحظة", { id: "po-save-inflight" });
       return;
     }
+
     isSavingRef.current = true;
+    setSaving(true);
+    try {
 
     // ميزة موحّدة "تحديث بدل التكرار" — إذا سبق الحفظ في هذه الجلسة ولم يتغيّر المورد
     // عاملها كتعديل لنفس السجل بدل إنشاء سجل جديد بعد كل ضغطة.
@@ -621,8 +630,6 @@ export default function PurchaseCreatePage() {
       }
     }
 
-    setSaving(true);
-    try {
       let savedId = treatAsEdit ? orderId || (lastSavedSupplierRef.current ? orderId : null) : null;
       let savedNumber = orderNumber;
 

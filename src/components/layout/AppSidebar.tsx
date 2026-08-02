@@ -70,6 +70,7 @@ const menuSections: MenuSection[] = [
         children: [
           { label: "أمر جديد", path: "/purchase/create" },
           { label: "إدارة الأوامر", path: "/purchase" },
+          { label: "كشوفات حسابات الموردين", path: "/suppliers/statements" },
         ],
       },
       {
