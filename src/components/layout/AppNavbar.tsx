@@ -1,4 +1,5 @@
 import { Bell, Mail, Menu, Search, User, LogOut, Settings, Moon, Sun, Maximize, ChevronDown, FileText, ShoppingCart, Users, Calculator, X, Command, Wallet, Receipt, Truck, RotateCcw, AlertTriangle, PackageX, ZoomIn, ZoomOut } from "lucide-react";
+import { invoiceDue } from "@/utils/invoiceDue";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "@/hooks/useTheme";
@@ -191,11 +192,11 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
     });
     (overdueRes.data || [])
       .filter((r: any) => {
-        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        const due = invoiceDue(r);
         return due > 0 && r.status !== "cancelled" && r.status !== "paid";
       })
       .forEach((r: any) => {
-        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        const due = invoiceDue(r);
         const daysLate = Math.max(1, Math.floor((Date.now() - new Date(r.due_date).getTime()) / 86400000));
         const id = `overdue:${r.id}:${r.due_date}`;
         items.push({

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { invoiceDue } from "@/utils/invoiceDue";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Bell, AlertTriangle, FileText, Wallet, Activity, Search, RefreshCw, Pin, EyeOff, RotateCcw, Clock, CheckSquare, FileClock } from "lucide-react";
@@ -78,7 +79,7 @@ function buildLogDetails(r: any): { title?: string; desc?: string; path?: string
     case "invoices": {
       const total = Number(data.total ?? 0);
       const paid = Number(data.paid_amount ?? 0);
-      const due = Number(data.due_amount ?? Math.max(0, total - paid));
+      const due = invoiceDue(data);
       const num = data.invoice_number || "";
       let extra = "";
       if (action === "UPDATE") {
@@ -341,11 +342,11 @@ export default function NotificationsPage() {
 
     (overdueRes.data || [])
       .filter((r: any) => {
-        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        const due = invoiceDue(r);
         return due > 0 && r.status !== "cancelled" && r.status !== "paid";
       })
       .forEach((r: any) => {
-        const due = Number(r.due_amount ?? Math.max(0, Number(r.total || 0) - Number(r.paid_amount || 0)));
+        const due = invoiceDue(r);
         const daysLate = Math.max(1, Math.floor((Date.now() - new Date(r.due_date).getTime()) / 86400000));
         const id = `overdue:${r.id}:${r.due_date}`;
         acc.push({

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { invoiceDue } from "@/utils/invoiceDue";
 import { notifyDuplicateItem } from "@/utils/duplicateItemToast";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
@@ -445,7 +446,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       setSavedCustomerId(inv.customer_id || null);
       setSavedTotal(Number(inv.total) || 0);
       setSavedPaid(Number(inv.paid_amount) || 0);
-      setSavedDue(Number(inv.due_amount) || 0);
+      setSavedDue(invoiceDue(inv as any));
       if (inv.currency_code) setCurrencyCode(inv.currency_code);
       if (inv.exchange_rate_to_base) setExchangeRateToBase(Number(inv.exchange_rate_to_base));
       if (inv.customer_id) {
@@ -2682,7 +2683,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
               if (data) {
                 setSavedTotal(Number((data as any).total || 0));
                 setSavedPaid(Number((data as any).paid_amount || 0));
-                setSavedDue(Number((data as any).due_amount || 0));
+                setSavedDue(invoiceDue(data as any));
                 const itemDiscounts = rows.reduce((s: number, r: any) => s + ((Number(r.quantity) || 0) * (Number(r.unit_price) || 0) * (Number(r.discount) || 0) / 100), 0);
                 setGeneralDiscount(Math.max(0, Number((data as any).discount || 0) - itemDiscounts));
               }
@@ -2844,7 +2845,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
                   setWorkflowStatus((inv as any).workflow_status || "new");
                   setInvoiceStatus((inv as any).status || "pending");
                   setSavedPaid(Number((inv as any).paid_amount) || 0);
-                  setSavedDue(Number((inv as any).due_amount) || 0);
+                  setSavedDue(invoiceDue(inv as any));
                   setSavedTotal(Number((inv as any).total) || 0);
                 }
               }}
