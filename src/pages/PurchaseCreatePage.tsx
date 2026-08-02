@@ -25,6 +25,7 @@ import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLock
 import { useSuggestionsWidth, SuggestionsResizeHandle } from "@/hooks/useSuggestionsWidth";
 import { SuggestionsPortal } from "@/components/SuggestionsPortal";
 import { ItemsScroll } from "@/components/items/ItemsScroll";
+import { decidePurchaseSave } from "@/utils/purchaseSave";
 import { TableFiller } from "@/components/items/TableFiller";
 import { makeRowNavHandler } from "@/utils/itemTableNav";
 import { useCreatePageNav } from "@/utils/createPageNav";
@@ -647,13 +648,24 @@ export default function PurchaseCreatePage() {
         }));
       }
 
-      // ملاحظة أمان: لو كنّا سنستلم البضاعة لأول مرة، احفظ الحالة كـ "pending" مؤقتاً.
-      // نُحدّثها إلى "received" فقط بعد نجاح addStockForLines، حتى لا يتسبّب
-      // فشل الشبكة في بقاء الحالة "received" بلا زيادة مخزون (سيؤدي ذلك إلى
-      // مسار delta في الحفظ التالي ولن يُعوَّض الفارق أبداً).
-      const persistedStatus =
-        alsoReceive ? (prevStatusInDb === "received" ? "received" : "pending") : status;
+      // قرار الحفظ في مكان واحد مُختبَر: الحالة المكتوبة، و`paid_amount` الذي
+      // منه يُشتقّ ما يظهر في كشف المورد. راجع `src/utils/purchaseSave.ts`.
+      let existingPaid = 0;
+      if (savedId) {
+        const { data: prevRow } = await (supabase as any)
+          .from("purchase_orders").select("paid_amount").eq("id", savedId).maybeSingle();
+        existingPaid = Number(prevRow?.paid_amount || 0);
+      }
+      const decision = decidePurchaseSave({
+        alsoReceive,
+        prevStatusInDb,
+        formStatus: status,
+        grandTotal: totals.grandTotal,
+        existingPaid,
+      });
+      const persistedStatus = decision.status;
       const payload: any = {
+        paid_amount: decision.paidAmount,
         supplier_id: supplierId,
         warehouse_id: warehouseId || null,
         date: purchaseDate,
@@ -1398,7 +1410,26 @@ export default function PurchaseCreatePage() {
                             return;
                           }
                         }
-                        const { error } = await supabase.from("purchase_orders").update({ status: v }).eq("id", editId);
+                        // نفس قاعدة «حفظ واستلام»: الاستلام يُسوّي الأمر فلا
+                        // يبقى في كشف المورد. هذا مسارٌ ثانٍ للاستلام — لولا
+                        // تطبيق القاعدة هنا لبقي الإجمالي دَيناً على المورد
+                        // رغم استلام البضاعة، والفرق بين المسارين لا يراه أحد.
+                        const receiving = v === "received" && prev !== "received";
+                        const { data: curRow } = receiving
+                          ? await (supabase as any).from("purchase_orders")
+                              .select("total, paid_amount").eq("id", editId).maybeSingle()
+                          : { data: null };
+                        const statusPatch: any = { status: v };
+                        if (receiving && curRow) {
+                          statusPatch.paid_amount = decidePurchaseSave({
+                            alsoReceive: true,
+                            prevStatusInDb: prev,
+                            formStatus: v,
+                            grandTotal: Number(curRow.total || 0),
+                            existingPaid: Number(curRow.paid_amount || 0),
+                          }).paidAmount;
+                        }
+                        const { error } = await supabase.from("purchase_orders").update(statusPatch).eq("id", editId);
                         if (error) { setStatus(prev); toast.error(error.message); }
                         else if (v === "received" && prev !== "received") toast.success("تم تحديث الحالة وزيادة المخزون");
                         else if (prev === "received" && v !== "received") toast.message("تم تغيير الحالة. ملاحظة: لم يُعَد خصم المخزون تلقائياً.");
