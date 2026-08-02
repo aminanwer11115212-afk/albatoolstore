@@ -275,6 +275,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
         {selectedLabel || <span className="text-muted-foreground">{placeholder}</span>}
       </button>
       {open && (() => {
+        void posTick; // إعادة الحساب عند التمرير/تغيير الحجم
         const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
         const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
         const vh = typeof window !== "undefined" ? window.innerHeight : 768;
