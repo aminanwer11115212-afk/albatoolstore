@@ -241,7 +241,7 @@ export default function InvoiceViewPage() {
       });
 
       toast.success("تم إنشاء المرتجع");
-      navigate(`/stock-returns/edit/${ret.id}`);
+      navigate(`/stock-return/edit/${ret.id}`);
     } catch (e: any) { toast.error(e.message); }
     finally { setConvertSaving(false); }
     setShowAdditionalMenu(false);
@@ -435,7 +435,7 @@ export default function InvoiceViewPage() {
 
   const handleSMS = () => {
     if (!pickCustomerWhatsApp(invoice?.customers)) { toast.error("لا يوجد رقم واتساب صالح للعميل"); return; }
-    const msg = encodeURIComponent(`فاتورة رقم ${invoice.invoice_number} بمبلغ ${invoice.currency_code || company?.currency || "SDG"} ${Number(invoice.total || 0).toLocaleString()}. المبلغ المستحق: ${invoice.currency_code || company?.currency || "SDG"} ${Number(invoice.due_amount || 0).toLocaleString()}`);
+    const msg = encodeURIComponent(`فاتورة رقم ${invoice.invoice_number} بمبلغ ${invoice.currency_code || company?.currency || "SDG"} ${Number(invoice.total || 0).toLocaleString()}. المبلغ المستحق: ${invoice.currency_code || company?.currency || "SDG"} ${invoiceDue(invoice).toLocaleString()}`);
     window.open(`sms:${invoice.customers.phone}?body=${msg}`);
   };
 
@@ -636,7 +636,7 @@ export default function InvoiceViewPage() {
             </Button>
           )},
           { id: "deleted-products", node: (
-            <Button onClick={() => navigate(`/deleted-items?invoice=${id}`)} variant="outline" className="gap-1.5 text-xs h-9">
+            <Button onClick={() => navigate(`/audit/deleted-items?invoice=${id}`)} variant="outline" className="gap-1.5 text-xs h-9">
               <Trash2 size={14} /> المنتجات المحذوفة
             </Button>
           )},

@@ -58,7 +58,7 @@ describe("الجدول المسطّح — أسطر المثال بالضبط", (
     expect(rows).toHaveLength(4); // فاتورتان + شحن + المجموع
     expect(cellsOf(rows[0])).toEqual(["1", "2026-07-20 · 09:00", "فاتورة INV-A", "200", "—", "\u2212200"]);
     expect(cellsOf(rows[1])).toEqual(["2", "2026-07-21 · 10:40", "فاتورة INV-B", "200", "—", "\u2212200"]);
-    expect(cellsOf(rows[2])).toEqual(["3", "2026-07-25 · 12:00", "＋تم شحن +500 — نقدًا — رقم العملية OP-7", "—", "500", "+500"]);
+    expect(cellsOf(rows[2])).toEqual(["3", "2026-07-25 · 12:00", "＋تم شحن +500", "—", "500", "+500"]);
   });
 
   it("سطر المجموع: 400 / 500 / +100 — والطرح يقفل", async () => {
@@ -97,8 +97,8 @@ describe("الجدول المسطّح — أسطر المثال بالضبط", (
     await ready();
     const row = container.querySelector(".ps-credit-row")!;
     expect(row.textContent).toContain("تم شحن +500");
-    // الإيراد يحمل معرّفه كما تحمل الفاتورة رقمها
-    expect(row.textContent).toContain("رقم العملية OP-7");
+    // البيان مختصر: التفاصيل مكانها قسم «المعاملات» لا عمود البيان الضيّق
+    expect(row.textContent).not.toContain("رقم العملية");
     expect(row.textContent).toContain("2026-07-25 · 12:00");
     expect(row.textContent).not.toContain("السبت");
   });

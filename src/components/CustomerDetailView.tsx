@@ -1,4 +1,5 @@
 import { useMemo, useState, forwardRef } from "react";
+import { invoiceDue } from "@/utils/invoiceDue";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
@@ -91,8 +92,8 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
   const stats = useMemo(() => {
     const totalSales = invoices.reduce((s: number, i: any) => s + Number(i.total || 0), 0);
     const totalPaid = invoices.reduce((s: number, i: any) => s + Number(i.paid_amount || 0), 0);
-    const totalDue = invoices.reduce((s: number, i: any) => s + (Number(i.total || 0) - Number(i.paid_amount || 0)), 0);
-    const unpaidCount = invoices.filter((i: any) => Number(i.total || 0) - Number(i.paid_amount || 0) > 0.01).length;
+    const totalDue = invoices.reduce((s: number, i: any) => s + invoiceDue(i), 0);
+    const unpaidCount = invoices.filter((i: any) => invoiceDue(i) > 0.01).length;
     const totalReturns = returns.reduce((s: number, r: any) => s + Number(r.total || 0), 0);
     return {
       totalSales, totalPaid, totalDue, unpaidCount,
@@ -219,7 +220,7 @@ export default function CustomerDetailView({ customer, onBack, onEdit, onDelete 
             empty="لا توجد فواتير"
             cols={["رقم", "التاريخ", "الإجمالي", "المدفوع", "المتبقي", "التجهيز", "الدفع", ""]}
             rows={invoices.slice(0, 100).map((inv: any) => {
-              const due = Number(inv.total || 0) - Number(inv.paid_amount || 0);
+              const due = invoiceDue(inv);
               return {
                 key: inv.id,
                 cells: [

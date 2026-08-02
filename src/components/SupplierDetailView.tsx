@@ -179,13 +179,13 @@ export default function SupplierDetailView({ supplier, onBack, onEdit, onDelete 
             rows={orders.slice(0, 100).map((o: any) => ({
               key: o.id,
               cells: [
-                <Link to={`/purchase/view/${o.id}`} className="text-primary font-medium hover:underline">{o.order_number}</Link>,
+                <Link to={`/purchase/edit/${o.id}`} className="text-primary font-medium hover:underline">{o.order_number}</Link>,
                 <span className="text-foreground">{o.date}</span>,
                 <span className="text-muted-foreground">{o.supplier_invoice_number || "-"}</span>,
                 <span className="text-foreground font-medium">{fmt(o.total)}</span>,
                 <span className="text-muted-foreground text-xs">{o.currency_code || "-"}</span>,
                 <StatusBadge value={o.status} />,
-                <Link to={`/purchase/view/${o.id}`} className="text-muted-foreground hover:text-primary inline-flex"><ExternalLink size={14} /></Link>,
+                <Link to={`/purchase/edit/${o.id}`} className="text-muted-foreground hover:text-primary inline-flex"><ExternalLink size={14} /></Link>,
               ],
             }))}
           />

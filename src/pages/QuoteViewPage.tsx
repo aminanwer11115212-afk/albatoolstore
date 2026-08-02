@@ -460,7 +460,7 @@ export default function QuoteViewPage() {
             </Button>
           )},
           { id: "deleted-products", node: (
-            <Button onClick={() => navigate(`/deleted-items?quote=${id}`)} variant="outline" className="gap-1.5 text-xs h-9">
+            <Button onClick={() => navigate(`/audit/deleted-items?quote=${id}`)} variant="outline" className="gap-1.5 text-xs h-9">
               <Trash2 size={14} /> المنتجات المحذوفة
             </Button>
           )},

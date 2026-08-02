@@ -105,7 +105,7 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
 
   function reset() {
     setCustomerId(""); setCustomerSearch(""); setAmount(""); setMethod("bank_transfer");
-    setBankAccountId(""); setReferenceNo(""); setNotes("");
+    setBankAccountId(""); setReferenceNo("");
     setDate(new Date().toISOString().slice(0, 10));
   }
 

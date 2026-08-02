@@ -175,7 +175,7 @@ export function generateStatementHTML(data: StatementData): string {
         <td>${esc(inv.date)}</td>
         <td>${fmt(inv.total)}</td>
         <td style="color:#16a34a;">${fmt(inv.paid_amount)}</td>
-        <td style="color:#dc2626;font-weight:700;">${fmt(Number(inv.total) - Number(inv.paid_amount))}</td>
+        <td style="color:#dc2626;font-weight:700;">${fmt(Math.max(0, Number(inv.total || 0) - Number(inv.paid_amount || 0)))}</td>
       </tr>`
       )
       .join("")}
