@@ -2489,6 +2489,7 @@ export default function QuoteCreatePage() {
         onSaveDefault={() => { saveColsAsDefault(); toast.success("تم تعيين عرض الأعمدة كافتراضي"); }}
         onReset={() => { resetColWidths(); toast.success("تم إعادة عرض الأعمدة"); }}
         onSave={() => { try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); } catch { toast.error(COLS_TOAST_SAVE_FAILED); } }}
+        onOpen={() => { setColsLocked(false); toast(COLS_TOAST_EDIT_MODE); }}
       />
     </div>
   );

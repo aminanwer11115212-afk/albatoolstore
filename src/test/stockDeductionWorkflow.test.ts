@@ -6,9 +6,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * subsequent transitions between non-quote statuses.
  *
  * Mirrors the inline guard used in:
- *   - src/pages/InvoicesPage.tsx (handleWorkflowChange)
+ *   - src/screens/InvoicesScreen.tsx (handleWorkflowChange)
  *   - src/pages/InvoiceViewPage.tsx
- *   - src/pages/InvoiceCreatePage.tsx
+ *   - src/screens/InvoiceCreateScreen.tsx
  *
  * Guard: `before === "quote" && newStatus !== "quote"` => deduct.
  */

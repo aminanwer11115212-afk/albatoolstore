@@ -584,7 +584,7 @@ describe("ملف الفحص والإصلاح", () => {
 
 describe("حفظ الفاتورة لا يمحو المدفوع", () => {
   const src = fs.readFileSync(
-    path.resolve(process.cwd(), "src/pages/InvoiceCreatePage.tsx"), "utf8");
+    path.resolve(process.cwd(), "src/screens/InvoiceCreateScreen.tsx"), "utf8");
 
   /**
    * العطل المُبلَّغ: تسجيل دفعة ثانية في شاشة تعديل الفاتورة يجعل المدفوع صفراً.

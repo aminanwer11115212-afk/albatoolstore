@@ -25,6 +25,8 @@ import { useColumnWidths, useContainerFit, ColumnResizeHandle, useScreenColsLock
 import { useSuggestionsWidth, SuggestionsResizeHandle } from "@/hooks/useSuggestionsWidth";
 import { SuggestionsPortal } from "@/components/SuggestionsPortal";
 import { ItemsScroll } from "@/components/items/ItemsScroll";
+import { decidePurchaseSave } from "@/utils/purchaseSave";
+import { TableFiller } from "@/components/items/TableFiller";
 import { makeRowNavHandler } from "@/utils/itemTableNav";
 import { useCreatePageNav } from "@/utils/createPageNav";
 import { useSpaceToDelete } from "@/hooks/useSpaceToDelete";
@@ -318,12 +320,28 @@ export default function PurchaseCreatePage() {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
     };
+    /**
+     * رسالة «جارٍ تحديث الرصيد…» كانت تعلّق إلى الأبد.
+     *
+     * `invalidateQueries` تُرجع وعداً لا يُحلّ إلا بانتهاء إعادة الجلب النشطة.
+     * فإن تعثّرت الشبكة — أو غادر المستخدم الشاشة قبل أن تنتهي — بقيت الرسالة
+     * معلّقة بلا نهاية، فتوحي بأن الحفظ نفسه لم يتمّ وهو قد تمّ.
+     *
+     * فلها الآن مهلة، وتُغلق عند مغادرة الشاشة. والرصيد يُعاد حسابه في
+     * القاعدة بتريغر `po_recompute_supplier_balance` لا بهذه الرسالة — فتأخّر
+     * الواجهة لا يعني تأخّر الحساب.
+     */
     const onSuppliersChanged = async () => {
       const tid = toast.loading("جارٍ تحديث الرصيد…", { id: "balance-refresh" });
       try {
-        await queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+        await Promise.race([
+          queryClient.invalidateQueries({ queryKey: ["suppliers"] }),
+          new Promise((resolve) => setTimeout(resolve, 5000)),
+        ]);
         toast.success("تم تحديث الرصيد", { id: tid, duration: 1200 });
-      } catch { toast.dismiss(tid); }
+      } catch {
+        toast.dismiss(tid);
+      }
     };
     window.addEventListener("products:changed", handleSync);
     window.addEventListener("suppliers:changed", onSuppliersChanged);
@@ -332,6 +350,8 @@ export default function PurchaseCreatePage() {
       window.removeEventListener("products:changed", handleSync);
       window.removeEventListener("suppliers:changed", onSuppliersChanged);
       window.removeEventListener("focus", handleSync);
+      // لا تُترك رسالة معلّقة على شاشة غادرها المستخدم
+      toast.dismiss("balance-refresh");
     };
   }, [queryClient]);
 
@@ -550,8 +570,8 @@ export default function PurchaseCreatePage() {
     selectSupplier(data);
     setAddSupplierOpen(false);
     setNewSupplier(emptySupplierForm);
-    // إبطال كاش الموردين + إخطار الشاشات الأخرى
-    queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+    // الحدث وحده يُبطل الكاش. النداء المباشر هنا كان يبدأ إعادة جلبٍ ثم
+    // ينتظرها مستمعُ الحدث نفسه — تسابقٌ يُطيل تعليق الرسالة بلا فائدة.
     try { window.dispatchEvent(new Event("suppliers:changed")); } catch {}
     toast.success("تم إضافة المورد");
   }
@@ -561,12 +581,21 @@ export default function PurchaseCreatePage() {
     const valid = rows.filter((r) => r.product_id);
     if (valid.length === 0) { toast.error("أضف منتج واحد على الأقل"); return; }
 
-    // حارس متزامن: يمنع الإدراج المضاعف عند الضغط المتكرر على زر الحفظ
+    // حارس متزامن: يمنع الإدراج المضاعف عند الضغط المتكرر على زر الحفظ.
+    //
+    // **يُرفع داخل `try` لا قبله.** كان يُرفع هنا ثم يمرّ التنفيذ على
+    // `await` — الاستيراد الديناميكي وفحص التكرار — خارج أي `try`. فإن رمى
+    // أحدهما (شبكة متعثّرة مثلاً) لم يبلغ `finally` أبداً وبقي الحارس مرفوعاً
+    // إلى الأبد: كل ضغطة حفظ بعدها تردّ «يتم حفظ الأمر بالفعل» ولا تحفظ شيئاً،
+    // فيبدو الأمر كأنه لم يُسجَّل ولا رسالة خطأ تدلّ على السبب.
     if (isSavingRef.current) {
       toast.info("يتم حفظ الأمر بالفعل — انتظر لحظة", { id: "po-save-inflight" });
       return;
     }
+
     isSavingRef.current = true;
+    setSaving(true);
+    try {
 
     // ميزة موحّدة "تحديث بدل التكرار" — إذا سبق الحفظ في هذه الجلسة ولم يتغيّر المورد
     // عاملها كتعديل لنفس السجل بدل إنشاء سجل جديد بعد كل ضغطة.
@@ -602,8 +631,6 @@ export default function PurchaseCreatePage() {
       }
     }
 
-    setSaving(true);
-    try {
       let savedId = treatAsEdit ? orderId || (lastSavedSupplierRef.current ? orderId : null) : null;
       let savedNumber = orderNumber;
 
@@ -621,12 +648,11 @@ export default function PurchaseCreatePage() {
         }));
       }
 
-      // ملاحظة أمان: لو كنّا سنستلم البضاعة لأول مرة، احفظ الحالة كـ "pending" مؤقتاً.
-      // نُحدّثها إلى "received" فقط بعد نجاح addStockForLines، حتى لا يتسبّب
-      // فشل الشبكة في بقاء الحالة "received" بلا زيادة مخزون (سيؤدي ذلك إلى
-      // مسار delta في الحفظ التالي ولن يُعوَّض الفارق أبداً).
-      const persistedStatus =
-        alsoReceive ? (prevStatusInDb === "received" ? "received" : "pending") : status;
+      // قرار الحفظ في مكان واحد مُختبَر: الحالة المكتوبة، و`paid_amount` الذي
+      // منه يُشتقّ ما يظهر في كشف المورد. راجع `src/utils/purchaseSave.ts`.
+      const persistedStatus = decidePurchaseSave({
+        alsoReceive, prevStatusInDb, formStatus: status,
+      }).status;
       const payload: any = {
         supplier_id: supplierId,
         warehouse_id: warehouseId || null,
@@ -738,7 +764,15 @@ export default function PurchaseCreatePage() {
           throw new Error(`تعذّر استلام المخزون: ${res.reason}`);
         }
         await updatePurchasePrices();
-        if (alsoReceive) setStatus("received");
+        if (alsoReceive) {
+          setStatus("received");
+          // رسالة تشرح ما حدث بالضبط: الفرق بين الزرّين محاسبيّ لا شكليّ،
+          // ومن لا يعرفه سيبحث عن الأمر في كشف المورد ولن يجده.
+          toast.success(
+            "تم الاستلام: دخلت البضاعة المخزن — ولا يُسجَّل هذا الأمر في كشف حساب المورد",
+            { duration: 5000 },
+          );
+        }
         toast.success(res.added ? "تم استلام البضاعة وتحديث المخزون" : "الأمر مستلَم مسبقاً");
       } else if (isNowCompleted && wasCompleted) {
         // B — تعديل أمر مستلَم: طبّق الفارق فقط.
@@ -1226,6 +1260,13 @@ export default function PurchaseCreatePage() {
                     );
                     });
                   })()}
+                  {/* التسطير: صفوف فارغة تُكمل الجدول فلا يبقى فراغ أبيض بين
+                      آخر بند وأزرار الحفظ — نفس ما في الفواتير وعروض الأسعار. */}
+                  <TableFiller
+                    scrollRef={itemsScrollRef}
+                    realRowsCount={rows.length}
+                    columnsCount={colWidths.length}
+                  />
                 </tbody>
               </table>
             </ItemsScroll>
@@ -1280,7 +1321,7 @@ export default function PurchaseCreatePage() {
                   id: "save-and-receive",
                   group: "1-primary",
                   node: (
-                    <button type="button" onClick={() => handleSubmit(true)} title="حفظ + استلام" style={btnStyle("#16a34a")} disabled={saving}>
+                    <button type="button" onClick={() => handleSubmit(true)} title="حفظ + استلام — تدخل البضاعة المخزن ولا يُسجَّل الأمر في كشف حساب المورد" style={btnStyle("#16a34a")} disabled={saving}>
                       ✓ حفظ + استلام
                     </button>
                   ),
@@ -1365,6 +1406,9 @@ export default function PurchaseCreatePage() {
                             return;
                           }
                         }
+                        // الحالة وحدها تُكتب. خروج الأمر من كشف المورد يتبع
+                        // حالته عند القراءة (`countsInSupplierStatement`) لا
+                        // كتابةً على `paid_amount` — فالمدفوع يبقى صادقاً.
                         const { error } = await supabase.from("purchase_orders").update({ status: v }).eq("id", editId);
                         if (error) { setStatus(prev); toast.error(error.message); }
                         else if (v === "received" && prev !== "received") toast.success("تم تحديث الحالة وزيادة المخزون");
@@ -1535,6 +1579,7 @@ export default function PurchaseCreatePage() {
         onSaveDefault={() => { saveColsAsDefault(); toast.success("تم تعيين عرض الأعمدة كافتراضي"); }}
         onReset={() => { resetColWidths(); toast.success("تم إعادة عرض الأعمدة"); }}
         onSave={() => { try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); } catch { toast.error(COLS_TOAST_SAVE_FAILED); } }}
+        onOpen={() => { setColsLocked(false); toast(COLS_TOAST_EDIT_MODE); }}
       />
     </div>
   );

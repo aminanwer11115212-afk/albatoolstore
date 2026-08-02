@@ -62,7 +62,7 @@ describe("صفحات الإنشاء تمرّر رقم المستند للطبا�
   // بناء HTML الطباعة استُخرج في `buildCurrentPrintHTML` ليشترك فيه ثلاثة
   // أزرار (معاينة/طباعة/واتساب PDF) — فالفحص يتبع الدالة لا نداء openPrintWindow.
   it("صفحة إنشاء الفاتورة تمرّر number", () => {
-    const src = read("src/pages/InvoiceCreatePage.tsx");
+    const src = read("src/screens/InvoiceCreateScreen.tsx");
     const call = src.slice(src.indexOf("function buildCurrentPrintHTML"));
     expect(call.slice(0, 600)).toContain("number: invoiceNumber");
   });
@@ -74,7 +74,7 @@ describe("صفحات الإنشاء تمرّر رقم المستند للطبا�
   });
 
   it("الأزرار الثلاثة تبني الـHTML من نفس الدالة — فلا يختلف ما يُعاين عمّا يُرسل", () => {
-    for (const page of ["src/pages/InvoiceCreatePage.tsx", "src/pages/QuoteCreatePage.tsx"]) {
+    for (const page of ["src/screens/InvoiceCreateScreen.tsx", "src/pages/QuoteCreatePage.tsx"]) {
       const src = read(page);
       expect(src).toContain("function buildCurrentPrintHTML");
       // لا نداء مباشر لـ generatePrintHTML خارج الدالة الموحّدة
@@ -87,8 +87,8 @@ describe("صفحات الإنشاء تمرّر رقم المستند للطبا�
 describe("زر الإرسال للعميل في صفحات الفواتير وعروض الأسعار", () => {
   const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
   const pages = [
-    "src/pages/InvoicesPage.tsx",
-    "src/pages/InvoiceCreatePage.tsx",
+    "src/screens/InvoicesScreen.tsx",
+    "src/screens/InvoiceCreateScreen.tsx",
     "src/pages/QuoteCreatePage.tsx",
     "src/pages/QuotesPage.tsx",
     "src/pages/SideQuoteDetailPage.tsx",
@@ -147,7 +147,7 @@ describe("اسم الملف لا يحمل محارف غير مرئية تفسد�
 describe("زرّا «معاينة» و«واتساب PDF» في شاشات الإنشاء والتعديل", () => {
   const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
   // شاشة الفاتورة واحدة للإنشاء والتعديل (`editId`)، فالزران يظهران في الحالتين.
-  const pages = ["src/pages/InvoiceCreatePage.tsx", "src/pages/QuoteCreatePage.tsx"];
+  const pages = ["src/screens/InvoiceCreateScreen.tsx", "src/pages/QuoteCreatePage.tsx"];
 
   /**
    * زر «معاينة» يجب أن ينادي **نفس** مسار F9 لا مساراً موازياً: مساران

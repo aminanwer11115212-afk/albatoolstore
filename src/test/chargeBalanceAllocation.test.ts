@@ -69,7 +69,7 @@ describe("charge balance allocation — dues first, surplus as credit", () => {
 });
 
 describe("invoice-create header balance label — display contract", () => {
-  // Mirrors the inline logic in src/pages/InvoiceCreatePage.tsx (~line 1660).
+  // Mirrors the inline logic in src/screens/InvoiceCreateScreen.tsx (~line 1660).
   function labelOf(customer: { balance: number; credit_balance?: number }) {
     return computeDisplayBalance(customer).label;
   }

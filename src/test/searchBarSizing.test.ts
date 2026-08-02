@@ -15,7 +15,7 @@ import { resolve } from "path";
 
 const PAGES = [
   "src/pages/QuoteCreatePage.tsx",
-  "src/pages/InvoiceCreatePage.tsx",
+  "src/screens/InvoiceCreateScreen.tsx",
   "src/pages/PurchaseCreatePage.tsx",
   "src/pages/StockReturnCreatePage.tsx",
 ];

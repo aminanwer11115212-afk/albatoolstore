@@ -31,6 +31,7 @@ import SummaryChip from "@/components/toolbar/SummaryChip";
 import { ToolbarCustomizationProvider } from "@/components/toolbar/ToolbarCustomizationContext";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { ItemsScroll } from "@/components/items/ItemsScroll";
+import { TableFiller } from "@/components/items/TableFiller";
 import MessageImportDialog, { MessageImportButton } from "@/components/MessageImportDialog";
 import type { ParsedLine } from "@/hooks/useMessageImport";
 
@@ -1306,6 +1307,13 @@ export default function StockReturnCreatePage() {
                     );
                     });
                   })()}
+                  {/* التسطير: صفوف فارغة تُكمل الجدول فلا يبقى فراغ أبيض بين
+                      آخر بند وأزرار الحفظ — نفس ما في الفواتير وعروض الأسعار. */}
+                  <TableFiller
+                    scrollRef={itemsScrollRef}
+                    realRowsCount={rows.length}
+                    columnsCount={colWidths.length}
+                  />
                 </tbody>
               </table>
             </ItemsScroll>
@@ -1513,6 +1521,7 @@ export default function StockReturnCreatePage() {
         onSaveDefault={() => { saveColsAsDefault(); toast.success("تم تعيين عرض الأعمدة كافتراضي"); }}
         onReset={() => { resetColWidths(); toast.success("تم إعادة عرض الأعمدة"); }}
         onSave={() => { try { setColsLocked(true); toast.success(COLS_TOAST_SAVED); } catch { toast.error(COLS_TOAST_SAVE_FAILED); } }}
+        onOpen={() => { setColsLocked(false); toast(COLS_TOAST_EDIT_MODE); }}
       />
     </div>
   );
