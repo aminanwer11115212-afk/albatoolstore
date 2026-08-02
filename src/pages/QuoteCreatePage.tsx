@@ -1100,7 +1100,10 @@ export default function QuoteCreatePage() {
       lastSavedIdRef.current = null;
       lastSavedCustomerRef.current = null;
       originalItemsHashRef.current = null;
-      const createPath = isSideMode ? "/quotes/side/new" : "/quotes/create";
+      // `?side=1` يجب أن يبقى في العنوان: `SideQuoteCreatePage` تقرأه لتفرض
+      // الوضع الجانبي، وإسقاطه يجعل تحديث الصفحة يعيد المستخدم إلى العروض
+      // العادية — فيكتب عرضاً جانبياً في القناة الخطأ دون أن يشعر.
+      const createPath = isSideMode ? "/quotes/side/new?side=1" : "/quotes/create";
       window.history.replaceState({}, "", createPath);
       setTimeout(() => customerInputRef.current?.focus(), 0);
     }
@@ -2219,7 +2222,7 @@ export default function QuoteCreatePage() {
                       className="btn btn-sm"
                       onClick={() => saveQuote("draft", { andNew: true })}
                       style={btnStyle("#0ea5e9")}
-                      title="حفظ والانتقال إلى عرض سعر جديد"
+                      title="حفظ وفتح عرض سعر جديد في نفس الشاشة"
                       disabled={savingQuote}
                     >
                       + جديد
