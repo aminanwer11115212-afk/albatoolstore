@@ -358,8 +358,9 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
 
         // ─── فرع الموبايل: Bottom Sheet ملء العرض ───
         if (isMobile) {
-          return (
+          return createPortal(
             <>
+
               {/* overlay خلفي — النقر عليه يُغلق فقط */}
               <div
                 className="fixed inset-0 bg-black/50 animate-fade-in"
