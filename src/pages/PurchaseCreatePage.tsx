@@ -650,22 +650,10 @@ export default function PurchaseCreatePage() {
 
       // قرار الحفظ في مكان واحد مُختبَر: الحالة المكتوبة، و`paid_amount` الذي
       // منه يُشتقّ ما يظهر في كشف المورد. راجع `src/utils/purchaseSave.ts`.
-      let existingPaid = 0;
-      if (savedId) {
-        const { data: prevRow } = await (supabase as any)
-          .from("purchase_orders").select("paid_amount").eq("id", savedId).maybeSingle();
-        existingPaid = Number(prevRow?.paid_amount || 0);
-      }
-      const decision = decidePurchaseSave({
-        alsoReceive,
-        prevStatusInDb,
-        formStatus: status,
-        grandTotal: totals.grandTotal,
-        existingPaid,
-      });
-      const persistedStatus = decision.status;
+      const persistedStatus = decidePurchaseSave({
+        alsoReceive, prevStatusInDb, formStatus: status,
+      }).status;
       const payload: any = {
-        paid_amount: decision.paidAmount,
         supplier_id: supplierId,
         warehouse_id: warehouseId || null,
         date: purchaseDate,
@@ -776,7 +764,15 @@ export default function PurchaseCreatePage() {
           throw new Error(`تعذّر استلام المخزون: ${res.reason}`);
         }
         await updatePurchasePrices();
-        if (alsoReceive) setStatus("received");
+        if (alsoReceive) {
+          setStatus("received");
+          // رسالة تشرح ما حدث بالضبط: الفرق بين الزرّين محاسبيّ لا شكليّ،
+          // ومن لا يعرفه سيبحث عن الأمر في كشف المورد ولن يجده.
+          toast.success(
+            "تم الاستلام: دخلت البضاعة المخزن — ولا يُسجَّل هذا الأمر في كشف حساب المورد",
+            { duration: 5000 },
+          );
+        }
         toast.success(res.added ? "تم استلام البضاعة وتحديث المخزون" : "الأمر مستلَم مسبقاً");
       } else if (isNowCompleted && wasCompleted) {
         // B — تعديل أمر مستلَم: طبّق الفارق فقط.
@@ -1325,7 +1321,7 @@ export default function PurchaseCreatePage() {
                   id: "save-and-receive",
                   group: "1-primary",
                   node: (
-                    <button type="button" onClick={() => handleSubmit(true)} title="حفظ + استلام" style={btnStyle("#16a34a")} disabled={saving}>
+                    <button type="button" onClick={() => handleSubmit(true)} title="حفظ + استلام — تدخل البضاعة المخزن ولا يُسجَّل الأمر في كشف حساب المورد" style={btnStyle("#16a34a")} disabled={saving}>
                       ✓ حفظ + استلام
                     </button>
                   ),
@@ -1410,26 +1406,10 @@ export default function PurchaseCreatePage() {
                             return;
                           }
                         }
-                        // نفس قاعدة «حفظ واستلام»: الاستلام يُسوّي الأمر فلا
-                        // يبقى في كشف المورد. هذا مسارٌ ثانٍ للاستلام — لولا
-                        // تطبيق القاعدة هنا لبقي الإجمالي دَيناً على المورد
-                        // رغم استلام البضاعة، والفرق بين المسارين لا يراه أحد.
-                        const receiving = v === "received" && prev !== "received";
-                        const { data: curRow } = receiving
-                          ? await (supabase as any).from("purchase_orders")
-                              .select("total, paid_amount").eq("id", editId).maybeSingle()
-                          : { data: null };
-                        const statusPatch: any = { status: v };
-                        if (receiving && curRow) {
-                          statusPatch.paid_amount = decidePurchaseSave({
-                            alsoReceive: true,
-                            prevStatusInDb: prev,
-                            formStatus: v,
-                            grandTotal: Number(curRow.total || 0),
-                            existingPaid: Number(curRow.paid_amount || 0),
-                          }).paidAmount;
-                        }
-                        const { error } = await supabase.from("purchase_orders").update(statusPatch).eq("id", editId);
+                        // الحالة وحدها تُكتب. خروج الأمر من كشف المورد يتبع
+                        // حالته عند القراءة (`countsInSupplierStatement`) لا
+                        // كتابةً على `paid_amount` — فالمدفوع يبقى صادقاً.
+                        const { error } = await supabase.from("purchase_orders").update({ status: v }).eq("id", editId);
                         if (error) { setStatus(prev); toast.error(error.message); }
                         else if (v === "received" && prev !== "received") toast.success("تم تحديث الحالة وزيادة المخزون");
                         else if (prev === "received" && v !== "received") toast.message("تم تغيير الحالة. ملاحظة: لم يُعَد خصم المخزون تلقائياً.");

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { countsInSupplierStatement } from "@/utils/purchaseSave";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,7 +30,10 @@ export default function SupplierStatementPage() {
         .neq("status", "cancelled")
         .order("date", { ascending: false });
       if (error) throw error;
-      return data;
+      // الأمر المستلَم لا يدخل كشف المورد: البضاعة دخلت المخزن ولا مطالبة
+      // تُسجَّل عليه هنا. الاستبعاد عند **القراءة** لا بكتابةٍ على
+      // `paid_amount` — فالمدفوع يبقى صادقاً يحمل ما دُفع فعلاً.
+      return (data || []).filter(countsInSupplierStatement);
     },
     enabled: !!selectedSupplierId,
   });

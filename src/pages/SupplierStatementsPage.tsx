@@ -1,9 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, FileText, X, AlertTriangle } from "lucide-react";
-import { useSuppliers } from "@/hooks/useData";
+import { useSuppliers, usePurchaseOrders } from "@/hooks/useData";
 import { containsAny } from "@/utils/searchMatch";
 import { formatMoney } from "@/utils/balanceDisplay";
+import { supplierBalanceOf } from "@/utils/purchaseSave";
 
 /**
  * «كشوفات حسابات الموردين» — نقطة وصول موحّدة، نظيرة `CustomerStatementsPage`.
@@ -26,6 +27,9 @@ import { formatMoney } from "@/utils/balanceDisplay";
 export default function SupplierStatementsPage() {
   const navigate = useNavigate();
   const { data: suppliers, isLoading, isError, error, refetch } = useSuppliers();
+  // الرصيد يُحسب من الأوامر لا يُقرأ من `suppliers.balance`: العمود المخزَّن
+  // يجمع كل أمر غير ملغى بما فيه المستلَم، فلا يعرف قاعدة الاستبعاد.
+  const { data: purchaseOrders } = usePurchaseOrders();
   const [searchParams, setSearchParams] = useSearchParams();
   const [q, setQ] = useState(() => searchParams.get("q") || "");
   const [activeIdx, setActiveIdx] = useState(0);
@@ -51,10 +55,17 @@ export default function SupplierStatementsPage() {
     const filtered = query
       ? list.filter((s) => containsAny([s.name, s.phone, s.company, s.email], query))
       : list;
+    const ordersBySupplier = new Map<string, any[]>();
+    for (const o of (purchaseOrders || []) as any[]) {
+      const k = String(o.supplier_id || "");
+      if (!k) continue;
+      if (!ordersBySupplier.has(k)) ordersBySupplier.set(k, []);
+      ordersBySupplier.get(k)!.push(o);
+    }
     return filtered
-      .map((s) => ({ ...s, _bal: Number(s.balance || 0) }))
+      .map((s) => ({ ...s, _bal: supplierBalanceOf(ordersBySupplier.get(String(s.id)) || []) }))
       .sort((a, b) => Math.abs(b._bal) - Math.abs(a._bal));
-  }, [suppliers, q]);
+  }, [suppliers, purchaseOrders, q]);
 
   const totals = useMemo(() => {
     let owed = 0;   // ما علينا لهم
@@ -86,7 +97,7 @@ export default function SupplierStatementsPage() {
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
               اختر مورّداً لعرض كشف حسابه التفصيلي — الأرصدة من نفس عمود
-              <code className="mx-1">suppliers.balance</code> الذي يُعيد حسابه تريغر أوامر الشراء.
+              الأوامر <b>غير المستلَمة</b> — فالمستلَم دخلت بضاعته ولا يُسجَّل هنا.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-2 min-w-[280px]">

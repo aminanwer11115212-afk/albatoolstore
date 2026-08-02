@@ -1,25 +1,18 @@
 /**
- * قواعد حفظ أمر الشراء — ما يدخل حساب المورد وما لا يدخله.
+ * قواعد أمر الشراء — ما يدخل كشف حساب المورد وما لا يدخله.
  *
  * ## الزرّان يعنيان شيئين مختلفين
  *   «حفظ»          → شراء على الحساب: البضاعة لم تُستلم بعد، والمبلغ **دَينٌ
  *                    علينا للمورد** فيظهر في كشفه.
- *   «حفظ واستلام»  → شراء نقدي: البضاعة دخلت المخزن والمبلغ سُوّي على الفور،
- *                    فلا يُسجَّل شيءٌ على المورد.
+ *   «حفظ واستلام»  → البضاعة تدخل المخزن، ولا يُسجَّل الأمر في كشف المورد.
  *
- * ## كيف يسقط المبلغ من كشف المورد بلا هجرة
- * رصيد المورد محسوبٌ في القاعدة بمعادلة قائمة:
+ * ## «لا يُسجَّل» ليست «مدفوعة»
+ * محاولةٌ أولى صفّرت الأثر بكتابة `paid_amount = total` — فيسقط الأمر من
+ * معادلة الرصيد في القاعدة بلا هجرة. لكنها تكذب على الدفاتر: تُعلن أن المال
+ * دُفع وهو لم يُدفع، فتضيع منك مطالبةٌ قائمة لو استلمت اليوم ودفعت بعد شهر.
  *
- *     balance = Σ GREATEST(total − paid_amount, 0)   لكل أمر غير ملغى
- *
- * فتسويةُ الأمر لحظةَ الاستلام (`paid_amount = total`) تُصفّر حصّته من المجموع
- * دون لمس المعادلة ولا التريغر. لا هجرة، ولا عمود جديد، ولا فرعٌ ثانٍ في
- * الحساب يمكن أن ينسى أحدٌ تحديثه.
- *
- * ## ما لا تفعله هذه الدالّة
- * لا تُنقص مدفوعاً مسجَّلاً. أمرٌ دُفع له 800 من 1000 ثم استُلم يصير مسدَّداً
- * بالكامل (1000)؛ أمّا العكس — أمرٌ سُدِّد ثم حُوِّل إلى «غير مستلَم» — فيحتفظ
- * بما دُفع فعلاً، لأن الدفع واقعةٌ لا يمحوها تغيير الحالة.
+ * فالاستبعاد صار **في القراءة لا في الكتابة**: `paid_amount` يبقى صادقاً
+ * يحمل ما دُفع فعلاً، والكشف يتخطّى الأوامر المستلَمة عند العرض.
  */
 
 export interface PurchaseSaveInput {
@@ -29,43 +22,53 @@ export interface PurchaseSaveInput {
   prevStatusInDb: string | null;
   /** حالة الأمر المختارة في الشاشة (تُستعمل عند الحفظ العادي) */
   formStatus: string;
-  /** إجمالي الأمر بعد الخصم */
-  grandTotal: number;
-  /** المدفوع المسجَّل على الأمر قبل هذا الحفظ */
-  existingPaid?: number | null;
 }
 
 export interface PurchaseSaveDecision {
   /** الحالة التي تُكتب في هذه الخطوة */
   status: string;
-  /** `paid_amount` المكتوب — منه يُشتقّ ما يظهر في كشف المورد */
-  paidAmount: number;
-  /** ما سيضيفه هذا الأمر إلى رصيد المورد */
-  supplierDebt: number;
+}
+
+/**
+ * الحالة المكتوبة في خطوة الحفظ.
+ *
+ * عند الاستلام لأول مرة تُكتب `pending` مؤقتاً ولا تُقلب إلى `received` إلا بعد
+ * نجاح إضافة المخزون — حتى لا يترك فشلُ الشبكة أمراً «مستلَماً» بلا بضاعةٍ
+ * دخلت، فيُحسب الفارق خطأً في الحفظ التالي ولا يُعوَّض أبداً.
+ */
+export function decidePurchaseSave(input: PurchaseSaveInput): PurchaseSaveDecision {
+  const { alsoReceive, prevStatusInDb, formStatus } = input;
+  return {
+    status: alsoReceive
+      ? (prevStatusInDb === "received" ? "received" : "pending")
+      : formStatus,
+  };
+}
+
+/** أمرٌ استُلمت بضاعته — لا يدخل كشف حساب المورد. */
+export function countsInSupplierStatement(
+  order: { status?: string | null } | null | undefined,
+): boolean {
+  const st = String(order?.status || "");
+  return st !== "received" && st !== "cancelled";
 }
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
-export function decidePurchaseSave(input: PurchaseSaveInput): PurchaseSaveDecision {
-  const { alsoReceive, prevStatusInDb, formStatus, grandTotal } = input;
-  const total = Math.max(0, r2(grandTotal));
-  const existingPaid = Math.max(0, r2(input.existingPaid ?? 0));
-
-  /**
-   * الحالة المكتوبة في هذه الخطوة.
-   *
-   * عند الاستلام لأول مرة تُكتب `pending` مؤقتاً ولا تُقلب إلى `received` إلا
-   * بعد نجاح إضافة المخزون — حتى لا يترك فشلُ الشبكة أمراً «مستلَماً» بلا
-   * بضاعةٍ دخلت، فيُحسب الفارق خطأً في الحفظ التالي ولا يُعوَّض أبداً.
-   */
-  const status = alsoReceive
-    ? (prevStatusInDb === "received" ? "received" : "pending")
-    : formStatus;
-
-  // النية هي الفاصل لا الحالة المكتوبة: الاستلام يُسوّي الأمر ولو كُتبت
-  // `pending` مؤقتاً في هذه الخطوة.
-  const settled = alsoReceive || prevStatusInDb === "received";
-  const paidAmount = settled ? Math.max(total, existingPaid) : existingPaid;
-
-  return { status, paidAmount, supplierDebt: Math.max(0, r2(total - paidAmount)) };
+/**
+ * رصيد المورد **محسوباً** من أوامره — لا مقروءاً من `suppliers.balance`.
+ *
+ * العمود المخزَّن يجمع كل أمر غير ملغى بما فيه المستلَم، فلا يعرف القاعدة
+ * الجديدة. وتغييرُه يحتاج هجرةً لا تُطبَّق من بيئة التطوير — والحساب هنا
+ * يُغني عنها ويبقى صحيحاً مهما كان العمود.
+ */
+export function supplierBalanceOf(
+  orders: Array<{ status?: string | null; total?: number | null; paid_amount?: number | null }> | null | undefined,
+): number {
+  if (!orders?.length) return 0;
+  return r2(
+    orders
+      .filter(countsInSupplierStatement)
+      .reduce((s, o) => s + Math.max(0, r2(Number(o.total || 0) - Number(o.paid_amount || 0))), 0),
+  );
 }
