@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { startsWithMatch, normalizeAr } from "@/utils/searchMatch";
 
 
@@ -44,6 +45,9 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
   const [adding, setAdding] = useState(false);
+  // يُستخدم لإعادة حساب موضع القائمة عند التمرير/تغيير حجم النافذة
+  const [posTick, setPosTick] = useState(0);
+
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -87,7 +91,20 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
     };
   }, [open]);
 
-  // (تم حذف capture-listener القديم — القائمة الآن داخل شجرة DOM لا تتسرّب لـ Radix)
+  // إعادة حساب موضع القائمة عند التمرير أو تغيير حجم النافذة (القائمة portaled
+  // إلى body لذا موضعها fixed محسوب من إحداثيات الزر).
+  useEffect(() => {
+    if (!open) return;
+    const onMove = () => setPosTick((t) => t + 1);
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [open]);
+
+
 
   const openMenu = () => {
     if (disabled) return;
@@ -258,6 +275,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
         {selectedLabel || <span className="text-muted-foreground">{placeholder}</span>}
       </button>
       {open && (() => {
+        void posTick; // إعادة الحساب عند التمرير/تغيير الحجم
         const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
         const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
         const vh = typeof window !== "undefined" ? window.innerHeight : 768;
@@ -340,8 +358,9 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
 
         // ─── فرع الموبايل: Bottom Sheet ملء العرض ───
         if (isMobile) {
-          return (
+          return createPortal(
             <>
+
               {/* overlay خلفي — النقر عليه يُغلق فقط */}
               <div
                 className="fixed inset-0 bg-black/50 animate-fade-in"
@@ -400,8 +419,10 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
                   {listBody}
                 </div>
               </div>
-            </>
+            </>,
+            document.body,
           );
+
         }
 
         // ─── فرع الديسكتوب: popover عائم بجانب الزر (كما كان) ───
@@ -424,7 +445,7 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
           zIndex: 10000,
           pointerEvents: "auto",
         };
-        return (
+        return createPortal(
           <div
             ref={menuRef}
             className="bg-popover text-popover-foreground border border-border rounded-lg shadow-xl overflow-hidden flex flex-col"
@@ -451,7 +472,8 @@ const InlineSearchSelect = forwardRef<InlineSearchSelectHandle, Props>(function 
             <div className="flex-1 overflow-y-auto overscroll-contain">
               {listBody}
             </div>
-          </div>
+          </div>,
+          document.body,
         );
       })()}
     </div>
