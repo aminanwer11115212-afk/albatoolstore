@@ -54,6 +54,24 @@ export function computeUnitPrice(foreignPrice: unknown, rate: unknown): number {
   return roundMoney((Number(foreignPrice) || 0) * (Number(rate) || 0));
 }
 
+/**
+ * السعر المحلي لبطاقة المنتج = الأجنبي × المعدّل، **رقماً صحيحاً بلا كسور**.
+ *
+ * يختلف عن `computeUnitPrice` عمداً: سعر البند في الفاتورة قد يحتاج القروش
+ * (خصمٌ نسبي، كمية كسرية)، أمّا سعر البطاقة فرقمٌ يُعلَن للزبون ويُكتب على
+ * الرفّ — و«2,520.00» لا تُقرأ ولا تُنطق. فالتدوير هنا للوحدة الكاملة:
+ *
+ *     2   × 1400 = 2,800
+ *     1.8 × 1400 = 2,520
+ *     33  × 1400 = 46,200
+ */
+export function productLocalPrice(foreignPrice: unknown, rate: unknown): number {
+  const fp = Number(foreignPrice) || 0;
+  const r = Number(rate) || 0;
+  if (fp <= 0 || r <= 0) return 0;
+  return Math.round(fp * r);
+}
+
 /** دقّة اشتقاق المعدّل من (المحلي ÷ الأجنبي). */
 export const RATE_PRECISION = 6;
 

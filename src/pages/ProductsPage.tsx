@@ -7,6 +7,8 @@ import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
+import { productLocalPrice } from "@/utils/invoiceCreateHelpers";
+import { getProductExchangeRate } from "@/utils/currency";
 import { mobileDocListCSS } from "@/components/mobile/MobileDocList";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 // كسول: chunk القصّ (~75KB مع cropper) يُحمَّل عند فتح نافذة القصّ فقط.
@@ -139,34 +141,15 @@ export default function ProductsPage() {
   const [keepFields, setKeepFields] = useState<boolean>(false);
   const [exchangeRate, setExchangeRate] = useState<number>(1);
 
+  // المعدّل من مصدرٍ واحد يشاركه حوار الإضافة السريعة — راجع
+  // `getProductExchangeRate`. كان الاستعلام مكتوباً هنا وحده فيُنسخ لمن يحتاجه.
   useEffect(() => {
-    const fetchRate = async () => {
-      try {
-        const { data: currencies, error: cErr } = await supabase.from("currencies").select("*").eq("is_active", true).order("is_base", { ascending: false });
-        if (cErr) throw cErr;
-        if (currencies && currencies.length > 0) {
-          const nonBase = currencies.find((c: any) => !c.is_base);
-          if (nonBase) {
-            const { data: er, error: erErr } = await supabase
-              .from("exchange_rates")
-              .select("rate_to_base")
-              .eq("currency_code", nonBase.code)
-              .order("effective_date", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (erErr) throw erErr;
-            if (er?.rate_to_base) {
-              setExchangeRate(Number(er.rate_to_base));
-            }
-          }
-        }
-      } catch (e: any) {
-        console.error("[ProductsPage] exchange rate fetch failed:", e);
-        toast.message("تعذّر جلب سعر الصرف الحالي — الأسعار بالعملة الأجنبية قد تكون غير دقيقة");
-        console.error("Error fetching rate:", e);
+    getProductExchangeRate().then((r) => {
+      setExchangeRate(r);
+      if (r === 1) {
+        console.warn("[ProductsPage] لا سعر صرف للعملة الأجنبية — السعر المحلي يساوي الأجنبي");
       }
-    };
-    fetchRate();
+    });
   }, []);
 
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -918,6 +901,29 @@ export default function ProductsPage() {
     queryClient.setQueryData(["products-with-details"], patch);
     try {
       await update.mutateAsync({ id, [field]: value });
+      window.dispatchEvent(new Event("products:changed"));
+    } catch (e: any) {
+      queryClient.setQueryData(["products"], prevProducts);
+      queryClient.setQueryData(["products-with-details"], prevDetails);
+      toast.error(e.message || "فشل التحديث — تم التراجع");
+    }
+  };
+
+  /**
+   * تحديث عدّة حقول في نداءٍ واحد — بنفس تفاؤل `updateField` وتراجعه.
+   *
+   * نداءان متتاليان لا يصلحان هنا: السعر الأجنبي والمحلي يتغيّران معاً، فلو
+   * نجح أحدهما وفشل الآخر لبقيت البطاقة بسعرٍ لا يطابق الآخر.
+   */
+  const updateFields = async (id: string, fields: Record<string, any>) => {
+    const prevProducts = queryClient.getQueryData<any[]>(["products"]);
+    const prevDetails = queryClient.getQueryData<any[]>(["products-with-details"]);
+    const patch = (old: any[] | undefined) =>
+      (old || []).map((p: any) => p.id === id ? { ...p, ...fields } : p);
+    queryClient.setQueryData(["products"], patch);
+    queryClient.setQueryData(["products-with-details"], patch);
+    try {
+      await update.mutateAsync({ id, ...fields });
       window.dispatchEvent(new Event("products:changed"));
     } catch (e: any) {
       queryClient.setQueryData(["products"], prevProducts);
@@ -1889,7 +1895,16 @@ export default function ProductsPage() {
                     <div>
                       <label className={lbl}>سعر الأجنبي</label>
                       <input ref={el => fieldRefs.current[k] = el} type="number" value={form.foreign_price}
-                        onChange={e => setForm({ ...form, foreign_price: e.target.value })}
+                        onChange={e => {
+                          // السعر المحلي يتبع الأجنبي تلقائياً، ويبقى قابلاً
+                          // للتعديل بعدها يدوياً من حقله.
+                          const local = productLocalPrice(e.target.value, exchangeRate);
+                          setForm({
+                            ...form,
+                            foreign_price: e.target.value,
+                            ...(local > 0 ? { sale_price: String(local) } : {}),
+                          });
+                        }}
                         onKeyDown={handleFieldEnter(k)} onFocus={handleNumFocus} className={inp} placeholder="0.00" />
                       {(() => {
                         const fVal = parseFloat(form.foreign_price) || 0;
@@ -2415,7 +2430,14 @@ export default function ProductsPage() {
                   </td>
                   <td>
                     <input type="number" value={quickAdd.foreign_price}
-                      onChange={e => setQuickAdd({ ...quickAdd, foreign_price: e.target.value })}
+                      onChange={e => {
+                        const local = productLocalPrice(e.target.value, exchangeRate);
+                        setQuickAdd({
+                          ...quickAdd,
+                          foreign_price: e.target.value,
+                          ...(local > 0 ? { sale_price: String(local) } : {}),
+                        });
+                      }}
                       onKeyDown={e => { if (e.key === "Enter") handleQuickAdd(); }}
                       placeholder="—" disabled={quickSaving}
                       className="bg-background border border-border rounded px-1 py-0.5 text-[11px] w-full min-w-0 tabular-nums" />
@@ -2879,7 +2901,14 @@ export default function ProductsPage() {
                           onSave={(v) => {
                             const t = normalizeNumStr(v).replace(",", ".");
                             const n = t === "" ? null : (parseFloat(t) || 0);
-                            if (n !== (p.foreign_price ?? null)) return updateField(p.id, "foreign_price", n);
+                            if (n === (p.foreign_price ?? null)) return;
+                            // تغيير السعر الأجنبي يجرّ السعر المحلي معه — كان
+                            // يُكتب وحده فيبقى «السعر» على قيمته القديمة.
+                            const local = productLocalPrice(n, exchangeRate);
+                            if (local > 0) {
+                              return updateFields(p.id, { foreign_price: n, sale_price: local });
+                            }
+                            return updateField(p.id, "foreign_price", n);
                           }}
                           inputClassName="text-[12px] tabular-nums"
                           placeholder="—"
