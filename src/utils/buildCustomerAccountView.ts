@@ -24,6 +24,7 @@
  */
 import { extractOperationNo } from "@/utils/buildCustomerLedger";
 import { classifyCreditRow } from "@/utils/creditSource";
+import { paymentStatement, paymentCustomerText, indexLinkedOverpay } from "@/utils/paymentDisplay";
 
 export type AccountEntryKind =
   | "invoice"
@@ -281,6 +282,15 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
   const invoiceNoById = new Map<string, string>(
     liveInvoices.map((i) => [String(i.id), String(i.invoice_number || "—")]),
   );
+  const invoiceTotalById = new Map<string, number>(
+    liveInvoices.map((i) => [String(i.id), r2(num(i.total))]),
+  );
+  // الفائض منسوباً إلى الدفعة التي أنتجته — يُفهرس **قبل** المرور على
+  // الحركات: ترتيب القاعدة لا يضمن وصول قيد الفائض قبل قيد دفعته.
+  const overpayByPayment = indexLinkedOverpay(
+    transactions,
+    (t) => classifyCreditRow(t).source === "overpay_invoice",
+  );
 
   // ===== 2) بناء الحركات =====
   const byInvoice = new Map<string, AccountEntry[]>();
@@ -368,13 +378,24 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
 
     // (ج) دفعة نقدية/بنكية
     if (t.category === "customer_payment") {
+      const linkedInv = ref && invoiceIds.has(ref) ? ref : null;
+      // الدفعة كما دفعها العميل: المطبَّق + فائضها. القيدان يبقيان كما هما
+      // في الدفاتر — المضموم هنا نصٌّ يُقرأ لا مبلغٌ يُحتسب، فـ`effect` على
+      // حاله وإلا حُسب الفائض مرّتين (مرّةً هنا ومرّةً في قيده).
+      const surplus = r2(overpayByPayment.get(String(t.id)) || 0);
+      const display = {
+        applied: Math.abs(amt),
+        surplus,
+        invoiceNumber: linkedInv ? invoiceNoById.get(linkedInv) : null,
+        invoiceTotal: linkedInv ? invoiceTotalById.get(linkedInv) : null,
+      };
       push(ref, {
         id: `pay:${t.id}`,
         kind: "payment",
         ...st,
-        label: ref && invoiceIds.has(ref) ? "دفعة على الفاتورة" : "دفعة من العميل",
+        label: linkedInv ? paymentStatement(display) : "دفعة من العميل",
         detail,
-        customerText: `دفعتم ${money(Math.abs(amt))} عن طريق ${acc}${opNo ? ` — رقم العملية ${opNo}` : ""}`,
+        customerText: paymentCustomerText({ ...display, via: acc, operationNo: opNo }),
         effect: -r2(Math.abs(amt)),
         runningBalance: 0,
         raw: t,

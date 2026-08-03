@@ -53,6 +53,13 @@ interface PrintData {
   /** إخفاء صندوق "المبلغ المدفوع" في قسم ملخّص الحساب (يُستخدم في المعاينة). */
   hidePaidBox?: boolean;
   /**
+   * أقسامٌ تُحذف من الورقة قبل توليدها: `signatures` | `transport` |
+   * `packaging`. الحذف من الـHTML لا بالتنسيق، لأن مسارات PDF والرابط العام
+   * والطباعة المباشرة لا تمرّ بشريط المعاينة الذي يخفي بالـCSS — فلو كان
+   * الإخفاء تنسيقاً لخرج المخفيُّ إلى العميل.
+   */
+  hiddenSections?: string[];
+  /**
    * صافي حساب العميل **الآن** بإشارة الدفاتر (موجب = عليه).
    *
    * حين يُمرَّر، يصير هو «رصيد العميل الحالي» ويُشتقّ منه «المدفوع»:
@@ -100,7 +107,10 @@ export function generatePrintHTML(data: PrintData): string {
     paidAmount = 0, dueAmount = 0, notes, company, status, paymentMethod,
     variant = "full", noHeader = false, oldBalance = 0, packagingInfo, transportInfo, customTitle,
     previousDebt = 0, previousCredit = 0, hidePaidBox = false, currentNet = null,
+    hiddenSections = [],
   } = data;
+
+  const isSectionHidden = (key: string) => hiddenSections.includes(key);
 
   const balSum = computeDocumentBalance({
     grandTotal, discount: discountTotal, paidAmount,
@@ -117,13 +127,25 @@ export function generatePrintHTML(data: PrintData): string {
       : type === "purchase" ? "أمر شراء"
       : "فاتورة مشتريات"));
 
+  // اسم المستند في جُمَل «لا توجد بيانات…» — كان "الفاتورة" مثبَّتاً حتى في
+  // عرض السعر، ومرّةً بخطأ نحوي ("لهذا الفاتورة").
+  const docNoun = type === "quote" ? "لعرض السعر هذا"
+    : type === "purchase" ? "لأمر الشراء هذا"
+    : type === "return" ? "لهذا المرتجع"
+    : "لهذه الفاتورة";
+
   const currency = "";
   // Header visibility is controlled solely by the explicit `noHeader` flag.
   const showHeader = noHeader !== true;
   const showItems = variant !== "account-only" && variant !== "no-details";
   const showAccount = variant !== "no-account" && variant !== "no-details" && variant !== "stocktake";
   // Packaging/transport block: hidden for account-only and no-details variants.
-  const showExtras = variant !== "account-only" && variant !== "no-details" && variant !== "stocktake";
+  const extrasAllowedByVariant = variant !== "account-only" && variant !== "no-details" && variant !== "stocktake";
+  const showPackaging = extrasAllowedByVariant && !isSectionHidden("packaging");
+  const showTransport = extrasAllowedByVariant && !isSectionHidden("transport");
+  // الصندوقان متجاوران؛ إن أُخفيا معاً سقط الصفّ كلّه فلا يبقى إطارٌ فارغ.
+  const showExtras = showPackaging || showTransport;
+  const showSignatures = variant !== "stocktake" && !isSectionHidden("signatures");
   const logoURL = resolveLogoUrl(company?.logo_url);
   // "المطلوب النهائي" = جملة الفاتورة − المبلغ المدفوع (لا يُجمع مع الحساب القديم).
   const finalTotal = Math.max(0, grandTotal - paidAmount);
@@ -431,13 +453,26 @@ ${showAccount ? (() => {
   const prevNet = (Number(previousDebt) || 0) - (Number(previousCredit) || 0);
   const hasPrev = Math.abs(prevNet) > 0.01;
   const generalDiscount = balSum.hasDiscount ? balSum.discount : 0;
+  /**
+   * ## عرض السعر لا يدخل حساب العميل
+   *
+   * كان الملخّص واحداً للفاتورة وعرض السعر، فيُجمع إجمالي العرض على الرصيد
+   * السابق ويُعرض الناتج «رصيد العميل الحالي». فيقرأ العميل أن عرضاً لم
+   * يُقبل بعد قد صار ديناً عليه — والعرض ليس مطالبةً أصلاً، ولا يُكتب في كشف
+   * الحساب ولا في `customers.balance`.
+   *
+   * فالورقة هنا تعرض أرقام العرض وحدها، ورصيدَ العميل كما هو **قبل العرض
+   * وبعده** — لا فرق بينهما — ولا صفَّ «مدفوع» لمستندٍ لا يُدفع.
+   */
+  const isQuote = type === "quote";
   const invoiceValue = Math.max(
     (Number(grandTotal) || 0) + generalDiscount,
     (Number(subtotal) || 0) + (Number(shipping) || 0),
     Number(grandTotal) || 0,
   ); // قيمة الفاتورة قبل الخصم
   const netInvoiceValue = Number(grandTotal) || 0; // صافي الفاتورة بعد الخصم
-  const jomlaHesab = netInvoiceValue + prevNet; // جملة الحساب
+  // جملة الحساب — وفي عرض السعر لا حساب: إجماليه لا يُضمّ إلى رصيد العميل.
+  const jomlaHesab = isQuote ? netInvoiceValue : netInvoiceValue + prevNet;
   /**
    * ## «المدفوع» يُشتقّ من الرصيد الفعلي لا من `paid_amount` الفاتورة
    *
@@ -454,9 +489,12 @@ ${showAccount ? (() => {
    * وهي نفس آلية «شحن الرصيد»: يُسجَّل على الحساب ولا يُوزَّع على بنوده.
    */
   const netProvided = currentNet != null && !Number.isNaN(Number(currentNet));
-  const finalNet = netProvided ? r2(Number(currentNet)) : jomlaHesab - paidAmount; // >0 عليه، <0 له
+  // رصيد العميل في عرض السعر هو رصيده السابق حرفياً — العرض لا يحرّكه.
+  const finalNet = isQuote
+    ? r2(prevNet)
+    : netProvided ? r2(Number(currentNet)) : jomlaHesab - paidAmount; // >0 عليه، <0 له
   const derivedPaid = netProvided ? Math.max(0, r2(jomlaHesab - finalNet)) : paidAmount;
-  const hasPaid = !hidePaidBox && derivedPaid > 0.01;
+  const hasPaid = !isQuote && !hidePaidBox && derivedPaid > 0.01;
   const paidValue = hasPaid ? derivedPaid : 0;
   // الإشارة بلغة العميل — `signedAmountText` هي المصدر الواحد لها في النظام:
   // `+` أخضر لما في مصلحته، `−` أحمر لما عليه. ولأن دالتها تقرأ الموجبَ لصالح
@@ -483,9 +521,9 @@ ${showAccount ? (() => {
 <!-- ملخّص الحساب على شكل خلايا Excel: أصغر من جدول البنود، مضغوط في الأسفل -->
 <table data-section="account-summary" data-section-label="ملخص الحساب" style="width:38%;max-width:260px;margin:6px 0 4px;border-collapse:collapse;font-size:10px;">
   <tbody>
-    ${row({ section: "invoice-value", label: "قيمة الفاتورة", value: fmt(invoiceValue) })}
-    ${generalDiscount > 0.01 ? row({ section: "discount-row", label: "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : ""}
-    ${hasPrev ? (() => {
+    ${row({ section: "invoice-value", label: isQuote ? "قيمة عرض السعر" : "قيمة الفاتورة", value: fmt(invoiceValue) })}
+    ${generalDiscount > 0.01 ? row({ section: "discount-row", label: isQuote ? "الخصم على العرض" : "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : ""}
+    ${!isQuote && hasPrev ? (() => {
       const prevSigned = signedAmountText(-prevNet);
       return row({
         section: "prev-account-row",
@@ -496,13 +534,14 @@ ${showAccount ? (() => {
         badgeColor: TONE_COLOR[prevSigned.tone],
       });
     })() : ""}
-    ${row({ section: "majmoo-row", label: "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
-    ${row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
+    ${row({ section: "majmoo-row", label: isQuote ? "إجمالي عرض السعر" : "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
+    ${isQuote ? "" : row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
+    ${isQuote && !hasPrev ? "" : `
     <tr data-section="final-status" data-section-label="رصيد العميل الحالي">
       <td style="${cellR}background:#e8eef7;">رصيد العميل الحالي</td>
       <td data-section="final-total" data-section-label="رصيد العميل الحالي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:11.5px;color:${finalColor};">${finalDisplay}</td>
       <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:9.5px;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
-    </tr>
+    </tr>`}
   </tbody>
 </table>
 `;
@@ -511,14 +550,16 @@ ${showAccount ? (() => {
 ${showExtras ? `
 <!-- Packaging & Transport -->
 <div class="extra-row">
-  <div class="extra-box" data-section="packaging" data-section-label="التغليف">
+  ${showPackaging ? `
+  <div class="extra-box" data-section="packaging" data-section-label="تفاصيل التغليف">
     <div class="extra-box-title">تفاصيل التغليف</div>
-    <p>${cleanPackaging || "لا توجد بيانات تغليف لهذه الفاتورة"}</p>
-  </div>
-  <div class="extra-box" data-section="transport" data-section-label="الترحيلات">
+    <p>${cleanPackaging || `لا توجد بيانات تغليف ${docNoun}`}</p>
+  </div>` : ""}
+  ${showTransport ? `
+  <div class="extra-box" data-section="transport" data-section-label="معلومات الترحيل">
     <div class="extra-box-title">معلومات الترحيل</div>
-    <p>${cleanTransport || "لا توجد بيانات ترحيل لهذا الفاتورة"}</p>
-  </div>
+    <p>${cleanTransport || `لا توجد بيانات ترحيل ${docNoun}`}</p>
+  </div>` : ""}
 </div>
 ` : ""}
 
@@ -529,11 +570,13 @@ ${notes ? `
 </div>
 ` : ""}
 
+${showSignatures ? `
 <!-- Signatures -->
-<div class="signatures">
+<div class="signatures" data-section="signatures" data-section-label="التواقيع">
   <div class="sig-box"><div class="sig-line">توقيع المستلم</div></div>
   <div class="sig-box"><div class="sig-line">توقيع المسؤول</div></div>
 </div>
+` : ""}
 
 </div>
 </body>

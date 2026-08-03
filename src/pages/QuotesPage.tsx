@@ -4,6 +4,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useQuotes, useCompanySettings } from "@/hooks/useData";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -28,15 +29,16 @@ export const statusMap: Record<string, { label: string; cls: string }> = {
 function useQuotesFullList() {
   return useQuery({
     queryKey: ["quotes-full"],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    // بلا `range` يتوقّف الاستعلام عند حدّ Supabase (1000 صف) صامتاً، فتغيب
+    // العروض الأقدم عن شاشة الإدارة بلا خطأ يُنبّه — راجع `fetchAllRows`.
+    queryFn: () => fetchAllRows((from, to) =>
+      supabase
         .from("quotes")
         .select("*, customers(name, phone, whatsapp, balance)")
         .or("is_side.is.null,is_side.eq.false")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    ),
   });
 }
 

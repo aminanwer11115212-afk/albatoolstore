@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { toast } from "sonner";
 import { startsWithAny } from "@/utils/searchMatch";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -12,15 +13,15 @@ import { useConfirmDelete } from "@/components/common/ConfirmDeleteProvider";
 function useSideQuotes() {
   return useQuery({
     queryKey: ["side-quotes"],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    // نفس علّة شاشة العروض الرئيسية: بلا `range` تُقصّ القائمة عند 1000 صف.
+    queryFn: () => fetchAllRows((from, to) =>
+      supabase
         .from("quotes")
         .select("*, customers(name, phone)")
         .eq("is_side", true)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    ),
   });
 }
 
@@ -108,8 +109,13 @@ export default function SideQuotesPage() {
       errorMessage: "تعذّر حذف العرض",
       onConfirm: async () => {
         await supabase.from("quote_items").delete().eq("quote_id", id);
-        const { error } = await supabase.from("quotes").delete().eq("id", id);
+        // `select` يكشف الحذف الذي تمنعه سياسة RLS: ينجح الطلب بصفر صفوف
+        // بلا خطأ، فتُعرض رسالة نجاح ويعود العرض عند أوّل تحديث.
+        const { data, error } = await supabase.from("quotes").delete().eq("id", id).select("id");
         if (error) throw error;
+        if (Array.isArray(data) && data.length === 0) {
+          throw new Error("لم يُحذف العرض — تحقّق من صلاحيتك أو أنه محذوف مسبقاً");
+        }
         qc.invalidateQueries({ queryKey: ["side-quotes"] });
         qc.invalidateQueries({ queryKey: ["quotes-full"] });
         qc.invalidateQueries({ queryKey: ["quotes-with-customers"] });

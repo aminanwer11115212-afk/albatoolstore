@@ -16,7 +16,13 @@ export interface ShareFileInput {
   fileName: string;
   /** نوع MIME إن عُرف */
   mimeType?: string | null;
-  /** نص مرافق (اختياري) */
+  /**
+   * نص مرافق — يُرسل مع الملف فقط إن طُلب صراحةً.
+   *
+   * كان اسم الملف يُمرَّر هنا من كل نداءات المرفقات، فيصل المستلم على واتساب
+   * سطرٌ نصّي فيه `17857000106409110774407288145045-cropped.jpg` فوق الصورة.
+   * والمطلوب صورةٌ وحدها بلا شيء، فالافتراض الآن ألّا يُرسل نصّ مع الملف.
+   */
   text?: string;
   /** عنوان المشاركة */
   title?: string;
@@ -46,7 +52,11 @@ export async function shareFileNative(input: ShareFileInput): Promise<ShareFileO
         });
         if (canShareFiles(file)) {
           try {
-            await navigator.share({ files: [file], title, text });
+            // الملف وحده ما لم يُطلب نصّ صراحةً — لا اسم ملف ولا عنوان يُحشر
+            // فوق الصورة عند المستلم.
+            await navigator.share(
+              text ? { files: [file], title, text } : { files: [file] },
+            );
             return "file";
           } catch (e: any) {
             if (e?.name === "AbortError") return "cancelled";

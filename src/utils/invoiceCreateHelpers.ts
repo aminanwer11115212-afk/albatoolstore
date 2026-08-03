@@ -38,6 +38,40 @@ export interface InvRow {
   note: string;
 }
 
+/** تدوير نقدي موحّد — منزلتان. مصدرٌ واحد حتى لا يختلف بندٌ عن بند. */
+export function roundMoney(n: unknown): number {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+/**
+ * السعر المحلي = الأجنبي × المعدّل، مدوَّراً مرّةً واحدة.
+ *
+ * الضرب الخام كان مبعثراً في ستّة مواضع (شريط الإضافة، حقل السعر الأجنبي،
+ * حقل المعدّل، نافذة المنتج السريع، استيراد الرسالة — في الشاشتين)، فينتج
+ * `51799.999999999994` ويظهر في الجدول رقماً بكسورٍ لا معنى لها.
+ */
+export function computeUnitPrice(foreignPrice: unknown, rate: unknown): number {
+  return roundMoney((Number(foreignPrice) || 0) * (Number(rate) || 0));
+}
+
+/** دقّة اشتقاق المعدّل من (المحلي ÷ الأجنبي). */
+export const RATE_PRECISION = 6;
+
+/**
+ * معدّل الصفّ مشتقّاً من سعرَيه.
+ *
+ * الدقّة هنا ليست تجميلاً: كانت ثلاث منازل، فبندٌ محلّيه 51,800 وأجنبيّه 763.63
+ * يُشتقّ له 67.834، وأيّ إعادة حساب لاحقة تُرجع 51,800.23 — كسورٌ تظهر للمستخدم
+ * من لا شيء. بستّ منازل يبقى الفرق دون نصف قرش فيبتلعه `roundMoney`.
+ */
+export function deriveRowRate(unitPrice: unknown, foreignPrice: unknown): number {
+  const up = Number(unitPrice) || 0;
+  const fp = Number(foreignPrice) || 0;
+  if (fp <= 0 || up <= 0) return 1;
+  const f = 10 ** RATE_PRECISION;
+  return Math.round((up / fp) * f) / f;
+}
+
 export function newRow(rate: number = 1): InvRow {
   return {
     uid: crypto.randomUUID(),
@@ -116,7 +150,7 @@ export function priceFromProduct(
 ): { foreign_price: number; unit_price: number } {
   const fp = Number(p.foreign_price) || Number(p.sale_price) || 0;
   const rate = Number(exchangeRate) || 1;
-  return { foreign_price: fp, unit_price: Math.round(fp * rate * 100) / 100 };
+  return { foreign_price: fp, unit_price: computeUnitPrice(fp, rate) };
 }
 
 /**
@@ -133,7 +167,7 @@ export function backfillForeignPrice(
   const up = Number(row.unit_price) || 0;
   const cardFp = Number(card?.foreign_price) || 0;
   if (up <= 0 || cardFp <= 0) return null;
-  return { foreign_price: cardFp, exchange_rate: Math.round((up / cardFp) * 1000) / 1000 };
+  return { foreign_price: cardFp, exchange_rate: deriveRowRate(up, cardFp) };
 }
 
 /**
@@ -146,13 +180,13 @@ export function applyRateToRow<T extends { foreign_price: number; unit_price: nu
   rate: number,
 ): T {
   if ((Number(row.foreign_price) || 0) <= 0) return row;
-  return { ...row, exchange_rate: rate, unit_price: Math.round(row.foreign_price * rate * 100) / 100 };
+  return { ...row, exchange_rate: rate, unit_price: computeUnitPrice(row.foreign_price, rate) };
 }
 
 export function calcTotal(r: InvRow): number {
   const sub = r.quantity * r.unit_price;
   const afterDisc = sub - sub * (r.discount / 100);
-  return Math.round(afterDisc * 100) / 100;
+  return roundMoney(afterDisc);
 }
 
 export const btnStyle = (bg: string): React.CSSProperties => ({

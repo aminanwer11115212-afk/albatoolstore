@@ -46,11 +46,16 @@ test.describe("customer share-link PDF download", () => {
     const paidTxt = (await page.locator('[data-section="paid-amount"] .summary-box-value').innerText()).replace(/,/g, "");
     const finalTxt = (await page.locator('[data-section="final-total"] .summary-box-value').innerText()).replace(/,/g, "");
     const paid = Number(paidTxt);
-    const final = Number(finalTxt);
-    // Same math as printTemplate.ts line 97: Math.max(0, grandTotal - paidAmount)
+    // «رصيد العميل الحالي» موقّعٌ بإشارة العميل — نفس نصّ الطباعة حرفياً:
+    // `−X` عليه، `+X` له، «خالص» صفراً. كان مقصوصاً عند الصفر فيخفي الرصيد.
+    const owed = finalTxt.includes("خالص")
+      ? 0
+      : /^[−-]/.test(finalTxt.trim())
+        ? Number(finalTxt.trim().replace(/^[−-]\s*/, ""))
+        : -Number(finalTxt.trim().replace(/^\+\s*/, ""));
     expect(paid).toBe(FIXTURE.paidAmount);
-    expect(final).toBe(Math.max(0, FIXTURE.grandTotal - FIXTURE.paidAmount));
-    expect(paid + final).toBe(FIXTURE.grandTotal);
+    expect(owed).toBe(FIXTURE.grandTotal - FIXTURE.paidAmount);
+    expect(paid + owed).toBe(FIXTURE.grandTotal);
 
     // --- filename exposed on button (data-filename set by inline script) -
     // Wait for the IIFE to run.

@@ -6,6 +6,7 @@ import { runOrQueue } from "@/lib/offlineQueue";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
 import ShareFileButton from "@/components/shared/ShareFileButton";
+import AttachmentLightbox from "@/components/shared/AttachmentLightbox";
 import { useCropQueue } from "@/hooks/useCropQueue";
 import { useRecropImage } from "@/hooks/useRecropImage";
 
@@ -42,6 +43,11 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("receipt");
+  // فهرس المرفق المفتوح في العارض المكبّر — `null` = مغلق.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  // الفهرس يشير داخل قائمة الفئة الحالية، فتبديل الفئة يُبطله — ولولا الإغلاق
+  // لعُرض مرفقٌ آخر بالفهرس نفسه.
+  useEffect(() => { setLightboxIndex(null); }, [activeTab]);
 
   const cropQueue = useCropQueue((files) => { handleUpload(filesToList(files)); });
   const onFilesSelected = (files: FileList | null) => cropQueue.start(files);
@@ -332,15 +338,29 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
                     key={att.id}
                     className="flex items-center gap-3 p-2 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition"
                   >
-                    <div className="w-12 h-12 rounded bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {/* المصغّرة 48 بكسل لا يُتأكَّد منها — النقر يفتح العارض المكبّر. */}
+                    <button
+                      type="button"
+                      onClick={() => setLightboxIndex(filtered.findIndex((x) => x.id === att.id))}
+                      className="w-12 h-12 rounded bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden cursor-zoom-in hover:ring-2 hover:ring-primary/50 transition"
+                      title="عرض المستند مكبّراً"
+                      aria-label={`عرض ${att.file_name} مكبّراً`}
+                    >
                       {isImage(att.file_type) ? (
                         <img src={att.file_url} alt={att.file_name} className="w-full h-full object-cover" />
                       ) : (
                         <FileText size={18} className="text-muted-foreground" />
                       )}
-                    </div>
+                    </button>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-foreground truncate">{att.file_name}</div>
+                      <button
+                        type="button"
+                        onClick={() => setLightboxIndex(filtered.findIndex((x) => x.id === att.id))}
+                        className="text-sm font-medium text-foreground truncate block w-full text-right hover:text-primary transition"
+                        title="عرض المستند مكبّراً"
+                      >
+                        {att.file_name}
+                      </button>
                       <div className="text-[11px] text-muted-foreground">
                         {fmtSize(att.file_size)} · {new Date(att.created_at).toLocaleDateString("ar-EG")}
                       </div>
@@ -385,12 +405,12 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
                             <Scissors size={15} />
                           </button>
                         )}
+                        {/* بلا `text`: اسم الملف كان يصل المستلم سطراً نصّياً
+                            فوق الصورة — والمطلوب الصورة وحدها. */}
                         <ShareFileButton
                           url={att.file_url}
                           fileName={att.file_name}
                           mimeType={att.file_type}
-                          text={att.file_name}
-                          title="مشاركة مستند"
                         />
                         <a
                           href={att.file_url}
@@ -444,6 +464,11 @@ export default function QuoteAttachmentsDialog({ quoteId, open, onClose }: Props
         onConfirm={recrop.confirm}
         defaultAspect="free"
         title="إعادة قص صورة المرفق"
+      />
+      <AttachmentLightbox
+        items={filtered}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
       />
     </div>
   );

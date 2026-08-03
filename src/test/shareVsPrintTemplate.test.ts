@@ -137,45 +137,67 @@ describe("printTemplate account-summary contract (current-balance semantics)", (
 });
 
 // ---------------------------------------------------------------------------
-// Cross-template equivalence: the print template and the share template must
-// display the SAME numbers for the same input (paid + final boxes).
+// تطابق القالبين: رابط العميل يعرض **نفس** ما تعرضه الطباعة والمعاينة.
+//
+// كان القالبان يختلفان عمداً: الطباعة تعرض «رصيد العميل الحالي» موقّعاً، ورابط
+// العميل يعرض «المطلوب النهائي» مقصوصاً عند الصفر. فمن دفع أكثر من فاتورته
+// يقرأ في رابطه «0» ولا يرى رصيده، ومن عليه حسابٌ قديم لا يراه أصلاً — ورقتان
+// لمستندٍ واحد. صار القالبان يعطيان الرقم نفسه بالإشارة نفسها.
 // ---------------------------------------------------------------------------
-describe("share vs print: equivalent numeric output", () => {
+describe("share vs print: نفس الأرقام ونفس الإشارة", () => {
   const cases: Array<{ label: string; grandTotal: number; paidAmount: number }> = [
     { label: "clean integers",              grandTotal: 1000,          paidAmount: 300 },
     { label: "0.1 + 0.2 float precision",   grandTotal: 0.1 + 0.2,     paidAmount: 0.1 },
     { label: "cents precision partial",     grandTotal: 123.45,        paidAmount: 67.89 },
     { label: "large amount",                grandTotal: 12_345_678_901.5, paidAmount: 1_234_567.25 },
-    { label: "overpayment clamped",         grandTotal: 500,           paidAmount: 999 },
+    { label: "overpayment",                 grandTotal: 500,           paidAmount: 999 },
     { label: "zero total",                  grandTotal: 0,             paidAmount: 0 },
     { label: "many partial sum drift",      grandTotal: 1000,          paidAmount: [123.45, 67.89, 200.11, 8.55].reduce((s, x) => s + x, 0) },
   ];
 
   const round2 = (x: number) => Math.round(x * 100) / 100;
   for (const c of cases) {
-    it(`${c.label}: paid boxes match; each final follows its template formula`, () => {
-      const shareHtml = buildDocHTML({ ...shareBase, grandTotal: c.grandTotal, paidAmount: c.paidAmount });
+    it(`${c.label}: القالبان يعطيان نفس المدفوع ونفس الرصيد`, () => {
+      const shareHtml = buildDocHTML({ ...shareBase, grandTotal: c.grandTotal, subtotal: c.grandTotal, paidAmount: c.paidAmount });
       const printHtml = generatePrintHTML({ ...base, grandTotal: c.grandTotal, subtotal: c.grandTotal, paidAmount: c.paidAmount });
-      // المدفوع متطابق بين القالبين
       expect(pickBox(shareHtml, "paid-amount")).toBe(pickBox(printHtml, "paid-amount"));
-      const due = round2(c.grandTotal - c.paidAmount);
-      // قالب المشاركة: المتبقي المطلوب مقصوصاً عند 0
-      expect(pickBox(shareHtml, "final-total")).toBe(Math.max(0, due));
-      // قالب الطباعة: رصيد العميل الحالي موقّعاً (غير مقصوص)
-      expect(parseOwed(pickRaw(printHtml, "final-total"))).toBe(due);
+      // نفس النصّ حرفياً — لا مجرّد نفس القيمة
+      expect(pickRaw(shareHtml, "final-total")).toBe(pickRaw(printHtml, "final-total"));
+      expect(parseOwed(pickRaw(shareHtml, "final-total"))).toBe(round2(c.grandTotal - c.paidAmount));
     });
   }
 
-  it("share template: 0.1 + 0.2 doesn't leak 0.30000000000000004", () => {
+  it("الفائض يُعرض رصيداً للعميل — لا يُقصّ عند الصفر كما كان", () => {
+    const html = buildDocHTML({ ...shareBase, grandTotal: 500, paidAmount: 999 });
+    expect(pickRaw(html, "final-total")).toMatch(/^\+/);
+    expect(parseOwed(pickRaw(html, "final-total"))).toBe(-499);
+  });
+
+  it("الحساب القديم يظهر في رابط العميل كما في الطباعة", () => {
+    const shareHtml = buildDocHTML({ ...shareBase, paidAmount: 0, previousDebt: 700 });
+    const printHtml = generatePrintHTML({ ...base, paidAmount: 0, previousDebt: 700 });
+    for (const html of [shareHtml, printHtml]) {
+      expect(html).toContain("الحساب القديم");
+      expect(html).toContain("جملة الحساب");
+    }
+    expect(pickRaw(shareHtml, "final-total")).toBe(pickRaw(printHtml, "final-total"));
+  });
+
+  it("عرض السعر لا يدخل حساب العميل في رابطه أيضاً", () => {
+    const html = buildDocHTML({ ...shareBase, docTitle: "عرض سعر", isQuote: true, previousDebt: 300 });
+    expect(html).toContain("إجمالي عرض السعر");
+    expect(html).not.toContain("جملة الحساب");
+    expect(html).not.toContain("المدفوع");
+  });
+
+  it("share template: 0.1 + 0.2 لا يُسرّب 0.30000000000000004", () => {
     const html = buildDocHTML({ ...shareBase, grandTotal: 0.1 + 0.2, paidAmount: 0.1 });
-    expect(pickBox(html, "final-total")).toBe(0.2);
+    expect(parseOwed(pickRaw(html, "final-total"))).toBe(0.2);
   });
 
   it("share template: large numbers include thousands grouping", () => {
     const html = buildDocHTML({ ...shareBase, grandTotal: 12_345_678, paidAmount: 0 });
-    const m = html.match(/data-section="final-total"[\s\S]*?class="summary-box-value[^"]*"[^>]*>([^<]+)</);
-    expect(m).toBeTruthy();
-    expect(m![1]).toContain(",");
+    expect(pickRaw(html, "final-total")).toContain(",");
   });
 
   it("share template: filename builder ingredients are inlined for e2e download check", () => {
@@ -183,7 +205,72 @@ describe("share vs print: equivalent numeric output", () => {
     expect(html).toContain('"فاتورة مبيعات"');
     expect(html).toContain('"أحمد علي"');
     expect(html).toContain('"INV-001"');
-    // The button also exposes the computed filename as data-filename after JS runs.
     expect(html).toContain('id="__btn_pdf"');
+  });
+});
+
+/**
+ * بنية الورقة نفسها في القالبين — لا الأرقام وحدها.
+ * «يطابق المعاينة والطباعة بكل شيء»: نفس الأقسام، ونفس أعمدة الجدول،
+ * ونفس الصناديق والتواقيع، ونفس أدوات التكبير/التصغير.
+ */
+describe("share vs print: نفس بنية الورقة", () => {
+  const shareHtml = buildDocHTML({ ...shareBase, paidAmount: 300 });
+  const printHtml = generatePrintHTML({ ...base, paidAmount: 300 });
+
+  const SECTIONS = [
+    "header", "items", "grand-total", "account-summary",
+    "invoice-value", "majmoo-row", "paid-amount", "final-total",
+    "packaging", "transport", "signatures",
+  ];
+
+  it.each(SECTIONS)("القسم %s موجود في القالبين", (key) => {
+    expect(shareHtml).toContain(`data-section="${key}"`);
+    expect(printHtml).toContain(`data-section="${key}"`);
+  });
+
+  it("نفس أعمدة جدول البنود", () => {
+    for (const th of ["اسم الصنف", "الكمية", "السعر", "الإجمالي"]) {
+      expect(shareHtml).toContain(th);
+      expect(printHtml).toContain(th);
+    }
+  });
+
+  it("نفس التواقيع", () => {
+    for (const html of [shareHtml, printHtml]) {
+      expect(html).toContain("توقيع المستلم");
+      expect(html).toContain("توقيع المسؤول");
+    }
+  });
+
+  it("نفس صندوقَي التغليف والترحيل", () => {
+    for (const html of [shareHtml, printHtml]) {
+      expect(html).toContain("تفاصيل التغليف");
+      expect(html).toContain("معلومات الترحيل");
+    }
+  });
+
+  it("رابط العميل فيه تكبير وتصغير — الوظيفة التي طُلب تطابقها", () => {
+    expect(shareHtml).toContain('id="__zoom_in"');
+    expect(shareHtml).toContain('id="__zoom_out"');
+    expect(shareHtml).toContain('id="__zoom_reset"');
+    expect(shareHtml).toContain('id="__btn_print"');
+  });
+
+  it("إخفاء قسم من المعاينة يُخفيه في رابط العميل", () => {
+    const html = buildDocHTML({ ...shareBase, hiddenSections: ["signatures", "transport"] });
+    expect(html).not.toContain("توقيع المستلم");
+    expect(html).not.toContain("معلومات الترحيل");
+    expect(html).toContain("تفاصيل التغليف");
+  });
+
+  it("تفاصيل التغليف والترحيل تُعرض حين تُمرَّر", () => {
+    const html = buildDocHTML({
+      ...shareBase,
+      packagingInfo: "النوع: كرتونة | الكمية: 10",
+      transportInfo: "الاسم: مرحّل | الهاتف: 0912",
+    });
+    expect(html).toContain("النوع: كرتونة");
+    expect(html).toContain("الاسم: مرحّل");
   });
 });

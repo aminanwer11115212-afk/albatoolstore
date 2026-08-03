@@ -53,6 +53,9 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0, float
   const [editing, setEditing] = useState<EditablePayment | null>(null);
   const [editingCharge, setEditingCharge] = useState<EditableCharge | null>(null);
   const [bump, setBump] = useState(0);
+  // الفائض المسجَّل على هذه الفاتورة — قيدُ `customer_credit` الذي يفصله
+  // `splitPayment` عن الدفعة. بدونه يقرأ المستخدم 4,000 وقد دُفع 5,000.
+  const [linkedSurplus, setLinkedSurplus] = useState(0);
   const { isAdmin } = useUserRole();
 
 
@@ -76,9 +79,18 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0, float
           .eq("category", "customer_payment")
           .order("created_at", { ascending: false }),
       ]);
+      const { data: surplus } = await (supabase as any)
+        .from("transactions")
+        .select("amount")
+        .eq("reference_id", invoiceId)
+        .eq("category", "customer_credit")
+        .gt("amount", 0);
       if (cancelled) return;
       setRows((revs as Revision[]) || []);
       setLive((txs as LiveTx[]) || []);
+      setLinkedSurplus(
+        ((surplus as any[]) || []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+      );
       setLoading(false);
     };
     load();
@@ -130,6 +142,16 @@ export default function InvoicePaymentHistory({ invoiceId, refreshKey = 0, float
               {isAdmin && live.length > 0 && (
                 <div className="border-b border-border/70 bg-muted/20 p-2 space-y-1">
                   <div className="text-[10px] font-semibold text-muted-foreground">الدفعات النشطة (قابلة للتعديل)</div>
+                  {/* ما دفعه العميل كاملاً: القيود مقسومة، والدفعة واحدة. */}
+                  {linkedSurplus > 0.009 && (
+                    <div className="text-[10px] text-emerald-700 dark:text-emerald-300">
+                      إجمالي المدفوع على هذه الفاتورة{" "}
+                      <b className="tabular-nums">
+                        {(live.reduce((s, t) => s + Number(t.amount || 0), 0) + linkedSurplus).toLocaleString()}
+                      </b>{" "}
+                      — منها <b className="tabular-nums">{linkedSurplus.toLocaleString()}</b> فائض أُضيف إلى رصيد العميل
+                    </div>
+                  )}
                   <ul className="divide-y divide-border/60">
                     {live.map((t) => {
                       const alloc = t.allocation || {};
