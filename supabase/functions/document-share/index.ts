@@ -8,6 +8,70 @@ import { attr, fmt, buildDocHTML } from "./template.ts";
 // Re-export so Deno tests (index_test.ts) can keep importing from index.ts.
 export { buildDocHTML } from "./template.ts";
 
+/**
+ * تفاصيل التغليف والترحيل بنفس صياغة `src/utils/printExtras.ts`.
+ *
+ * ورقة العميل كانت تُبنى بلا هذين الصندوقين، فيرى المستخدم في المعاينة
+ * والطباعة ما لا يصل عميله. والحقول هنا مقصورة على ما تعرضه الطباعة:
+ * اسم المرحّل وهاتفه وعنوانه — لا مركبة ولا سائق ولا تكلفة.
+ */
+async function loadExtras(
+  supabase: any,
+  kind: "invoice" | "quote",
+  docId: string,
+): Promise<[string | null, string | null]> {
+  const esc = (v: unknown) => String(v ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const transportTable = kind === "invoice" ? "invoice_transports" : "quote_transports";
+  const packagingTable = kind === "invoice" ? "invoice_packaging" : "quotes_packaging";
+  const fk = kind === "invoice" ? "invoice_id" : "quote_id";
+  try {
+    const [{ data: transports }, { data: packaging }] = await Promise.all([
+      supabase.from(transportTable).select("transporters(name, phone, address)").eq(fk, docId),
+      supabase.from(packagingTable)
+        .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
+        .eq(fk, docId),
+    ]);
+
+    const seen = new Set<string>();
+    const tBlocks: string[] = [];
+    for (const r of (transports || [])) {
+      const t = (r as any).transporters || {};
+      if (!t.name) continue;
+      const key = `${t.name}|${t.phone || ""}|${t.address || ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const parts = [`الاسم: ${esc(t.name)}`];
+      if (t.phone) parts.push(`الهاتف: ${esc(t.phone)}`);
+      if (t.address) parts.push(`العنوان: ${esc(t.address)}`);
+      tBlocks.push(parts.join(" | "));
+    }
+
+    const pLines = (packaging || []).map((r: any) => {
+      const parts: string[] = [];
+      if (r.packaging_types?.name) parts.push(`النوع: ${esc(r.packaging_types.name)}`);
+      if (Number(r.quantity)) parts.push(`الكمية: ${Number(r.quantity)}`);
+      if (Number(r.packs_count)) parts.push(`عدد الطرود: ${Number(r.packs_count)}`);
+      if (Number(r.pieces_per_pack)) parts.push(`قطع/طرد: ${Number(r.pieces_per_pack)}`);
+      if (Number(r.weight)) parts.push(`الوزن: ${Number(r.weight)}`);
+      if (r.dimensions) parts.push(`الأبعاد: ${esc(r.dimensions)}`);
+      let line = parts.join(" | ");
+      const cost = Number(r.cost || 0);
+      if (cost > 0) line += ` — التكلفة: ${cost.toLocaleString("en-US")}`;
+      if (r.notes) line += `<br><span style="color:#666;font-size:11px;">${esc(r.notes)}</span>`;
+      return line;
+    }).filter(Boolean);
+    const totalCost = (packaging || []).reduce((sum: number, r: any) => sum + Number(r.cost || 0), 0);
+    let pHtml = pLines.join("<br>");
+    if (pHtml && totalCost > 0) pHtml += `<br><strong>الإجمالي: ${totalCost.toLocaleString("en-US")}</strong>`;
+
+    return [pHtml || null, tBlocks.join("<br>") || null];
+  } catch (_e) {
+    // تعذّرت القراءة: الصندوقان يظهران بجملة «لا توجد بيانات» بدل كسر الورقة.
+    return [null, null];
+  }
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -612,6 +676,16 @@ Deno.serve(async (req) => {
     let items: any[] = [];
     let grandTotal = 0;
     let paidAmount = 0;
+    // بيانات ملخّص الحساب وصندوقَي التغليف/الترحيل — يطابق بها رابطُ العميل
+    // ورقةَ الطباعة والمعاينة. كانت الورقة هنا مبسّطة فتختلف عمّا يراه المستخدم.
+    let subtotal: number | null = null;
+    let discountTotal = 0;
+    let previousDebt = 0;
+    let previousCredit = 0;
+    let currentNet: number | null = null;
+    let isQuote = false;
+    let packagingInfo: string | null = null;
+    let transportInfo: string | null = null;
 
     let notes: string | null = null;
     let statementHtml: string | null = null;
@@ -619,7 +693,7 @@ Deno.serve(async (req) => {
     if (tk.doc_type === "invoice") {
       const { data: inv } = await supabase
         .from("invoices")
-        .select("*, customers(name, phone, address, balance)")
+        .select("*, customers(name, phone, address, balance, credit_balance)")
         .eq("id", tk.doc_id)
         .maybeSingle();
       if (!inv) return buildErrorHTML("الفاتورة غير موجودة", 404);
@@ -630,6 +704,21 @@ Deno.serve(async (req) => {
       customer = c ? { name: c.name, phone: c.phone, address: c.address } : null;
       paidAmount = Number((inv as any).paid_amount || 0);
       grandTotal = Number((inv as any).total || 0);
+      subtotal = Number((inv as any).subtotal || 0) || null;
+      discountTotal = Number((inv as any).discount || 0);
+      // رصيد العميل الآن: منه يُشتقّ «المدفوع» في الملخّص كما في الطباعة،
+      // والمتبقّي على هذه الفاتورة يُطرح ليُعرف الحساب القديم.
+      {
+        const bal = Number(c?.balance || 0);
+        const credit = Number((c as any)?.credit_balance || 0);
+        currentNet = c ? bal - credit : null;
+        const remaining = Math.max(grandTotal - paidAmount, 0);
+        const surplus = Math.max(paidAmount - grandTotal, 0);
+        const prevNet = Math.max(bal - remaining, 0) - Math.max(credit - surplus, 0);
+        previousDebt = prevNet > 0 ? prevNet : 0;
+        previousCredit = prevNet < 0 ? -prevNet : 0;
+      }
+      [packagingInfo, transportInfo] = await loadExtras(supabase, "invoice", tk.doc_id);
 
       notes = (inv as any).notes || null;
       const { data: rows } = await supabase.from("invoice_items").select("*").eq("invoice_id", tk.doc_id);
@@ -639,7 +728,7 @@ Deno.serve(async (req) => {
     } else if (tk.doc_type === "quote") {
       const { data: q } = await supabase
         .from("quotes")
-        .select("*, customers(name, phone, address, balance)")
+        .select("*, customers(name, phone, address, balance, credit_balance)")
         .eq("id", tk.doc_id)
         .maybeSingle();
       if (!q) return buildErrorHTML("عرض السعر غير موجود", 404);
@@ -650,6 +739,16 @@ Deno.serve(async (req) => {
       customer = c ? { name: c.name, phone: c.phone, address: c.address } : null;
       paidAmount = 0;
       grandTotal = Number((q as any).total || 0);
+      subtotal = Number((q as any).subtotal || 0) || null;
+      discountTotal = Number((q as any).discount || 0);
+      // عرض السعر لا يدخل حساب العميل — رصيده يُعرض كما هو قبل العرض وبعده.
+      isQuote = true;
+      {
+        const net = Number(c?.balance || 0) - Number((c as any)?.credit_balance || 0);
+        previousDebt = net > 0 ? net : 0;
+        previousCredit = net < 0 ? -net : 0;
+      }
+      [packagingInfo, transportInfo] = await loadExtras(supabase, "quote", tk.doc_id);
 
       notes = (q as any).notes || null;
       const { data: rows } = await supabase.from("quote_items").select("*").eq("quote_id", tk.doc_id);
@@ -659,7 +758,7 @@ Deno.serve(async (req) => {
     } else if (tk.doc_type === "return") {
       const { data: r } = await supabase
         .from("stock_returns")
-        .select("*, customers(name, phone, address, balance)")
+        .select("*, customers(name, phone, address, balance, credit_balance)")
         .eq("id", tk.doc_id)
         .maybeSingle();
       if (!r) return buildErrorHTML("المرتجع غير موجود", 404);
@@ -934,7 +1033,10 @@ Deno.serve(async (req) => {
     const hiddenSections = Array.isArray((tk as any).hidden_sections)
       ? ((tk as any).hidden_sections as unknown[]).filter((s) => typeof s === "string") as string[]
       : [];
-    const html = statementHtml || buildDocHTML({ docTitle, docNumber, date, customer, items, grandTotal, paidAmount, notes, company, hiddenSections });
+    const html = statementHtml || buildDocHTML({
+      docTitle, docNumber, date, customer, items, grandTotal, paidAmount, notes, company, hiddenSections,
+      subtotal, discountTotal, previousDebt, previousCredit, currentNet, isQuote, packagingInfo, transportInfo,
+    });
     logInfo(requestId, "share.rendered", {
       doc_type: tk.doc_type,
       doc_number: docNumber,
