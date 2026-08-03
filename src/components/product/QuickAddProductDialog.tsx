@@ -11,6 +11,8 @@ import { useProducts, useProductCategories, useWarehouses } from "@/hooks/useDat
 import { useDialogSize } from "@/hooks/useDialogSize";
 import InlineSearchSelect from "@/components/InlineSearchSelect";
 import ImageCropDialog from "@/components/shared/ImageCropDialog";
+import { productLocalPrice } from "@/utils/invoiceCreateHelpers";
+import { getProductExchangeRate } from "@/utils/currency";
 
 export interface QuickAddProductDialogProps {
   open: boolean;
@@ -75,11 +77,16 @@ export default function QuickAddProductDialog({
   const [newCompanyName, setNewCompanyName] = useState("");
   const [savingCompany, setSavingCompany] = useState(false);
 
+  // معدّل الصرف — يُقرأ عند الفتح ليتبع السعرُ المحلي الأجنبيَّ هنا أيضاً،
+  // فمنتجٌ يُنشأ من شاشة الفاتورة يخرج بنفس سعر منتجٍ يُنشأ من شاشة المنتجات.
+  const [exchangeRate, setExchangeRate] = useState(1);
+
   useEffect(() => {
     if (open) {
       setForm({ ...emptyForm, name: initialName || "" });
       setSelectedCategoryIds([]);
       setCategoryToAdd("");
+      getProductExchangeRate().then(setExchangeRate);
     }
   }, [open, initialName]);
 
@@ -346,7 +353,14 @@ export default function QuickAddProductDialog({
             {/* الصف 4: السعر الأجنبي + المخزون + الحد الأدنى */}
             <div>
               <label className={labelClass}>السعر الأجنبي</label>
-              <input type="number" value={form.foreign_price} onChange={e => setForm({ ...form, foreign_price: e.target.value })} className={inputClass} placeholder="0.00" />
+              <input type="number" value={form.foreign_price} onChange={e => {
+                const local = productLocalPrice(e.target.value, exchangeRate);
+                setForm({
+                  ...form,
+                  foreign_price: e.target.value,
+                  ...(local > 0 ? { sale_price: String(local) } : {}),
+                });
+              }} className={inputClass} placeholder="0.00" />
             </div>
             <div>
               <label className={labelClass}>الوحدات بالمخزن</label>
