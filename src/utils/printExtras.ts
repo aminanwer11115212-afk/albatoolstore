@@ -54,7 +54,7 @@ function setCached(key: string, value: ExtraStrings) {
   cache.set(key, { value, expires: Date.now() + TTL_MS });
 }
 
-function formatTransports(rows: any[]): string | undefined {
+export function formatTransports(rows: any[]): string | undefined {
   if (!rows || rows.length === 0) return undefined;
   // بيانات الترحيلات المعروضة في ورقة الطباعة تقتصر على: الاسم، الهاتف، العنوان،
   // والوجهة. (رقم/نوع المركبة والسائق والتكلفة والتاريخ لا تظهر — لأسباب سرية
@@ -98,7 +98,7 @@ function formatTransports(rows: any[]): string | undefined {
  * تغليفه. فصارت البنود هي المصدر، والترويسة تُكمّل بحقول المستند وحدها
  * (الوزن والأبعاد والتكلفة) حين تُملأ.
  */
-function formatPackaging(headers: any[], items: any[] = []): string | undefined {
+export function formatPackaging(headers: any[], items: any[] = []): string | undefined {
   const typeName = (r: any) => r.packaging_types?.name || "";
 
   // 1) بنود المستخدم — كلٌّ سطر: النوع والصنف وعدد الطرود والقطع والكمية.
