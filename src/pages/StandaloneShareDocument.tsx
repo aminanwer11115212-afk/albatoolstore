@@ -3,10 +3,15 @@
  *
  * تُركَّب من main.tsx مباشرة قبل App.tsx — أي بدون أي Providers،
  * بدون Sidebar/Header، بدون PWA install prompt، بدون React Query
- * أو Router أو Toaster. فقط: جلب HTML المستند من edge function
- * وعرضه + زر طباعة و زر تحميل PDF.
+ * أو Router أو Toaster.
  *
- * تُفعَّل عند مطابقة المسار `/share/document/:token`.
+ * تُفعَّل عند مطابقة المسار `/share/document/:token`، **وتعترضه قبل الراوتر**
+ * — فمسار `PublicDocumentSharePage` في `App.tsx` لا يُبلَغ لهذا العنوان أبداً.
+ * وهذا ما جعل ورقة العميل تبقى مختلفة عن المعاينة رغم إصلاح تلك الصفحة: كان
+ * الإصلاح في صفحةٍ لا يفتحها أحد.
+ *
+ * فالورقة هنا تُبنى بـ`generatePrintHTML` نفسها — قالبُ المعاينة والطباعة
+ * حرفياً — من بيانات `get_shared_document`. راجع `sharedDocumentHtml.ts`.
  */
 import { useEffect, useRef, useState } from "react";
 import { buildDocumentFileName } from "@/utils/documentFileName";
@@ -28,14 +33,34 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
       return;
     }
     const url = `${SUPABASE_URL}/functions/v1/document-share?token=${encodeURIComponent(token)}`;
-    fetch(url, { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } })
-      .then(async (r) => {
-        const text = await r.text();
-        if (!r.ok) throw new Error(text.replace(/<[^>]+>/g, " ").trim() || `HTTP ${r.status}`);
-        setHtml(text);
-      })
-      .catch((e) => setError(e?.message || "تعذّر فتح المستند"))
-      .finally(() => setLoading(false));
+
+    /** مسار الحافة القديم — يبقى شبكةَ أمانٍ حتى تُطبَّق الهجرة في كل بيئة. */
+    const loadFromEdge = () =>
+      fetch(url, { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } })
+        .then(async (r) => {
+          const text = await r.text();
+          if (!r.ok) throw new Error(text.replace(/<[^>]+>/g, " ").trim() || `HTTP ${r.status}`);
+          setHtml(text);
+        })
+        .catch((e) => setError(e?.message || "تعذّر فتح المستند"))
+        .finally(() => setLoading(false));
+
+    (async () => {
+      try {
+        const { fetchSharedDocumentHTML } = await import("@/utils/sharedDocumentHtml");
+        setHtml(await fetchSharedDocumentHTML(token));
+        setLoading(false);
+      } catch (e: any) {
+        // رفضٌ صريح (منتهٍ/غير موجود) يصل العميل بلغته ولا يُخفى بالسقوط.
+        if (e?.code && ["not_found", "expired", "doc_missing", "missing_token", "unsupported_type"].includes(e.code)) {
+          setError(e.message);
+          setLoading(false);
+          return;
+        }
+        console.warn("[share] RPC unavailable, falling back to edge function:", e?.message || e);
+        void loadFromEdge();
+      }
+    })();
   }, [token]);
 
   function logEvent(event: "viewed" | "printed" | "downloaded") {

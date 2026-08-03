@@ -274,6 +274,15 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
 
   const loadData = async () => {
     if (!parentId) return;
+    /**
+     * ذاكرة `printExtras` تعيش دقيقة. فمن أدخل تغليفاً ثم طبع فوراً كان يقرأ
+     * «لا توجد بيانات تغليف» — قراءةً محفوظة من قبل الإدخال. تُبطَل هنا لأن
+     * `loadData` تُنادى بعد كل كتابة (إضافة/حذف) وعند الفتح.
+     */
+    try {
+      const { clearPrintExtrasCache } = await import("@/utils/printExtras");
+      clearPrintExtrasCache(parentType, parentId);
+    } catch { /* لا يمنع تحميل النافذة */ }
     setLoading(true);
 
     const customerJoin = isInvoice ? "*, customers(name, phone)" : "*, customers(name, phone)";
