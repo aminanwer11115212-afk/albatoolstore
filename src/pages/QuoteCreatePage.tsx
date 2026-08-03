@@ -17,7 +17,7 @@ import {
   deriveRowRate,
 } from "@/utils/invoiceCreateHelpers";
 import { toast } from "sonner";
-import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck, Eye, FileDown } from "lucide-react";
+import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck, Eye, EyeOff, FileDown } from "lucide-react";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
 import { useDocPrintShortcuts } from "@/hooks/useDocPrintShortcuts";
@@ -33,6 +33,7 @@ import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils
 import { getLatestRate } from "@/utils/currency";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadQuoteExtras } from "@/utils/printExtras";
+import { usePrintSectionPrefs, PRINT_SECTION_LABELS } from "@/utils/printSectionPrefs";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
 import { useQuoteConvertedDialog } from "@/hooks/useQuoteConvertedDialog";
 import { useScreenZoom } from "@/hooks/useScreenZoom";
@@ -368,6 +369,9 @@ export default function QuoteCreatePage() {
   const [itemNoteEditing, setItemNoteEditing] = useState<{ uid: string; productName?: string; value: string } | null>(null);
   const [packagingDialogOpen, setPackagingDialogOpen] = useState(false);
   const [transportDialogOpen, setTransportDialogOpen] = useState(false);
+  // رؤية أقسام الورقة (التواقيع/الترحيل/التغليف) — نطاقٌ مستقلّ عن الفاتورة
+  // لأن عرض السعر يُرسل غالباً بلا تواقيع ولا مرحّل.
+  const { prefs: sectionPrefs, toggle: toggleSection, hiddenSections } = usePrintSectionPrefs("quote");
   const [quoteWorkflowStatus, setQuoteWorkflowStatus] = useState<string>("draft");
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -890,6 +894,10 @@ export default function QuoteCreatePage() {
       oldBalance: netBalanceOf(customer as any),
       variant,
       noHeader,
+      // تفاصيل التغليف والترحيل — كانت `loadQuoteExtras` مستوردةً بلا استعمال،
+      // فتظهر في معاينة العرض المحفوظ وتغيب عن طباعته و PDF من هذه الشاشة.
+      ...(editId ? await loadQuoteExtras(editId) : {}),
+      hiddenSections,
     });
   }
 
@@ -2287,6 +2295,26 @@ export default function QuoteCreatePage() {
                     </button>
                   ),
                 },
+                // أزرار رؤية أقسام الورقة — تُحذف من الـHTML لا بالتنسيق، فما
+                // يُخفى هنا لا يخرج في PDF ولا في رابط العميل أيضاً.
+                ...(["signatures", "transport", "packaging"] as const).map((key) => ({
+                  id: `sec-${key}`,
+                  group: "3-share",
+                  node: (
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(key)}
+                      style={{
+                        ...btnStyle(sectionPrefs[key] ? "#ffffff" : "#64748b"),
+                        color: sectionPrefs[key] ? "#475569" : "#ffffff",
+                        border: sectionPrefs[key] ? "1px solid #cbd5e1" : "1px solid #64748b",
+                      }}
+                      title={`${sectionPrefs[key] ? "إخفاء" : "إظهار"} ${PRINT_SECTION_LABELS[key]} في الطباعة والمعاينة و PDF`}
+                    >
+                      {sectionPrefs[key] ? <Eye size={14} /> : <EyeOff size={14} />} {PRINT_SECTION_LABELS[key]}
+                    </button>
+                  ),
+                })),
 
                 // === حفظ ===
                 {

@@ -53,6 +53,13 @@ interface PrintData {
   /** إخفاء صندوق "المبلغ المدفوع" في قسم ملخّص الحساب (يُستخدم في المعاينة). */
   hidePaidBox?: boolean;
   /**
+   * أقسامٌ تُحذف من الورقة قبل توليدها: `signatures` | `transport` |
+   * `packaging`. الحذف من الـHTML لا بالتنسيق، لأن مسارات PDF والرابط العام
+   * والطباعة المباشرة لا تمرّ بشريط المعاينة الذي يخفي بالـCSS — فلو كان
+   * الإخفاء تنسيقاً لخرج المخفيُّ إلى العميل.
+   */
+  hiddenSections?: string[];
+  /**
    * صافي حساب العميل **الآن** بإشارة الدفاتر (موجب = عليه).
    *
    * حين يُمرَّر، يصير هو «رصيد العميل الحالي» ويُشتقّ منه «المدفوع»:
@@ -100,7 +107,10 @@ export function generatePrintHTML(data: PrintData): string {
     paidAmount = 0, dueAmount = 0, notes, company, status, paymentMethod,
     variant = "full", noHeader = false, oldBalance = 0, packagingInfo, transportInfo, customTitle,
     previousDebt = 0, previousCredit = 0, hidePaidBox = false, currentNet = null,
+    hiddenSections = [],
   } = data;
+
+  const isSectionHidden = (key: string) => hiddenSections.includes(key);
 
   const balSum = computeDocumentBalance({
     grandTotal, discount: discountTotal, paidAmount,
@@ -117,13 +127,25 @@ export function generatePrintHTML(data: PrintData): string {
       : type === "purchase" ? "أمر شراء"
       : "فاتورة مشتريات"));
 
+  // اسم المستند في جُمَل «لا توجد بيانات…» — كان "الفاتورة" مثبَّتاً حتى في
+  // عرض السعر، ومرّةً بخطأ نحوي ("لهذا الفاتورة").
+  const docNoun = type === "quote" ? "لعرض السعر هذا"
+    : type === "purchase" ? "لأمر الشراء هذا"
+    : type === "return" ? "لهذا المرتجع"
+    : "لهذه الفاتورة";
+
   const currency = "";
   // Header visibility is controlled solely by the explicit `noHeader` flag.
   const showHeader = noHeader !== true;
   const showItems = variant !== "account-only" && variant !== "no-details";
   const showAccount = variant !== "no-account" && variant !== "no-details" && variant !== "stocktake";
   // Packaging/transport block: hidden for account-only and no-details variants.
-  const showExtras = variant !== "account-only" && variant !== "no-details" && variant !== "stocktake";
+  const extrasAllowedByVariant = variant !== "account-only" && variant !== "no-details" && variant !== "stocktake";
+  const showPackaging = extrasAllowedByVariant && !isSectionHidden("packaging");
+  const showTransport = extrasAllowedByVariant && !isSectionHidden("transport");
+  // الصندوقان متجاوران؛ إن أُخفيا معاً سقط الصفّ كلّه فلا يبقى إطارٌ فارغ.
+  const showExtras = showPackaging || showTransport;
+  const showSignatures = variant !== "stocktake" && !isSectionHidden("signatures");
   const logoURL = resolveLogoUrl(company?.logo_url);
   // "المطلوب النهائي" = جملة الفاتورة − المبلغ المدفوع (لا يُجمع مع الحساب القديم).
   const finalTotal = Math.max(0, grandTotal - paidAmount);
@@ -511,14 +533,16 @@ ${showAccount ? (() => {
 ${showExtras ? `
 <!-- Packaging & Transport -->
 <div class="extra-row">
-  <div class="extra-box" data-section="packaging" data-section-label="التغليف">
+  ${showPackaging ? `
+  <div class="extra-box" data-section="packaging" data-section-label="تفاصيل التغليف">
     <div class="extra-box-title">تفاصيل التغليف</div>
-    <p>${cleanPackaging || "لا توجد بيانات تغليف لهذه الفاتورة"}</p>
-  </div>
-  <div class="extra-box" data-section="transport" data-section-label="الترحيلات">
+    <p>${cleanPackaging || `لا توجد بيانات تغليف ${docNoun}`}</p>
+  </div>` : ""}
+  ${showTransport ? `
+  <div class="extra-box" data-section="transport" data-section-label="معلومات الترحيل">
     <div class="extra-box-title">معلومات الترحيل</div>
-    <p>${cleanTransport || "لا توجد بيانات ترحيل لهذا الفاتورة"}</p>
-  </div>
+    <p>${cleanTransport || `لا توجد بيانات ترحيل ${docNoun}`}</p>
+  </div>` : ""}
 </div>
 ` : ""}
 
@@ -529,11 +553,13 @@ ${notes ? `
 </div>
 ` : ""}
 
+${showSignatures ? `
 <!-- Signatures -->
-<div class="signatures">
+<div class="signatures" data-section="signatures" data-section-label="التواقيع">
   <div class="sig-box"><div class="sig-line">توقيع المستلم</div></div>
   <div class="sig-box"><div class="sig-line">توقيع المسؤول</div></div>
 </div>
+` : ""}
 
 </div>
 </body>
