@@ -63,6 +63,38 @@ export default function PublicDocumentSharePage() {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     const fnUrl = `${supabaseUrl}/functions/v1/document-share?token=${encodeURIComponent(token)}`;
+
+    /**
+     * المسار الأوّل: تبني الصفحة الورقة بنفسها من `get_shared_document` بنفس
+     * قالب الطباعة — فيصل العميلَ ما يراه صاحب المستودع تماماً، ويكفي نشرُ
+     * الواجهة لتحديثه.
+     *
+     * والسقوط إلى دالّة الحافة ليس زينة: دالّة القاعدة تحتاج تطبيق هجرتها
+     * أوّلاً، وحتى ذلك الحين يبقى الرابط عاملاً بنسخته القديمة بدل أن ينكسر.
+     */
+    (async () => {
+      try {
+        const { fetchSharedDocumentHTML, SharedDocumentError } = await import("@/utils/sharedDocumentHtml");
+        const html = await fetchSharedDocumentHTML(token);
+        console.log(`[share][${localTrace}] rendered client-side`);
+        try { sessionStorage.removeItem(VISIT_KEY_PREFIX + token); } catch { /* ignore */ }
+        setHtml(html);
+        setLoading(false);
+        return;
+      } catch (e: any) {
+        // رفضٌ صريح من دالّة القاعدة (منتهٍ/غير موجود) — لا يُخفى بالسقوط.
+        if (e?.code && ["not_found", "expired", "doc_missing", "missing_token", "unsupported_type"].includes(e.code)) {
+          console.error(`[share][${localTrace}] rejected: ${e.code}`);
+          setError(e.message);
+          setLoading(false);
+          return;
+        }
+        console.warn(`[share][${localTrace}] RPC unavailable, falling back to edge function:`, e?.message || e);
+      }
+      loadFromEdgeFunction();
+    })();
+
+    function loadFromEdgeFunction() {
     console.log(`[share][${localTrace}] fetching document HTML (visit ${visits})`);
 
     fetch(fnUrl, {
@@ -143,6 +175,7 @@ export default function PublicDocumentSharePage() {
         setError(e?.message || "تعذّر فتح المستند");
       })
       .finally(() => setLoading(false));
+    }
   }, [token]);
 
   const handleDownloadPdf = async () => {
