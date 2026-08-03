@@ -24,45 +24,75 @@ async function loadExtras(
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const transportTable = kind === "invoice" ? "invoice_transports" : "quote_transports";
   const packagingTable = kind === "invoice" ? "invoice_packaging" : "quotes_packaging";
+  const packagingItemsTable = kind === "invoice" ? "invoices_packaging_items" : "quotes_packaging_items";
   const fk = kind === "invoice" ? "invoice_id" : "quote_id";
   try {
-    const [{ data: transports }, { data: packaging }] = await Promise.all([
-      supabase.from(transportTable).select("transporters(name, phone, address)").eq(fk, docId),
+    const [{ data: transports }, { data: packaging }, { data: packagingItems }] = await Promise.all([
+      supabase.from(transportTable)
+        .select("transporters(name, phone, address), destinations(name)").eq(fk, docId),
       supabase.from(packagingTable)
         .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
         .eq(fk, docId),
+      // بنود المستخدم الحقيقية — الترويسة وحدها لا تحمل تغليفاً.
+      supabase.from(packagingItemsTable)
+        .select("product_name, packs_count, pieces_per_pack, quantity, description, packaging_types(name)")
+        .eq(fk, docId).order("created_at"),
     ]);
 
     const seen = new Set<string>();
     const tBlocks: string[] = [];
     for (const r of (transports || [])) {
       const t = (r as any).transporters || {};
-      if (!t.name) continue;
-      const key = `${t.name}|${t.phone || ""}|${t.address || ""}`;
+      const destination = (r as any).destinations?.name || "";
+      // ترحيلٌ بلا مرحّلٍ مسجَّل كان يُتخطّى فتُقرأ الورقة «لا توجد بيانات».
+      if (!t.name && !destination) continue;
+      const key = `${t.name || ""}|${t.phone || ""}|${t.address || ""}|${destination}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const parts = [`الاسم: ${esc(t.name)}`];
+      const parts: string[] = [];
+      if (t.name) parts.push(`الاسم: ${esc(t.name)}`);
       if (t.phone) parts.push(`الهاتف: ${esc(t.phone)}`);
       if (t.address) parts.push(`العنوان: ${esc(t.address)}`);
+      if (destination) parts.push(`الوجهة: ${esc(destination)}`);
       tBlocks.push(parts.join(" | "));
     }
 
-    const pLines = (packaging || []).map((r: any) => {
+    const itemLines = (packagingItems || []).map((r: any) => {
       const parts: string[] = [];
       if (r.packaging_types?.name) parts.push(`النوع: ${esc(r.packaging_types.name)}`);
-      if (Number(r.quantity)) parts.push(`الكمية: ${Number(r.quantity)}`);
+      if (r.product_name) parts.push(`الصنف: ${esc(r.product_name)}`);
       if (Number(r.packs_count)) parts.push(`عدد الطرود: ${Number(r.packs_count)}`);
       if (Number(r.pieces_per_pack)) parts.push(`قطع/طرد: ${Number(r.pieces_per_pack)}`);
+      if (Number(r.quantity)) parts.push(`الكمية: ${Number(r.quantity)}`);
+      let line = parts.join(" | ");
+      if (r.description) line += `<br><span style="color:#666;font-size:11px;">${esc(r.description)}</span>`;
+      return line;
+    }).filter(Boolean);
+
+    // الترويسة المُنشأة تلقائياً (`quantity: 1` وما عداها فارغ) ليست تغليفاً.
+    const isAutoHeader = (r: any) =>
+      !r.packaging_types?.name && !Number(r.packs_count || 0) && !Number(r.pieces_per_pack || 0)
+      && !Number(r.weight || 0) && !r.dimensions && !Number(r.cost || 0) && !r.notes;
+
+    const headerLines = (packaging || []).filter((r: any) => !isAutoHeader(r)).map((r: any) => {
+      const parts: string[] = [];
+      if (itemLines.length === 0) {
+        if (r.packaging_types?.name) parts.push(`النوع: ${esc(r.packaging_types.name)}`);
+        if (Number(r.quantity)) parts.push(`الكمية: ${Number(r.quantity)}`);
+        if (Number(r.packs_count)) parts.push(`عدد الطرود: ${Number(r.packs_count)}`);
+        if (Number(r.pieces_per_pack)) parts.push(`قطع/طرد: ${Number(r.pieces_per_pack)}`);
+      }
       if (Number(r.weight)) parts.push(`الوزن: ${Number(r.weight)}`);
       if (r.dimensions) parts.push(`الأبعاد: ${esc(r.dimensions)}`);
       let line = parts.join(" | ");
       const cost = Number(r.cost || 0);
-      if (cost > 0) line += ` — التكلفة: ${cost.toLocaleString("en-US")}`;
-      if (r.notes) line += `<br><span style="color:#666;font-size:11px;">${esc(r.notes)}</span>`;
+      if (line && cost > 0) line += ` — التكلفة: ${cost.toLocaleString("en-US")}`;
+      if (line && r.notes) line += `<br><span style="color:#666;font-size:11px;">${esc(r.notes)}</span>`;
       return line;
     }).filter(Boolean);
+
     const totalCost = (packaging || []).reduce((sum: number, r: any) => sum + Number(r.cost || 0), 0);
-    let pHtml = pLines.join("<br>");
+    let pHtml = [...itemLines, ...headerLines].join("<br>");
     if (pHtml && totalCost > 0) pHtml += `<br><strong>الإجمالي: ${totalCost.toLocaleString("en-US")}</strong>`;
 
     return [pHtml || null, tBlocks.join("<br>") || null];

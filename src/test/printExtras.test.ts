@@ -5,18 +5,27 @@ type TableData = Record<string, any[]>;
 const tableData: TableData = {
   invoice_transports: [],
   invoice_packaging: [],
+  invoices_packaging_items: [],
   quote_transports: [],
   quotes_packaging: [],
+  quotes_packaging_items: [],
 };
 
 const fromCalls: string[] = [];
 
 vi.mock("@/integrations/supabase/client", () => {
-  const makeChain = (table: string) => ({
-    select: () => ({
-      eq: () => Promise.resolve({ data: tableData[table] ?? [], error: null }),
-    }),
-  });
+  // جدول البنود يُقرأ بـ`.order()` بعد `.eq()` — فالحلقة قابلة للانتظار
+  // وقابلة للترتيب معاً، وإلا انكسرت قراءة البنود بصمت.
+  const makeChain = (table: string) => {
+    const result = () => Promise.resolve({ data: tableData[table] ?? [], error: null });
+    const chain: any = {
+      select: () => chain,
+      eq: () => chain,
+      order: () => result(),
+      then: (onOk: any, onErr?: any) => result().then(onOk, onErr),
+    };
+    return chain;
+  };
   return {
     supabase: {
       from: (table: string) => {
@@ -32,8 +41,10 @@ import { loadInvoiceExtras, loadQuoteExtras, clearPrintExtrasCache } from "@/uti
 beforeEach(() => {
   tableData.invoice_transports = [];
   tableData.invoice_packaging = [];
+  tableData.invoices_packaging_items = [];
   tableData.quote_transports = [];
   tableData.quotes_packaging = [];
+  tableData.quotes_packaging_items = [];
   fromCalls.length = 0;
   clearPrintExtrasCache();
 });
@@ -56,15 +67,12 @@ describe("loadInvoiceExtras", () => {
         transporters: { name: "Fast Co", phone: "0100000000", address: "Riyadh HQ" },
       },
     ];
+    // الترويسة تحمل حقول المستند (وزن/أبعاد/تكلفة)، والبند يحمل تغليف المستخدم
     tableData.invoice_packaging = [
-      {
-        quantity: 5,
-        weight: 12,
-        dimensions: "10x10",
-        cost: 50,
-        notes: null,
-        packaging_types: { name: "Box" },
-      },
+      { quantity: 5, weight: 12, dimensions: "10x10", cost: 50, notes: null, packaging_types: null },
+    ];
+    tableData.invoices_packaging_items = [
+      { product_name: "Widget", packs_count: 2, pieces_per_pack: 5, quantity: 10, packaging_types: { name: "Box" } },
     ];
     const res = await loadInvoiceExtras("inv-1");
     expect(res.transportInfo).toBeDefined();
@@ -106,14 +114,10 @@ describe("loadQuoteExtras", () => {
       },
     ];
     tableData.quotes_packaging = [
-      {
-        quantity: 3,
-        weight: 7,
-        dimensions: "5x5",
-        cost: 25,
-        notes: null,
-        packaging_types: { name: "Crate" },
-      },
+      { quantity: 3, weight: 7, dimensions: "5x5", cost: 25, notes: null, packaging_types: null },
+    ];
+    tableData.quotes_packaging_items = [
+      { product_name: "Gadget", packs_count: 1, pieces_per_pack: 3, quantity: 3, packaging_types: { name: "Crate" } },
     ];
     const res = await loadQuoteExtras("q-1");
     expect(res.transportInfo).toContain("Speedy");

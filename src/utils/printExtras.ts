@@ -56,55 +56,112 @@ function setCached(key: string, value: ExtraStrings) {
 
 function formatTransports(rows: any[]): string | undefined {
   if (!rows || rows.length === 0) return undefined;
-  // بيانات الترحيلات المعروضة في ورقة الطباعة تقتصر على: الاسم، الهاتف، العنوان.
-  // (رقم/نوع المركبة والسائق والتكلفة والتاريخ لا تظهر — لأسباب سرية العمل.)
+  // بيانات الترحيلات المعروضة في ورقة الطباعة تقتصر على: الاسم، الهاتف، العنوان،
+  // والوجهة. (رقم/نوع المركبة والسائق والتكلفة والتاريخ لا تظهر — لأسباب سرية
+  // العمل.)
   const seen = new Set<string>();
   const blocks: string[] = [];
   for (const r of rows) {
     const t = r.transporters || {};
     const name = t.name || r.transporter_name || "";
-    if (!name) continue;
+    const destination = r.destinations?.name || "";
+    // سطرُ ترحيلٍ بلا مرحّلٍ مسجَّل كان يُتخطّى فتُقرأ الورقة «لا توجد بيانات
+    // ترحيل» رغم وجود الترحيل — والوجهة وحدها معلومةٌ تكفي العميل.
+    if (!name && !destination) continue;
     const phone = t.phone || "";
     const address = t.address || "";
-    const key = `${name}|${phone}|${address}`;
+    const key = `${name}|${phone}|${address}|${destination}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const parts: string[] = [`الاسم: ${escapeHtml(name)}`];
+    const parts: string[] = [];
+    if (name)    parts.push(`الاسم: ${escapeHtml(name)}`);
     if (phone)   parts.push(`الهاتف: ${escapeHtml(phone)}`);
     if (address) parts.push(`العنوان: ${escapeHtml(address)}`);
+    if (destination) parts.push(`الوجهة: ${escapeHtml(destination)}`);
     blocks.push(parts.join(" | "));
   }
   if (blocks.length === 0) return undefined;
   return blocks.join("<br>");
 }
 
-function formatPackaging(rows: any[]): string | undefined {
-  if (!rows || rows.length === 0) return undefined;
-  const lines = rows.map((r) => {
-    const type = r.packaging_types?.name || "";
-    const qty = Number(r.quantity || 0);
+/**
+ * تفاصيل التغليف كما أدخلها المستخدم.
+ *
+ * ## العطل الذي عالجَته
+ * التغليف مُخزَّنٌ في جدولين: `invoice_packaging` **ترويسةٌ واحدة** تُنشئها
+ * الشاشة تلقائياً بمجرّد فتح النافذة (`{ invoice_id, quantity: 1 }`)، و
+ * `invoices_packaging_items` فيها **بنود المستخدم الحقيقية**: نوع التغليف
+ * والصنف وعدد الطرود والقطع.
+ *
+ * وكانت الطباعة تقرأ الترويسة وحدها. فمن أدخل تغليفاً كاملاً يقرأ في ورقته
+ * «لا توجد بيانات تغليف» — أو أسوأ: «الكمية: 1» وهي قيمة الترويسة الفارغة لا
+ * تغليفه. فصارت البنود هي المصدر، والترويسة تُكمّل بحقول المستند وحدها
+ * (الوزن والأبعاد والتكلفة) حين تُملأ.
+ */
+function formatPackaging(headers: any[], items: any[] = []): string | undefined {
+  const typeName = (r: any) => r.packaging_types?.name || "";
+
+  // 1) بنود المستخدم — كلٌّ سطر: النوع والصنف وعدد الطرود والقطع والكمية.
+  const itemLines = (items || []).map((r) => {
+    const parts: string[] = [];
+    const type = typeName(r);
     const packs = Number(r.packs_count || 0);
-    const piecesPerPack = Number(r.pieces_per_pack || 0);
+    const pieces = Number(r.pieces_per_pack || 0);
+    const qty = Number(r.quantity || 0);
+    if (type) parts.push(`النوع: ${escapeHtml(type)}`);
+    if (r.product_name) parts.push(`الصنف: ${escapeHtml(r.product_name)}`);
+    if (packs) parts.push(`عدد الطرود: ${packs}`);
+    if (pieces) parts.push(`قطع/طرد: ${pieces}`);
+    if (qty) parts.push(`الكمية: ${qty}`);
+    let line = parts.join(" | ");
+    if (r.description) line += `<br><span style="color:#666;font-size:11px;">${escapeHtml(r.description)}</span>`;
+    return line;
+  }).filter(Boolean);
+
+  /**
+   * الترويسة المُنشأة تلقائياً ليست تغليفاً.
+   *
+   * شاشة التغليف تكتب `{ invoice_id, quantity: 1 }` بمجرّد فتحها — قبل أن
+   * يُدخل المستخدم شيئاً. فمن فتح النافذة وأغلقها كان يقرأ في فاتورته
+   * «الكمية: 1» ويظنّها تغليفاً. والعلامة الفارقة أن ما عدا الكمية فارغٌ
+   * كلّه: لا نوع ولا طرود ولا وزن ولا أبعاد ولا تكلفة ولا ملاحظة.
+   */
+  const isAutoHeader = (r: any) =>
+    !typeName(r) && !Number(r.packs_count || 0) && !Number(r.pieces_per_pack || 0)
+    && !Number(r.weight || 0) && !r.dimensions && !Number(r.cost || 0) && !r.notes;
+
+  // 2) حقول المستند من الترويسة — تُذكر إن مُلئت فقط.
+  const headerLines = (headers || []).filter((r) => !isAutoHeader(r)).map((r) => {
+    const parts: string[] = [];
+    const type = typeName(r);
     const weight = Number(r.weight || 0);
     const dims = r.dimensions || "";
-    const cost = Number(r.cost || 0);
-    const parts: string[] = [];
-    if (type) parts.push(`النوع: ${escapeHtml(type)}`);
-    if (qty) parts.push(`الكمية: ${qty}`);
-    if (packs) parts.push(`عدد الطرود: ${packs}`);
-    if (piecesPerPack) parts.push(`قطع/طرد: ${piecesPerPack}`);
+    // النوع والكمية على الترويسة لا يُذكران إلا حين لا بنود أصلاً — وإلا
+    // كُرِّرا فوق تفصيلٍ أدقّ منهما.
+    if (itemLines.length === 0) {
+      if (type) parts.push(`النوع: ${escapeHtml(type)}`);
+      const qty = Number(r.quantity || 0);
+      const packs = Number(r.packs_count || 0);
+      const pieces = Number(r.pieces_per_pack || 0);
+      if (qty) parts.push(`الكمية: ${qty}`);
+      if (packs) parts.push(`عدد الطرود: ${packs}`);
+      if (pieces) parts.push(`قطع/طرد: ${pieces}`);
+    }
     if (weight) parts.push(`الوزن: ${weight}`);
     if (dims) parts.push(`الأبعاد: ${escapeHtml(dims)}`);
     let line = parts.join(" | ");
-    if (cost > 0) line += ` — التكلفة: ${fmt(cost)}`;
-    if (r.notes) line += `<br><span style="color:#666;font-size:11px;">${escapeHtml(r.notes)}</span>`;
+    const cost = Number(r.cost || 0);
+    if (line && cost > 0) line += ` — التكلفة: ${fmt(cost)}`;
+    if (line && r.notes) line += `<br><span style="color:#666;font-size:11px;">${escapeHtml(r.notes)}</span>`;
     return line;
-  });
-  const totalCost = rows.reduce((s, r) => s + Number(r.cost || 0), 0);
+  }).filter(Boolean);
+
+  const lines = [...itemLines, ...headerLines];
+  if (lines.length === 0) return undefined;
+
   let html = lines.join("<br>");
-  if (totalCost > 0) {
-    html += `<br><strong>الإجمالي: ${fmt(totalCost)}</strong>`;
-  }
+  const totalCost = (headers || []).reduce((s, r) => s + Number(r.cost || 0), 0);
+  if (totalCost > 0) html += `<br><strong>الإجمالي: ${fmt(totalCost)}</strong>`;
   return html;
 }
 
@@ -114,19 +171,25 @@ export async function loadInvoiceExtras(invoiceId: string | undefined | null): P
   const cached = getCached(key);
   if (cached) return cached;
   try {
-    const [{ data: transports }, { data: packaging }] = await Promise.all([
+    const [{ data: transports }, { data: packaging }, { data: packagingItems }] = await Promise.all([
       supabase
         .from("invoice_transports")
-        .select("transporters(name, phone, address)")
+        .select("transporters(name, phone, address), destinations(name)")
         .eq("invoice_id", invoiceId),
       supabase
         .from("invoice_packaging")
         .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
         .eq("invoice_id", invoiceId),
+      // بنود المستخدم الحقيقية — الترويسة وحدها لا تحمل تغليفاً. راجع `formatPackaging`.
+      supabase
+        .from("invoices_packaging_items")
+        .select("product_name, packs_count, pieces_per_pack, quantity, description, packaging_types(name)")
+        .eq("invoice_id", invoiceId)
+        .order("created_at"),
     ]);
     const value: ExtraStrings = {
       transportInfo: formatTransports(transports || []),
-      packagingInfo: formatPackaging(packaging || []),
+      packagingInfo: formatPackaging(packaging || [], packagingItems || []),
     };
     setCached(key, value);
     return value;
@@ -142,19 +205,24 @@ export async function loadQuoteExtras(quoteId: string | undefined | null): Promi
   const cached = getCached(key);
   if (cached) return cached;
   try {
-    const [{ data: transports }, { data: packaging }] = await Promise.all([
+    const [{ data: transports }, { data: packaging }, { data: packagingItems }] = await Promise.all([
       supabase
         .from("quote_transports")
-        .select("transporters(name, phone, address)")
+        .select("transporters(name, phone, address), destinations(name)")
         .eq("quote_id", quoteId),
       supabase
         .from("quotes_packaging")
         .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
         .eq("quote_id", quoteId),
+      supabase
+        .from("quotes_packaging_items")
+        .select("product_name, packs_count, pieces_per_pack, quantity, description, packaging_types(name)")
+        .eq("quote_id", quoteId)
+        .order("created_at"),
     ]);
     const value: ExtraStrings = {
       transportInfo: formatTransports(transports || []),
-      packagingInfo: formatPackaging(packaging || []),
+      packagingInfo: formatPackaging(packaging || [], packagingItems || []),
     };
     setCached(key, value);
     return value;
