@@ -3312,6 +3312,7 @@ export type Database = {
       }
       get_customer_balance_stats: { Args: never; Returns: Json }
       get_dashboard_stats: { Args: never; Returns: Json }
+      get_shared_document: { Args: { _token: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
