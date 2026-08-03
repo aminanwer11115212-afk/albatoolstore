@@ -4,7 +4,6 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 import { loadInvoiceExtras, loadQuoteExtras } from "@/utils/printExtras";
-import { documentHiddenSections } from "@/utils/printSectionPrefs";
 import { ArrowRight, Loader2, Wallet, Eye, EyeOff } from "lucide-react";
 import CustomerPaymentDialog from "@/components/invoice/CustomerPaymentDialog";
 import InvoicePaymentHistory from "@/components/invoice/InvoicePaymentHistory";
@@ -129,7 +128,6 @@ export default function DocumentPreviewPage({ docType }: Props) {
             previousCredit: Number(qCust?.credit_balance || 0),
             hidePaidBox: false,
             ...extras,
-            hiddenSections: documentHiddenSections("quote"),
           });
         } else if (docType === "invoice") {
           const { data: invoice, error: iErr } = await supabase
@@ -217,9 +215,6 @@ export default function DocumentPreviewPage({ docType }: Props) {
             currentNet: invCustomerId && iCust ? netBalanceOf(iCust) : null,
             hidePaidBox: false,
             ...extras,
-            // نفس رؤية الأقسام المختارة في شاشة الفاتورة — المعاينة والطباعة
-            // ورابط العميل تخرج من إعدادٍ واحد لا من ثلاثة.
-            hiddenSections: documentHiddenSections("invoice"),
           });
           setInvMeta({
             id: invoice.id,

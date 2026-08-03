@@ -2,7 +2,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { invoiceDue } from "@/utils/invoiceDue";
 import { generatePrintHTML } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
-import { documentHiddenSections } from "@/utils/printSectionPrefs";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { netBeforeInvoice } from "@/utils/customerNetBefore";
 
@@ -99,9 +98,6 @@ export async function buildInvoicePrintHtml(invoiceId: string): Promise<string> 
     // توزيع الدفعة على الفواتير. يُمرَّر للعملاء المسجّلين وحدهم؛ فاتورة
     // الكاش بلا عميل لا حساب لها فيبقى الاشتقاق من `paid_amount`.
     currentNet: customerId && iCust ? netBalanceOf(iCust) : null,
-    // نفس رؤية الأقسام المختارة في شاشة الفاتورة — الطباعة المباشرة لا تمرّ
-    // بشريط المعاينة، فلولا هذا لخرج التوقيع المخفيّ في الورقة المطبوعة.
-    hiddenSections: documentHiddenSections("invoice"),
     hidePaidBox: false,
     ...extras,
   } as any);
