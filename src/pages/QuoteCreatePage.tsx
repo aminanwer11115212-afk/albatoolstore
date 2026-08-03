@@ -7,7 +7,15 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { startsWithAny } from "@/utils/searchMatch";
-import { effectiveRowRate } from "@/utils/invoiceCreateHelpers";
+import {
+  effectiveRowRate,
+  resolveDefaultRate,
+  deriveRateFromRows,
+  backfillForeignPrice,
+  applyRateToRow,
+  computeUnitPrice,
+  deriveRowRate,
+} from "@/utils/invoiceCreateHelpers";
 import { toast } from "sonner";
 import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck, Eye, FileDown } from "lucide-react";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";
@@ -370,6 +378,12 @@ export default function QuoteCreatePage() {
 
   // Default exchange rate from Dashboard (latest in exchange_rates for foreign currency)
   const [defaultRate, setDefaultRate] = useState<number>(1);
+  // السعر العام كما قُرئ من `exchange_rates` (0 = لم يُقرأ بعد)
+  const globalRateRef = useRef<number>(0);
+  // المعدّل المشتقّ من بنود العرض المحفوظ — أولى من العام حتى تبقى بنوده متجانسة
+  const derivedRateRef = useRef<number>(0);
+  // يُرفع حين يكتب المستخدم المعدّل بيده فلا يدوسه أي مصدر تلقائي بعدها
+  const rateTouchedRef = useRef(false);
 
   // Quick-add row (الصف العلوي الأخضر)
   const [quickRow, setQuickRow] = useState<QuoteItem>(newRow());
@@ -507,7 +521,11 @@ export default function QuoteCreatePage() {
     };
   }, [editId]);
 
-  // Fetch latest exchange rate from Dashboard (most recent entry in exchange_rates, any currency)
+  // سعر الصرف العام من لوحة التحكّم (أحدث سطر في `exchange_rates`).
+  //
+  // كان يُطبَّق على عرض السعر القديم بلا شرط، فيدوس معدّل العرض نفسه بمعدّل
+  // اليوم — وهو ما يراه المستخدم "المعدّل يتغيّر لوحده". وفي وضع التعديل
+  // الأولوية للمشتقّ من بنود العرض؛ والعام احتياطٌ حين لا مشتقّ.
   useEffect(() => {
     (async () => {
       const { data: er } = await supabase
@@ -518,13 +536,16 @@ export default function QuoteCreatePage() {
         .limit(1)
         .maybeSingle();
       const rate = Number(er?.rate_to_base || 0);
-      if (rate && rate > 0 && rate !== 1) {
-        setDefaultRate(rate);
-        setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: rate, unit_price: r.foreign_price * rate }));
-        setRows((prev) => prev.map((r) => (r.product_id ? r : { ...r, exchange_rate: rate, unit_price: r.foreign_price * rate })));
-      }
+      if (!(rate > 0)) return;
+      globalRateRef.current = rate;
+      if (rateTouchedRef.current) return;
+      const effective = resolveDefaultRate(editId ? derivedRateRef.current : 0, rate);
+      if (effective === 1) return;
+      setDefaultRate(effective);
+      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: computeUnitPrice(r.foreign_price, effective) }));
+      setRows((prev) => prev.map((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: computeUnitPrice(r.foreign_price, effective) })));
     })();
-  }, []);
+  }, [editId]);
 
   // ---------- Load quote for edit ----------
   useEffect(() => {
@@ -566,7 +587,7 @@ export default function QuoteCreatePage() {
         const mapped = items.map((it: any) => {
           const fp = Number(it.foreign_price) || 0;
           const up = Number(it.unit_price) || 0;
-          const er = fp > 0 ? Math.round((up / fp) * 1000) / 1000 : 1;
+          const er = deriveRowRate(up, fp);
           return {
             uid: crypto.randomUUID(),
             dbId: it.id,
@@ -586,6 +607,15 @@ export default function QuoteCreatePage() {
           };
         });
         setRows(mapped);
+        // معدّل البنود الجديدة = معدّل العرض نفسه (مشتقّاً من بنوده)، فإن لم
+        // يحمل أي بند سعراً أجنبياً فالسعر العام — لا 1، وإلا أُدرج الصنف
+        // الجديد بسعره الأجنبي الخام كسعر محلي (رقمٌ بكسور).
+        derivedRateRef.current = deriveRateFromRows(mapped);
+        const effectiveRate = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
+        if (effectiveRate > 0 && !rateTouchedRef.current) {
+          setDefaultRate(effectiveRate);
+          setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effectiveRate, unit_price: computeUnitPrice(r.foreign_price, effectiveRate) }));
+        }
         // احفظ بصمة البنود الأصلية لتخطّي إعادة الكتابة لاحقاً إن لم تتغيّر
         originalItemsHashRef.current = quoteItemsHash(mapped);
       } else {
@@ -593,6 +623,45 @@ export default function QuoteCreatePage() {
       }
     })();
   }, [editId, navigate]);
+
+  // ---------- Backfill: سعر أجنبي مفقود في بنود عرضٍ قديم ----------
+  // بنودٌ حُفظت قبل تفعيل السعر الأجنبي تصل بـ`foreign_price` فارغاً رغم وجوده
+  // في بطاقة المنتج، بينما مسار الإضافة يقرأه دائماً — فيختلف المساران داخل
+  // العرض الواحد. نملأه من البطاقة ونشتقّ المعدّل منه بحيث يبقى السعر المحلي
+  // والإجمالي كما هما حرفياً.
+  const backfilledForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!editId || productsLoading || products.length === 0) return;
+    if (backfilledForRef.current === editId) return;
+    setRows((prev) => {
+      if (prev.length === 0) return prev;
+      let changed = false;
+      const next = prev.map((r) => {
+        if (!r.dbId || !r.product_id) return r;
+        const patch = backfillForeignPrice(r, products.find((p) => p.id === r.product_id));
+        if (!patch) return r;
+        changed = true;
+        return { ...r, ...patch };
+      });
+      if (!changed) return prev;
+      backfilledForRef.current = editId;
+      derivedRateRef.current = deriveRateFromRows(next);
+      // البصمة تتغيّر بتغيّر السعر الأجنبي — حدّثها حتى لا يُحسب هذا الملء
+      // "تعديلاً للبنود" فتُعاد كتابتها بلا سبب.
+      originalItemsHashRef.current = quoteItemsHash(next);
+      return next;
+    });
+  }, [editId, products, productsLoading]);
+
+  // بعد الملء أعلاه قد يصبح للعرض معدّل مشتق — اعتمده للبنود الجديدة.
+  useEffect(() => {
+    if (!editId || rateTouchedRef.current) return;
+    const effective = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
+    if (effective > 0 && effective !== defaultRate) {
+      setDefaultRate(effective);
+      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: computeUnitPrice(r.foreign_price, effective) }));
+    }
+  }, [editId, rows.length, defaultRate]);
 
   // ---------- Customer search ----------
   const customerMatches = useMemo(() => {
@@ -704,7 +773,7 @@ export default function QuoteCreatePage() {
         const merged = { ...r, ...patch };
         // recompute unit_price إذا تغيّر foreign_price أو exchange_rate
         if ("foreign_price" in patch || "exchange_rate" in patch) {
-          merged.unit_price = merged.foreign_price * merged.exchange_rate;
+          merged.unit_price = computeUnitPrice(merged.foreign_price, merged.exchange_rate);
         }
         merged.total = calcTotal(merged);
         return merged;
@@ -1567,7 +1636,7 @@ export default function QuoteCreatePage() {
                 onChange={(e) =>
                   setQuickRow((r) => {
                     const fp = Number(e.target.value) || 0;
-                    const updated = { ...r, foreign_price: fp, unit_price: fp * r.exchange_rate };
+                    const updated = { ...r, foreign_price: fp, unit_price: computeUnitPrice(fp, r.exchange_rate) };
                     updated.total = calcTotal(updated);
                     return updated;
                   })
@@ -1588,13 +1657,20 @@ export default function QuoteCreatePage() {
                 value={quickRow.exchange_rate}
                 onChange={(e) => {
                   const er = Number(e.target.value) || 1;
+                  // المعدّل المكتوب بيد المستخدم قرارٌ نهائي — لا يدوسه أي مصدر
+                  // تلقائي بعده، وهو أيضاً معدّل البنود الجديدة من الآن.
+                  rateTouchedRef.current = true;
+                  setDefaultRate(er);
                   setQuickRow((r) => {
-                    const updated = { ...r, exchange_rate: er, unit_price: r.foreign_price * er };
+                    const updated = { ...r, exchange_rate: er, unit_price: computeUnitPrice(r.foreign_price, er) };
                     updated.total = calcTotal(updated);
                     return updated;
                   });
+                  // `applyRateToRow` يتخطّى البنود المسعّرة محلياً — ضربها في
+                  // المعدّل كان يصفّر سعرها ويتلف بنود العروض القديمة.
                   setRows((prev) => prev.map((row) => {
-                    const updated = { ...row, exchange_rate: er, unit_price: row.foreign_price * er };
+                    const updated = applyRateToRow(row, er);
+                    if (updated === row) return row;
                     updated.total = calcTotal(updated);
                     return updated;
                   }));
@@ -1809,6 +1885,12 @@ export default function QuoteCreatePage() {
                                 if (row.uid !== r.uid) return row;
                                 const up = Number(e.target.value) || 0;
                                 const merged = { ...row, unit_price: up };
+                                // أبقِ المعدّل متسقاً مع (المحلي ÷ الأجنبي) — وهو
+                                // نفس ما يُشتقّ عند إعادة فتح العرض، فلا يختلف
+                                // المعروض قبل الحفظ وبعده.
+                                if ((Number(row.foreign_price) || 0) > 0 && up > 0) {
+                                  merged.exchange_rate = deriveRowRate(up, row.foreign_price);
+                                }
                                 merged.total = calcTotal(merged);
                                 return merged;
                               }),
@@ -2441,7 +2523,7 @@ export default function QuoteCreatePage() {
             product_name: p.name,
             productSearch: p.name,
             foreign_price: fp,
-            unit_price: fp * base.exchange_rate,
+            unit_price: computeUnitPrice(fp, base.exchange_rate),
             quantity: Number(p.stock_quantity) || 1,
             unit: p.unit,
             showSuggestions: false,
@@ -2482,7 +2564,7 @@ export default function QuoteCreatePage() {
                 product_name: p.name,
                 productSearch: p.name,
                 foreign_price: fp,
-                unit_price: fp * base.exchange_rate,
+                unit_price: computeUnitPrice(fp, base.exchange_rate),
                 quantity: line.qty || 1,
                 unit: p.unit || null,
                 showSuggestions: false,

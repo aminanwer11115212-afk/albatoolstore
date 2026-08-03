@@ -81,6 +81,8 @@ import {
   effectiveRowRate,
   backfillForeignPrice,
   applyRateToRow,
+  computeUnitPrice,
+  deriveRowRate,
 } from "@/utils/invoiceCreateHelpers";
 
 
@@ -422,8 +424,8 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       const effective = resolveDefaultRate(editId ? derivedRateRef.current : 0, rate);
       if (effective === 1) return;
       setDefaultRate(effective);
-      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: r.foreign_price * effective }));
-      setRows((prev) => prev.map((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: r.foreign_price * effective })));
+      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: computeUnitPrice(r.foreign_price, effective) }));
+      setRows((prev) => prev.map((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: computeUnitPrice(r.foreign_price, effective) })));
     })();
   }, [editId]);
 
@@ -462,7 +464,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         const mapped = items.map((it: any) => {
           const fp = Number(it.foreign_price) || 0;
           const up = Number(it.unit_price) || 0;
-          const er = fp > 0 ? Math.round((up / fp) * 1000) / 1000 : 1;
+          const er = deriveRowRate(up, fp);
           return {
             uid: crypto.randomUUID(),
             dbId: it.id,
@@ -491,7 +493,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         const effectiveRate = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
         if (effectiveRate > 0 && !rateTouchedRef.current) {
           setDefaultRate(effectiveRate);
-          setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effectiveRate, unit_price: r.foreign_price * effectiveRate }));
+          setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effectiveRate, unit_price: computeUnitPrice(r.foreign_price, effectiveRate) }));
         }
         // احفظ بصمة البنود الأصلية لتخطّي إعادة الكتابة وعمليات المخزون لاحقاً إن لم تتغيّر
         originalItemsHashRef.current = invoiceItemsHash(mapped);
@@ -536,7 +538,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
     const effective = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
     if (effective > 0 && effective !== defaultRate) {
       setDefaultRate(effective);
-      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: r.foreign_price * effective }));
+      setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: computeUnitPrice(r.foreign_price, effective) }));
     }
   }, [editId, rows.length, defaultRate]);
 
@@ -644,7 +646,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       if (r.uid !== uid) return r;
       const merged = { ...r, ...patch };
       if ("foreign_price" in patch || "exchange_rate" in patch) {
-        merged.unit_price = merged.foreign_price * merged.exchange_rate;
+        merged.unit_price = computeUnitPrice(merged.foreign_price, merged.exchange_rate);
       }
       merged.total = calcTotal(merged);
       return merged;
@@ -2070,14 +2072,14 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
             <div className="quick-add-field">
               <input step="any" data-nav-col="foreign_price" type="number" className="form-control text-center" placeholder="$ السعر الأجنبي"
                 value={quickRow.foreign_price || ""}
-                onChange={(e) => setQuickRow((r) => { const fp = Number(e.target.value) || 0; const u = { ...r, foreign_price: fp, unit_price: fp * r.exchange_rate }; u.total = calcTotal(u); return u; })} />
+                onChange={(e) => setQuickRow((r) => { const fp = Number(e.target.value) || 0; const u = { ...r, foreign_price: fp, unit_price: computeUnitPrice(fp, r.exchange_rate) }; u.total = calcTotal(u); return u; })} />
               <ExpandFieldButton currentExtra={quickExtras[3] || 0} onDrag={(v) => quickSetExtra(3, v)} onReset={() => quickReset(3)} />
             </div>
 
             <div className="quick-add-field">
               <input ref={quickRateRef} data-nav-col="exchange_rate" type="number" step="0.01" className="form-control text-center" placeholder="معدل التحويل"
                 value={quickRow.exchange_rate}
-                onChange={(e) => { const er = Number(e.target.value) || 1; rateTouchedRef.current = true; setDefaultRate(er); setQuickRow((r) => { const u = { ...r, exchange_rate: er, unit_price: r.foreign_price * er }; u.total = calcTotal(u); return u; }); setRows((prev) => prev.map((row) => { const u = applyRateToRow(row, er); if (u === row) return row; u.total = calcTotal(u); return u; })); }}
+                onChange={(e) => { const er = Number(e.target.value) || 1; rateTouchedRef.current = true; setDefaultRate(er); setQuickRow((r) => { const u = { ...r, exchange_rate: er, unit_price: computeUnitPrice(r.foreign_price, er) }; u.total = calcTotal(u); return u; }); setRows((prev) => prev.map((row) => { const u = applyRateToRow(row, er); if (u === row) return row; u.total = calcTotal(u); return u; })); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addQuickRowToTable(); } }} />
               <ExpandFieldButton currentExtra={quickExtras[4] || 0} onDrag={(v) => quickSetExtra(4, v)} onReset={() => quickReset(4)} />
             </div>
@@ -2243,7 +2245,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
                                 // نفس ما يُشتق عند إعادة فتح الفاتورة، فلا يختلف العرض
                                 // قبل الحفظ وبعده.
                                 if ((Number(row.foreign_price) || 0) > 0 && up > 0) {
-                                  merged.exchange_rate = Math.round((up / row.foreign_price) * 1000) / 1000;
+                                  merged.exchange_rate = deriveRowRate(up, row.foreign_price);
                                 }
                                 merged.total = calcTotal(merged);
                                 return merged;
@@ -2874,7 +2876,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
             product_name: p.name,
             productSearch: p.name,
             foreign_price: fp,
-            unit_price: fp * base.exchange_rate,
+            unit_price: computeUnitPrice(fp, base.exchange_rate),
             quantity: Number(p.stock_quantity) || 1,
             unit: p.unit,
             showSuggestions: false,
@@ -2914,7 +2916,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
                 product_name: p.name,
                 productSearch: p.name,
                 foreign_price: fp,
-                unit_price: fp * base.exchange_rate,
+                unit_price: computeUnitPrice(fp, base.exchange_rate),
                 quantity: line.qty || 1,
                 unit: (p as any).unit || null,
                 showSuggestions: false,

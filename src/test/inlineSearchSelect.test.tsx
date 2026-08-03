@@ -61,13 +61,23 @@ describe("InlineSearchSelect", () => {
     expect(onChange).toHaveBeenCalledWith("2"); // الخيار الثاني (highlight بدأ من 0 ثم +1)
   });
 
-  it("القائمة تُرسم داخل شجرة DOM للـ wrapper (وليس portal خارجي) — يمنع إغلاق Radix Dialog قبل التثبيت", () => {
-    const { container } = render(
-      <InlineSearchSelect value="" options={opts} onChange={onChange} />,
-    );
-    fireEvent.click(screen.getByRole("button"));
-    const item = screen.getByText("زويتش").closest("button")!;
-    // العنصر يجب أن يكون داخل container (شجرة المكوّن)، لا خارجها عبر portal لـ body.
-    expect(container.contains(item)).toBe(true);
+  /**
+   * القائمة تُرسم في `document.body` عمداً — لولا ذلك لقصّها `overflow` أيّ
+   * حاوية جدولٍ فوقها. فالحارس ضدّ إغلاق Radix Dialog قبل تثبيت الاختيار ليس
+   * موضع الرسم، بل **حبس حدث `mousedown` داخل القائمة** فلا يبلغ `document`
+   * فيقرأه الـDialog نقرةً خارجه. وهذا ما يفحصه الاختبار.
+   */
+  it("mousedown داخل القائمة لا يتسرّب إلى document — يمنع إغلاق Radix Dialog قبل التثبيت", () => {
+    const onDocMouseDown = vi.fn();
+    document.addEventListener("mousedown", onDocMouseDown);
+    try {
+      render(<InlineSearchSelect value="" options={opts} onChange={onChange} />);
+      fireEvent.click(screen.getByRole("button"));
+      const item = screen.getByText("زويتش").closest("button")!;
+      fireEvent.mouseDown(item, { bubbles: true });
+      expect(onDocMouseDown).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener("mousedown", onDocMouseDown);
+    }
   });
 });
