@@ -4,6 +4,11 @@
 # `supabase link` أو رابط لوحة يُبنى من هذا الملف كان يذهب للمكان الخطأ.
 project_id = "exmasfdcjgwapmobefne"
 
+# `verify_jwt` يُصرَّح لكل دالّة تُنشر آلياً — والافتراضي `true`.
+# الدوالّ العامّة (يفتحها العميل أو زاحف واتساب بلا مفتاح) يجب أن تُصرَّح
+# `false` هنا، وإلا قلبها أوّلُ نشرٍ آلي إلى `true` فتردّ 401 على العميل.
+# حارسُها ليس الـJWT بل **توكن المشاركة** نفسه: يُبحث في `document_share_tokens`
+# ويُرفض المنتهي.
 [functions]
   [functions.auth-email-hook]
     verify_jwt = false
@@ -12,4 +17,16 @@ project_id = "exmasfdcjgwapmobefne"
   [functions.process-email-queue]
     verify_jwt = true
   [functions.s]
+    verify_jwt = false
+  # رابط العميل: صفحة المستند نفسها
+  [functions.document-share]
+    verify_jwt = false
+  # الرابط المُرسَل في واتساب — يزحف عليه واتساب/تيليجرام بلا مفتاح ليقرأ OG
+  [functions.document-share-meta]
+    verify_jwt = false
+  # كشف الحساب العام بتوكنه
+  [functions.customer-statement-token]
+    verify_jwt = false
+  # تسجيل «فُتح/طُبع/نُزّل» من صفحة العميل
+  [functions.log-share-event]
     verify_jwt = false
