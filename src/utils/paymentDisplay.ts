@@ -56,23 +56,56 @@ export function paymentCustomerText(input: PaymentDisplayInput & { via?: string;
   return `دفعتم ${money(full)}${on}${via}${op}${extra}`;
 }
 
+const stamp = (t: any): number => {
+  const v = t?.created_at || t?.date;
+  const ms = v ? new Date(String(v)).getTime() : NaN;
+  return Number.isNaN(ms) ? 0 : ms;
+};
+
 /**
- * الفائض المرتبط بكل فاتورة، مفهرساً قبل المرور على الحركات.
+ * الفائض منسوباً إلى **الدفعة التي أنتجته**، لا إلى الفاتورة كلّها.
  *
- * لا يصلح بناؤه أثناء المرور: ترتيب الحركات القادم من القاعدة لا يضمن وصول
- * قيد الفائض قبل قيد الدفعة، فقد يُصاغ نصّ الدفعة قبل أن يُعرف فائضها.
+ * ## لماذا لا يكفي الفهرس بالفاتورة
+ * فاتورةٌ قيمتها 4,000 دُفعت على دفعتين: 2,000 ثم 3,000. الثانية وحدها تتجاوز
+ * المتبقي فتُنتج فائضاً قدره 1,000. ولو نُسب الفائض إلى الفاتورة لقرأ
+ * المستخدم **كلا** السطرين مضخّمين: «دفعة 3,000» و«دفعة 4,000» — ومجموعهما
+ * 7,000 على فاتورةٍ دُفع فيها 5,000.
+ *
+ * فالنسبة هنا إلى أقرب دفعةٍ زمنياً على الفاتورة نفسها: قيد الفائض يُكتب في
+ * الثانية نفسها التي تُكتب فيها دفعته (`splitPayment` يفصلهما في العملية
+ * الواحدة)، والدفعة الواحدة لا تُنسب لها فائضان.
+ *
+ * ويُبنى الفهرس **قبل** المرور على الحركات: ترتيب القاعدة لا يضمن وصول قيد
+ * الفائض قبل قيد دفعته.
+ *
+ * @returns خريطة مفتاحها معرّف قيد الدفعة وقيمتها فائضها
  */
 export function indexLinkedOverpay(
   transactions: any[],
   isOverpay: (t: any) => boolean,
 ): Map<string, number> {
+  const rows = transactions || [];
+  const credits = rows.filter(
+    (t) => t?.category === "customer_credit" && (Number(t.amount) || 0) > 0 && t.reference_id && isOverpay(t),
+  );
+  if (credits.length === 0) return new Map();
+
+  const payments = rows.filter((t) => t?.category === "customer_payment" && t.reference_id);
   const map = new Map<string, number>();
-  for (const t of transactions || []) {
-    if (t?.category !== "customer_credit") continue;
-    const amt = Number(t.amount) || 0;
-    if (amt <= 0 || !t.reference_id || !isOverpay(t)) continue;
-    const key = String(t.reference_id);
-    map.set(key, r2((map.get(key) || 0) + amt));
+  const taken = new Set<string>();
+
+  // الأقدم أوّلاً: الفائض الأقدم يأخذ دفعته الأقرب قبل أن يزاحمه الأحدث.
+  for (const credit of [...credits].sort((a, b) => stamp(a) - stamp(b))) {
+    const ref = String(credit.reference_id);
+    const candidates = payments.filter((p) => String(p.reference_id) === ref && !taken.has(String(p.id)));
+    if (candidates.length === 0) continue;
+    const at = stamp(credit);
+    const nearest = candidates.reduce((best, p) =>
+      Math.abs(stamp(p) - at) < Math.abs(stamp(best) - at) ? p : best,
+    );
+    const key = String(nearest.id);
+    taken.add(key);
+    map.set(key, r2((map.get(key) || 0) + (Number(credit.amount) || 0)));
   }
   return map;
 }

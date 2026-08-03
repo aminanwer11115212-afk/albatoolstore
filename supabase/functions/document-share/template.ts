@@ -67,6 +67,79 @@ function cleanExtraHTML(s?: string | null): string | undefined {
   return textOnly.length ? out : undefined;
 }
 
+/**
+ * صافي حساب العميل **قبل إنشاء فاتورة بعينها** — نسخة من
+ * `src/utils/customerNetBefore.ts`، وهي نفس ما تستعمله شاشة المعاينة.
+ *
+ * الطريقة المختصرة («اطرح هذه الفاتورة من الرصيد الحالي») تُدخل في «الحساب
+ * القديم» فواتيرَ أُنشئت **بعد** هذه الفاتورة، وتقصّ عند الصفر فتشوّه الصافي
+ * حين يجتمع دَينٌ ورصيد. فلو بقيت هنا لاختلف «الحساب القديم» في رابط العميل
+ * عن الرقم نفسه في المعاينة — وهو ما يُفترض أن يطابقه.
+ */
+export function netBeforeInvoiceEdge(
+  invoiceId: string,
+  invoices: any[],
+  transactions: any[],
+): number | null {
+  const num = (v: any) => Number(v || 0);
+  const r2n = (n: number) => Math.round(n * 100) / 100;
+  const stampKey = (row: any): string => {
+    const created = row?.created_at ? String(row.created_at) : "";
+    if (created) {
+      const d = new Date(created);
+      if (!Number.isNaN(d.getTime())) return d.toISOString();
+    }
+    const plain = row?.date ? String(row.date).slice(0, 10) : "";
+    return plain ? `${plain}T00:00:00.000Z` : "";
+  };
+
+  const inv = (invoices || []).find((i) => String(i.id) === String(invoiceId));
+  if (!inv) return null;
+  const at = stampKey(inv);
+  if (!at) return null;
+
+  // حركات هذه الفاتورة نفسها لا تسبق إنشاءها مهما قال الطابع الزمني.
+  const txs = (transactions || []).filter(
+    (t) => String(t?.reference_id || "") !== String(invoiceId),
+  );
+
+  // زوج السداد من الرصيد (استهلاك سالب + دفعة `credit_balance`) أثره صفر.
+  const consumptions = txs.filter((t) => t.category === "customer_credit" && num(t.amount) < 0);
+  const creditPayments = txs.filter(
+    (t) => t.category === "customer_payment" && t.method === "credit_balance",
+  );
+  const paired = new Set<string>();
+  for (const c of consumptions) {
+    const amt = Math.abs(num(c.amount));
+    const match = creditPayments.find(
+      (p) =>
+        !paired.has(p.id) &&
+        Math.abs(num(p.amount) - amt) < 0.01 &&
+        (!c.reference_id || !p.reference_id || c.reference_id === p.reference_id),
+    );
+    if (match) paired.add(match.id);
+  }
+
+  const events: Array<{ at: string; effect: number }> = [];
+  for (const i of (invoices || []).filter((x) => x.status !== "cancelled")) {
+    events.push({ at: stampKey(i), effect: r2n(num(i.total)) });
+  }
+  for (const t of txs) {
+    if (paired.has(t.id)) continue;
+    const amt = num(t.amount);
+    if (t.category === "customer_credit") {
+      if (amt < 0) continue;
+      events.push({ at: stampKey(t), effect: -r2n(amt) });
+      continue;
+    }
+    if (t.category === "customer_payment") {
+      events.push({ at: stampKey(t), effect: -r2n(Math.abs(amt)) });
+    }
+  }
+
+  return r2n(events.filter((e) => e.at < at).reduce((sum, e) => sum + e.effect, 0));
+}
+
 export interface ShareDocArgs {
   docTitle: string;
   docNumber?: string;

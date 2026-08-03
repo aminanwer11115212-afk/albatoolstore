@@ -126,9 +126,9 @@ export function buildCustomerLedger(input: BuildLedgerInput): LedgerResult {
 
   const invoiceById = new Map<string, any>();
   for (const inv of invoices) invoiceById.set(inv.id, inv);
-  // الفائض المرتبط بكل فاتورة، مفهرساً قبل المرور — ترتيب القاعدة لا يضمن
-  // وصول قيد الفائض قبل قيد دفعته.
-  const overpayByInvoice = indexLinkedOverpay(
+  // الفائض منسوباً إلى الدفعة التي أنتجته، مفهرساً قبل المرور — ترتيب
+  // القاعدة لا يضمن وصول قيد الفائض قبل قيد دفعته.
+  const overpayByPayment = indexLinkedOverpay(
     transactions,
     (t) => classifyCreditRow(t).source === "overpay_invoice",
   );
@@ -219,7 +219,7 @@ export function buildCustomerLedger(input: BuildLedgerInput): LedgerResult {
         // `paymentDisplay`: القيدان يبقيان، والمضموم نصٌّ لا مبلغٌ يُحتسب.
         statement: paymentStatement({
           applied: Math.abs(amt),
-          surplus: inv ? (overpayByInvoice.get(String(inv.id)) || 0) : 0,
+          surplus: overpayByPayment.get(String(t.id)) || 0,
           invoiceNumber: inv?.invoice_number || null,
           invoiceTotal: inv ? num(inv.total) : null,
         }),

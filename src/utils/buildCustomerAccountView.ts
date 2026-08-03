@@ -285,9 +285,9 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
   const invoiceTotalById = new Map<string, number>(
     liveInvoices.map((i) => [String(i.id), r2(num(i.total))]),
   );
-  // الفائض المرتبط بكل فاتورة — يُفهرس **قبل** المرور على الحركات: ترتيب
-  // القاعدة لا يضمن وصول قيد الفائض قبل قيد دفعته.
-  const overpayByInvoice = indexLinkedOverpay(
+  // الفائض منسوباً إلى الدفعة التي أنتجته — يُفهرس **قبل** المرور على
+  // الحركات: ترتيب القاعدة لا يضمن وصول قيد الفائض قبل قيد دفعته.
+  const overpayByPayment = indexLinkedOverpay(
     transactions,
     (t) => classifyCreditRow(t).source === "overpay_invoice",
   );
@@ -382,7 +382,7 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
       // الدفعة كما دفعها العميل: المطبَّق + فائضها. القيدان يبقيان كما هما
       // في الدفاتر — المضموم هنا نصٌّ يُقرأ لا مبلغٌ يُحتسب، فـ`effect` على
       // حاله وإلا حُسب الفائض مرّتين (مرّةً هنا ومرّةً في قيده).
-      const surplus = linkedInv ? r2(overpayByInvoice.get(linkedInv) || 0) : 0;
+      const surplus = r2(overpayByPayment.get(String(t.id)) || 0);
       const display = {
         applied: Math.abs(amt),
         surplus,

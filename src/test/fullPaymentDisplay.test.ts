@@ -63,34 +63,114 @@ describe("fullPaidAmount", () => {
   });
 });
 
-describe("indexLinkedOverpay — الفهرسة قبل المرور", () => {
+describe("indexLinkedOverpay — الفائض ينتسب لدفعته لا لفاتورته", () => {
   const isOverpay = () => true;
+  const pay = (id: string, ref: string, at: string) =>
+    ({ id, category: "customer_payment", reference_id: ref, created_at: at });
+  const credit = (id: string, ref: string, amount: number, at: string) =>
+    ({ id, category: "customer_credit", reference_id: ref, amount, created_at: at });
 
-  it("يجمع فوائض الفاتورة الواحدة", () => {
+  it("دفعةٌ واحدة بفائض: الفائض عليها", () => {
     const map = indexLinkedOverpay([
-      { category: "customer_credit", amount: 1000, reference_id: "i1" },
-      { category: "customer_credit", amount: 500, reference_id: "i1" },
-      { category: "customer_credit", amount: 200, reference_id: "i2" },
+      pay("p1", "i1", "2026-08-02T10:00:00Z"),
+      credit("c1", "i1", 1000, "2026-08-02T10:00:01Z"),
     ], isOverpay);
-    expect(map.get("i1")).toBe(1500);
-    expect(map.get("i2")).toBe(200);
+    expect(map.get("p1")).toBe(1000);
+  });
+
+  /**
+   * العطل الذي كشفَته المراجعة: فاتورةٌ 4,000 على دفعتين 2,000 ثم 3,000.
+   * الثانية وحدها تتجاوز المتبقي. والفهرس بالفاتورة كان ينسب الفائض للاثنتين
+   * فيُقرأ «3,000» و«4,000» — مجموعهما 7,000 وقد دُفع 5,000.
+   */
+  it("دفعتان وفائضٌ واحد: الفائض على الثانية وحدها", () => {
+    const map = indexLinkedOverpay([
+      pay("p1", "i1", "2026-08-02T10:00:00Z"),
+      pay("p2", "i1", "2026-08-05T10:00:00Z"),
+      credit("c1", "i1", 1000, "2026-08-05T10:00:01Z"),
+    ], isOverpay);
+    expect(map.get("p2")).toBe(1000);
+    expect(map.get("p1")).toBeUndefined();
+  });
+
+  it("فائضان لدفعتين: كلٌّ إلى دفعته", () => {
+    const map = indexLinkedOverpay([
+      pay("p1", "i1", "2026-08-02T10:00:00Z"),
+      credit("c1", "i1", 300, "2026-08-02T10:00:01Z"),
+      pay("p2", "i1", "2026-08-09T10:00:00Z"),
+      credit("c2", "i1", 700, "2026-08-09T10:00:01Z"),
+    ], isOverpay);
+    expect(map.get("p1")).toBe(300);
+    expect(map.get("p2")).toBe(700);
+  });
+
+  it("فواتير مختلفة لا تتداخل", () => {
+    const map = indexLinkedOverpay([
+      pay("p1", "i1", "2026-08-02T10:00:00Z"),
+      credit("c1", "i1", 1000, "2026-08-02T10:00:01Z"),
+      pay("p2", "i2", "2026-08-02T10:00:00Z"),
+      credit("c2", "i2", 200, "2026-08-02T10:00:01Z"),
+    ], isOverpay);
+    expect(map.get("p1")).toBe(1000);
+    expect(map.get("p2")).toBe(200);
   });
 
   it("يتجاهل الاستهلاك (السالب) وغير المرتبط", () => {
     const map = indexLinkedOverpay([
-      { category: "customer_credit", amount: -1000, reference_id: "i1" },
-      { category: "customer_credit", amount: 1000, reference_id: null },
-      { category: "customer_payment", amount: 1000, reference_id: "i1" },
+      credit("c1", "i1", -1000, "2026-08-02T10:00:00Z"),
+      { id: "c2", category: "customer_credit", amount: 1000, reference_id: null },
+      pay("p1", "i1", "2026-08-02T10:00:00Z"),
     ], isOverpay);
     expect(map.size).toBe(0);
   });
 
   it("الشحن العادي لا يُحسب فائضاً", () => {
+    const map = indexLinkedOverpay([
+      pay("p1", "i1", "2026-08-02T10:00:00Z"),
+      credit("c1", "i1", 1000, "2026-08-02T10:00:01Z"),
+    ], () => false);
+    expect(map.size).toBe(0);
+  });
+
+  it("فائضٌ بلا دفعةٍ على فاتورته لا يُنسب لأحد", () => {
     const map = indexLinkedOverpay(
-      [{ category: "customer_credit", amount: 1000, reference_id: "i1" }],
-      () => false,
+      [credit("c1", "i1", 1000, "2026-08-02T10:00:00Z")],
+      isOverpay,
     );
     expect(map.size).toBe(0);
+  });
+});
+
+describe("كشف الحساب بدفعتين — لا تضخيم", () => {
+  const invoices = [{
+    id: "i1", invoice_number: "INV-1", date: "2026-08-02", created_at: "2026-08-02T09:00:00Z",
+    total: 4000, paid_amount: 4000, status: "paid",
+  }];
+  const transactions = [
+    { id: "t1", category: "customer_payment", amount: 2000, reference_id: "i1", date: "2026-08-02", created_at: "2026-08-02T10:00:00Z", method: "cash" },
+    { id: "t2", category: "customer_payment", amount: 2000, reference_id: "i1", date: "2026-08-05", created_at: "2026-08-05T10:00:00Z", method: "cash" },
+    { id: "t3", category: "customer_credit", amount: 1000, reference_id: "i1", date: "2026-08-05", created_at: "2026-08-05T10:00:01Z", method: "cash", description: "فائض دفعة على فاتورة INV-1" },
+  ];
+
+  it("الدفعة الأولى تُقرأ 2,000 والثانية 3,000 — لا 3,000 و3,000", () => {
+    const view = buildCustomerAccountView({ invoices, transactions });
+    const pays = view.blocks[0].movements.filter((m) => m.kind === "payment");
+    expect(pays[0].label).toContain("2,000");
+    expect(pays[1].label).toContain("3,000");
+  });
+
+  it("مجموع ما يقرؤه المستخدم = ما دفعه فعلاً (5,000)", () => {
+    const view = buildCustomerAccountView({ invoices, transactions });
+    const nums = view.blocks[0].movements
+      .filter((m) => m.kind === "payment")
+      .map((m) => Number(m.label.match(/دفعة ([\d,]+)/)![1].replace(/,/g, "")));
+    expect(nums.reduce((s, n) => s + n, 0)).toBe(5000);
+  });
+
+  it("والمجاميع لم تتحرّك", () => {
+    const view = buildCustomerAccountView({ invoices, transactions });
+    expect(view.accountTotal).toBe(-1000);
+    expect(view.drift).toBe(0);
   });
 });
 

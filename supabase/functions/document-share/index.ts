@@ -3,10 +3,10 @@
 // Returns full HTML page with the document and a single "Download PDF" button.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { attr, fmt, buildDocHTML } from "./template.ts";
+import { attr, fmt, buildDocHTML, netBeforeInvoiceEdge } from "./template.ts";
 
 // Re-export so Deno tests (index_test.ts) can keep importing from index.ts.
-export { buildDocHTML } from "./template.ts";
+export { buildDocHTML, netBeforeInvoiceEdge } from "./template.ts";
 
 /**
  * تفاصيل التغليف والترحيل بنفس صياغة `src/utils/printExtras.ts`.
@@ -712,9 +712,26 @@ Deno.serve(async (req) => {
         const bal = Number(c?.balance || 0);
         const credit = Number((c as any)?.credit_balance || 0);
         currentNet = c ? bal - credit : null;
-        const remaining = Math.max(grandTotal - paidAmount, 0);
-        const surplus = Math.max(paidAmount - grandTotal, 0);
-        const prevNet = Math.max(bal - remaining, 0) - Math.max(credit - surplus, 0);
+        const custId = (inv as any).customer_id;
+        let prevNet: number | null = null;
+        if (custId) {
+          const [{ data: custInvoices }, { data: custTxs }] = await Promise.all([
+            supabase.from("invoices")
+              .select("id, total, paid_amount, status, date, created_at")
+              .eq("customer_id", custId),
+            supabase.from("transactions")
+              .select("id, category, amount, method, reference_id, date, created_at")
+              .eq("customer_id", custId)
+              .in("category", ["customer_payment", "customer_credit"]),
+          ]);
+          prevNet = netBeforeInvoiceEdge(String(tk.doc_id), custInvoices || [], custTxs || []);
+        }
+        if (prevNet == null) {
+          // احتياطٌ حين لا عميل مسجّل: اطرح هذه الفاتورة من الرصيد الحالي.
+          const remaining = Math.max(grandTotal - paidAmount, 0);
+          const surplus = Math.max(paidAmount - grandTotal, 0);
+          prevNet = Math.max(bal - remaining, 0) - Math.max(credit - surplus, 0);
+        }
         previousDebt = prevNet > 0 ? prevNet : 0;
         previousCredit = prevNet < 0 ? -prevNet : 0;
       }
