@@ -148,9 +148,23 @@ function useTable<T extends keyof Tables<any>>(table: string) {
   };
 
   const remove = useMutation({
+    /**
+     * ## الحذف الصامت الذي لا يحذف
+     *
+     * سياسة `RLS` للحذف على `quotes` (وغيرها) مقصورةٌ على الأدمن. وحين تمنع
+     * السياسة الصفَّ لا يأتي خطأ — بل ينجح الطلب بصفر صفوف محذوفة. فيقرأ
+     * المستخدم «تم حذف العرض»، ويختفي الصفّ تفاؤلياً، ثم يعود عند أوّل
+     * تحديث. وهذا ما جعل زرّ الحذف يبدو «فيه مشكلة» بلا رسالة تشرحها.
+     *
+     * `select("id")` يُرجع الصفوف المحذوفة فعلاً، فصفرُها خطأٌ صريح.
+     */
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from(table).delete().eq("id", id);
+      const { data, error } = await (supabase as any)
+        .from(table).delete().eq("id", id).select("id");
       if (error) throw error;
+      if (Array.isArray(data) && data.length === 0) {
+        throw new Error("لم يُحذف السجل — تحقّق من صلاحيتك أو أنه محذوف مسبقاً");
+      }
     },
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: [table] });

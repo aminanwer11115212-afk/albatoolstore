@@ -453,13 +453,26 @@ ${showAccount ? (() => {
   const prevNet = (Number(previousDebt) || 0) - (Number(previousCredit) || 0);
   const hasPrev = Math.abs(prevNet) > 0.01;
   const generalDiscount = balSum.hasDiscount ? balSum.discount : 0;
+  /**
+   * ## عرض السعر لا يدخل حساب العميل
+   *
+   * كان الملخّص واحداً للفاتورة وعرض السعر، فيُجمع إجمالي العرض على الرصيد
+   * السابق ويُعرض الناتج «رصيد العميل الحالي». فيقرأ العميل أن عرضاً لم
+   * يُقبل بعد قد صار ديناً عليه — والعرض ليس مطالبةً أصلاً، ولا يُكتب في كشف
+   * الحساب ولا في `customers.balance`.
+   *
+   * فالورقة هنا تعرض أرقام العرض وحدها، ورصيدَ العميل كما هو **قبل العرض
+   * وبعده** — لا فرق بينهما — ولا صفَّ «مدفوع» لمستندٍ لا يُدفع.
+   */
+  const isQuote = type === "quote";
   const invoiceValue = Math.max(
     (Number(grandTotal) || 0) + generalDiscount,
     (Number(subtotal) || 0) + (Number(shipping) || 0),
     Number(grandTotal) || 0,
   ); // قيمة الفاتورة قبل الخصم
   const netInvoiceValue = Number(grandTotal) || 0; // صافي الفاتورة بعد الخصم
-  const jomlaHesab = netInvoiceValue + prevNet; // جملة الحساب
+  // جملة الحساب — وفي عرض السعر لا حساب: إجماليه لا يُضمّ إلى رصيد العميل.
+  const jomlaHesab = isQuote ? netInvoiceValue : netInvoiceValue + prevNet;
   /**
    * ## «المدفوع» يُشتقّ من الرصيد الفعلي لا من `paid_amount` الفاتورة
    *
@@ -476,9 +489,12 @@ ${showAccount ? (() => {
    * وهي نفس آلية «شحن الرصيد»: يُسجَّل على الحساب ولا يُوزَّع على بنوده.
    */
   const netProvided = currentNet != null && !Number.isNaN(Number(currentNet));
-  const finalNet = netProvided ? r2(Number(currentNet)) : jomlaHesab - paidAmount; // >0 عليه، <0 له
+  // رصيد العميل في عرض السعر هو رصيده السابق حرفياً — العرض لا يحرّكه.
+  const finalNet = isQuote
+    ? r2(prevNet)
+    : netProvided ? r2(Number(currentNet)) : jomlaHesab - paidAmount; // >0 عليه، <0 له
   const derivedPaid = netProvided ? Math.max(0, r2(jomlaHesab - finalNet)) : paidAmount;
-  const hasPaid = !hidePaidBox && derivedPaid > 0.01;
+  const hasPaid = !isQuote && !hidePaidBox && derivedPaid > 0.01;
   const paidValue = hasPaid ? derivedPaid : 0;
   // الإشارة بلغة العميل — `signedAmountText` هي المصدر الواحد لها في النظام:
   // `+` أخضر لما في مصلحته، `−` أحمر لما عليه. ولأن دالتها تقرأ الموجبَ لصالح
@@ -505,9 +521,9 @@ ${showAccount ? (() => {
 <!-- ملخّص الحساب على شكل خلايا Excel: أصغر من جدول البنود، مضغوط في الأسفل -->
 <table data-section="account-summary" data-section-label="ملخص الحساب" style="width:38%;max-width:260px;margin:6px 0 4px;border-collapse:collapse;font-size:10px;">
   <tbody>
-    ${row({ section: "invoice-value", label: "قيمة الفاتورة", value: fmt(invoiceValue) })}
-    ${generalDiscount > 0.01 ? row({ section: "discount-row", label: "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : ""}
-    ${hasPrev ? (() => {
+    ${row({ section: "invoice-value", label: isQuote ? "قيمة عرض السعر" : "قيمة الفاتورة", value: fmt(invoiceValue) })}
+    ${generalDiscount > 0.01 ? row({ section: "discount-row", label: isQuote ? "الخصم على العرض" : "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : ""}
+    ${!isQuote && hasPrev ? (() => {
       const prevSigned = signedAmountText(-prevNet);
       return row({
         section: "prev-account-row",
@@ -518,13 +534,14 @@ ${showAccount ? (() => {
         badgeColor: TONE_COLOR[prevSigned.tone],
       });
     })() : ""}
-    ${row({ section: "majmoo-row", label: "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
-    ${row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
+    ${row({ section: "majmoo-row", label: isQuote ? "إجمالي عرض السعر" : "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
+    ${isQuote ? "" : row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
+    ${isQuote && !hasPrev ? "" : `
     <tr data-section="final-status" data-section-label="رصيد العميل الحالي">
       <td style="${cellR}background:#e8eef7;">رصيد العميل الحالي</td>
       <td data-section="final-total" data-section-label="رصيد العميل الحالي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:11.5px;color:${finalColor};">${finalDisplay}</td>
       <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:9.5px;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
-    </tr>
+    </tr>`}
   </tbody>
 </table>
 `;
