@@ -20,6 +20,7 @@
  * وأثره على الرصيد صفر — وهو السلوك المحاسبي الصحيح.
  */
 import { classifyCreditRow } from "@/utils/creditSource";
+import { paymentStatement, indexLinkedOverpay } from "@/utils/paymentDisplay";
 
 export type LedgerKind =
   | "invoice"
@@ -125,6 +126,12 @@ export function buildCustomerLedger(input: BuildLedgerInput): LedgerResult {
 
   const invoiceById = new Map<string, any>();
   for (const inv of invoices) invoiceById.set(inv.id, inv);
+  // الفائض المرتبط بكل فاتورة، مفهرساً قبل المرور — ترتيب القاعدة لا يضمن
+  // وصول قيد الفائض قبل قيد دفعته.
+  const overpayByInvoice = indexLinkedOverpay(
+    transactions,
+    (t) => classifyCreditRow(t).source === "overpay_invoice",
+  );
 
   const events: Omit<LedgerEvent, "balance">[] = [];
 
@@ -208,7 +215,14 @@ export function buildCustomerLedger(input: BuildLedgerInput): LedgerResult {
         refNumber: inv?.invoice_number || t.reference_no || "—",
         refKind: inv ? "invoice" : "payment",
         invoiceId: inv?.id || null,
-        statement: inv ? `دفعة على فاتورة ${inv.invoice_number}` : "دفعة من العميل",
+        // الدفعة كما دفعها العميل — لا كما قُسِّمت في الدفاتر. راجع
+        // `paymentDisplay`: القيدان يبقيان، والمضموم نصٌّ لا مبلغٌ يُحتسب.
+        statement: paymentStatement({
+          applied: Math.abs(amt),
+          surplus: inv ? (overpayByInvoice.get(String(inv.id)) || 0) : 0,
+          invoiceNumber: inv?.invoice_number || null,
+          invoiceTotal: inv ? num(inv.total) : null,
+        }),
         reason: `تسجيل دفعة — ${acc}${opNo ? ` (رقم العملية ${opNo})` : ""}`,
         accountLabel: acc,
         operationNo: opNo,
