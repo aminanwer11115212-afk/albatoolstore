@@ -9,7 +9,7 @@ import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
 import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
-import { Plus, Edit, Printer, MessageCircle, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet, Eye, EyeOff, FileDown } from "lucide-react";
+import { Plus, Edit, Printer, MessageCircle, FileText, StickyNote, Image as ImageIcon, Package, Truck, Wallet, Eye, FileDown } from "lucide-react";
 import StatusButton, { WORKFLOW_STATUS_OPTIONS, INVOICE_STATUS_OPTIONS } from "@/components/StatusButton";
 import { invalidateWorkflowAutoCache } from "@/components/invoice/WorkflowStatusBadge";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
@@ -22,7 +22,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
-import { usePrintSectionPrefs, PRINT_SECTION_LABELS } from "@/utils/printSectionPrefs";
 import { deductStockForLines, applyStockDeltaForLines } from "@/utils/stockDeduction";
 import { checkDuplicateBeforeInsert } from "@/utils/duplicateSaveToast";
 import PrintMenu, { type PrintVariant } from "@/components/PrintMenu";
@@ -171,9 +170,6 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
   const [attachmentsDialogOpen, setAttachmentsDialogOpen] = useState(false);
   const [transportDialogOpen, setTransportDialogOpen] = useState(false);
 
-  // رؤية أقسام الورقة (التواقيع/الترحيل/التغليف) — تُحفظ لكل مستخدم وتُطبَّق
-  // على كل مخارج هذه الشاشة: طباعة ومعاينة وPDF ورابط العميل.
-  const { prefs: sectionPrefs, toggle: toggleSection, hiddenSections } = usePrintSectionPrefs("invoice");
   // تفاصيل التغليف والترحيل للفاتورة المحفوظة — كانت غائبة عن مخارج هذه
   // الشاشة كلّها، فتظهر في معاينة الفاتورة المحفوظة وتختفي من طباعتها هنا.
   const [printExtras, setPrintExtras] = useState<{ packagingInfo?: string; transportInfo?: string }>({});
@@ -1579,7 +1575,6 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       variant,
       noHeader,
       ...printExtras,
-      hiddenSections,
     } as any);
   }
 
@@ -2489,26 +2484,6 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
                     </button>
                   ),
                 },
-                // أزرار رؤية أقسام الورقة — تُحذف من الـHTML لا بالتنسيق، فما
-                // يُخفى هنا لا يخرج في PDF ولا في رابط العميل أيضاً.
-                ...(["signatures", "transport", "packaging"] as const).map((key) => ({
-                  id: `sec-${key}`,
-                  group: "3-share",
-                  node: (
-                    <button
-                      type="button"
-                      onClick={() => toggleSection(key)}
-                      style={{
-                        ...btnStyle(sectionPrefs[key] ? "#ffffff" : "#64748b"),
-                        color: sectionPrefs[key] ? "#475569" : "#ffffff",
-                        border: sectionPrefs[key] ? "1px solid #cbd5e1" : "1px solid #64748b",
-                      }}
-                      title={`${sectionPrefs[key] ? "إخفاء" : "إظهار"} ${PRINT_SECTION_LABELS[key]} في الطباعة والمعاينة و PDF`}
-                    >
-                      {sectionPrefs[key] ? <Eye size={14} /> : <EyeOff size={14} />} {PRINT_SECTION_LABELS[key]}
-                    </button>
-                  ),
-                })),
                 {
                   id: "preview",
                   group: "3-share",

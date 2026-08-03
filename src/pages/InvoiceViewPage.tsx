@@ -10,7 +10,6 @@ import { validatePaymentAmount, computePaymentStatus } from "@/utils/paymentVali
 import { splitPayment } from "@/utils/overpayment";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
-import { documentHiddenSections } from "@/utils/printSectionPrefs";
 import { type WhatsAppMessageType, pickCustomerWhatsApp} from "@/utils/whatsapp";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PackagingDialog from "@/components/packaging/PackagingDialog";
@@ -393,7 +392,6 @@ export default function InvoiceViewPage() {
       variant: "no-account", oldBalance: 0,
       customTitle: "مذكرة تسليم",
       ...extras,
-      hiddenSections: documentHiddenSections("invoice"),
     }));
     setShowAdditionalMenu(false);
   };
@@ -420,7 +418,6 @@ export default function InvoiceViewPage() {
       variant: "full", oldBalance: 0,
       customTitle: "فاتورة أولية (Proforma)",
       ...extras,
-      hiddenSections: documentHiddenSections("invoice"),
     }));
     setShowAdditionalMenu(false);
   };

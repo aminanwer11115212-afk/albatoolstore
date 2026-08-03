@@ -1,19 +1,22 @@
 /**
- * البندان 2 و 8 — رؤية التواقيع ومعلومات الترحيل وتفاصيل التغليف.
+ * رؤية التواقيع ومعلومات الترحيل وتفاصيل التغليف.
  *
- * ## لماذا الحذف من الـHTML لا الإخفاء بالتنسيق
- * شريط المعاينة يخفي الأقسام بـCSS، وذلك يكفي لمن ينظر إلى شاشته. لكن الورقة
- * تخرج إلى العميل من مساراتٍ لا تمرّ بذلك الشريط: PDF، والطباعة المباشرة،
- * والرابط العام. فلو بقي الإخفاء تنسيقاً لخرج التوقيعُ ومعلوماتُ المرحّل إلى
- * العميل رغم إخفائهما. لذا تُحذف عند التوليد — وهذا ما تفحصه هذه الاختبارات.
+ * ## أين يُتحكَّم بها
+ * في **«تخصيص الرؤية» بشريط المعاينة وحده** — لا أزرار لها في شاشة إدخال
+ * الفاتورة أو عرض السعر. شريط المعاينة يبني أزراره تلقائياً من كل عنصر يحمل
+ * `data-section`، فيكفي أن يحمله القسم ليصير قابلاً للإخفاء. وهذا ما تفحصه
+ * أوّل مجموعة هنا: **التواقيع لم تكن تحمله أصلاً** فلم يكن لها زرّ.
+ *
+ * ## ولماذا يبقى `hiddenSections` في القالب
+ * ما يُخفى في المعاينة يُنقل إلى رابط العميل عند المشاركة، فيُحذف هناك من
+ * الـHTML نفسه لا بالتنسيق — ورقةٌ تخرج إلى العميل لا شريط أدوات فيها يُخفي.
  */
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { generatePrintHTML } from "@/utils/printTemplate";
-import {
-  hiddenSectionKeys,
-  DEFAULT_PRINT_SECTION_PREFS,
-  PRINT_SECTION_LABELS,
-} from "@/utils/printSectionPrefs";
+
+const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 
 const base = {
   type: "invoice" as const,
@@ -29,34 +32,61 @@ const base = {
   company: null,
 };
 
-describe("الافتراضي: الأقسام الثلاثة تظهر", () => {
+const OPTIONAL_SECTIONS: Array<[string, string]> = [
+  ["signatures", "التواقيع"],
+  ["packaging", "تفاصيل التغليف"],
+  ["transport", "معلومات الترحيل"],
+];
+
+describe("الأقسام الثلاثة تظهر افتراضاً وتُخصَّص رؤيتها من المعاينة", () => {
   const html = generatePrintHTML({ ...base });
 
-  it("التواقيع", () => {
+  it("التواقيع مرسومة", () => {
     expect(html).toContain("توقيع المستلم");
     expect(html).toContain("توقيع المسؤول");
   });
 
-  it("تفاصيل التغليف ومعلومات الترحيل", () => {
+  it("صندوقا التغليف والترحيل مرسومان", () => {
     expect(html).toContain("تفاصيل التغليف");
     expect(html).toContain("معلومات الترحيل");
   });
 
-  it("كلٌّ منها قابل للإخفاء من شريط المعاينة — أي يحمل `data-section`", () => {
-    for (const key of ["signatures", "packaging", "transport"]) {
-      expect(html).toContain(`data-section="${key}"`);
-    }
+  it.each(OPTIONAL_SECTIONS)("القسم %s يحمل `data-section` — فيبنى له زرّ في «تخصيص الرؤية»", (key) => {
+    expect(html).toContain(`data-section="${key}"`);
+  });
+
+  it.each(OPTIONAL_SECTIONS)("والقسم %s يحمل عنواناً عربياً يظهر على الزرّ: %s", (key, label) => {
+    expect(html).toContain(`data-section="${key}" data-section-label="${label}"`);
+  });
+
+  it("شريط المعاينة يبني أزراره من `data-section` — فلا قائمة يدوية تُنسى", () => {
+    const src = read("src/utils/printTemplate.ts");
+    expect(src).toContain("document.querySelectorAll('[data-section]')");
+    expect(src).toContain("__lov_visibility_row");
+  });
+
+  it("الإخفاء في المعاينة يحذف العنصر قبل توليد الـPDF — فلا يصل العميل مخفيّاً", () => {
+    const src = read("src/utils/printTemplate.ts");
+    expect(src).toContain("clone.querySelectorAll('.__lov_hidden').forEach");
   });
 });
 
-describe("الإخفاء يحذف القسم من الورقة", () => {
+describe("لا أزرار رؤية في شاشتَي الإدخال — مكانها المعاينة وحدها", () => {
+  it.each([
+    "src/screens/InvoiceCreateScreen.tsx",
+    "src/pages/QuoteCreatePage.tsx",
+  ])("%s", (file) => {
+    const src = read(file);
+    expect(src).not.toContain("printSectionPrefs");
+    expect(src).not.toContain("PRINT_SECTION_LABELS");
+  });
+});
+
+describe("`hiddenSections` يحذف القسم من الورقة — لا يخفيه بالتنسيق", () => {
   it("التواقيع", () => {
     const html = generatePrintHTML({ ...base, hiddenSections: ["signatures"] });
     expect(html).not.toContain("توقيع المستلم");
-    expect(html).not.toContain("توقيع المسؤول");
-    // ولا يُخفى بالتنسيق فيبقى في المصدر ويخرج في PDF
     expect(html).not.toContain('data-section="signatures"');
-    // وما عداه باقٍ
     expect(html).toContain("تفاصيل التغليف");
   });
 
@@ -72,12 +102,11 @@ describe("الإخفاء يحذف القسم من الورقة", () => {
     expect(html).toContain("توقيع المستلم");
   });
 
-  it("الثلاثة معاً", () => {
+  it("الثلاثة معاً — والورقة نفسها سليمة", () => {
     const html = generatePrintHTML({ ...base, hiddenSections: ["signatures", "transport", "packaging"] });
     for (const s of ["توقيع المستلم", "معلومات الترحيل", "تفاصيل التغليف"]) {
       expect(html).not.toContain(s);
     }
-    // الورقة نفسها سليمة: البنود والإجمالي في مكانهما
     expect(html).toContain("بطارية");
     expect(html).toContain("INV-23360");
   });
@@ -95,6 +124,11 @@ describe("تفاصيل التغليف والترحيل تُطبع حين تُم�
     expect(html).toContain("مرحّل تجريبي");
     expect(html).not.toContain("لا توجد بيانات تغليف");
   });
+
+  it("وشاشتا الإدخال تمرّرانها — كانتا لا تمرّرانها أصلاً", () => {
+    expect(read("src/screens/InvoiceCreateScreen.tsx")).toContain("...printExtras,");
+    expect(read("src/pages/QuoteCreatePage.tsx")).toContain("await loadQuoteExtras(editId)");
+  });
 });
 
 describe("جملة «لا توجد بيانات» تتبع نوع المستند", () => {
@@ -111,24 +145,8 @@ describe("جملة «لا توجد بيانات» تتبع نوع المستند
   });
 });
 
-describe("hiddenSectionKeys — ترجمة التفضيل إلى ما يفهمه القالب", () => {
-  it("الافتراضي: لا شيء مخفي", () => {
-    expect(hiddenSectionKeys(DEFAULT_PRINT_SECTION_PREFS)).toEqual([]);
-  });
-
-  it("`false` تعني مخفي", () => {
-    expect(hiddenSectionKeys({ signatures: false, transport: true, packaging: false }).sort())
-      .toEqual(["packaging", "signatures"]);
-  });
-
-  it("لكل قسم اسمٌ عربي معروض على الزرّ", () => {
-    expect(Object.keys(PRINT_SECTION_LABELS).sort()).toEqual(["packaging", "signatures", "transport"]);
-    expect(PRINT_SECTION_LABELS.signatures).toBe("التواقيع");
-  });
-});
-
 describe("كشف الجرد لا تواقيع فيه ولا صناديق تغليف", () => {
-  it("لا يتأثّر بالتفضيل — الصيغة نفسها تمنعها", () => {
+  it("الصيغة نفسها تمنعها", () => {
     const html = generatePrintHTML({ ...base, variant: "stocktake" });
     expect(html).not.toContain("توقيع المستلم");
     expect(html).not.toContain('<div class="extra-row">');
