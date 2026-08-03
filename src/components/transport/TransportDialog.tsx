@@ -73,6 +73,14 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
   }, [open, parentId, showAllReady]);
 
   const load = async () => {
+    // نفس علّة التغليف: القراءة محفوظة دقيقةً، فترحيلٌ أُدخل للتوّ لا يظهر في
+    // الطباعة. `load` تُنادى بعد كل كتابة وعند الفتح.
+    if (parentId) {
+      try {
+        const { clearPrintExtrasCache } = await import("@/utils/printExtras");
+        clearPrintExtrasCache(parentType, parentId);
+      } catch { /* لا يمنع تحميل النافذة */ }
+    }
     setLoading(true);
     const { data: trns } = await (supabase as any).from(table)
       .select("*, transporters(name), destinations(name)")

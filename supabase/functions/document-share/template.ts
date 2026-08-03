@@ -240,7 +240,12 @@ export function buildDocHTML(args: ShareDocArgs): string {
   table { page-break-inside: auto; }
   thead { display: table-header-group; }
   tr, td, th { page-break-inside: avoid; break-inside: avoid; }
-  .total-row, .summary-row, .summary-box, .extra-row, .signatures { page-break-inside: avoid; break-inside: avoid; }
+  .total-row, .summary-row, .summary-box, .footer, .signatures { page-break-inside: avoid; break-inside: avoid; }
+  /* نفس قاعدة قالب الطباعة حرفياً — كان صفّ الصندوقين هنا في قائمة "لا تنقسم"
+     وحده، فبنودُ تغليفٍ كثيرة تدفع الصندوق لصفحةٍ تالية في ورقة العميل بينما
+     تنقسم طبيعياً في المعاينة. اختلافٌ لا يظهر إلا عند كثرة البنود.
+     (بلا علامة backtick هنا: هذا التعليق داخل نصٍّ قالبي، والعلامة تُنهيه.) */
+  .extra-row, .extra-box { page-break-inside: auto; break-inside: auto; }
   body {
     font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     color: #1a1a1a; background: #f3f4f6; padding: 80px 12px 24px; line-height: 1.5;

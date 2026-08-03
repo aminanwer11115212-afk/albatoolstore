@@ -184,7 +184,10 @@ export function generatePrintHTML(data: PrintData): string {
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
   tr, td, th { page-break-inside: avoid; break-inside: avoid; }
-  .total-row, .summary-row, .summary-box, .footer { page-break-inside: avoid; break-inside: avoid; }
+  .total-row, .summary-row, .summary-box, .footer, .signatures { page-break-inside: avoid; break-inside: avoid; }
+  /* صندوقا التغليف والترحيل ينقسمان على الصفحات بحرّية: بنود التغليف قد تبلغ
+     عشرات الأسطر، ومنعُ القسمة يدفع الصندوق كلّه لصفحةٍ تالية — أو يقصّه. */
+  .extra-row, .extra-box { page-break-inside: auto; break-inside: auto; }
   @media print { body { padding: 0; } .page { max-width: none; } }
   body {
     font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
