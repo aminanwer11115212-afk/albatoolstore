@@ -78,8 +78,10 @@ describe("التغليف والترحيل يمرّان بنفس المُنسِّ
   }));
 
   it("بنود التغليف تظهر — لا «لا توجد بيانات»", () => {
-    expect(html).toContain("النوع: كرتونة");
-    expect(html).toContain("الصنف: بطارية 125 سي جي");
+    // ورقة العميل تُبنى بقالب الطباعة نفسه، فتصلها جدولة التغليف كما هي
+    expect(html).toContain("نوع التغليف");
+    expect(html).toContain("كرتونة بطارية 125 سي جي");
+    expect(html).toContain("عدد القطع");
     expect(html).not.toContain("لا توجد بيانات تغليف");
   });
 

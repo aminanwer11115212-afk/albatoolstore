@@ -87,8 +87,9 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     });
     const out = await loadInvoiceExtras("inv-49417");
     expect(out.packagingInfo).toBeTruthy();
-    expect(out.packagingInfo).toContain("النوع: كرتونة");
-    expect(out.packagingInfo).toContain("الصنف: بطارية 125 سي جي");
+    // الجدول: عمود «نوع التغليف» يجمع النوع واسم الصنف في خانةٍ واحدة
+    expect(out.packagingInfo).toContain("نوع التغليف");
+    expect(out.packagingInfo).toContain("كرتونة بطارية 125 سي جي");
     // قيمة الترويسة الفارغة لا تُعرض فوق تفصيلٍ أدقّ منها
     expect(out.packagingInfo).not.toBe("الكمية: 1");
   });
@@ -127,11 +128,12 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
       invoice_transports: [],
     });
     const out = await loadInvoiceExtras("inv-full");
+    // حقول المستند سطرٌ تحت الجدول لا صفٌّ فيه
     expect(out.packagingInfo).toContain("الوزن: 12.5");
     expect(out.packagingInfo).toContain("الأبعاد: 40×30×20");
     expect(out.packagingInfo).toContain("الإجمالي:");
-    // النوع لا يتكرّر من الترويسة فوق البند
-    expect(out.packagingInfo!.match(/النوع:/g)).toHaveLength(1);
+    // والترويسة لا تُضيف صفّاً فوق البند: صفُّ بندٍ واحد + صفُّ المجموع
+    expect(out.packagingInfo!.match(/<tr>/g)).toHaveLength(3);
   });
 
   it("بنودٌ متعدّدة ⇒ سطرٌ لكلٍّ منها", async () => {
@@ -145,9 +147,11 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
       invoice_transports: [],
     });
     const out = await loadInvoiceExtras("inv-multi");
-    expect(out.packagingInfo).toContain("الصنف: زيت");
-    expect(out.packagingInfo).toContain("قطع/طرد: 6");
-    expect(out.packagingInfo!.split("<br>").filter((l: string) => l.includes("النوع:"))).toHaveLength(2);
+    expect(out.packagingInfo).toContain("كيس زيت");
+    // قطع الطرد تُذكر بعلامة «6X» الحمراء حين تتجاوز الواحدة
+    expect(out.packagingInfo).toContain("6X");
+    // صفّان للبندين + صفُّ الترويسة + صفُّ المجموع
+    expect(out.packagingInfo!.match(/<tr>/g)).toHaveLength(4);
   });
 });
 
