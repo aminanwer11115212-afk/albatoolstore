@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isFreeTypingCol } from "@/utils/itemTableColumns";
 
 /**
  * تحديد/حذف صفوف جدول البنود عبر مفتاح Space في وضع التنقّل:
@@ -11,6 +12,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * وضع التعديل (بعد نقر ماوس على الحقل — يُدار في `spaceColumnNav.ts`)
  * يُعطّل هذا السلوك بالكامل: Space يكتب مسافة عادية، ولا تحديد.
  *
+ * والأعمدة الرقمية (كمية/سعر/أجنبي/إجمالي) خارج هذا السلوك دائماً — راجع
+ * `itemTableColumns.ts`. فالحذف بالمسطرة يُستعمل من عمود المنتج: تحدّد الصف
+ * من اسمه لا من كمّيته.
+ *
  * الصفحات يجب أن تضع data-row-uid على عنصر <tr> لكل صف.
  * التوقيع محفوظ: isPending / handleRowKeyDown / pendingUids / clear.
  */
@@ -21,6 +26,10 @@ function isNavModeCell(el: Element | null): boolean {
   const he = el as HTMLElement;
   if (!he.hasAttribute?.("data-nav-col")) return false;
   if (he.getAttribute("data-edit-mode") === "true") return false;
+  // الأعمدة الرقمية `<input>` عادية: المسطرة فيها تكتب مسافة ولا تحذف صفاً.
+  // الفحص صريحٌ لا يتّكل على السمة أعلاه — السمة تُوضع عند التركيز، والحكم
+  // يجب أن يصحّ قبله (لوحة مفاتيح خارجية، اختبارٌ يركّب الخلية يدوياً).
+  if (isFreeTypingCol(he)) return false;
   // خانات معلَّمة صراحةً لتعطيل الحذف بالمسطرة (مثل خانة تحديد المنتج).
   if (he.closest?.("[data-nospace-delete]")) return false;
   // صف الإضافة السريعة ليس ضمن وضع التنقّل — Space يجب أن يكتب مسافة عادية.

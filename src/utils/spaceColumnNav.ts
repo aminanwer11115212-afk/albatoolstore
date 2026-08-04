@@ -11,8 +11,13 @@
  * A floating pill in the corner reflects the current mode. Visual cell
  * state is styled in index.css via `data-edit-mode` / `data-nav-col`.
  *
+ * **الأعمدة الرقمية مستثناة من الوضعين** — انظر `itemTableColumns.ts`: هي
+ * `<input>` عادية تُكتب فور الوصول إليها. تُعلَّم هنا بـ`data-edit-mode`
+ * دائماً كي يعمل التنسيق القائم بلا نسخةٍ ثانية منه في CSS.
+ *
  * Idempotent — safe to call multiple times.
  */
+import { isFreeTypingCol } from "./itemTableColumns";
 
 const EDIT_ATTR = "data-edit-mode";
 
@@ -31,13 +36,23 @@ function isEligibleCell(el: Element | null): el is HTMLElement {
   return true;
 }
 
+/** الخلايا الخاضعة للوضعين — الرقمية خارجها، تُكتب مباشرةً. */
+function isModeGatedCell(el: Element | null): el is HTMLElement {
+  return isEligibleCell(el) && !isFreeTypingCol(el);
+}
+
 function inEditMode(el: HTMLElement): boolean {
+  // الرقمية في وضع تعديلٍ دائم: لا حاجزَ تدخله ولا Shift تضغطه.
+  if (isFreeTypingCol(el)) return true;
   return el.getAttribute(EDIT_ATTR) === "true";
 }
 
 function setEditMode(cell: HTMLElement) {
   cell.setAttribute(EDIT_ATTR, "true");
   updateModeIndicator(cell);
+  // لا يُحرَّك المؤشّر في الخانة الرقمية: من نقر موضعاً بعينه يريده هناك،
+  // ومن وصل بالمفاتيح يجد محتواها محدَّداً (`selectIfFreeTyping`).
+  if (isFreeTypingCol(cell)) return;
   if (cell instanceof HTMLInputElement && typeof cell.setSelectionRange === "function") {
     try {
       const v = cell.value ?? "";
@@ -78,6 +93,9 @@ export function attachSpaceColumnNav() {
       pendingFocusOutTimer = null;
     }
     const el = e.target as HTMLElement | null;
+    // الخانة الرقمية تُعلَّم فور وصول التركيز — بالماوس أو بالمفاتيح سواء —
+    // فيظهر مؤشّر الكتابة ويأخذ الصف تنسيق «التعديل» بلا قاعدة CSS جديدة.
+    if (el && isEligibleCell(el) && isFreeTypingCol(el)) el.setAttribute(EDIT_ATTR, "true");
     updateModeIndicator(el && isEligibleCell(el) ? el : null);
   };
 
@@ -94,7 +112,8 @@ export function attachSpaceColumnNav() {
 
   const onKeyDown = (e: KeyboardEvent) => {
     const el = e.target as HTMLElement | null;
-    if (!isEligibleCell(el)) return;
+    // الرقمية لا تمرّ من هنا أصلاً: لا مفتاحَ يُمنع فيها ولا Shift يُنتظر.
+    if (!isModeGatedCell(el)) return;
 
     // Shift مفردة → دخول وضع التعديل فوراً.
     if (e.key === "Shift" && !e.repeat && !inEditMode(el)) {
@@ -115,7 +134,7 @@ export function attachSpaceColumnNav() {
 
   const onBeforeInput = (e: Event) => {
     const el = e.target as HTMLElement | null;
-    if (!isEligibleCell(el)) return;
+    if (!isModeGatedCell(el)) return;
     if (inEditMode(el)) return;
     e.preventDefault();
   };

@@ -168,11 +168,15 @@ export default function InvoiceViewPage() {
       }).eq("id", invoice.id);
 
       // 1) قيد الدفعة المطبَّقة على الفاتورة
+      //    الفئة صريحة: قيدُ دفعةٍ بلا `category` لا يعرفه كشف الحساب دفعةً،
+      //    ولا يُزاوَج بفائضه في جدول المعاملات، ولا يمنعه حارس الحذف. وكان
+      //    هذا المسار وحده يكتبها بلا فئة بينما يكتبها حوار الدفع بها.
       if (payAccount && split.applied > 0) {
         await supabase.from("transactions").insert({
           type: "income", amount: split.applied, date: payDate, description: finalNote,
           account_id: payAccount, customer_id: invoice.customer_id, reference_id: invoice.id,
-        });
+          category: "customer_payment",
+        } as any);
       }
       // 2) قيد الفائض كسلفة/دائن للعميل (يرفع رصيده الدائن تلقائياً)
       if (payAccount && split.overpay > 0) {
