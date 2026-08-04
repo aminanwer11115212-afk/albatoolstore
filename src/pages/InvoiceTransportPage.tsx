@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import TransportItemsManager from "@/components/transport/TransportItemsManager";
 import ZoomControls from "@/components/ZoomControls";
+import { attachLookups, TRANSPORTER_LOOKUP, DESTINATION_LOOKUP } from "@/utils/lookupJoin";
 
 export default function InvoiceTransportPage() {
   const { id } = useParams();
@@ -58,12 +59,14 @@ export default function InvoiceTransportPage() {
       setInvoiceProductIds(ids);
       setProductQuantities(qtyMap);
 
-      const { data: trns, error: trnsErr } = await supabase.from("invoice_transports")
-        .select("*, transporters(name), destinations(name)")
+      // بلا ربطٍ في `select`: الجدول بلا مفاتيح أجنبية — راجع `lookupJoin.ts`
+      const { data: trnsRaw, error: trnsErr } = await supabase.from("invoice_transports")
+        .select("*")
         .eq("invoice_id", id)
         .order("created_at", { ascending: false });
       if (trnsErr) throw trnsErr;
-      setList(trns || []);
+      const trns = await attachLookups(trnsRaw as any[], [TRANSPORTER_LOOKUP, DESTINATION_LOOKUP]);
+      setList(trns);
 
       const trnIds = (trns || []).map((t: any) => t.id);
       if (trnIds.length) {

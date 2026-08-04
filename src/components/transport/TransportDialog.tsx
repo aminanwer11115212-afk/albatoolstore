@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Truck, Plus, Trash2, Printer, X } from "lucide-react";
 import SearchableSelect from "./SearchableSelect";
+import { attachLookups, PACKAGING_TYPE_LOOKUP, PRODUCT_LOOKUP, TRANSPORTER_LOOKUP, DESTINATION_LOOKUP } from "@/utils/lookupJoin";
 
 interface Props {
   open: boolean;
@@ -82,11 +83,12 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
       } catch { /* لا يمنع تحميل النافذة */ }
     }
     setLoading(true);
+    // بلا ربطٍ في `select`: الجدول بلا مفاتيح أجنبية — راجع `lookupJoin.ts`
     const { data: trns } = await (supabase as any).from(table)
-      .select("*, transporters(name), destinations(name)")
+      .select("*")
       .eq(idColumn, parentId)
       .order("created_at", { ascending: false });
-    setList(trns || []);
+    setList(await attachLookups(trns as any[], [TRANSPORTER_LOOKUP, DESTINATION_LOOKUP]));
 
     if (customerId) {
       // جلب موقع العميل
@@ -206,11 +208,13 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
     `).join("");
     
     // جلب بيانات التغليف من الجدول الصحيح invoices_packaging_items
-    const { data: packagingItems } = await (supabase as any)
+    // بلا ربطٍ في `select`: الجدول بلا مفاتيح أجنبية — راجع `lookupJoin.ts`
+    const { data: packagingItemsRaw } = await (supabase as any)
       .from("invoices_packaging_items")
-      .select("packs_count, pieces_per_pack, quantity, products(name), packaging_types(name)")
+      .select("packs_count, pieces_per_pack, quantity, product_id, product_name, packaging_type_id")
       .eq("invoice_id", invoiceId)
       .order("created_at", { ascending: true });
+    const packagingItems = await attachLookups(packagingItemsRaw as any[], [PRODUCT_LOOKUP, PACKAGING_TYPE_LOOKUP]);
 
     let packagingHTML = "";
     if (packagingItems && packagingItems.length > 0) {
@@ -218,7 +222,8 @@ export default function TransportDialog({ open, onOpenChange, parentType, parent
         const packs = Number(pi.packs_count || 0);
         const pieces = Number(pi.pieces_per_pack || 0);
         const typeName = pi.packaging_types?.name || "—";
-        const prodName = pi.products?.name || "—";
+        // الاسم المباشر أولاً: بندٌ أُدخل بلا منتجٍ مرجعي يحمل اسمه نصّاً
+        const prodName = pi.products?.name || pi.product_name || "—";
         const piecesPart = pieces > 1 ? ` × ${pieces}` : "";
         return `<div style="padding:3px 0;font-size:10px">${i + 1}) ${packs} — <b>${typeName}</b> ${prodName}${piecesPart}</div>`;
       }).join("");

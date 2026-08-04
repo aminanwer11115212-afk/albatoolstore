@@ -2,6 +2,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 type TableData = Record<string, any[]>;
 
+/**
+ * المحاكاة تُشبه القاعدة الحيّة: جداول التغليف والترحيل **بلا مفاتيح أجنبية**،
+ * فصفوفها تحمل معرّفاتٍ لا كائناتٍ مربوطة، والأسماء تُجلب باستعلامٍ مستقلّ
+ * بـ`.in("id", …)`. وكانت المحاكاة السابقة تردّ الكائنات المربوطة جاهزةً —
+ * أي أنها تفترض ربطاً لا وجود له، فمرّ العطل من تحتها.
+ */
 const tableData: TableData = {
   invoice_transports: [],
   invoice_packaging: [],
@@ -9,18 +15,24 @@ const tableData: TableData = {
   quote_transports: [],
   quotes_packaging: [],
   quotes_packaging_items: [],
+  transporters: [],
+  destinations: [],
+  packaging_types: [],
 };
 
 const fromCalls: string[] = [];
 
 vi.mock("@/integrations/supabase/client", () => {
-  // جدول البنود يُقرأ بـ`.order()` بعد `.eq()` — فالحلقة قابلة للانتظار
-  // وقابلة للترتيب معاً، وإلا انكسرت قراءة البنود بصمت.
+  // جدول البنود يُقرأ بـ`.order()` بعد `.eq()`، وجداول الأسماء بـ`.in()` —
+  // فالحلقة قابلة للانتظار وللترتيب وللتصفية معاً.
   const makeChain = (table: string) => {
-    const result = () => Promise.resolve({ data: tableData[table] ?? [], error: null });
+    const rows = () => tableData[table] ?? [];
+    const result = () => Promise.resolve({ data: rows(), error: null });
     const chain: any = {
       select: () => chain,
       eq: () => chain,
+      in: (_col: string, ids: string[]) =>
+        Promise.resolve({ data: rows().filter((r: any) => ids.includes(r.id)), error: null }),
       order: () => result(),
       then: (onOk: any, onErr?: any) => result().then(onOk, onErr),
     };
@@ -45,6 +57,9 @@ beforeEach(() => {
   tableData.quote_transports = [];
   tableData.quotes_packaging = [];
   tableData.quotes_packaging_items = [];
+  tableData.transporters = [];
+  tableData.destinations = [];
+  tableData.packaging_types = [];
   fromCalls.length = 0;
   clearPrintExtrasCache();
 });
@@ -62,17 +77,16 @@ describe("loadInvoiceExtras", () => {
   });
 
   it("returns HTML strings when records exist", async () => {
-    tableData.invoice_transports = [
-      {
-        transporters: { name: "Fast Co", phone: "0100000000", address: "Riyadh HQ" },
-      },
-    ];
+    // معرّفات لا كائنات — كما في القاعدة الحيّة
+    tableData.transporters = [{ id: "tr1", name: "Fast Co", phone: "0100000000", address: "Riyadh HQ" }];
+    tableData.packaging_types = [{ id: "pt1", name: "Box" }];
+    tableData.invoice_transports = [{ transporter_id: "tr1", destination_id: null }];
     // الترويسة تحمل حقول المستند (وزن/أبعاد/تكلفة)، والبند يحمل تغليف المستخدم
     tableData.invoice_packaging = [
-      { quantity: 5, weight: 12, dimensions: "10x10", cost: 50, notes: null, packaging_types: null },
+      { quantity: 5, weight: 12, dimensions: "10x10", cost: 50, notes: null, packaging_type_id: null },
     ];
     tableData.invoices_packaging_items = [
-      { product_name: "Widget", packs_count: 2, pieces_per_pack: 5, quantity: 10, packaging_types: { name: "Box" } },
+      { product_name: "Widget", packs_count: 2, pieces_per_pack: 5, quantity: 10, packaging_type_id: "pt1" },
     ];
     const res = await loadInvoiceExtras("inv-1");
     expect(res.transportInfo).toBeDefined();
@@ -108,16 +122,14 @@ describe("loadQuoteExtras", () => {
   });
 
   it("returns HTML strings when records exist", async () => {
-    tableData.quote_transports = [
-      {
-        transporters: { name: "Speedy", phone: "0200", address: "Jeddah St" },
-      },
-    ];
+    tableData.transporters = [{ id: "tr2", name: "Speedy", phone: "0200", address: "Jeddah St" }];
+    tableData.packaging_types = [{ id: "pt2", name: "Crate" }];
+    tableData.quote_transports = [{ transporter_id: "tr2", destination_id: null }];
     tableData.quotes_packaging = [
-      { quantity: 3, weight: 7, dimensions: "5x5", cost: 25, notes: null, packaging_types: null },
+      { quantity: 3, weight: 7, dimensions: "5x5", cost: 25, notes: null, packaging_type_id: null },
     ];
     tableData.quotes_packaging_items = [
-      { product_name: "Gadget", packs_count: 1, pieces_per_pack: 3, quantity: 3, packaging_types: { name: "Crate" } },
+      { product_name: "Gadget", packs_count: 1, pieces_per_pack: 3, quantity: 3, packaging_type_id: "pt2" },
     ];
     const res = await loadQuoteExtras("q-1");
     expect(res.transportInfo).toContain("Speedy");

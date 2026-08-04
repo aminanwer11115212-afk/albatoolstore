@@ -13,6 +13,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
+import { attachLookups, PACKAGING_TYPE_LOOKUP, TRANSPORTER_LOOKUP, DESTINATION_LOOKUP } from "@/utils/lookupJoin";
 
 const ACCENT = "#16a34a";
 
@@ -74,16 +75,17 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
     { data: transportItems, error: tiErr },
   ] = await Promise.all([
     supabase.from("invoice_items").select("quantity").eq("invoice_id", id),
+    // بلا ربطٍ في `select`: الجدولان بلا مفاتيح أجنبية — راجع `lookupJoin.ts`
     supabase
       .from("invoice_transports")
       .select(
-        "id, vehicle_number, driver_name, transport_date, cost, notes, transporters(name, phone, address), destinations(name)"
+        "id, vehicle_number, driver_name, transport_date, cost, notes, transporter_id, destination_id"
       )
       .eq("invoice_id", id),
     supabase
       .from("invoice_packaging")
       .select(
-        "id, packaging_type_id, quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)"
+        "id, packaging_type_id, quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes"
       )
       .eq("invoice_id", id),
     supabase
@@ -108,6 +110,12 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
   if (piErr) console.error(`[loadDispatchDoc] packagingItems ${id}:`, piErr);
   if (tiErr) console.error(`[loadDispatchDoc] transportItems ${id}:`, tiErr);
 
+  // الأسماء تُركَّب هنا بدل الربط في `select` — الجداول بلا مفاتيح أجنبية.
+  const [transportsJoined, packagingJoined] = await Promise.all([
+    attachLookups(transports as any[], [TRANSPORTER_LOOKUP, DESTINATION_LOOKUP]),
+    attachLookups(packaging as any[], [PACKAGING_TYPE_LOOKUP]),
+  ]);
+
   const itemsCount = items?.length || 0;
   const qtyTotal = (items || []).reduce(
     (s: number, it: any) => s + Number(it.quantity || 0),
@@ -115,7 +123,7 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
   );
 
   const typeNameByHeaderId: Record<string, string> = {};
-  (packaging || []).forEach((p: any) => {
+  packagingJoined.forEach((p: any) => {
     typeNameByHeaderId[p.id] = p.packaging_types?.name || "";
   });
 
@@ -148,7 +156,7 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
     quantity: r.quantity,
   }));
 
-  const transportsWithItems = (transports || []).map((t: any) => ({
+  const transportsWithItems = transportsJoined.map((t: any) => ({
     ...t,
     items: (transportItems || []).filter(
       (it: any) => it.invoice_transport_id === t.id
@@ -160,7 +168,7 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
     itemsCount,
     qtyTotal,
     transports: transportsWithItems,
-    packaging: packaging || [],
+    packaging: packagingJoined,
     packagingItemsFlat,
   };
 }

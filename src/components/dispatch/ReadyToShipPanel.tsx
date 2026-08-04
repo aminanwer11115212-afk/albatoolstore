@@ -20,6 +20,7 @@ import {
 } from "@/hooks/useData";
 import SearchableSelect from "@/components/transport/SearchableSelect";
 import { resolveDefaultsFromCache } from "@/utils/customerTransportDefaults";
+import { attachLookups, TRANSPORTER_LOOKUP } from "@/utils/lookupJoin";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -133,14 +134,16 @@ export default function ReadyToShipPanel({
       const rows = (data || []) as any[];
       const ids = rows.map((r) => r.id);
       if (ids.length > 0) {
-        const { data: trs, error: trsErr } = await (supabase as any)
+        // بلا ربطٍ في `select`: الجدول بلا مفاتيح أجنبية — راجع `lookupJoin.ts`
+        const { data: trsRaw, error: trsErr } = await (supabase as any)
           .from("invoice_transports")
-          .select("id, invoice_id, transporter_id, transporters(id, name)")
+          .select("id, invoice_id, transporter_id")
           .in("invoice_id", ids);
         if (trsErr) {
           // فشل صامت هنا = الفواتير تظهر بدون ناقل والـauto-select يقفز إلى خيارات خاطئة.
           console.error("[ReadyToShipPanel] invoice_transports query failed:", trsErr);
         }
+        const trs = await attachLookups(trsRaw as any[], [TRANSPORTER_LOOKUP]);
         const byInv = new Map<string, any[]>();
         for (const t of (trs || [])) {
           const arr = byInv.get(t.invoice_id) || [];

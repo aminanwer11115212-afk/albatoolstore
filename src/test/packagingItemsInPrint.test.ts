@@ -34,11 +34,15 @@ function mockSupabase(byTable: Record<string, any[]>) {
     client: {
       from(table: string) {
         seen.push(table);
+        const rows = () => byTable[table] ?? [];
         const chain: any = {
           select: () => chain,
           eq: () => chain,
-          order: () => Promise.resolve({ data: byTable[table] ?? [], error: null }),
-          then: (res: any) => res({ data: byTable[table] ?? [], error: null }),
+          // جداول الأسماء تُقرأ باستعلامٍ مستقلّ — لا ربطاً داخل `select`
+          in: (_c: string, ids: string[]) =>
+            Promise.resolve({ data: rows().filter((r: any) => ids.includes(r.id)), error: null }),
+          order: () => Promise.resolve({ data: rows(), error: null }),
+          then: (res: any) => res({ data: rows(), error: null }),
         };
         return chain;
       },
@@ -49,12 +53,14 @@ function mockSupabase(byTable: Record<string, any[]>) {
 /** الحالة الحيّة من لقطة المستخدم: ترويسة فارغة + بندٌ حقيقي واحد. */
 const HEADER_EMPTY = [{
   quantity: 1, packs_count: null, pieces_per_pack: null,
-  weight: null, dimensions: null, cost: null, notes: null, packaging_types: null,
+  weight: null, dimensions: null, cost: null, notes: null, packaging_type_id: null,
 }];
+/** جداول الأسماء — تُقرأ بـ`.in("id", …)` كما في القاعدة الحيّة. */
+const TYPES = [{ id: "pt-box", name: "كرتونة" }, { id: "pt-bag", name: "كيس" }];
 const REAL_ITEM = [{
   product_name: "بطارية 125 سي جي / دايون صغير SUSUKAI جديدة",
   packs_count: 1, pieces_per_pack: 1, quantity: 1,
-  description: null, packaging_types: { name: "كرتونة" },
+  description: null, packaging_type_id: "pt-box",
 }];
 
 describe("loadInvoiceExtras — البنود هي المصدر", () => {
@@ -76,6 +82,7 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     await setup({
       invoice_packaging: HEADER_EMPTY,
       invoices_packaging_items: REAL_ITEM,
+      packaging_types: TYPES,
       invoice_transports: [],
     });
     const out = await loadInvoiceExtras("inv-49417");
@@ -91,6 +98,7 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     const { client, seen } = mockSupabase({
       invoice_packaging: HEADER_EMPTY,
       invoices_packaging_items: REAL_ITEM,
+      packaging_types: TYPES,
       invoice_transports: [],
     });
     vi.doMock("@/integrations/supabase/client", () => ({ supabase: client }));
@@ -115,6 +123,7 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     await setup({
       invoice_packaging: [{ ...HEADER_EMPTY[0], weight: 12.5, dimensions: "40×30×20", cost: 5000 }],
       invoices_packaging_items: REAL_ITEM,
+      packaging_types: TYPES,
       invoice_transports: [],
     });
     const out = await loadInvoiceExtras("inv-full");
@@ -130,8 +139,9 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
       invoice_packaging: HEADER_EMPTY,
       invoices_packaging_items: [
         REAL_ITEM[0],
-        { product_name: "زيت", packs_count: 2, pieces_per_pack: 6, quantity: 12, packaging_types: { name: "كيس" } },
+        { product_name: "زيت", packs_count: 2, pieces_per_pack: 6, quantity: 12, packaging_type_id: "pt-bag" },
       ],
+      packaging_types: TYPES,
       invoice_transports: [],
     });
     const out = await loadInvoiceExtras("inv-multi");
@@ -155,7 +165,8 @@ describe("الترحيل — سطرٌ بلا مرحّلٍ مسجَّل لا يخ
 
   it("مرحّلٌ مسجَّل: الاسم والهاتف والعنوان", async () => {
     const mod = await setup({
-      invoice_transports: [{ transporters: { name: "مرحّل تجريبي", phone: "0912", address: "السوق" }, destinations: null }],
+      invoice_transports: [{ transporter_id: "tr-1", destination_id: null }],
+      transporters: [{ id: "tr-1", name: "مرحّل تجريبي", phone: "0912", address: "السوق" }],
       invoice_packaging: [], invoices_packaging_items: [],
     });
     const out = await mod.loadInvoiceExtras("i1");
@@ -165,7 +176,8 @@ describe("الترحيل — سطرٌ بلا مرحّلٍ مسجَّل لا يخ
 
   it("بلا مرحّلٍ مسجَّل لكن بوجهة: الوجهة تُعرض بدل «لا توجد بيانات»", async () => {
     const mod = await setup({
-      invoice_transports: [{ transporters: null, destinations: { name: "بورتسودان" } }],
+      invoice_transports: [{ transporter_id: null, destination_id: "d-1" }],
+      destinations: [{ id: "d-1", name: "بورتسودان" }],
       invoice_packaging: [], invoices_packaging_items: [],
     });
     const out = await mod.loadInvoiceExtras("i2");
@@ -174,7 +186,7 @@ describe("الترحيل — سطرٌ بلا مرحّلٍ مسجَّل لا يخ
 
   it("سطرٌ بلا مرحّلٍ ولا وجهة يبقى متخطّى — لا سطر فارغ", async () => {
     const mod = await setup({
-      invoice_transports: [{ transporters: null, destinations: null }],
+      invoice_transports: [{ transporter_id: null, destination_id: null }],
       invoice_packaging: [], invoices_packaging_items: [],
     });
     const out = await mod.loadInvoiceExtras("i3");
@@ -201,8 +213,13 @@ describe("لا قارئَ متروكاً يقرأ الترويسة وحدها", 
   });
 
   it("والوجهة تُقرأ في الاثنين — فلا يختفي ترحيلٌ بلا مرحّل", () => {
-    for (const f of ["src/utils/printExtras.ts", "supabase/functions/document-share/index.ts"]) {
-      expect(read(f)).toContain("destinations(name)");
-    }
+    // القالب يقرؤها بالمعرّف ثم يركّب الاسم: الجدول بلا مفتاحٍ أجنبي فلا
+    // يقدر PostgREST على ربطه — راجع `lookupJoin.ts` و`fkLessEmbeds.test.ts`.
+    const app = read("src/utils/printExtras.ts");
+    expect(app).toContain("destination_id");
+    expect(app).toContain("DESTINATION_LOOKUP");
+    // دالّة الحافة متروكةٌ مسارَ سقوطٍ للروابط القديمة ولا تُطوَّر — تبقى على
+    // ربطها، ورابط العميل لا يمرّ بها أصلاً (دالّة القاعدة + قالب الطباعة).
+    expect(read("supabase/functions/document-share/index.ts")).toContain("destinations(name)");
   });
 });
