@@ -227,7 +227,10 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
     : "";
 
   const table = rows.length
-    ? `<table style="width:100%;border-collapse:collapse;border:${PKG_BORDER};margin:0;font-size:11.5px;color:#1a1a1a;">`
+    // `data-pkg-rows` يُبلِّغ القالبَ عدد البنود: عند كثرتها يأخذ الصندوق
+    // عرض الورقة كاملاً وينزل الترحيل تحته. والعدد يأتي من مُنتِجه لا من
+    // عدٍّ للوسوم في القالب.
+    ? `<table data-pkg-rows="${rows.length}" style="width:100%;border-collapse:collapse;border:${PKG_BORDER};margin:0;font-size:11.5px;color:#1a1a1a;">`
       + `<thead><tr>`
       + `<th style="${pkgHeadCell("right")}">نوع التغليف</th>`
       + `<th style="${pkgHeadCell("center")}width:56px;">العدد</th>`

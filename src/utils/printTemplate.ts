@@ -152,6 +152,21 @@ export function generatePrintHTML(data: PrintData): string {
   const cleanPackaging = cleanExtraHTML(packagingInfo);
   const cleanTransport = cleanExtraHTML(transportInfo);
 
+  /**
+   * صندوقا التغليف والترحيل متجاوران ما دام التغليف قصيراً.
+   *
+   * فإذا تجاوزت بنودُ التغليف عشرين صار الصندوق أطول من صفحة، وبقي نصفُ
+   * الورقة الأيسر بياضاً إلى جانبه ثلاث صفحاتٍ أو أربعاً — لأن الترحيل سطران
+   * أو ثلاثة لا أكثر. فعندها ينزل كلٌّ منهما بعرض الورقة: التغليف أوّلاً ثم
+   * الترحيل تحته، وهو ترتيب الأهمّية أيضاً.
+   *
+   * والعدد يأتي من `data-pkg-rows` الذي يكتبه `formatPackaging` — أي من
+   * مُنتِج الجدول، لا من عدٍّ لوسوم `<tr>` هنا يخطئ إن تغيّر الشكل.
+   */
+  const PACKAGING_STACK_THRESHOLD = 20;
+  const pkgRows = Number(/data-pkg-rows="(\d+)"/.exec(cleanPackaging || "")?.[1] || 0);
+  const stackExtras = pkgRows > PACKAGING_STACK_THRESHOLD;
+
   // Helper: escape value for safe insertion inside an HTML attribute (double-quoted)
   const attr = (v: string) => String(v ?? "")
     .replace(/&/g, "&amp;")
@@ -170,6 +185,9 @@ export function generatePrintHTML(data: PrintData): string {
 <html dir="rtl" lang="ar">
 <head>
 <meta charset="utf-8">
+<!-- عرضٌ ثابتٌ بمقاس A4 (210mm ≈ 794px): الهاتف يعرض الورقة كاملةً مصغَّرةً
+     كما يفعل قارئ الـPDF، بدل شريط تمرير أفقي على ورقةٍ أعرض من الشاشة. -->
+<meta name="viewport" content="width=794">
 <meta name="lov-doc-label" content="${attr(title)}">
 <meta name="lov-doc-number" content="${attr(number || "")}">
 <meta name="lov-customer-name" content="${attr(customer?.name || "")}">
@@ -196,6 +214,26 @@ export function generatePrintHTML(data: PrintData): string {
   }
 
   .page { max-width: 800px; margin: 0 auto; }
+
+  /**
+   * على الشاشة: ورقةُ A4 كالـPDF تماماً — لا عمودٌ مطّاط بعرض النافذة.
+   *
+   * الرابط والمعاينة يعرضان هذا المستند في iframe، فكان يتمدّد بعرض الشاشة
+   * ويختلف عمّا يراه العميل حين ينزّل الـPDF. فصار الورقُ صفحةً بيضاء بعرض
+   * 210mm وهامشٍ 10mm — نفس قاعدة @page — على أرضيةٍ رمادية تُظهر حوافّه.
+   *
+   * والعرض ثابتٌ بالمليمتر لا نسبةً: A4 مقاسٌ لا يتغيّر. أمّا الشاشة الضيّقة
+   * فيتكفّل بها وسمُ viewport في الترويسة: يعرض المتصفّح الورقة كاملةً
+   * مصغَّرةً كما يفعل قارئ الـPDF، بدل شريط تمرير أفقي.
+   */
+  @media screen {
+    body { background: #e5e7eb; padding: 10px 0; }
+    .page {
+      width: 210mm; max-width: 210mm; min-height: 297mm;
+      margin: 0 auto; background: #fff; padding: 10mm;
+      box-shadow: 0 2px 14px rgba(0, 0, 0, 0.18);
+    }
+  }
 
   /* === HEADER === */
   .header {
@@ -554,23 +592,24 @@ ${showAccount ? (() => {
 `;
 })() : ""}
 
-${showExtras ? `
-<!-- Packaging & Transport -->
-<div class="extra-row">
-  ${showPackaging ? `
+${showExtras ? (() => {
+  // عنصرُ كتلةٍ لا p للتغليف: هو جدولٌ الآن، والجدول داخل فقرةٍ يخرج منها في
+  // المتصفّح فينكسر الترتيب. راجع formatPackaging في printExtras.
+  const packagingBox = showPackaging ? `
   <div class="extra-box" data-section="packaging" data-section-label="تفاصيل التغليف">
     <div class="extra-box-title">تفاصيل التغليف</div>
-    <!-- عنصرُ كتلةٍ لا p: التغليف جدولٌ الآن، والجدول داخل فقرةٍ يخرج منها
-         في المتصفّح فينكسر الترتيب. راجع formatPackaging في printExtras. -->
     <div class="extra-content">${cleanPackaging || `لا توجد بيانات تغليف ${docNoun}`}</div>
-  </div>` : ""}
-  ${showTransport ? `
+  </div>` : "";
+  const transportBox = showTransport ? `
   <div class="extra-box" data-section="transport" data-section-label="معلومات الترحيل">
     <div class="extra-box-title">معلومات الترحيل</div>
     <p>${cleanTransport || `لا توجد بيانات ترحيل ${docNoun}`}</p>
-  </div>` : ""}
-</div>
-` : ""}
+  </div>` : "";
+  return stackExtras
+    // صندوقان متتاليان بعرض الورقة: التغليف أوّلاً ثم الترحيل تحته.
+    ? `<div class="extra-row">${packagingBox}</div><div class="extra-row">${transportBox}</div>`
+    : `<div class="extra-row">${packagingBox}${transportBox}</div>`;
+})() : ""}
 
 ${notes ? `
 <div class="notes-section" data-section="notes" data-section-label="الملاحظات">
