@@ -5,9 +5,17 @@
  * كميات المنتجات مع بحث وفلترة حسب الرقم والاسم وهكذا».
  *
  * ## لماذا شاشةٌ مستقلّة عن «إدارة جميع المنتجات»
- * تلك شاشةُ تحريرٍ: أعمدةٌ كثيرة وأسعارٌ وخلايا تُكتب. وهذه شاشةُ **قراءة**
- * سريعة: الرقم والاسم والكمية والوحدة والحدّ الأدنى — تُفتح للجرد أو للردّ
- * على «عندك كم من كذا؟» بلا خوفٍ من تعديلٍ بالخطأ.
+ * تلك شاشةُ تحريرٍ شاملة: أعمدةٌ كثيرة وأسعارٌ وتصنيفات. وهذه شاشةُ **الجرد**:
+ * الرقم والاسم والكمية والوحدة والحدّ الأدنى لا غير — تُفتح للعدّ أو للردّ على
+ * «عندك كم من كذا؟».
+ *
+ * ## التعديل هنا: الكمية والحدّ الأدنى وحدهما
+ * وهو ما طلبه صاحب المستودع. وقصرُ التحرير عليهما مقصود: من يعدّ المخزن لا
+ * يريد أن يُخطئ في سعرٍ أو تصنيفٍ بضغطةٍ في العمود المجاور. والسعر مكانه
+ * شاشة المنتجات.
+ *
+ * والكمية عمودٌ تكتبه حركاتُ الفواتير والمشتريات أيضاً، فتعديلها هنا **تسوية
+ * جردٍ يدوية** لا حركة مخزون: تُصحّح الرقم إلى ما في الرفّ فعلاً.
  *
  * ## البحث «يبدأ بـ» لا «يحتوي على»
  * نفس قاعدة شاشات إدخال البنود (`leadsWithAny`): كتابة «است» تُظهر ما يبدأ
@@ -20,10 +28,13 @@
  * بالتمرير لا بالتنقّل بين صفحات.
  */
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, PackageSearch } from "lucide-react";
+import { toast } from "sonner";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { leadsWithAny, normalizeAr } from "@/utils/searchMatch";
+import { useProducts } from "@/hooks/useData";
+import EditableCell from "@/components/EditableCell";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 
@@ -58,16 +69,62 @@ const STATE_CLASS: Record<Exclude<StockFilter, "all">, string> = {
   in: "bg-success/10 text-success border-success/30",
 };
 
+/**
+ * رقمٌ من حقل إدخال: يقبل الفاصلة العشرية العربية، والفارغ صفر.
+ * `null` = مدخلٌ غير صالح فلا يُكتب شيء.
+ */
+export function parseQty(v: string): number | null {
+  const t = String(v ?? "").trim().replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace("،", ".").replace(",", ".");
+  if (t === "") return 0;
+  if (!/^-?\d*(\.\d*)?$/.test(t)) return null;
+  const n = parseFloat(t);
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function ProductQuantitiesPage() {
   const [search, setSearch] = useState("");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
   const [sort, setSort] = useState<"name" | "qty_asc" | "qty_desc">("name");
+
+  const queryClient = useQueryClient();
+  const { update } = useProducts();
 
   const { data, isLoading } = useQuery({
     queryKey: ["product-quantities"],
     queryFn: async () =>
       fetchAllProducts<Row>("id, name, sku, unit, stock_quantity, min_stock"),
   });
+
+  /**
+   * تعديل الكمية أو الحدّ الأدنى — تفاؤلٌ مع تراجع.
+   *
+   * الرقم يظهر فوراً على الشاشة قبل ردّ القاعدة، فالجرد يمشي بلا انتظار. وإن
+   * فشلت الكتابة عاد الرقم القديم مع رسالةٍ صريحة — لا يبقى على الشاشة رقمٌ
+   * ليس في القاعدة، وهو أخطر ما في التحديث المتفائل.
+   *
+   * وتُبطَل ذاكرة شاشتَي المنتجين معاً: من عدّل هنا ثم فتح «إدارة المنتجات»
+   * كان يقرأ الرقم القديم.
+   */
+  const patchLocal = (id: string, field: keyof Row, value: number) =>
+    queryClient.setQueryData<Row[]>(["product-quantities"], (old) =>
+      (old || []).map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+
+  const saveField = async (row: Row, field: "stock_quantity" | "min_stock", raw: string) => {
+    const n = parseQty(raw);
+    if (n === null) { toast.error("أرقام فقط"); return; }
+    if (n === Number(row[field] ?? 0)) return;      // لا كتابةَ بلا تغيير
+    const before = row[field];
+    patchLocal(row.id, field, n);
+    try {
+      await update.mutateAsync({ id: row.id, [field]: n });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-details"] });
+      window.dispatchEvent(new Event("products:changed"));
+    } catch (e: any) {
+      patchLocal(row.id, field, Number(before ?? 0));
+      toast.error(e?.message || "فشل التحديث — تم التراجع");
+    }
+  };
 
   const rows = useMemo(() => {
     const all = (data || []) as Row[];
@@ -184,9 +241,13 @@ export default function ProductQuantitiesPage() {
                   <th className="text-right px-4 py-3 font-semibold text-muted-foreground">#</th>
                   <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الرقم</th>
                   <th className="text-right px-4 py-3 font-semibold text-muted-foreground">اسم الصنف</th>
-                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground">الكمية</th>
+                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground" title="انقر للتعديل">
+                    الكمية <span className="text-[10px] font-normal opacity-70">✎</span>
+                  </th>
                   <th className="text-center px-4 py-3 font-semibold text-muted-foreground">الوحدة</th>
-                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground">الحدّ الأدنى</th>
+                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground" title="انقر للتعديل">
+                    الحدّ الأدنى <span className="text-[10px] font-normal opacity-70">✎</span>
+                  </th>
                   <th className="text-center px-4 py-3 font-semibold text-muted-foreground">الحالة</th>
                 </tr>
               </thead>
@@ -211,12 +272,26 @@ export default function ProductQuantitiesPage() {
                         <td className="px-4 py-2 text-muted-foreground tabular-nums">{i + 1}</td>
                         <td className="px-4 py-2 text-foreground tabular-nums">{r.sku || "—"}</td>
                         <td className="px-4 py-2 text-foreground font-medium">{r.name}</td>
-                        <td className="px-4 py-2 text-center font-bold tabular-nums">
-                          {Number(r.stock_quantity || 0).toLocaleString()}
+                        <td className="px-1 py-1 text-center font-bold tabular-nums" style={{ padding: 0 }}>
+                          <EditableCell
+                            value={String(r.stock_quantity ?? "")}
+                            inputMode="decimal"
+                            placeholder="الكمية"
+                            displayClassName="cursor-text hover:bg-muted/40 justify-center font-bold"
+                            validate={(v) => (parseQty(v) === null ? "أرقام فقط" : null)}
+                            onSave={(v) => saveField(r, "stock_quantity", v)}
+                          />
                         </td>
                         <td className="px-4 py-2 text-center text-muted-foreground">{r.unit || "—"}</td>
-                        <td className="px-4 py-2 text-center text-muted-foreground tabular-nums">
-                          {r.min_stock == null ? "—" : Number(r.min_stock).toLocaleString()}
+                        <td className="px-1 py-1 text-center tabular-nums" style={{ padding: 0 }}>
+                          <EditableCell
+                            value={String(r.min_stock ?? "")}
+                            inputMode="decimal"
+                            placeholder="الحدّ الأدنى"
+                            displayClassName="cursor-text hover:bg-muted/40 justify-center text-muted-foreground"
+                            validate={(v) => (parseQty(v) === null ? "أرقام فقط" : null)}
+                            onSave={(v) => saveField(r, "min_stock", v)}
+                          />
                         </td>
                         <td className="px-4 py-2 text-center">
                           <span className={`px-2 py-0.5 rounded-full border text-[11px] font-bold ${STATE_CLASS[st]}`}>
