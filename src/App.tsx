@@ -67,6 +67,7 @@ const QuoteCreatePage = lazy(() => import("./pages/QuoteCreatePage"));
 const SideQuoteCreatePage = lazy(() => import("./pages/SideQuoteCreatePage"));
 const QuoteViewPage = lazy(() => import("./pages/QuoteViewPage"));
 const ProductsPage = lazy(() => import("./pages/ProductsPage"));
+const ProductQuantitiesPage = lazy(() => import("./pages/ProductQuantitiesPage"));
 const FieldsPlaygroundPage = lazy(() => import("./pages/FieldsPlaygroundPage"));
 const SuppliersPage = lazy(() => import("./pages/SuppliersPage"));
 const AccountsPage = lazy(() => import("./pages/AccountsPage"));
@@ -396,6 +397,7 @@ const App = () => {
             <Route path="/products/out-of-stock" element={lazyEl(<ProductsPage />, "المنتجات المنتهية")} />
             <Route path="/products/in-stock" element={lazyEl(<ProductsPage />, "المنتجات المتوفرة")} />
             <Route path="/products/price-report" element={lazyEl(<ProductsPage />, "تقرير الأسعار")} />
+            <Route path="/products/quantities" element={lazyEl(<ProductQuantitiesPage />, "كميات المنتجات")} />
             <Route path="/dev/fields-playground" element={lazyEl(<FieldsPlaygroundPage />, "اختبار الحقول")} />
             <Route path="/categories" element={lazyEl(<CategoriesPage />, "فئات المنتجات")} />
             <Route path="/companies" element={lazyEl(<ProductCompaniesPage />, "ماركات المنتجات")} />

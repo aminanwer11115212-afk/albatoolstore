@@ -41,6 +41,31 @@ export function startsWithMatch(haystack: unknown, query: unknown): boolean {
 }
 
 
+/**
+ * «يبدأ بـ» على **الحقل كاملاً** لا على بداية كلمةٍ في وسطه.
+ *
+ * `startsWithMatch` تطابق بداية أي كلمة داخل النص، فكتابة «است» تُظهر
+ * «بوري است» كما تُظهر «استانلس». وطلب صاحب المستودع في شاشات إدخال البنود
+ * أن تظهر **ما يبدأ بالمكتوب فقط**: «كتبت است تظهر كل المنتجات التي تبدأ بـ
+ * است فقط».
+ *
+ * والفرق يظهر في قائمةٍ طويلة: البحث بحرفين يردّ عشرات النتائج نصفُها لا
+ * علاقة لبدايتها بما كُتب، فيضيع المقصود بينها.
+ */
+export function leadsWithMatch(haystack: unknown, query: unknown): boolean {
+  const q = normalizeAr(query);
+  if (!q) return true;
+  const h = normalizeAr(haystack);
+  return !!h && h.startsWith(q);
+}
+
+/** يُرجِع true إذا أيّ حقل **يبدأ** بالمكتوب. */
+export function leadsWithAny(fields: Array<unknown>, query: unknown): boolean {
+  const q = normalizeAr(query);
+  if (!q) return true;
+  return fields.some((f) => leadsWithMatch(f, q));
+}
+
 /** يُرجِع true إذا أي حقل من الحقول يطابق startsWithMatch. */
 export function startsWithAny(fields: Array<unknown>, query: unknown): boolean {
   const q = normalizeAr(query);

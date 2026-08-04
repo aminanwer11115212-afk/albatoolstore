@@ -420,7 +420,9 @@ export default function QuotePackagingPage() {
             {items.length > 0 && (
               <tfoot>
                 <tr>
-                  <td colSpan={3} className="text-center">إجمالي القطع: {totalQty}</td>
+                  {/* «إجمالي القطع» أُخفي بطلب صاحب المستودع — يُقرأ في ذيل
+                      جدول التغليف على الورقة. */}
+                  <td colSpan={3} className="text-center"></td>
                   <td colSpan={5}></td>
                 </tr>
               </tfoot>

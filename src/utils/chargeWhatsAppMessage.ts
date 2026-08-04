@@ -4,7 +4,7 @@
  *   👤 العميل: عميل تجريبي تبع مينا
  *
  *   💳 كان عليك: 200,000
- *   ✅ تم سداد: 100,000
+ *   ✅ تم شحن: 100,000
  *   📌 المتبقي عليك: 100,000
  *   📅 02/08/2026
  *
@@ -17,7 +17,8 @@
  *
  * ## معنى السطور
  *   «كان عليك/لك»    — صافي حساب العميل **قبل** السداد.
- *   «تم سداد»        — المبلغ المستلَم كاملاً.
+ *   «تم شحن»         — المبلغ المستلَم كاملاً. وهي رسالة **شحن** رصيد، فاللفظ
+ *                      لفظ الشحن لا السداد — طلبه صاحب المستودع صراحةً.
  *   «المتبقي عليك/لك» — صافي الحساب **بعد** السداد.
  *
  * والحسابُ المقفل لا يُكتب «0» فيه: «كان حسابك مسدداً» و«تم السداد بالكامل»
@@ -55,7 +56,13 @@ function accountLine(net: number, owedLabel: string, creditLabel: string, settle
 
 export function buildChargeWhatsAppMessage(input: ChargeMessageInput): string {
   const { customerName, date } = input;
-  const amount = Math.max(r2(input.amount), 0);
+  /**
+   * المبلغ السالب **خصمٌ على العميل** لا شحنَ رصيد: يزيد دَينه بدل أن
+   * يُنقصه. ولهذا لا يُقصَّ عند الصفر كما كان — القصّ كان يُخفي الخصم
+   * فتصل رسالةٌ تقول «تم شحن: 0» ورصيدٌ تغيّر بلا سبب ظاهر.
+   */
+  const amount = r2(input.amount);
+  const isDebit = amount < 0;
   const netBefore = r2(input.netBefore);
   const netAfter = r2(netBefore - amount);
 
@@ -63,7 +70,7 @@ export function buildChargeWhatsAppMessage(input: ChargeMessageInput): string {
     `👤 العميل: ${customerName}`,
     "",
     `💳 ${accountLine(netBefore, "كان عليك", "كان لك رصيد", "كان حسابك مسدداً")}`,
-    `✅ تم سداد: ${money(amount)}`,
+    isDebit ? `➖ تم خصم: ${money(amount)}` : `✅ تم شحن: ${money(amount)}`,
     `📌 ${accountLine(netAfter, "المتبقي عليك", "رصيدك الآن", "تم السداد بالكامل")}`,
     `📅 ${formatChargeDate(date)}`,
   ].join("\n");

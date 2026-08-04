@@ -5,6 +5,7 @@
  *   - overpay_invoice : فائض من دفعة على فاتورة (يظهر رقم الفاتورة في description)
  *   - manual_charge   : من allocate_customer_charge → allocation.kind='surplus'
  *   - credit_used     : استهلاك رصيد (amount سالب) — allocation.kind='credit_used'
+ *   - manual_debit    : خصمٌ يدوي على العميل — شحنٌ بمبلغٍ سالب، allocation.kind='manual_debit'
  *   - payment_adjust  : تعديل دفع لاحق (وصف يحتوي "تعديل")
  *   - return_credit   : من مرتجع (وصف يحتوي "مرتجع")
  *   - unknown         : غير مصنّف
@@ -15,6 +16,7 @@ export type CreditSource =
   | "overpay_invoice"
   | "manual_charge"
   | "credit_used"
+  | "manual_debit"
   | "payment_adjust"
   | "return_credit"
   | "unknown";
@@ -43,6 +45,24 @@ export function classifyCreditRow(row: {
   const linkedInvoice =
     row.allocation?.invoice_number ||
     (invMatch ? invMatch[1] : null);
+
+  /**
+   * الخصم اليدوي على العميل — يُفحص **قبل** استهلاك الرصيد.
+   *
+   * كلاهما `customer_credit` بمبلغٍ سالب، فالفرق بينهما في النيّة لا في
+   * الرقم: استهلاكُ الرصيد يسدّد فاتورةً بمالٍ للعميل عندنا (أثره على
+   * الحساب صفر)، والخصمُ اليدوي قيدٌ **عليه** يزيد دَينه. ولو تُرك للقاعدة
+   * السالبة وحدها لقُرئ الخصم «استهلاك رصيد» وظهر بأثرٍ صفري — بينما رصيد
+   * القاعدة يقول «عليه». فالوسمُ صريح.
+   */
+  if (kind === "manual_debit") {
+    return {
+      source: "manual_debit",
+      label: "خصم على العميل",
+      colorClass: "bg-rose-100 text-rose-800 border-rose-300",
+      linkedInvoice: null,
+    };
+  }
 
   // استهلاك للرصيد (amount سالب أو kind=credit_used)
   if (kind === "credit_used" || amt < 0) {

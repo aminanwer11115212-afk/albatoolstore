@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { notifyDuplicateItem } from "@/utils/duplicateItemToast";
 import { useNavigate, useParams } from "react-router-dom";
-import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
+import { startsWithAny, startsWithMatch, leadsWithAny } from "@/utils/searchMatch";
 import { Plus, Image as ImageIcon, StickyNote, Printer, Save, ArrowRight } from "lucide-react";
 import StatusButton, { PURCHASE_STATUS_OPTIONS } from "@/components/StatusButton";
 import { useSuppliers, useProductsWithDetails, useWarehouses, useCompanySettings } from "@/hooks/useData";
@@ -409,7 +409,9 @@ export default function PurchaseCreatePage() {
     );
     return (products || []).filter((p: any) => {
       if (usedIds.has(p.id)) return false;
-      const m = startsWithAny([p.name, p.sku], query);
+      // «يبدأ بـ» على الاسم كاملاً لا على بداية كلمةٍ في وسطه — نفس قاعدة
+      // باقي شاشات إدخال البنود. راجع `leadsWithAny`.
+      const m = leadsWithAny([p.name, p.sku], query);
       if (!warehouseId) return m;
       return m && p.warehouse_id === warehouseId;
     }).slice(0, 10);

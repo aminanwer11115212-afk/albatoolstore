@@ -96,7 +96,15 @@ describe("ChargeBalanceDialog — input validation", () => {
     expect(insertedTransactions.length).toBe(0);
   });
 
-  it("rejects negative amount", async () => {
+  /**
+   * المبلغ السالب صار **خصماً على العميل** — منطقٌ جديد طلبه صاحب المستودع:
+   * «إدخال شحن رصيد للعميل بالسالب ليكون عليه».
+   *
+   * وكان مرفوضاً بـ«أدخل مبلغاً صحيحاً». والقاعدة تحسب رصيد العميل
+   * `credit_balance = Σ amount` لقيود `customer_credit`، فالسالب يُنقص رصيده
+   * أي يرفع صافيه إلى «عليه» — فالقيد الواحد يكفي بلا دالّةٍ جديدة.
+   */
+  it("المبلغ السالب لم يعد مرفوضاً — يمضي إلى ما بعد فحص المبلغ", async () => {
     render(<ChargeBalanceDialog open onOpenChange={() => {}} />);
     const search = await screen.findByPlaceholderText(/ابحث بالاسم/);
     fireEvent.focus(search);
@@ -105,7 +113,24 @@ describe("ChargeBalanceDialog — input validation", () => {
 
     const amountInput = screen.getByPlaceholderText("0.00");
     fireEvent.change(amountInput, { target: { value: "-50" } });
+    fireEvent.click(screen.getByRole("button", { name: /شحن الرصيد/ }));
 
+    // يتوقّف عند فحص التحويل البنكي (لا حساب بنكي في هذه البيئة) — أي أنه
+    // تجاوز فحص المبلغ. وشكلُ القيد المكتوب يحرسه `customerManualDebit`
+    // على `buildManualDebitPayload` مباشرةً، بلا حاجة لقيادة قائمة Radix.
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastError).not.toHaveBeenCalledWith("أدخل مبلغاً صحيحاً");
+    expect(insertedTransactions.length).toBe(0);
+  });
+
+  it("والصفر وحده مرفوض", async () => {
+    render(<ChargeBalanceDialog open onOpenChange={() => {}} />);
+    const search = await screen.findByPlaceholderText(/ابحث بالاسم/);
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "عميل" } });
+    fireEvent.mouseDown(await screen.findByText("عميل اختبار"));
+
+    fireEvent.change(screen.getByPlaceholderText("0.00"), { target: { value: "0" } });
     fireEvent.click(screen.getByRole("button", { name: /شحن الرصيد/ }));
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("أدخل مبلغاً صحيحاً"));
     expect(insertedTransactions.length).toBe(0);
