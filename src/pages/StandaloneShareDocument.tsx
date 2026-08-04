@@ -108,6 +108,24 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
       const doc = iframeRef.current?.contentDocument;
       const body = doc?.body?.cloneNode(true) as HTMLElement | undefined;
       if (!body) throw new Error("تعذّر قراءة المحتوى");
+      /**
+       * إطارُ الورقة على الشاشة لا يدخل الـPDF.
+       *
+       * القالب يرسم صفحة A4 بيضاء على أرضيةٍ رمادية بهامش 10mm وظِلّ — وهو
+       * تنسيقُ عرضٍ في `@media screen`. وhtml2canvas يصوّر بوسيط screen، فلو
+       * بقي لخرج الملف بأرضيةٍ رمادية وبهامشٍ مضاعَف: هامش الورقة فوق هامش
+       * html2pdf. فيُنزَع من النسخة وحدها — والصفحة على حالها.
+       */
+      body.style.background = "#fff";
+      body.style.padding = "0";
+      const page = body.querySelector<HTMLElement>(".page");
+      if (page) {
+        page.style.width = "auto";
+        page.style.maxWidth = "none";
+        page.style.minHeight = "0";
+        page.style.padding = "0";
+        page.style.boxShadow = "none";
+      }
       const html2pdf = (await import("html2pdf.js")).default;
       logEvent("downloaded");
       await html2pdf()

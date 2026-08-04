@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { toast } from "sonner";
-import { startsWithAny, startsWithMatch } from "@/utils/searchMatch";
+import { startsWithAny, startsWithMatch, leadsWithMatch } from "@/utils/searchMatch";
 import { applyStockDeltaForLines } from "@/utils/stockDeduction";
 import { Plus, Edit, Printer, StickyNote } from "lucide-react";
 import StatusButton, { STOCK_RETURN_STATUS_OPTIONS } from "@/components/StatusButton";
@@ -488,7 +488,8 @@ export default function StockReturnCreatePage() {
       for (const it of linkedInvoiceItems) {
         const key = `${it.product_id || ""}|${it.product_name}`;
         if (seen.has(key)) continue;
-        if (!startsWithMatch(it.product_name, query)) continue;
+        // «يبدأ بـ» على الاسم كاملاً — نفس قاعدة باقي شاشات إدخال البنود
+        if (!leadsWithMatch(it.product_name, query)) continue;
         const candidateId = it.product_id || it.id;
         if (usedIds.has(candidateId)) continue;
         seen.add(key);
@@ -506,7 +507,7 @@ export default function StockReturnCreatePage() {
     return products
       .filter((p) => !usedIds.has(p.id))
       .filter((p) => !warehouseId || p.warehouse_id === warehouseId)
-      .filter((p) => startsWithMatch(p.name, query))
+      .filter((p) => leadsWithMatch(p.name, query))
       .slice(0, 10);
   }
 

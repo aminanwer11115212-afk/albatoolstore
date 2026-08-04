@@ -871,6 +871,19 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     // حشو الشريط يُزال من النسخة: الشريط نفسه محذوف منها، فبقاء حشوه يفتح
     // فراغاً بارتفاعه في أعلى صفحة الـPDF.
     clone.style.paddingTop = '0';
+    // إطارُ الورقة على الشاشة (أرضية رمادية، ظِلّ، هامش 10mm) تنسيقُ عرضٍ لا
+    // يدخل الـPDF: html2canvas يصوّر بوسيط screen، فلولا إزالته لخرج الملف
+    // بأرضيةٍ رمادية وبهامشٍ مضاعَف — هامش الورقة فوق هامش html2pdf.
+    clone.style.background = '#fff';
+    clone.style.padding = '0';
+    var pg = clone.querySelector('.page');
+    if (pg) {
+      pg.style.width = 'auto';
+      pg.style.maxWidth = 'none';
+      pg.style.minHeight = '0';
+      pg.style.padding = '0';
+      pg.style.boxShadow = 'none';
+    }
     var bar = clone.querySelector('#__lov_print_toolbar');
     if (bar) bar.remove();
     clone.querySelectorAll('.__lov_hidden').forEach(function(n){ n.remove(); });

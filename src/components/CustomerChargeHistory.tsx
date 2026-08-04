@@ -2,6 +2,8 @@ import { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { foldOverpayTransactions } from "@/utils/paymentDisplay";
+import { classifyCreditRow } from "@/utils/creditSource";
 import { ExternalLink, Wallet, ArrowDownCircle, PlusCircle, Download, AlertTriangle, CheckCircle2, ArrowUpDown, Undo2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,7 +154,17 @@ export default function CustomerChargeHistory({ customerId }: { customerId: stri
         .order("date", { ascending: false })
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data || [];
+      /**
+       * الفائض يُضمّ إلى دفعته قبل التجميع — لا سطرَ مستقلّاً له.
+       *
+       * قيدُ الفائض يخرج من `CustomerPaymentDialog` بلا `group_id`، فكان
+       * يصير مجموعةً يتيمة بجوار مجموعة دفعته: عمليةٌ واحدة في سطرين.
+       * والدمج هنا هو نفسه الذي يجري في شاشة المعاملات — مصدرٌ واحد.
+       */
+      return foldOverpayTransactions(
+        (data || []) as any[],
+        (t: any) => classifyCreditRow(t).source === "overpay_invoice",
+      );
     },
   });
 

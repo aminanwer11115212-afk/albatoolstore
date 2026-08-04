@@ -60,6 +60,7 @@ const menuSections: MenuSection[] = [
         children: [
           { label: "تقرير الأسعار", path: "/products/price-report" },
           { label: "إدارة جميع المنتجات", path: "/products" },
+          { label: "كميات المنتجات", path: "/products/quantities" },
           { label: "المستودعات", path: "/warehouses" },
           { label: "تحويل مخزون", path: "/stock-transfer" },
           { label: "تتبع المخزون", path: "/stock-tracking" },

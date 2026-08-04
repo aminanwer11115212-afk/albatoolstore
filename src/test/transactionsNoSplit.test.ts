@@ -180,3 +180,30 @@ describe("كل جداول العمليات تدمج", () => {
     },
   );
 });
+
+/**
+ * الفائض لا يظهر سطراً مستقلاً في **أي** شاشة.
+ *
+ * طلب صاحب المستودع: «فائض الدفعة لا يظهر في أي مكان في النظام؛ في كشوف
+ * الحساب والمعاملات يظهر المدفوع كاملاً حتى لو كان أكثر من الفاتورة، دون
+ * سطرٍ زائد للدفعة الزائدة».
+ *
+ * وشاشة «سجل الشحنات» كانت تُظهره: قيدُ الفائض يخرج بلا `group_id` فيصير
+ * مجموعةً يتيمة بجوار مجموعة دفعته — عمليةٌ واحدة في سطرين.
+ */
+describe("لا سطرَ فائضٍ في أي شاشة", () => {
+  it.each([
+    "src/pages/TransactionsPage.tsx",
+    "src/pages/FilteredTransactionsPage.tsx",
+    "src/components/CustomerChargeHistory.tsx",
+  ])("%s تدمج قبل العرض", (file) => {
+    expect(read(file)).toContain("foldOverpayTransactions");
+  });
+
+  it("وكشف الحساب يضمّ الفائض إلى سطر فاتورته", () => {
+    const src = read("src/utils/buildCustomerAccountView.ts");
+    expect(src).toContain("overpayFoldedIds");
+    // يبقى مستقلاً إن حُذفت فاتورته وإلا ضاع المال من الكشف
+    expect(src).toContain("ويبقى مستقلاً إن كانت فاتورته محذوفة");
+  });
+});

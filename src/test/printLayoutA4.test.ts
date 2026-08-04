@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { formatPackaging, formatTransports } from "@/utils/printExtras";
-import { generatePrintHTML } from "@/utils/printTemplate";
+import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 
 const pkgItems = (n: number) =>
   Array.from({ length: n }, (_, i) => ({
@@ -234,5 +234,72 @@ describe("الورقة تخرج كاملة — لا سلسلةَ انقطعت", 
     for (const marker of ["بطارية", "تفاصيل التغليف", "معلومات الترحيل", "توقيع المستلم"]) {
       expect(html).toContain(marker);
     }
+  });
+});
+
+/**
+ * مراجعة أزرار المعاينة والرابط، وتطابق الـPDF.
+ *
+ * طلب صاحب المستودع: «راجع المعاينة والطباعة ورابط العميل وأزرارهم كلّها
+ * شغّالة، وتنزيل PDF لرابط المعاينة مطابق».
+ *
+ * والمخاطرة الجديدة أن إطار الورقة على الشاشة (أرضية رمادية، ظِلّ، هامش
+ * 10mm) يدخل الـPDF: html2canvas يصوّر بوسيط **screen** لا print. فلولا
+ * نزعُه لخرج الملف بأرضيةٍ رمادية وبهامشٍ مضاعَف — هامش الورقة فوق هامش
+ * html2pdf. وهذا ما يحرسه القسم الأخير.
+ */
+describe("أزرار شريط المعاينة كلّها موصولة", () => {
+  // الشريط يُحقن في `buildPrintWindowHtml` لا في القالب نفسه
+  const html = buildPrintWindowHtml(sheet(3));
+  const BUTTONS: Array<[string, string]> = [
+    ["__btn_print", "طباعة"],
+    ["__btn_pdf", "تحميل PDF"],
+    ["__btn_wa_pdf", "واتساب PDF"],
+    ["__btn_link_online", "رابط للعميل"],
+    ["__btn_wa_text", "واتساب نص"],
+    ["__btn_toggle_vis", "تخصيص الرؤية"],
+  ];
+
+  it.each(BUTTONS)("زر %s (%s) موجود", (id) => {
+    expect(html).toContain(`id="${id}"`);
+  });
+
+  it.each(BUTTONS)("وله معالِج نقر — لا زرٌّ ميّت (%s)", (id) => {
+    // كل زرٍّ يُقرأ بمعرّفه ثم يُربط بـonclick في نصّ الشريط
+    expect(html).toMatch(new RegExp(`${id}[\\s\\S]{0,4000}?onclick`));
+  });
+
+  it("والشريط لا يدخل الطباعة ولا الـPDF", () => {
+    expect(html).toContain("__lov_print_toolbar");
+    expect(html).toContain("bar.remove()");
+  });
+});
+
+describe("PDF مطابقٌ للورقة — لا إطارَ شاشةٍ يتسلّل إليه", () => {
+  const tpl = fs.readFileSync(path.resolve(process.cwd(), "src/utils/printTemplate.ts"), "utf8");
+  const share = fs.readFileSync(path.resolve(process.cwd(), "src/pages/StandaloneShareDocument.tsx"), "utf8");
+
+  it("زر الـPDF في المعاينة ينزع إطار الشاشة من النسخة", () => {
+    const fn = tpl.slice(tpl.indexOf("function contentEl()"), tpl.indexOf("function genPdfBlob()"));
+    expect(fn).toContain("boxShadow = 'none'");
+    expect(fn).toContain("background = '#fff'");
+    expect(fn).toMatch(/padding = '0'/);
+  });
+
+  it("وتنزيل PDF من رابط العميل كذلك", () => {
+    const fn = share.slice(share.indexOf("handleDownloadPdf"), share.indexOf("html2pdf()"));
+    expect(fn).toContain('boxShadow = "none"');
+    expect(fn).toContain('background = "#fff"');
+  });
+
+  it("والمقاس المطبوع A4 في المسارين", () => {
+    expect(tpl).toContain("format: 'a4'");
+    expect(share).toContain('format: "a4"');
+  });
+
+  it("والصفحة الأصلية لا تُمسّ — النزع على النسخة وحدها", () => {
+    const fn = tpl.slice(tpl.indexOf("function contentEl()"), tpl.indexOf("function genPdfBlob()"));
+    expect(fn).toContain("document.body.cloneNode(true)");
+    expect(share).toContain("cloneNode(true)");
   });
 });
