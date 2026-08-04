@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { runOrQueue } from "@/lib/offlineQueue";
+import { buildManualDebitPayload, isCustomerDebitAmount } from "@/utils/customerDebitEntry";
 import { validateBankTransferPayment, isAllowedBank } from "@/lib/bankTransferValidation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,8 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
   const selectedCustomer = customers.find((c) => c.id === customerId);
   const netBefore = netBalanceOf(selectedCustomer);
   const amt = Number(amount) || 0;
+  /** مبلغٌ سالب = خصمٌ على العميل يزيد دَينه، لا شحنَ رصيد. */
+  const isDebit = isCustomerDebitAmount(amt);
   const netAfter = netBefore - amt;
 
   // صيغة ثابتة في كل الحالات: شُحن كذا، خُصم كذا من الدَّين، وبقي كذا.
@@ -111,7 +114,8 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
 
   async function handleSave(sendWhatsApp: boolean = false) {
     if (!customerId) return toast.error("اختر العميل");
-    if (!amt || amt <= 0) return toast.error("أدخل مبلغاً صحيحاً");
+    // المبلغ السالب مقصود: خصمٌ على العميل يزيد دَينه. والصفر وحده مرفوض.
+    if (!amt) return toast.error("أدخل مبلغاً صحيحاً");
     if (method === "bank_transfer") {
       const selectedAcc = bankAccounts.find((a) => a.id === bankAccountId);
       // رقم العملية اختياري في الشحن: المبلغ والحساب هما ما يحرّك الرصيد،
@@ -134,7 +138,31 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       let allocatedSum = 0;
       let surplus = 0;
 
-      if (online) {
+      if (isDebit) {
+        /**
+         * الخصم على العميل: قيدٌ واحد بمبلغٍ سالب.
+         *
+         * لا يمرّ بـ`record_customer_charge` — تلك دالّة شحنٍ تتوقّع موجباً
+         * وتوزّع وتُصدر ملخّصاً لا معنى له هنا. والقاعدة تحسب رصيد العميل
+         * `credit_balance = Σ amount` لقيود `customer_credit`، فالسالب يُنقص
+         * رصيده أي يرفع صافيه إلى «عليه» — وهو المطلوب حرفياً.
+         *
+         * و`allocation.kind = "manual_debit"` وسمٌ لازم: بدونه يقرأ الكشف
+         * القيدَ «استهلاك رصيد» بأثرٍ صفري بينما الرصيد يقول «عليه».
+         */
+        const { queued, error: dErr } = await runOrQueue({
+          table: "transactions",
+          op: "insert",
+          payload: buildManualDebitPayload({
+            customerId, amount: amt, date, method,
+            accountId: targetAccountId, referenceNo,
+          }),
+          label: "خصم على حساب العميل",
+        });
+        if (dErr) throw dErr;
+        if (queued) toast.info("تم الحفظ محلياً — سيُزامَن عند عودة الاتصال");
+        surplus = 0;
+      } else if (online) {
         // RPC: يخزّن الشحن كرصيد دائن كامل للعميل — لا يُوزَّع على أي فاتورة.
         // تسوية المتبقي تتم يدوياً من كشف الحساب (apply_customer_credit_to_invoice).
         const { data, error } = await (supabase as any).rpc("record_customer_charge", {
@@ -179,12 +207,16 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       }
       try { localStorage.setItem("lov:last-method:charge", method); } catch {}
 
-      const parts: string[] = [`تم شحن ${amt.toLocaleString()}`];
-      // في الخطة الجديدة لا يُوزَّع الشحن على الفواتير — يُخزَّن كاملاً كرصيد دائن.
-      if (allocatedSum > 0) parts.push(`سُدِّد ${allocatedSum.toLocaleString()} على ${allocations.length} فاتورة`);
-      const credited = surplus > 0.01 ? surplus : amt;
-      parts.push(`أُضيف ${credited.toLocaleString()} كرصيد دائن للعميل — سدِّد المتبقي يدوياً من كشف الحساب`);
-      toast.success(parts.join(" • "));
+      if (isDebit) {
+        toast.success(`تم خصم ${Math.abs(amt).toLocaleString()} — أصبح على العميل`);
+      } else {
+        const parts: string[] = [`تم شحن ${amt.toLocaleString()}`];
+        // في الخطة الجديدة لا يُوزَّع الشحن على الفواتير — يُخزَّن كاملاً كرصيد دائن.
+        if (allocatedSum > 0) parts.push(`سُدِّد ${allocatedSum.toLocaleString()} على ${allocations.length} فاتورة`);
+        const credited = surplus > 0.01 ? surplus : amt;
+        parts.push(`أُضيف ${credited.toLocaleString()} كرصيد دائن للعميل — سدِّد المتبقي يدوياً من كشف الحساب`);
+        toast.success(parts.join(" • "));
+      }
 
       if (sendWhatsApp) {
         if (!selectedCustomer?.phone) {

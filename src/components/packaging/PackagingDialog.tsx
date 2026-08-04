@@ -796,7 +796,10 @@ export default function PackagingDialog({ open, onOpenChange, parentType, parent
 
                 <div className="pkg-sticky-bottom" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", fontSize: 11, padding: "4px 10px", borderTop: "1px solid hsl(var(--border))", background: "hsl(var(--muted) / 0.5)" }}>
                   <div className="legacy-dt-info" style={{ fontWeight: 600 }}>
-                    إظهار {fromIdx} إلى {toIdx} من أصل {filtered.length} مدخل · إجمالي القطع: <span style={{ color: "hsl(var(--primary))" }}>{totalQtyAll}</span>
+                    {/* «إجمالي القطع» أُخفي بطلب صاحب المستودع: الرقم يُقرأ
+                        في ذيل جدول التغليف على الورقة، وتكراره هنا يزاحم
+                        عدّاد المُدخلات بلا فائدة. */}
+                    إظهار {fromIdx} إلى {toIdx} من أصل {filtered.length} مدخل
                   </div>
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                     <button onClick={handleDeleteSelected} disabled={selected.size === 0}

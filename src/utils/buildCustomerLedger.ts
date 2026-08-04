@@ -157,8 +157,16 @@ export function buildCustomerLedger(input: BuildLedgerInput): LedgerResult {
   }
 
   // ===== 2) المعاملات — مع دمج (استهلاك رصيد + دفعة من رصيد) =====
+  /**
+   * الخصم اليدوي على العميل مستثنى من «استهلاك الرصيد».
+   *
+   * كلاهما `customer_credit` بمبلغٍ سالب، لكنّ الاستهلاك يقابله سدادُ فاتورة
+   * فيُدمج معها، أمّا الخصم فقيدٌ **عليه** لا يقابله شيء — يمرّ إلى فرع
+   * «أي حركة أخرى» فيُسجَّل مديناً. راجع `classifyCreditRow`.
+   */
+  const isManualDebit = (t: any) => classifyCreditRow(t).source === "manual_debit";
   const creditUsed = transactions.filter(
-    (t) => t.category === "customer_credit" && num(t.amount) < 0,
+    (t) => t.category === "customer_credit" && num(t.amount) < 0 && !isManualDebit(t),
   );
   const creditPayments = transactions.filter(
     (t) => t.category === "customer_payment" && t.method === "credit_balance",
@@ -261,7 +269,8 @@ export function buildCustomerLedger(input: BuildLedgerInput): LedgerResult {
       continue;
     }
 
-    if (t.category === "customer_credit" && amt < 0) continue; // عولجت أعلاه
+    // الخصم اليدوي يمرّ إلى الأسفل فيُسجَّل مديناً؛ والاستهلاك عولج أعلاه.
+    if (t.category === "customer_credit" && amt < 0 && !isManualDebit(t)) continue;
 
     // أي حركة أخرى مرتبطة بالعميل (تعديل/استرجاع…)
     events.push({

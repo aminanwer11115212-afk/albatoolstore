@@ -107,14 +107,17 @@ export function formatTransports(rows: any[]): string | undefined {
  * تفاصيل التغليف — **جدولٌ** كما طلبه صاحب المستودع (وأرسل صورته).
  *
  * ## الشكل المطلوب
- *     ┌──────────────────────────────────────┬───────┐
- *     │ نوع التغليف                          │ العدد │
- *     ├──────────────────────────────────────┼───────┤
- *     │ كرتونة كبيرة                          │   2   │
- *     │ ربطه باكم فرامل فوق جي ان        5X  │   1   │
- *     ├──────────────────────────────────────┼───────┤
- *     │ عدد القطع                            │  14   │
- *     └──────────────────────────────────────┴───────┘
+ *     ┌───────┬──────────────────────────────────────┐
+ *     │ العدد │ نوع التغليف                          │
+ *     ├───────┼──────────────────────────────────────┤
+ *     │   2   │ كرتونة كبيرة                          │
+ *     │   1   │ ربطه باكم فرامل فوق جي ان        5X  │
+ *     ├───────┼──────────────────────────────────────┤
+ *     │  14   │ عدد القطع                            │
+ *     └───────┴──────────────────────────────────────┘
+ *
+ * والعدد **إلى اليمين**: هو أوّل ما تقع عليه العين في RTL، وهو المطلوب عند
+ * التحميل — تعدّ الطرود ثم تقرأ نوعها.
  *
  * سطرٌ لكل بند: النوع ومعه اسم الصنف إن وُجد، والعدد هو عدد الطرود. و«5X»
  * بالأحمر تعني خمس قطعٍ في الطرد الواحد — تُذكر حين تتجاوز الواحدة فقط، وإلا
@@ -210,8 +213,8 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
       ? `<div style="color:#666;font-size:11px;font-weight:400;">${escapeHtml(r.note)}</div>`
       : "";
     return `<tr>`
-      + `<td style="${pkgCell("right")}">${escapeHtml(r.label)}${xMark}${note}</td>`
       + `<td style="${pkgCell("center")}">${r.packs || ""}</td>`
+      + `<td style="${pkgCell("right")}">${escapeHtml(r.label)}${xMark}${note}</td>`
       + `</tr>`;
   }).join("");
 
@@ -221,8 +224,8 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
   const footCellC = `${pkgCell("center")}color:#c0392b;font-weight:800;`;
   const foot = rows.length
     ? `<tr>`
-      + `<td style="${footCell}">عدد القطع</td>`
       + `<td style="${footCellC}">${totalPacks}</td>`
+      + `<td style="${footCell}">عدد القطع</td>`
       + `</tr>`
     : "";
 
@@ -232,8 +235,8 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
     // عدٍّ للوسوم في القالب.
     ? `<table data-pkg-rows="${rows.length}" style="width:100%;border-collapse:collapse;border:${PKG_BORDER};margin:0;font-size:11.5px;color:#1a1a1a;">`
       + `<thead><tr>`
-      + `<th style="${pkgHeadCell("right")}">نوع التغليف</th>`
       + `<th style="${pkgHeadCell("center")}width:56px;">العدد</th>`
+      + `<th style="${pkgHeadCell("right")}">نوع التغليف</th>`
       + `</tr></thead>`
       + `<tbody>${body}</tbody>`
       + `<tfoot>${foot}</tfoot>`

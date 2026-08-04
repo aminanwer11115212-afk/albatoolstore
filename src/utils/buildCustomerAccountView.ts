@@ -324,6 +324,32 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
     const detail = `${acc}${opNo ? ` — رقم العملية ${opNo}` : ""}`;
     const ref = t.reference_id ? String(t.reference_id) : null;
 
+    /**
+     * (أ0) خصمٌ يدوي على العميل — قيدٌ **عليه** لا استهلاكَ رصيد.
+     *
+     * كلاهما `customer_credit` بمبلغٍ سالب، والقاعدة تحسب رصيد العميل
+     * `credit_balance = Σ amount`، فالسالب يرفع صافيه إلى «عليه» في الحالتين.
+     * لكنّ الاستهلاك يقابله سدادُ فاتورةٍ فأثره على الكشف صفر، أمّا الخصم
+     * اليدوي فلا يقابله شيء: أثره زيادةُ الدَّين. ولولا هذا الفرع لقُرئ
+     * «سداد من رصيد العميل» بأثرٍ صفري بينما رصيد القاعدة يقول غير ذلك —
+     * وهو أسوأ أنواع الاختلاف: كشفٌ لا يطابق رصيده.
+     */
+    if (t.category === "customer_credit" && amt < 0
+        && classifyCreditRow(t).source === "manual_debit") {
+      push(ref, {
+        id: `debit:${t.id}`,
+        kind: "adjust",
+        ...st,
+        label: t.description || "خصم على حساب العميل",
+        detail,
+        customerText: `أُضيف عليكم ${money(Math.abs(amt))}${t.description ? ` — ${t.description}` : ""}`,
+        effect: r2(Math.abs(amt)),
+        runningBalance: 0,
+        raw: t,
+      });
+      continue;
+    }
+
     // (أ) استهلاك رصيد مُطبَّق على فاتورة — أثره صفر
     if (t.category === "customer_credit" && amt < 0) {
       const linked = ref && invoiceIds.has(ref) ? ref : null;

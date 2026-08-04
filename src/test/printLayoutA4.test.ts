@@ -9,6 +9,8 @@
  *      النافذة داخل الـiframe، فيختلف عمّا يراه العميل حين ينزّل الـPDF.
  */
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { formatPackaging, formatTransports } from "@/utils/printExtras";
 import { generatePrintHTML } from "@/utils/printTemplate";
 
@@ -86,6 +88,36 @@ describe("أكثر من عشرين: كلٌّ بعرض الورقة، والتر�
   });
 });
 
+/**
+ * عمود «العدد» إلى اليمين — أوّل ما تقع عليه العين في RTL، وهو المطلوب عند
+ * التحميل: تعدّ الطرود ثم تقرأ نوعها. طلبه صاحب المستودع صراحةً.
+ */
+describe("ترتيب أعمدة جدول التغليف", () => {
+  const table = formatPackaging([], pkgItems(3))!;
+
+  it("«العدد» قبل «نوع التغليف» في الترويسة", () => {
+    expect(table.indexOf("العدد")).toBeLessThan(table.indexOf("نوع التغليف"));
+  });
+
+  it("وفي صفوف البنود كذلك: الرقم أوّلاً ثم النوع", () => {
+    const firstRow = table.split("<tbody>")[1].split("</tr>")[0];
+    expect(firstRow.indexOf("text-align:center")).toBeLessThan(firstRow.indexOf("text-align:right"));
+  });
+
+  it("وفي صفّ المجموع: الرقم ثم «عدد القطع»", () => {
+    const foot = table.split("<tfoot>")[1];
+    const total = pkgItems(3).reduce((s, r) => s + r.packs_count, 0);
+    expect(foot.indexOf(String(total))).toBeLessThan(foot.indexOf("عدد القطع"));
+  });
+
+  it("ويظهر الترتيب نفسه في الورقة المطبوعة", () => {
+    const html = sheet(3);
+    const box = html.split('data-section="packaging"')[1].split("</div>")[0]
+      + html.split('data-section="packaging"')[1].slice(0, 4000);
+    expect(box.indexOf("العدد")).toBeLessThan(box.indexOf("نوع التغليف"));
+  });
+});
+
 describe("إخفاء أحد الصندوقين لا يكسر التخطيط", () => {
   const hidden = (keys: string[], n: number) =>
     generatePrintHTML({
@@ -142,6 +174,42 @@ describe("شكل A4 على الشاشة — كالـPDF", () => {
 
   it("والطباعة على حالها — لا تتأثّر بقواعد الشاشة", () => {
     expect(html).toContain("@media print { body { padding: 0; } .page { max-width: none; } }");
+  });
+});
+
+/**
+ * قاعدة الورقة الواحدة: أيّ تعديل في المعاينة يظهر في رابط العميل بشكل A4.
+ *
+ * والحراسة بنيوية لا تعاقدية: الصفحتان تعرضان ناتج القالب في `iframe` بلا
+ * زيادة، فما دام التنسيق في القالب وحده استحال أن تختلفا. ولو كُتبت قاعدةُ
+ * ورقٍ في إحدى الصفحتين لانفصلتا — وهو ما وقع سابقاً حين بُنيت ورقة العميل
+ * في دالّة حافةٍ مستقلّة.
+ */
+describe("قاعدة الورقة الواحدة — المعاينة والرابط", () => {
+  const read = (p: string) =>
+    fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
+  const PAGES = ["src/pages/DocumentPreviewPage.tsx", "src/pages/StandaloneShareDocument.tsx"];
+
+  it.each(PAGES)("%s تعرض ناتج القالب في iframe", (file) => {
+    const src = read(file);
+    expect(src).toContain("srcDoc");
+  });
+
+  it.each(PAGES)("%s لا تحمل مقاس ورقٍ خاصّاً بها", (file) => {
+    const src = read(file);
+    // مقاس الورقة في القالب وحده — لا نسخةَ ثانية تنفصل عنه
+    expect(src).not.toContain("210mm");
+    expect(src).not.toContain("297mm");
+  });
+
+  it("والمقاس مكتوبٌ في القالب مرّةً واحدة", () => {
+    const tpl = read("src/utils/printTemplate.ts");
+    expect(tpl.match(/210mm/g)?.length).toBeGreaterThan(0);
+    expect(tpl).toContain("@page { size: A4; margin: 10mm; }");
+  });
+
+  it("والرابط يبني بالقالب نفسه لا بـHTML جاهز", () => {
+    expect(read("src/utils/sharedDocumentHtml.ts")).toContain("generatePrintHTML");
   });
 });
 
