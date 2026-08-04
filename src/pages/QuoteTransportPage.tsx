@@ -3,6 +3,7 @@ import ZoomControls from "@/components/ZoomControls";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTransporters, useDestinations } from "@/hooks/useData";
+import { attachLookups, TRANSPORTER_LOOKUP, DESTINATION_LOOKUP } from "@/utils/lookupJoin";
 import { toast } from "sonner";
 
 export default function QuoteTransportPage() {
@@ -32,8 +33,9 @@ export default function QuoteTransportPage() {
     setLoading(true);
     const { data: q } = await supabase.from("quotes").select("*, customers(id, name)").eq("id", id).single();
     setQuote(q);
-    const { data: trs } = await supabase.from("quote_transports").select("*, transporters(name), destinations(name)").eq("quote_id", id).order("created_at", { ascending: false });
-    setList(trs || []);
+    // بلا ربطٍ في `select`: الجدول بلا مفاتيح أجنبية — راجع `lookupJoin.ts`
+    const { data: trs } = await supabase.from("quote_transports").select("*").eq("quote_id", id).order("created_at", { ascending: false });
+    setList(await attachLookups(trs as any[], [TRANSPORTER_LOOKUP, DESTINATION_LOOKUP]));
     if (q?.customer_id) {
       try {
         const { fetchCustomerTransportDefaults } = await import("@/utils/customerTransportDefaults");

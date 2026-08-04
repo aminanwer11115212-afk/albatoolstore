@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, ArrowRight, Save, Send, Printer } from "lucide-react";
 import { buildPackagingTextMessage, openWhatsAppPackagingText, openWhatsAppPackagingLink, type PackagingRow } from "@/utils/packagingShare";
 import ZoomControls from "@/components/ZoomControls";
+import { attachLookups, PACKAGING_TYPE_LOOKUP, PRODUCT_LOOKUP } from "@/utils/lookupJoin";
 
 export default function QuotePackagingPage() {
   const { id } = useParams();
@@ -69,12 +70,13 @@ export default function QuotePackagingPage() {
     }
     setHeaderId(header!.id);
 
+    // بلا ربطٍ في `select`: الجدول بلا مفاتيح أجنبية — راجع `lookupJoin.ts`
     const { data: rows } = await supabase
       .from("quotes_packaging_items")
-      .select("*, packaging_types(name), products(name)")
+      .select("*")
       .eq("quote_packaging_id", header!.id)
       .order("created_at", { ascending: true });
-    setItems(rows || []);
+    setItems(await attachLookups(rows as any[], [PACKAGING_TYPE_LOOKUP, PRODUCT_LOOKUP]));
 
     const { data: qItems } = await supabase
       .from("quote_items")

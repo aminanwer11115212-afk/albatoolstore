@@ -7,6 +7,7 @@ import { Plus, Trash2, ArrowRight, ChevronDown, ChevronUp, Send, Printer } from 
 import PackagingItemsManager from "@/components/packaging/PackagingItemsManager";
 import { buildPackagingTextMessage, openWhatsAppPackagingText, openWhatsAppPackagingLink, type PackagingRow } from "@/utils/packagingShare";
 import ZoomControls from "@/components/ZoomControls";
+import { attachLookups, PACKAGING_TYPE_LOOKUP } from "@/utils/lookupJoin";
 
 export default function InvoicePackagingPage() {
   const { id } = useParams();
@@ -50,13 +51,14 @@ export default function InvoicePackagingPage() {
       const ids = Array.from(new Set((items || []).map((it: any) => it.product_id).filter(Boolean))) as string[];
       setInvoiceProductIds(ids);
 
+      // بلا ربطٍ في `select`: الجدول بلا مفاتيح أجنبية — راجع `lookupJoin.ts`
       const { data: pkgs, error: pkgsErr } = await supabase
         .from("invoice_packaging")
-        .select("*, packaging_types(name)")
+        .select("*")
         .eq("invoice_id", id)
         .order("created_at", { ascending: false });
       if (pkgsErr) throw pkgsErr;
-      setPackagingList(pkgs || []);
+      setPackagingList(await attachLookups(pkgs as any[], [PACKAGING_TYPE_LOOKUP]));
     } catch (e: any) {
       console.error("loadData failed:", e);
       toast.error(e?.message || "تعذّر تحميل بيانات التغليف");

@@ -1,4 +1,23 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  attachLookups,
+  PACKAGING_TYPE_LOOKUP,
+  TRANSPORTER_LOOKUP,
+  DESTINATION_LOOKUP,
+} from "@/utils/lookupJoin";
+
+/**
+ * القراءة الفاشلة تُذكر ولا تُبتلع.
+ *
+ * PostgREST لا يرمي استثناءً حين يرفض الاستعلام — يردّ `{ data: null, error }`.
+ * فمن يستخرج `data` وحدها يقرأ «لا توجد بيانات» ولا يعرف أنه لم يقرأ شيئاً.
+ * وهو ما أخفى عطل المفاتيح الأجنبية أشهراً.
+ */
+function reportQueryErrors(where: string, results: Record<string, { error?: any }>) {
+  for (const [name, res] of Object.entries(results)) {
+    if (res?.error) console.error(`[printExtras] ${where}: فشل استعلام ${name}`, res.error);
+  }
+}
 
 /**
  * Format a number for display, falling back to a dash for empty/zero values
@@ -171,25 +190,36 @@ export async function loadInvoiceExtras(invoiceId: string | undefined | null): P
   const cached = getCached(key);
   if (cached) return cached;
   try {
-    const [{ data: transports }, { data: packaging }, { data: packagingItems }] = await Promise.all([
+    // بلا ربطٍ داخل `select`: الجداول الثلاثة بلا مفاتيح أجنبية في القاعدة
+    // الحيّة، فأيّ `packaging_types(name)` هنا يردّ خطأً و`data` فارغة
+    // صامتة — وهو ما كان يُقرأ «لا توجد بيانات تغليف». راجع `lookupJoin.ts`.
+    const [transportsRes, packagingRes, itemsRes] = await Promise.all([
       supabase
         .from("invoice_transports")
-        .select("transporters(name, phone, address), destinations(name)")
+        .select("transporter_id, destination_id")
         .eq("invoice_id", invoiceId),
       supabase
         .from("invoice_packaging")
-        .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
+        .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_type_id")
         .eq("invoice_id", invoiceId),
       // بنود المستخدم الحقيقية — الترويسة وحدها لا تحمل تغليفاً. راجع `formatPackaging`.
       supabase
         .from("invoices_packaging_items")
-        .select("product_name, packs_count, pieces_per_pack, quantity, description, packaging_types(name)")
+        .select("product_name, packs_count, pieces_per_pack, quantity, description, packaging_type_id")
         .eq("invoice_id", invoiceId)
         .order("created_at"),
     ]);
+    reportQueryErrors("loadInvoiceExtras", { transports: transportsRes, packaging: packagingRes, items: itemsRes });
+
+    const [transports, packaging, packagingItems] = await Promise.all([
+      attachLookups(transportsRes.data as any[], [TRANSPORTER_LOOKUP, DESTINATION_LOOKUP]),
+      attachLookups(packagingRes.data as any[], [PACKAGING_TYPE_LOOKUP]),
+      attachLookups(itemsRes.data as any[], [PACKAGING_TYPE_LOOKUP]),
+    ]);
+
     const value: ExtraStrings = {
-      transportInfo: formatTransports(transports || []),
-      packagingInfo: formatPackaging(packaging || [], packagingItems || []),
+      transportInfo: formatTransports(transports),
+      packagingInfo: formatPackaging(packaging, packagingItems),
     };
     setCached(key, value);
     return value;
@@ -205,24 +235,33 @@ export async function loadQuoteExtras(quoteId: string | undefined | null): Promi
   const cached = getCached(key);
   if (cached) return cached;
   try {
-    const [{ data: transports }, { data: packaging }, { data: packagingItems }] = await Promise.all([
+    // نفس علّة الفواتير: جداول العروض كذلك بلا مفاتيح أجنبية.
+    const [transportsRes, packagingRes, itemsRes] = await Promise.all([
       supabase
         .from("quote_transports")
-        .select("transporters(name, phone, address), destinations(name)")
+        .select("transporter_id, destination_id")
         .eq("quote_id", quoteId),
       supabase
         .from("quotes_packaging")
-        .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_types(name)")
+        .select("quantity, packs_count, pieces_per_pack, weight, dimensions, cost, notes, packaging_type_id")
         .eq("quote_id", quoteId),
       supabase
         .from("quotes_packaging_items")
-        .select("product_name, packs_count, pieces_per_pack, quantity, description, packaging_types(name)")
+        .select("product_name, packs_count, pieces_per_pack, quantity, description, packaging_type_id")
         .eq("quote_id", quoteId)
         .order("created_at"),
     ]);
+    reportQueryErrors("loadQuoteExtras", { transports: transportsRes, packaging: packagingRes, items: itemsRes });
+
+    const [transports, packaging, packagingItems] = await Promise.all([
+      attachLookups(transportsRes.data as any[], [TRANSPORTER_LOOKUP, DESTINATION_LOOKUP]),
+      attachLookups(packagingRes.data as any[], [PACKAGING_TYPE_LOOKUP]),
+      attachLookups(itemsRes.data as any[], [PACKAGING_TYPE_LOOKUP]),
+    ]);
+
     const value: ExtraStrings = {
-      transportInfo: formatTransports(transports || []),
-      packagingInfo: formatPackaging(packaging || [], packagingItems || []),
+      transportInfo: formatTransports(transports),
+      packagingInfo: formatPackaging(packaging, packagingItems),
     };
     setCached(key, value);
     return value;
