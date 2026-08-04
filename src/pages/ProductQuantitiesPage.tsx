@@ -1,40 +1,44 @@
 /**
- * كميات المنتجات — شاشةٌ تُريك ما في المخزن وكم بقي منه.
+ * كميات المنتجات — كشفُ جردٍ يُقرأ ويُصحَّح ويُطبع.
  *
- * طلبها صاحب المستودع: «نافذة جديدة مع المنتجات باسم كميات المنتجات تظهر لي
- * كميات المنتجات مع بحث وفلترة حسب الرقم والاسم وهكذا».
+ * ## ما طلبه صاحب المستودع
+ *   • «تظهر لي كميات المنتجات مع بحث وفلترة حسب الرقم والاسم».
+ *   • «أضف تعديل الكميات والحدّ الأدنى… عن طريق التنقّل».
+ *   • «ازبط الطباعة لكشف الكميات: الترويسة، وصورة المنتج، واسم المنتج،
+ *     والكمية، والحدّ الأدنى — لمراجعة الكميات في المخزن، ويظهر التاريخ».
  *
  * ## لماذا شاشةٌ مستقلّة عن «إدارة جميع المنتجات»
  * تلك شاشةُ تحريرٍ شاملة: أعمدةٌ كثيرة وأسعارٌ وتصنيفات. وهذه شاشةُ **الجرد**:
- * الرقم والاسم والكمية والوحدة والحدّ الأدنى لا غير — تُفتح للعدّ أو للردّ على
- * «عندك كم من كذا؟».
+ * صورةٌ واسمٌ وكميةٌ وحدٌّ أدنى — تُفتح للعدّ في المخزن، وتُطبع فتُمشى بها بين
+ * الرفوف.
+ *
+ * ## التعديل بالتنقّل — كجدول بنود الفاتورة
+ * الخانتان `<input>` عاديتان بأسهم تنقّلٍ بينهما: سهمٌ لأعلى وأسفل بين الصفوف،
+ * ويمين ويسار بين العمودين، والوصول يحدّد الرقم فتستبدله الضغطة الأولى.
+ * وهي القاعدة نفسها المطبَّقة في شاشات الإدخال (`itemTableColumns`) — فمن
+ * يعرف جدول البنود يعرف هذا الجدول بلا تعلّمٍ جديد.
+ *
+ * والحفظ عند مغادرة الخانة أو Enter: **لا نداءَ للقاعدة على كل حرف**، وإلا
+ * صار العدّ بطيئاً ومئةُ نداءٍ لرقمٍ واحد.
  *
  * ## التعديل هنا: الكمية والحدّ الأدنى وحدهما
- * وهو ما طلبه صاحب المستودع. وقصرُ التحرير عليهما مقصود: من يعدّ المخزن لا
- * يريد أن يُخطئ في سعرٍ أو تصنيفٍ بضغطةٍ في العمود المجاور. والسعر مكانه
- * شاشة المنتجات.
+ * من يعدّ المخزن لا يريد أن يُخطئ في سعرٍ بضغطةٍ في العمود المجاور. والسعر
+ * مكانه شاشة المنتجات.
  *
  * والكمية عمودٌ تكتبه حركاتُ الفواتير والمشتريات أيضاً، فتعديلها هنا **تسوية
  * جردٍ يدوية** لا حركة مخزون: تُصحّح الرقم إلى ما في الرفّ فعلاً.
  *
  * ## البحث «يبدأ بـ» لا «يحتوي على»
- * نفس قاعدة شاشات إدخال البنود (`leadsWithAny`): كتابة «است» تُظهر ما يبدأ
- * بـ«است» فقط. والرقم يُطابَق بالبداية كذلك، فكتابة «12» تُظهر 12 و120 و1234
- * — وهو ما يُنتظر من حقل رقم.
- *
- * ## الترتيب والفلترة
- * فلترةٌ بحالة المخزون (نافد/منخفض/متوفّر) لأن السؤال العملي غالباً «ما الذي
- * نفد؟» لا «ما قائمة كل شيء؟». والصفحة تعرض الكل بلا ترقيم لأن الجرد يُقرأ
- * بالتمرير لا بالتنقّل بين صفحات.
+ * نفس قاعدة شاشات الإدخال: كتابة «است» تُظهر ما يبدأ بها فقط.
  */
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, PackageSearch } from "lucide-react";
+import { Search, PackageSearch, ImageOff } from "lucide-react";
 import { toast } from "sonner";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { leadsWithAny, normalizeAr } from "@/utils/searchMatch";
+import { makeRowNavHandler } from "@/utils/itemTableNav";
 import { useProducts } from "@/hooks/useData";
-import EditableCell from "@/components/EditableCell";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 
@@ -43,14 +47,16 @@ type Row = {
   name: string;
   sku: string | null;
   unit: string | null;
+  image_url: string | null;
   stock_quantity: number | null;
   min_stock: number | null;
 };
 
 type StockFilter = "all" | "out" | "low" | "in";
+type EditableField = "stock_quantity" | "min_stock";
 
 /** حالة المخزون بقاعدةٍ واحدة تُستعمل في الفلتر وفي الشارة. */
-function stockState(r: Row): StockFilter {
+function stockState(r: Row): Exclude<StockFilter, "all"> {
   const qty = Number(r.stock_quantity || 0);
   if (qty <= 0) return "out";
   if (qty <= Number(r.min_stock || 0)) return "low";
@@ -74,17 +80,32 @@ const STATE_CLASS: Record<Exclude<StockFilter, "all">, string> = {
  * `null` = مدخلٌ غير صالح فلا يُكتب شيء.
  */
 export function parseQty(v: string): number | null {
-  const t = String(v ?? "").trim().replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace("،", ".").replace(",", ".");
+  const t = String(v ?? "")
+    .trim()
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace("،", ".")
+    .replace(",", ".");
   if (t === "") return 0;
   if (!/^-?\d*(\.\d*)?$/.test(t)) return null;
   const n = parseFloat(t);
   return Number.isFinite(n) ? n : null;
 }
 
+/** تاريخ اليوم كما يُقرأ على ورقة الجرد. */
+function todayText(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+const NAV_COLS = ["quantity", "min_stock"];
+
 export default function ProductQuantitiesPage() {
   const [search, setSearch] = useState("");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
   const [sort, setSort] = useState<"name" | "qty_asc" | "qty_desc">("name");
+  /** ما يكتبه المستخدم قبل الحفظ — يُمسح عند التثبيت أو التراجع. */
+  const [draft, setDraft] = useState<Record<string, string>>({});
 
   const queryClient = useQueryClient();
   const { update } = useProducts();
@@ -92,7 +113,7 @@ export default function ProductQuantitiesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["product-quantities"],
     queryFn: async () =>
-      fetchAllProducts<Row>("id, name, sku, unit, stock_quantity, min_stock"),
+      fetchAllProducts<Row>("id, name, sku, unit, image_url, stock_quantity, min_stock"),
   });
 
   /**
@@ -102,14 +123,13 @@ export default function ProductQuantitiesPage() {
    * فشلت الكتابة عاد الرقم القديم مع رسالةٍ صريحة — لا يبقى على الشاشة رقمٌ
    * ليس في القاعدة، وهو أخطر ما في التحديث المتفائل.
    *
-   * وتُبطَل ذاكرة شاشتَي المنتجين معاً: من عدّل هنا ثم فتح «إدارة المنتجات»
-   * كان يقرأ الرقم القديم.
+   * وتُبطَل ذاكرة شاشة المنتجات: من عدّل هنا ثم فتحها كان يقرأ الرقم القديم.
    */
-  const patchLocal = (id: string, field: keyof Row, value: number) =>
+  const patchLocal = (id: string, field: EditableField, value: number) =>
     queryClient.setQueryData<Row[]>(["product-quantities"], (old) =>
       (old || []).map((r) => (r.id === id ? { ...r, [field]: value } : r)));
 
-  const saveField = async (row: Row, field: "stock_quantity" | "min_stock", raw: string) => {
+  const saveField = async (row: Row, field: EditableField, raw: string) => {
     const n = parseQty(raw);
     if (n === null) { toast.error("أرقام فقط"); return; }
     if (n === Number(row[field] ?? 0)) return;      // لا كتابةَ بلا تغيير
@@ -124,6 +144,19 @@ export default function ProductQuantitiesPage() {
       patchLocal(row.id, field, Number(before ?? 0));
       toast.error(e?.message || "فشل التحديث — تم التراجع");
     }
+  };
+
+  /* ─── الخلايا: مسوّدةٌ تُثبَّت عند المغادرة ─── */
+  const key = (id: string, f: EditableField) => `${id}:${f}`;
+  const cellValue = (r: Row, f: EditableField) => draft[key(r.id, f)] ?? String(r[f] ?? "");
+  const onCellChange = (r: Row, f: EditableField, v: string) =>
+    setDraft((d) => ({ ...d, [key(r.id, f)]: v }));
+  const commitCell = (r: Row, f: EditableField) => {
+    const k = key(r.id, f);
+    if (!(k in draft)) return;                      // لم يُلمَس
+    const raw = draft[k];
+    setDraft((d) => { const next = { ...d }; delete next[k]; return next; });
+    void saveField(r, f, raw);
   };
 
   const rows = useMemo(() => {
@@ -143,6 +176,12 @@ export default function ProductQuantitiesPage() {
     );
   }, [data, search, stockFilter, sort]);
 
+  const handleNav = makeRowNavHandler({
+    tableId: "product-quantities",
+    cols: NAV_COLS,
+    getRowCount: () => rows.length,
+  });
+
   // الإجماليات على المعروض لا على الكل — فتتبع ما تراه العين
   const totals = useMemo(() => {
     const out = rows.filter((r) => stockState(r) === "out").length;
@@ -153,13 +192,38 @@ export default function ProductQuantitiesPage() {
 
   const inputCls =
     "bg-muted rounded-lg px-3 py-2 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary";
+  const cellInputCls =
+    "w-full bg-transparent text-center tabular-nums font-bold outline-none border border-transparent rounded px-1 py-1 focus:border-primary focus:bg-primary/5";
 
   return (
     <div className="space-y-6">
+      {/*
+        ورقة الجرد المطبوعة: صورةٌ واسمٌ وكميةٌ وحدٌّ أدنى لا غير.
+        الفلاتر والأزرار وأعمدة الشاشة الأخرى تُحذف — ورقةٌ تُمشى بها بين
+        الرفوف لا لقطةُ شاشة. والترويسة تتكرّر على كل صفحة، والصفّ لا ينقسم.
+      */}
+      <style>{`
+        @media print {
+          .qty-sheet table { width: 100%; border-collapse: collapse; }
+          .qty-sheet thead { display: table-header-group; }
+          .qty-sheet tr { page-break-inside: avoid; break-inside: avoid; }
+          .qty-sheet th, .qty-sheet td {
+            border: 1px solid #999; padding: 4px 6px; font-size: 11px; color: #111;
+          }
+          .qty-sheet thead th { background: #ede9fb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .qty-sheet img { width: 34px; height: 34px; object-fit: contain; }
+          .qty-print-hide { display: none !important; }
+          .qty-sheet input { border: 0 !important; background: transparent !important; font-weight: 700; }
+        }
+      `}</style>
+
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <PackageSearch size={22} /> كميات المنتجات
         </h1>
+        <span className="text-xs text-muted-foreground">
+          تنقّل بالأسهم بين الخانات — واكتب الرقم مباشرةً
+        </span>
       </div>
 
       <PrintVisibilityToolbar
@@ -171,20 +235,21 @@ export default function ProductQuantitiesPage() {
           { key: "summary", label: "الملخّص" },
           { key: "table", label: "جدول الكميات" },
         ]}
-        shareTitle="كميات المنتجات"
-        shareSummary={`عدد الأصناف: ${rows.length}`}
+        shareTitle="كشف كميات المخزن"
+        shareSummary={`عدد الأصناف: ${rows.length} • التاريخ: ${todayText()}`}
         pdfFilename={`كميات-المنتجات-${new Date().toISOString().split("T")[0]}`}
       />
 
       <div className="printable-statement">
         <ReportPrintHeader
-          title="كميات المنتجات"
-          periodText={`بحث: ${search || "—"} • الأصناف: ${rows.length}`}
+          title="كشف كميات المخزن"
+          subtitle="لمراجعة الكميات في المخزن"
+          periodText={`التاريخ: ${todayText()} • الأصناف: ${rows.length}${search ? ` • بحث: ${search}` : ""}`}
         />
 
-        <div className="legacy-card card-block">
+        <div className="legacy-card card-block qty-sheet">
           <div
-            className="p-4 border-b border-border flex flex-wrap gap-3 items-center justify-between"
+            className="p-4 border-b border-border flex flex-wrap gap-3 items-center justify-between qty-print-hide"
             data-section="filters"
             data-section-label="الفلاتر"
           >
@@ -238,62 +303,85 @@ export default function ProductQuantitiesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted">
-                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground">#</th>
-                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الرقم</th>
-                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground">اسم الصنف</th>
-                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground" title="انقر للتعديل">
+                  <th className="text-right px-3 py-3 font-semibold text-muted-foreground w-10">#</th>
+                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground w-14">الصورة</th>
+                  <th className="text-right px-3 py-3 font-semibold text-muted-foreground">اسم الصنف</th>
+                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground w-24" title="انقر أو تنقّل بالأسهم للتعديل">
                     الكمية <span className="text-[10px] font-normal opacity-70">✎</span>
                   </th>
-                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground">الوحدة</th>
-                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground" title="انقر للتعديل">
+                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground w-24" title="انقر أو تنقّل بالأسهم للتعديل">
                     الحدّ الأدنى <span className="text-[10px] font-normal opacity-70">✎</span>
                   </th>
-                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground">الحالة</th>
+                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground qty-print-hide">الوحدة</th>
+                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground qty-print-hide">الحالة</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                      جاري التحميل...
-                    </td>
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                      لا توجد أصناف مطابقة
-                    </td>
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد أصناف مطابقة</td>
                   </tr>
                 ) : (
                   rows.map((r, i) => {
                     const st = stockState(r);
                     return (
                       <tr key={r.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                        <td className="px-4 py-2 text-muted-foreground tabular-nums">{i + 1}</td>
-                        <td className="px-4 py-2 text-foreground tabular-nums">{r.sku || "—"}</td>
-                        <td className="px-4 py-2 text-foreground font-medium">{r.name}</td>
-                        <td className="px-1 py-1 text-center font-bold tabular-nums" style={{ padding: 0 }}>
-                          <EditableCell
-                            value={String(r.stock_quantity ?? "")}
+                        <td className="px-3 py-1 text-muted-foreground tabular-nums">{i + 1}</td>
+                        <td className="px-3 py-1 text-center">
+                          {r.image_url ? (
+                            <img
+                              src={r.image_url}
+                              alt={r.name}
+                              loading="lazy"
+                              className="w-9 h-9 object-contain rounded border border-border bg-white inline-block"
+                            />
+                          ) : (
+                            <span className="inline-flex w-9 h-9 items-center justify-center rounded border border-dashed border-border text-muted-foreground/50">
+                              <ImageOff size={14} />
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-1 text-foreground font-medium">{r.name}</td>
+                        <td className="px-1 py-1">
+                          <input
+                            className={cellInputCls}
                             inputMode="decimal"
-                            placeholder="الكمية"
-                            displayClassName="cursor-text hover:bg-muted/40 justify-center font-bold"
-                            validate={(v) => (parseQty(v) === null ? "أرقام فقط" : null)}
-                            onSave={(v) => saveField(r, "stock_quantity", v)}
+                            data-nav-table="product-quantities"
+                            data-nav-row={i}
+                            data-nav-col="quantity"
+                            aria-label={`كمية ${r.name}`}
+                            value={cellValue(r, "stock_quantity")}
+                            onChange={(e) => onCellChange(r, "stock_quantity", e.target.value)}
+                            onBlur={() => commitCell(r, "stock_quantity")}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); commitCell(r, "stock_quantity"); }
+                              handleNav(i, "quantity", e);
+                            }}
                           />
                         </td>
-                        <td className="px-4 py-2 text-center text-muted-foreground">{r.unit || "—"}</td>
-                        <td className="px-1 py-1 text-center tabular-nums" style={{ padding: 0 }}>
-                          <EditableCell
-                            value={String(r.min_stock ?? "")}
+                        <td className="px-1 py-1">
+                          <input
+                            className={cellInputCls}
                             inputMode="decimal"
-                            placeholder="الحدّ الأدنى"
-                            displayClassName="cursor-text hover:bg-muted/40 justify-center text-muted-foreground"
-                            validate={(v) => (parseQty(v) === null ? "أرقام فقط" : null)}
-                            onSave={(v) => saveField(r, "min_stock", v)}
+                            data-nav-table="product-quantities"
+                            data-nav-row={i}
+                            data-nav-col="min_stock"
+                            aria-label={`الحدّ الأدنى ${r.name}`}
+                            value={cellValue(r, "min_stock")}
+                            onChange={(e) => onCellChange(r, "min_stock", e.target.value)}
+                            onBlur={() => commitCell(r, "min_stock")}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); commitCell(r, "min_stock"); }
+                              handleNav(i, "min_stock", e);
+                            }}
                           />
                         </td>
-                        <td className="px-4 py-2 text-center">
+                        <td className="px-3 py-1 text-center text-muted-foreground qty-print-hide">{r.unit || "—"}</td>
+                        <td className="px-3 py-1 text-center qty-print-hide">
                           <span className={`px-2 py-0.5 rounded-full border text-[11px] font-bold ${STATE_CLASS[st]}`}>
                             {STATE_LABEL[st]}
                           </span>

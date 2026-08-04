@@ -2426,14 +2426,40 @@ export default function QuoteCreatePage() {
                       await supabase.from("quote_attachments").delete().eq("quote_id", editId);
                     }
 
-                    // 3) Delete other children
-                    await supabase.from("quote_items").delete().eq("quote_id", editId);
+                    /**
+                     * 3) بقيّة الأبناء — **معاً لا واحداً بعد واحد**.
+                     *
+                     * كانت ستّ رحلاتٍ متتابعة إلى القاعدة، فيتجمّد الحوار
+                     * ثوانيَ على اتصالٍ بطيء ويبدو النظام «معلَّقاً». وهي
+                     * مستقلّةٌ عن بعضها فلا معنى لتسلسلها.
+                     *
+                     * وبنود التغليف تُحذف بالرابطين معاً: صفوفٌ قديمة تحمل
+                     * `quote_id` وحده بلا `quote_packaging_id`، فحذفٌ بالأوّل
+                     * وحده يتركها يتيمة.
+                     */
+                    await Promise.all([
+                      supabase.from("quote_items").delete().eq("quote_id", editId),
+                      supabase.from("quotes_packaging_items").delete().eq("quote_id", editId),
+                      supabase.from("quote_transports").delete().eq("quote_id", editId),
+                    ]);
                     await supabase.from("quotes_packaging").delete().eq("quote_id", editId);
-                    await supabase.from("quote_transports").delete().eq("quote_id", editId);
 
-                    // 4) Finally delete the quote itself
-                    const { error } = await supabase.from("quotes").delete().eq("id", editId);
-                    if (error) { toast.error(error.message); setClearing(false); return; }
+                    /**
+                     * 4) حذف عرض السعر — **ويُتحقّق من وقوعه**.
+                     *
+                     * PostgREST يردّ `error: null` وصفراً من الصفوف حين تمنع
+                     * سياسةُ RLS الحذف. فكان الزرّ يعلن النجاح ويخرج، ثم يجد
+                     * المستخدم العرضَ كما هو عند العودة — وهو ما يبدو
+                     * «تعليقاً» لأن شيئاً لم يحدث رغم رسالة النجاح.
+                     * القاعدة في CLAUDE.md: `.select("id")` وصفرُ صفوفٍ خطأ.
+                     */
+                    const { data: deleted, error } = await supabase
+                      .from("quotes").delete().eq("id", editId).select("id");
+                    if (error) { toast.error(error.message); return; }
+                    if (!deleted || deleted.length === 0) {
+                      toast.error("تعذّر حذف عرض السعر — لا صلاحية للحذف أو أنه محذوفٌ أصلاً");
+                      return;
+                    }
                     quoteGoneRef.current = true;
                     savedRef.current = true;
 

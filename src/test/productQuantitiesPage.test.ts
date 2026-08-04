@@ -86,15 +86,40 @@ describe("الأعمدة التي طلبها", () => {
 describe("تعديل الكمية والحدّ الأدنى", () => {
   const src = read(PAGE);
 
-  it("الخانتان قابلتان للتحرير", () => {
-    expect(src).toMatch(/onSave=\{\(v\) => saveField\(r, "stock_quantity", v\)\}/);
-    expect(src).toMatch(/onSave=\{\(v\) => saveField\(r, "min_stock", v\)\}/);
+  it("الخانتان `<input>` تُثبَّتان عند المغادرة وعند Enter", () => {
+    expect(src).toMatch(/onBlur=\{\(\) => commitCell\(r, "stock_quantity"\)\}/);
+    expect(src).toMatch(/onBlur=\{\(\) => commitCell\(r, "min_stock"\)\}/);
+    expect(src).toContain('if (e.key === "Enter")');
   });
 
   it("ولا ثالثةَ لهما — السعر والتصنيف مكانهما شاشة المنتجات", () => {
-    const editable = src.match(/saveField\(r, "(\w+)"/g) || [];
-    const fields = new Set(editable.map((m) => m.split('"')[1]));
+    const edited = src.match(/commitCell\(r, "(\w+)"\)/g) || [];
+    const fields = new Set(edited.map((m) => m.split('"')[1]));
     expect([...fields].sort()).toEqual(["min_stock", "stock_quantity"]);
+  });
+
+  /**
+   * التعديل «عن طريق التنقّل» — كجدول بنود الفاتورة: أسهمٌ بين الخانات،
+   * والوصول يحدّد الرقم فتستبدله الضغطة الأولى.
+   */
+  it("والتنقّل بالأسهم موصولٌ بمُعالِج جدول البنود نفسه", () => {
+    expect(src).toContain("makeRowNavHandler");
+    expect(src).toMatch(/tableId: "product-quantities"/);
+    expect(src).toMatch(/handleNav\(i, "quantity", e\)/);
+    expect(src).toMatch(/handleNav\(i, "min_stock", e\)/);
+  });
+
+  it("والخانتان معلَّمتان بسمات التنقّل", () => {
+    expect(src).toContain('data-nav-table="product-quantities"');
+    expect(src).toContain('data-nav-col="quantity"');
+    expect(src).toContain('data-nav-col="min_stock"');
+  });
+
+  it("والحفظ عند المغادرة لا على كل حرف — وإلا مئةُ نداءٍ لرقمٍ واحد", () => {
+    // `onChange` يكتب في المسوّدة فقط، والقاعدة تُنادى من `commitCell`
+    expect(src).toMatch(/onChange=\{\(e\) => onCellChange\(r, "stock_quantity", e\.target\.value\)\}/);
+    const commit = src.slice(src.indexOf("const commitCell"), src.indexOf("const rows = useMemo"));
+    expect(commit).toContain("saveField");
   });
 
   it("والتحديث متفائلٌ **مع تراجع** عند الفشل", () => {
@@ -149,5 +174,64 @@ describe("قراءة الرقم المُدخَل", () => {
 
   it("والسالب مقبول — تسويةُ جردٍ قد تكشف عجزاً", () => {
     expect(parseQty("-3")).toBe(-3);
+  });
+});
+
+/**
+ * ورقة الجرد المطبوعة — ما طلبه صاحب المستودع حرفياً:
+ * «الترويسة، وصورة المنتج، واسم المنتج، والكمية، والحدّ الأدنى… ويظهر التاريخ».
+ */
+describe("طباعة كشف الكميات", () => {
+  const src = read(PAGE);
+
+  it("ترويسةُ التقرير بعنوانٍ يقول ما هو", () => {
+    expect(src).toContain("ReportPrintHeader");
+    expect(src).toContain('title="كشف كميات المخزن"');
+    expect(src).toContain("لمراجعة الكميات في المخزن");
+  });
+
+  it("والتاريخ يظهر عليها", () => {
+    expect(src).toContain("function todayText");
+    expect(src).toMatch(/periodText=\{`التاريخ: \$\{todayText\(\)\}/);
+  });
+
+  it("وصورة المنتج عمودٌ في الجدول", () => {
+    expect(src).toContain("image_url");
+    expect(src).toContain(">الصورة<");
+    // وبديلٌ حين لا صورة — لا خانةٌ فارغة تُربك العدّاد
+    expect(src).toContain("ImageOff");
+  });
+
+  it("والأعمدة الأربعة المطلوبة تُطبع", () => {
+    for (const col of [">الصورة<", ">اسم الصنف<", "الكمية", "الحدّ الأدنى"]) {
+      expect(src).toContain(col);
+    }
+  });
+
+  it("وما عداها يُحذف من الورقة — الفلاتر والوحدة والحالة", () => {
+    expect(src).toContain("qty-print-hide");
+    const filters = src.slice(src.indexOf('data-section="filters"') - 300, src.indexOf('data-section="filters"'));
+    expect(filters).toContain("qty-print-hide");
+  });
+
+  it("والترويسة تتكرّر على كل صفحة، والصفّ لا ينقسم", () => {
+    expect(src).toContain("thead { display: table-header-group; }");
+    expect(src).toContain("page-break-inside: avoid");
+  });
+
+  it("وصورةُ الطباعة بمقاسٍ ثابت — لا صورةٌ تبتلع الصفحة", () => {
+    expect(src).toMatch(/\.qty-sheet img \{[^}]*width: 34px/);
+  });
+});
+
+/**
+ * الكمية والحدّ الأدنى عمودان يُكتبان مباشرةً — نفس قاعدة جدول البنود:
+ * لا وضعَ تعديلٍ يُدخل، ولا مسطرةَ تحجز الضغطة.
+ */
+describe("الخانتان ضمن أعمدة الكتابة المباشرة", () => {
+  it("`min_stock` أُضيف إلى المصدر الواحد", () => {
+    const cols = read("src/utils/itemTableColumns.ts");
+    expect(cols).toContain('"min_stock"');
+    expect(cols).toContain('"quantity"');
   });
 });
