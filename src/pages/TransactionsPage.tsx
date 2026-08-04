@@ -8,6 +8,8 @@ import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
 import EditPaymentDialog, { type EditablePayment } from "@/components/finance/EditPaymentDialog";
 import { useUserRole } from "@/hooks/useUserRole";
+import { foldOverpayTransactions, overpaySurplusNote } from "@/utils/paymentDisplay";
+import { classifyCreditRow } from "@/utils/creditSource";
 export default function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -25,7 +27,14 @@ export default function TransactionsPage() {
   const { data: suppliers } = useSuppliers();
   const { insert, remove } = useTransactions();
 
-  const filtered = (transactions || []).filter((t: any) => {
+  // الدفعة الزائدة سطرٌ واحد لا سطران — الدمج **قبل** البحث والتقسيم إلى
+  // صفحات، وإلا وقع قيد الفائض في صفحةٍ وقيدُ دفعته في أخرى فلم يلتقيا.
+  const rows = foldOverpayTransactions(
+    (transactions || []) as any[],
+    (t: any) => classifyCreditRow(t).source === "overpay_invoice",
+  );
+
+  const filtered = rows.filter((t: any) => {
     return !search || startsWithAny([t.description, t.category, t.accounts?.name], search);
   });
 
@@ -207,7 +216,11 @@ export default function TransactionsPage() {
                     <td className="px-4 py-3 text-foreground">{t.accounts?.name || "-"}</td>
                     <td className="px-4 py-3 text-foreground">{Number(t.debit || (t.type === "income" ? t.amount : 0)).toLocaleString()}</td>
                     <td className="px-4 py-3 text-foreground">{Number(t.credit || (t.type === "expense" ? t.amount : 0)).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-foreground">{t.description || "-"}</td>
+                    <td className="px-4 py-3 text-foreground">
+                      {t.overpaySurplus
+                        ? `${t.description || "دفعة من العميل"}${overpaySurplusNote(t.overpaySurplus)}`
+                        : (t.description || "-")}
+                    </td>
                     <td className="px-4 py-3 text-foreground">{methodMap[t.method] || t.method || "-"}</td>
                     <td className="px-4 py-3 print:hidden">
                       <div className="flex items-center gap-1">
@@ -215,7 +228,8 @@ export default function TransactionsPage() {
                           <button
                             onClick={() => setEditingPayment({
                               id: t.id,
-                              amount: Number(t.amount || 0),
+                              // المبلغ المخزَّن لا المدموج — الدمج للقراءة وحدها
+                              amount: Number(t.overpayApplied ?? t.amount ?? 0),
                               reference_id: t.reference_id,
                               customer_id: t.customer_id,
                               description: t.description,

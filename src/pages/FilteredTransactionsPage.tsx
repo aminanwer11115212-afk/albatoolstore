@@ -5,6 +5,8 @@ import { DollarSign } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { startsWithMatch, startsWithAny } from "@/utils/searchMatch";
+import { foldOverpayTransactions, overpaySurplusNote } from "@/utils/paymentDisplay";
+import { classifyCreditRow } from "@/utils/creditSource";
 
 interface FilteredTransactionsPageProps {
   type: "income" | "expense";
@@ -38,7 +40,14 @@ export default function FilteredTransactionsPage({ type }: FilteredTransactionsP
     },
   });
 
-  const filtered = (transactions || []).filter((t: any) => {
+  // الدفعة الزائدة سطرٌ واحد هنا أيضاً — نفس القاعدة في كل جداول العمليات،
+  // والمجموع محفوظ: المدموج = المطبَّق + الفائض.
+  const rows = foldOverpayTransactions(
+    (transactions || []) as any[],
+    (t: any) => classifyCreditRow(t).source === "overpay_invoice",
+  );
+
+  const filtered = rows.filter((t: any) => {
     if (search) {
       if (!startsWithAny([t.description, t.category, t.accounts?.name], search)) return false;
     }
@@ -132,7 +141,11 @@ export default function FilteredTransactionsPage({ type }: FilteredTransactionsP
                     <td className={`px-5 py-3 font-medium ${type === "income" ? "text-success" : "text-destructive"}`}>{Number(t.amount).toLocaleString()}</td>
                     <td className="px-5 py-3 text-foreground">{t.accounts?.name || "-"}</td>
                     <td className="px-5 py-3 text-foreground">{t.category || "-"}</td>
-                    <td className="px-5 py-3 text-muted-foreground">{t.description || "-"}</td>
+                    <td className="px-5 py-3 text-muted-foreground">
+                      {t.overpaySurplus
+                        ? `${t.description || "دفعة من العميل"}${overpaySurplusNote(t.overpaySurplus)}`
+                        : (t.description || "-")}
+                    </td>
                     <td className="px-5 py-3 text-foreground">{t.method || "-"}</td>
                   </tr>
                 ))}

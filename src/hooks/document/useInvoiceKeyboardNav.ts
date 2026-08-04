@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { selectIfFreeTyping } from "@/utils/itemTableColumns";
 
 /** Keyboard navigation — مطابق لعرض السعر (مستخرج من InvoiceCreatePage) */
 export function useInvoiceKeyboardNav(rootRef: React.RefObject<HTMLDivElement>) {
@@ -84,7 +85,7 @@ export function useInvoiceKeyboardNav(rootRef: React.RefObject<HTMLDivElement>) 
         if (nextEl) {
           e.preventDefault();
           nextEl.focus();
-          // لا تحديد أثناء التنقّل.
+          selectIfFreeTyping(nextEl);
         } else {
 
           e.preventDefault();
@@ -111,7 +112,7 @@ export function useInvoiceKeyboardNav(rootRef: React.RefObject<HTMLDivElement>) 
         e.preventDefault();
         if (candidate) {
           candidate.focus();
-          // لا تحديد أثناء التنقّل.
+          selectIfFreeTyping(candidate);
         }
 
         return;
@@ -135,7 +136,9 @@ export function useInvoiceKeyboardNav(rootRef: React.RefObject<HTMLDivElement>) 
       if (nextEl) {
         e.preventDefault();
         nextEl.focus();
-        // لا تحديد أثناء التنقّل — يبدأ التحديد فقط في وضع التحرير.
+        // الحقول النصّية تبقى بلا تحديد — الوصول إليها ليس نيّة استبدال.
+        // أمّا الرقمية فتُحدَّد: ضغطةٌ واحدة تكفي لتبديل الرقم.
+        selectIfFreeTyping(nextEl);
       }
 
     };
