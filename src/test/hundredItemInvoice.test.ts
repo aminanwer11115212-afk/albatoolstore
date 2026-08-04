@@ -134,9 +134,10 @@ describe("ورقة الطباعة تحمل المئة كاملة", () => {
   });
 
   it("وكل بند تغليفٍ من المئة موجود", () => {
-    const lines = packagingInfo.split("<br>").filter((l) => l.includes("النوع:"));
-    expect(lines).toHaveLength(ITEM_COUNT);
-    expect(html).toContain("عدد الطرود");
+    // جدول التغليف: صفُّ الترويسة + مئة بند + صفُّ المجموع
+    expect(packagingInfo.match(/<tr>/g)).toHaveLength(ITEM_COUNT + 2);
+    expect(html).toContain("نوع التغليف");
+    expect(html).toContain("عدد القطع");
   });
 
   it("والترحيل بمرحّليه ووجهتيهما", () => {
@@ -175,7 +176,8 @@ describe("ورقة العميل من القالب نفسه", () => {
 
   it("وإخفاء التغليف يسري على الورقتين لأنه في القالب لا في الصفحة", () => {
     const hidden = generatePrintHTML({ ...printData, hiddenSections: ["packaging"] } as any);
-    expect(hidden).not.toContain("عدد الطرود");
+    expect(hidden).not.toContain("نوع التغليف");
+    expect(hidden).not.toContain("عدد القطع");
     expect(hidden).toContain(rows[0].product_name); // البنود باقية
   });
 });

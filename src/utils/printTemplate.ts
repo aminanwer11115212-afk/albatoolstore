@@ -297,9 +297,13 @@ export function generatePrintHTML(data: PrintData): string {
     border-bottom: 2px dashed #5b2c8e;
     padding-bottom: 4px; margin-bottom: 8px;
   }
-  .extra-box p {
+  .extra-box p, .extra-content {
     font-size: 12px; color: #666;
   }
+  /* جدول التغليف يرث تنسيقه من السمات داخله (يُحقن في قالبين)، فلا يأخذ
+     تنسيق جدول البنود العام. */
+  .extra-content table { width: 100%; border-collapse: collapse; }
+  .extra-content thead th { background: #5b4cad; color: #fff; }
 
   /* === NOTES === */
   .notes-section {
@@ -556,7 +560,9 @@ ${showExtras ? `
   ${showPackaging ? `
   <div class="extra-box" data-section="packaging" data-section-label="تفاصيل التغليف">
     <div class="extra-box-title">تفاصيل التغليف</div>
-    <p>${cleanPackaging || `لا توجد بيانات تغليف ${docNoun}`}</p>
+    <!-- عنصرُ كتلةٍ لا p: التغليف جدولٌ الآن، والجدول داخل فقرةٍ يخرج منها
+         في المتصفّح فينكسر الترتيب. راجع formatPackaging في printExtras. -->
+    <div class="extra-content">${cleanPackaging || `لا توجد بيانات تغليف ${docNoun}`}</div>
   </div>` : ""}
   ${showTransport ? `
   <div class="extra-box" data-section="transport" data-section-label="معلومات الترحيل">

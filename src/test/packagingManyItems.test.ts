@@ -71,9 +71,15 @@ describe("البنود الكثيرة تصل الورقة كاملة", () => {
     expect(packagingInfo).toContain("ملاحظة البند 5");
   });
 
-  it("عدد الأسطر = عدد البنود (لا دمج ولا إسقاط)", () => {
-    const lines = packagingInfo.split("<br>").filter((l) => l.includes("النوع:"));
-    expect(lines).toHaveLength(20);
+  it("عدد الصفوف = عدد البنود (لا دمج ولا إسقاط)", () => {
+    // صفُّ الترويسة + عشرون بنداً + صفُّ المجموع
+    expect(packagingInfo.match(/<tr>/g)).toHaveLength(22);
+  });
+
+  it("والمجموع في الذيل = مجموع الطرود", () => {
+    const total = manyItems.reduce((s, r) => s + r.packs_count, 0);
+    expect(packagingInfo).toContain("عدد القطع");
+    expect(packagingInfo).toContain(`>${total}<`);
   });
 
   it("مئة بند لا تكسر شيئاً", () => {

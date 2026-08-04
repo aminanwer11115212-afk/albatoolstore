@@ -100,10 +100,13 @@ describe("loadInvoiceExtras", () => {
     expect(res.transportInfo).not.toContain("المركبة:");
     expect(res.transportInfo).not.toContain("السائق:");
 
+    // التغليف جدولٌ الآن: عمودا «نوع التغليف» و«العدد» وذيلُ «عدد القطع»
     expect(res.packagingInfo).toBeDefined();
-    expect(res.packagingInfo).toContain("النوع:");
-    expect(res.packagingInfo).toContain("Box");
-    expect(res.packagingInfo).toContain("الكمية:");
+    expect(res.packagingInfo).toContain("نوع التغليف");
+    expect(res.packagingInfo).toContain("العدد");
+    expect(res.packagingInfo).toContain("Box Widget");
+    expect(res.packagingInfo).toContain("عدد القطع");
+    // وحقول المستند تبقى سطراً تحت الجدول
     expect(res.packagingInfo).toContain("الوزن:");
     expect(res.packagingInfo).toContain("الإجمالي:");
   });
@@ -135,8 +138,8 @@ describe("loadQuoteExtras", () => {
     expect(res.transportInfo).toContain("Speedy");
     expect(res.transportInfo).toContain("0200");
     expect(res.transportInfo).toContain("Jeddah St");
-    expect(res.packagingInfo).toContain("Crate");
-    expect(res.packagingInfo).toContain("الكمية:");
+    expect(res.packagingInfo).toContain("Crate Gadget");
+    expect(res.packagingInfo).toContain("عدد القطع");
     expect(res.packagingInfo).toContain("الإجمالي:");
   });
 });
