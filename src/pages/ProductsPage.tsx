@@ -22,6 +22,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { openWhatsApp } from "@/utils/whatsapp";
 
 type Focusable = { focus: () => void } | null;
+import TableColsControl from "@/components/common/TableColsControl";
+import { useProductColsPref, PRODUCTS_MIDDLE_KEYS, type ProductColKey } from "@/hooks/useProductColsPref";
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
 import { userScopedLegacyKey } from "@/lib/userScopedKey";
 import { useRowHeights } from "@/hooks/useRowHeights";
@@ -204,6 +206,26 @@ export default function ProductsPage() {
   const PRODUCTS_LOCK_KEY = userScopedLegacyKey("products-page:colsLocked:v1");
   const PRODUCTS_DEFAULTS: (number | null)[] = [60, null, 130, 140, 140, 140, 110, 110, 140, 80, 110];
   const [colsLocked, setColsLocked] = useSharedColsLocked(() => localStorage.getItem(PRODUCTS_LOCK_KEY) === "true");
+  /**
+   * إخفاء أعمدة جدول المنتجات — نفس منظومة صفحة العملاء.
+   *
+   * الإخفاء **بموضع العمود** لا بوسمٍ على كل خانة: خانات هذا الجدول مكتوبةٌ
+   * في مواضعها عبر فروعٍ متعدّدة، فوسمُها واحدةً واحدة تعديلٌ واسع في ملفٍ
+   * طويل، وخطرُ نسيان خانةٍ فيه أكبر من نفعه. والمواضع ثابتة لأن الترتيب
+   * غير قابلٍ للتغيير هنا (`reorderable={false}`).
+   *
+   * والطرفان — الفهرس والإعدادات — خارج القائمة أصلاً: بلا الفهرس يضيع
+   * العدّ، وبلا الإعدادات لا يبقى للصفّ زرٌّ يُفتح منه.
+   */
+  const productCols = useProductColsPref();
+  const colPositions: Record<ProductColKey, number> = {
+    name: 2, image: 3, category: 4, brand: 5, warehouse: 6,
+    price: 7, foreign_price: 8, supplier: 9, frozen: 10,
+  };
+  const hiddenColsCss = productCols.hidden
+    .map((k) => `.products-cols-scope tr > *:nth-child(${colPositions[k as ProductColKey]}) { display: none; }`)
+    .join("\n");
+
   const { widths: colWidths, minWidths: colMinWidths, startDrag: startColDrag, reset: resetColWidths, saveAsUserDefault: saveColDefault, tableProps } = useColumnWidths(
     PRODUCTS_COLS_KEY,
     PRODUCTS_DEFAULTS,
@@ -1613,6 +1635,9 @@ export default function ProductsPage() {
               <label>بحث: <input type="search" placeholder="اسم/كود/فئة..." value={search} onChange={e => setSearch(e.target.value)} /></label>
               <span className="text-xs text-muted-foreground">{filtered.length} منتج</span>
               {isAllProducts && (
+                <TableColsControl prefs={productCols} testPrefix="product" reorderable={false} />
+              )}
+              {isAllProducts && (
                 !colsLocked ? (
                   <>
                     <button type="button" className="btn-xxs btn-success" title={COLS_BTN_SAVE_TITLE}
@@ -2279,8 +2304,10 @@ export default function ProductsPage() {
             }
           }}
         >
+          {/* قواعد إخفاء الأعمدة — تُبنى من التفضيلات المحفوظة للمستخدم */}
+          {isAllProducts && hiddenColsCss && <style>{hiddenColsCss}</style>}
           <table
-            className="legacy-table"
+            className={`legacy-table${isAllProducts ? " products-cols-scope" : ""}`}
             cellSpacing={0}
             style={{ width: "100%", tableLayout: isAllProducts ? "fixed" : "auto" }}
             {...(isAllProducts ? tableProps : {})}
