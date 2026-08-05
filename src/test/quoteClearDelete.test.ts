@@ -90,7 +90,7 @@ describe("الزرّ لا يبقى معطَّلاً بعد الفشل", () => {
   const fn = clearHandler();
 
   it("`clearing` يُصفَّر في `finally` مهما كان المخرج", () => {
-    expect(fn).toMatch(/finally \{\s*setClearing\(false\);/);
+    expect(fn).toMatch(/finally \{[\s\S]*setClearing\(false\);/);
   });
 
   it("ولا يُصفَّر يدوياً قبل الخروج فيُنسى في مسارٍ آخر", () => {
@@ -107,5 +107,72 @@ describe("الزرّ لا يبقى معطَّلاً بعد الفشل", () => {
 describe("حذف الفاتورة مسارٌ واحد مُحكَم — للمقارنة", () => {
   it("شاشة الفاتورة تُفوّض لا تحذف بيدها", () => {
     expect(read("src/screens/InvoiceCreateScreen.tsx")).toContain("deleteInvoiceWithStockRestore");
+  });
+});
+
+/* ─────────── العلّتان الباقيتان بعد الإصلاح الأوّل ─────────── */
+
+/**
+ * أبلغ صاحب المستودع أن الزرّ **ما زال** يعلّق بعد إصلاح «النجاح الكاذب»:
+ * «يعلّق بالسستم كامل لا أستطيع الخروج من الصفحة، وبعد الحذف لا تنحذف البنود
+ * وبيانات عرض السعر المعروضة في الشاشة».
+ *
+ * وكانت علّتين لا واحدة، وكلتاهما خارج مسار القاعدة تماماً — ولهذا نجا منهما
+ * الإصلاح الأوّل.
+ */
+describe("١) الحوار لا يبقى حاجزاً على الصفحة", () => {
+  const fn = clearHandler();
+
+  it("يُغلق في `finally` — مهما كان المخرج", () => {
+    expect(fn).toMatch(/finally \{[\s\S]*setClearConfirmOpen\(false\);/);
+  });
+
+  it("ولا يُغلق في مسار النجاح وحده", () => {
+    // كان الإغلاق قبل `navigate` فقط، فيبقى مفتوحاً عند كل فشل
+    const successOnly = /setClearConfirmOpen\(false\);\s*\n\s*navigate\(/.test(fn);
+    expect(successOnly).toBe(false);
+  });
+
+  it("و`AlertDialog` مودالٌ يغطّي الصفحة — فبقاؤه مفتوحاً هو «التعليق»", () => {
+    const src = read(QUOTE);
+    expect(src).toContain("<AlertDialog open={clearConfirmOpen}");
+  });
+});
+
+describe("٢) الشاشة تُفرَّغ بعد الحذف", () => {
+  const fn = clearHandler();
+
+  it("التفريغ قبل الانتقال لا بعده", () => {
+    const resetAt = fn.indexOf("resetQuoteForm()");
+    const navAt = fn.indexOf("navigate(isSideMode");
+    expect(resetAt).toBeGreaterThan(-1);
+    expect(navAt).toBeGreaterThan(resetAt);
+  });
+
+  /**
+   * `navigate("/quotes/create")` من `/quotes/edit/:id` لا يُعيد تركيب
+   * المكوّن — الراوتر يرى الصفحة نفسها فيبقي نسختها وحالتها. فتبقى البنود
+   * أمام العين بعد حذفها من القاعدة.
+   */
+  it("والمسارُ وحده لا يُفرّغ — لهذا لزم التفريغ صراحةً", () => {
+    const src = read(QUOTE);
+    expect(src).toContain("const resetQuoteForm = () => {");
+  });
+
+  it("والمساران — اليدويّ والحذف — على مُفرِّغٍ واحد", () => {
+    expect((fn.match(/resetQuoteForm\(\)/g) || []).length).toBe(2);
+  });
+
+  it("ويشمل البنود والعميل والرقم والخصم", () => {
+    const src = read(QUOTE);
+    const reset = src.slice(src.indexOf("const resetQuoteForm = () => {"), src.indexOf("};", src.indexOf("const resetQuoteForm")));
+    for (const setter of ["setRows([])", "setCustomer(null)", "setQuoteNumber(\"\")", "setGeneralDiscount(0)", "setQuickRow("]) {
+      expect(reset).toContain(setter);
+    }
+  });
+
+  it("ولا حقلَ يُفرَّغ في مسارٍ ويُنسى في الآخر — مصدرٌ واحد", () => {
+    // نسختان من التفريغ تنحرفان مع أوّل حقلٍ يُضاف
+    expect((read(QUOTE).match(/setQuoteWorkflowStatus\("draft"\)/g) || []).length).toBeLessThanOrEqual(2);
   });
 });
