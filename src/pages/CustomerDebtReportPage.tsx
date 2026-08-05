@@ -4,7 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import PrintVisibilityToolbar from "@/components/PrintVisibilityToolbar";
+
+/** ألوان الإشارة — نفس ألوان الكشف والطباعة: أخضر للعميل، أحمر عليه. */
+const TONE_COLOR: Record<"debit" | "credit" | "settled", string> = {
+  credit: "#16a34a",
+  debit: "#c0392b",
+  settled: "#111",
+};
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { signedAmountText } from "@/utils/buildCustomerAccountView";
 
 type DebtorRow = {
   id: string;
@@ -128,7 +136,7 @@ export default function CustomerDebtReportPage() {
           <span className="font-bold text-destructive">{totalNet.toLocaleString()}</span>
         </p>
         <p className="text-[11px] text-muted-foreground">
-          الصافي = المديونية من الفواتير − الرصيد الدائن للعميل.
+          صافي حساب كل عميل — ما له أو ما عليه.
         </p>
         {mismatchCount > 0 && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -145,17 +153,24 @@ export default function CustomerDebtReportPage() {
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">#</th>
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الاسم</th>
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground">عدد الفواتير</th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">المستحق من الفواتير</th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">رصيد دائن</th>
-                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">الصافي</th>
+                {/**
+                 * عمودُ الصافي وحده — لا تقسيمَ إلى «مستحق من الفواتير» و«رصيد
+                 * دائن». طلبه صاحب المستودع: «يظهر فقط صافي حساب العميل
+                 * الحالي، الذي أريده منهم أو الذي يريده مني».
+                 *
+                 * والتقسيم كان يُقرأ خطأً: رقمان متجاوران في صفٍّ واحد يوحيان
+                 * بمبلغَين مستحقَّين، والحقيقة أنّ أحدهما يُطرح من الآخر.
+                 * والتفصيل مكانه كشف الحساب، وزرُّه على السطر نفسه.
+                 */}
+                <th className="text-right px-4 py-3 font-semibold text-muted-foreground">صافي الحساب</th>
                 <th className="text-right px-4 py-3 font-semibold text-muted-foreground print:hidden">إجراءات</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+                <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               ) : (debtors || []).length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد مبالغ مستحقة</td></tr>
+                <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد مبالغ مستحقة</td></tr>
               ) : (
                 (debtors || []).map((c, i) => {
                   const mismatch = Math.abs(c.balance - c.computed_due) > 0.01;
@@ -165,17 +180,15 @@ export default function CustomerDebtReportPage() {
                       <td className="px-4 py-3 font-medium text-foreground">{c.name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{c.invoice_count}</td>
                       <td
-                        className={`px-4 py-3 text-foreground ${mismatch ? "text-amber-600 dark:text-amber-400" : ""}`}
-                        title={mismatch ? "المستحق من الفواتير لا يطابق الرصيد المسجّل — أعد الحساب" : ""}
+                        className="px-4 py-3 font-bold"
+                        style={{ color: TONE_COLOR[signedAmountText(-c.net_balance).tone] }}
+                        title={mismatch ? "الرصيد المسجّل لا يطابق الفواتير — أعد الحساب" : ""}
                       >
-                        {c.computed_due.toLocaleString()}
+                        {signedAmountText(-c.net_balance).text}
+                        <span className="ms-2 text-[11px] font-bold">
+                          {c.net_balance > 0 ? "عليه" : c.net_balance < 0 ? "له" : ""}
+                        </span>
                         {mismatch && <span className="mr-1">⚠️</span>}
-                      </td>
-                      <td className="px-4 py-3 text-emerald-600">
-                        {c.credit_balance > 0 ? c.credit_balance.toLocaleString() : "—"}
-                      </td>
-                      <td className="px-4 py-3 font-bold text-destructive">
-                        {c.net_balance.toLocaleString()}
                       </td>
                       <td className="px-4 py-3 print:hidden">
                         <a

@@ -219,9 +219,19 @@ const money = (n: number) => Math.abs(r2(n)).toLocaleString();
  * مقروءٌ من عمودَي «المدفوع» و«المتبقي» على نفس السطر. أمّا الحساب ورقم
  * العملية والطريقة فمكانها قسم **المعاملات** أسفل الكشف، حيث لكلٍّ عمودُه.
  */
+/**
+ * وصفُ الشحن في الكشف — **بلا لفظ «زائدة» أو «فائض»**.
+ *
+ * طلبه صاحب المستودع: «تأكّد من عدم وجود كلمة دفعة زائدة في أيّ مكان في كشف
+ * الحساب». وله وجهُه: العميل دفع مرّةً واحدة، والزيادة تفصيلٌ محاسبيّ داخليّ
+ * لا يعنيه — يعنيه أنّ له رصيداً. ولفظُ «زائدة» يوحي بخطأٍ في الدفع أو
+ * بمطالبةٍ ثانية، وكلاهما غير واقع.
+ *
+ * فكلُّ ما يزيد رصيدَ العميل — من شحنٍ أو من دفعةٍ فاضت عن فاتورتها — يُقال
+ * «تم شحن». والمصدرُ يبقى معروفاً في `kind` لمن يحتاجه برمجياً.
+ */
 function chargeLabel(entry: AccountEntry, amount: number): string {
-  const head = entry.kind === "overpay" ? "دفعة زائدة" : "تم شحن";
-  return `${head} +${money(amount)}`;
+  return `تم شحن +${money(amount)}`;
 }
 
 function accountOf(t: any, map?: Map<string, string>): string {
@@ -380,22 +390,23 @@ export function buildCustomerAccountView(input: BuildAccountViewInput): Customer
         id: `credit:${t.id}`,
         kind: isOverpay ? "overpay" : "credit_charge",
         ...st,
-        label: isOverpay ? "فائض دفعة → رصيد العميل" : "شحن رصيد للعميل",
+        // بلا لفظ «فائض»: ما يزيد رصيد العميل يُقال شحناً مهما كان مصدره
+        label: "شحن رصيد للعميل",
         customerText: isOverpay
-          ? `دفعتم زيادة ${money(amt)} عن قيمة الفاتورة — أُضيفت إلى رصيدكم لدينا`
+          ? `أُضيف ${money(amt)} إلى رصيدكم لدينا`
           : `تم شحن رصيدكم بمبلغ ${money(amt)} عن طريق ${acc}${opNo ? ` — رقم العملية ${opNo}` : ""}`,
         detail,
         effect: -r2(amt),
         runningBalance: 0,
         raw: t,
       };
-      // صندوق واحد للفائض: كل رصيد دائن — من شحن أو من دفعة زائدة — يدخل
+      // صندوق واحد: كل رصيد دائن — من شحنٍ أو من دفعةٍ فاضت عن فاتورتها — يدخل
       // نفس الصندوق القابل للتوزيع اليدوي. لا يُخصم من متبقّي فاتورة بعينها،
       // فلا يظهر المال نفسه مرّتين ولا يضيع الفائض إن حُذفت فاتورته.
       if (isOverpay && ref && invoiceIds.has(ref)) {
         linkedOverpayByInvoice.set(ref, r2((linkedOverpayByInvoice.get(ref) || 0) + amt));
         overpayFoldedIds.add(entry.id);
-        entry.label = `دفعة زائدة على فاتورة ${invoiceNoById.get(ref)} → رصيد العميل`;
+        entry.label = `رصيد للعميل من فاتورة ${invoiceNoById.get(ref)}`;
       }
       pool.push(entry);
       creditAdds.push({ entry, amount: r2(amt) });

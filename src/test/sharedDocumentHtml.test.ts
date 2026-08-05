@@ -134,19 +134,63 @@ describe("الرفض يصل العميل بلغته", () => {
   });
 });
 
-/** حراسة: الهجرة موجودة ومصرَّحٌ تنفيذها لقارئٍ بلا حساب. */
+/**
+ * حراسة: الهجرة موجودة ومصرَّحٌ تنفيذها لقارئٍ بلا حساب.
+ *
+ * **تُلتمس بمحتواها لا باسمها.** كان الفحص يبحث عن جزءٍ من اسم الملف، فلمّا
+ * طُبّقت الهجرة من لوحة لافابل خرجت باسمٍ آخر (طابعٌ زمنيّ وUUID) — واسمٌ
+ * لا يُطابق يعني فحصاً يسقط، أو أسوأ: ملفاً يُحذف وفحصاً يظنّ الدالّة ضائعة.
+ *
+ * والمحتوى هو الحقيقة: أيّ ملفٍّ يُعرّف الدالّة يُقبَل، مهما سُمّي.
+ */
 describe("دالّة القاعدة", () => {
-  it("الهجرة تمنح التنفيذ لـ`anon` وتتحقّق من انتهاء التوكن", async () => {
+  const migrationSql = async (): Promise<{ file: string; sql: string }> => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const dir = path.resolve(process.cwd(), "supabase/migrations");
-    const file = fs.readdirSync(dir).find((f) => f.includes("shared_document_payload_rpc"));
-    expect(file).toBeTruthy();
-    const sql = fs.readFileSync(path.join(dir, file!), "utf8");
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+    // الأحدث يُقرأ آخراً، فيغلب — كما تفعل القاعدة نفسها بـCREATE OR REPLACE
+    const hits = files
+      .map((f) => ({ file: f, sql: fs.readFileSync(path.join(dir, f), "utf8") }))
+      .filter((x) => /CREATE OR REPLACE FUNCTION public\.get_shared_document/.test(x.sql));
+    expect(hits.length, "لا هجرةَ تُعرّف get_shared_document").toBeGreaterThan(0);
+    return hits[hits.length - 1];
+  };
+
+  it("الهجرة تمنح التنفيذ لـ`anon` وتتحقّق من انتهاء التوكن", async () => {
+    const { sql } = await migrationSql();
     expect(sql).toContain("SECURITY DEFINER");
     expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION public\.get_shared_document\(text\) TO anon/);
     expect(sql).toContain("expires_at <= now()");
     // بحثٌ بالتوكن وحده — لا معرّف مستندٍ يأتي من المستدعي
     expect(sql).toContain("WHERE t.token = btrim(_token)");
+  });
+
+  /**
+   * ونسخةٌ واحدة لا ثلاث: كانت في المجلد ثلاثةُ ملفاتٍ تُعرّف الدالّة نفسها
+   * بنصٍّ متطابق. لا ضررَ منها في القاعدة (`CREATE OR REPLACE` يتحمّل
+   * التكرار) لكنّها تُربك القارئ: أيُّها الحقيقة؟ فحُذف الزائد.
+   */
+  it("ولا تُعرَّف في أكثر من هجرة", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const dir = path.resolve(process.cwd(), "supabase/migrations");
+    const defining = fs.readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .filter((f) => /CREATE OR REPLACE FUNCTION public\.get_shared_document/
+        .test(fs.readFileSync(path.join(dir, f), "utf8")));
+    expect(defining).toHaveLength(1);
+  });
+
+  /** والعقد الذي تقرؤه الواجهة — حقلاً بحقل، فلا يسقط أحدها بصمت. */
+  it("وتُعيد كل حقلٍ تقرؤه الصفحة", async () => {
+    const { sql } = await migrationSql();
+    for (const key of [
+      "doc_type", "hidden_sections", "doc", "items", "customer",
+      "company", "packaging", "packaging_items", "transports",
+      "prev_net", "current_net",
+    ]) {
+      expect(sql, `الحقل ${key} مفقود من الدالّة`).toContain(`'${key}',`);
+    }
   });
 });

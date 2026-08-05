@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useCompanySettings } from "@/hooks/useData";
+import ChargeBalanceDialog from "@/components/dashboard/ChargeBalanceDialog";
 import { Search, X, Printer, Loader2, ArrowRight, Pencil, Eye, EyeOff } from "lucide-react";
 import type { FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { startsWithAny } from "@/utils/searchMatch";
@@ -443,6 +444,33 @@ export default function CustomerStatementPage() {
   }, [cashMode, filteredTransactions]);
 
   const selectedCustomer = (customers || []).find((c: any) => c.id === selectedCustomerId);
+
+  /**
+   * شحن رصيد العميل من كشفه — بزرٍّ وباختصار `Shift+S`.
+   *
+   * كان الشحن يبدأ من لوحة التحكّم فيُختار العميل من قائمةٍ فيها المئات. ومن
+   * يقرأ كشف عميلٍ ويريد شحنه كان يغادر الكشف ليعود إليه — والعميل معروفٌ
+   * أمامه أصلاً. فصار الحوار يُفتح من هنا **مملوءاً به**.
+   *
+   * ولا يُكتب شيءٌ من هنا: الحوار نفسه بتحقّقاته كاملةً هو من يحفظ.
+   */
+  const [chargeOpen, setChargeOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key !== "S" && e.key !== "s") return;
+      // لا يختطف الكتابة: من يكتب حرفاً كبيراً في حقلٍ يقصد الحرف لا الاختصار
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable) return;
+      if (!selectedCustomerId) return;
+      e.preventDefault();
+      setChargeOpen((v) => !v);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedCustomerId]);
   const totalInvoices = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.total || 0), 0);
   const totalPaid = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.paid_amount || 0), 0);
 
@@ -590,7 +618,14 @@ export default function CustomerStatementPage() {
             { key: "statement", label: "البيان", align: "right" as const },
             { key: "total", label: "القيمة", numeric: true },
             { key: "paid", label: "المدفوع", numeric: true },
-            { key: "remaining", label: "المتبقي", align: "center" as const },
+            /**
+             * عمود «المتبقي» مخفيّ — طلبه صاحب المستودع صراحةً.
+             *
+             * وله وجهُه: المتبقّي على **سطرٍ واحد** ليس رصيد العميل، بل بقيّة
+             * فاتورةٍ بعينها. وقارئُ الكشف يقرأ آخر رقمٍ في السطر فيظنّه
+             * الرصيد — وهو ليس إيّاه. والرصيد الحقيقي في بطاقة «رصيد العميل
+             * الحالي» أعلى الكشف، وفي سطر المجموع.
+             */
           ],
           // جدول مسطّح: فاتورة / شحن رصيد / سداد منه — كلها أسطر متساوية.
           // الأعمدة الرقمية تستقبل رقماً أو "—" فقط — لا نص يُحوَّل إلى NaN.
@@ -675,6 +710,16 @@ export default function CustomerStatementPage() {
         </button>
       {selectedCustomer && (
         <div className="flex justify-end gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setChargeOpen(true)}
+            data-testid="statement-charge-btn"
+            title="شحن رصيد هذا العميل — Shift+S"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 print:hidden"
+          >
+            شحن رصيد
+            <kbd className="rounded border border-white/40 px-1 font-mono text-[10px]">Shift+S</kbd>
+          </button>
           <button
             type="button"
             onClick={() => setMovementsOpen(true)}
@@ -971,7 +1016,6 @@ export default function CustomerStatementPage() {
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">البيان</th>
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">القيمة</th>
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المدفوع</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المتبقي</th>
                 </tr></thead>
                 <tbody>
                   {isLoading ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
@@ -990,7 +1034,6 @@ export default function CustomerStatementPage() {
                       <td data-label="المدفوع" className="px-5 py-3 text-success tabular-nums">
                         {row.paid == null || row.paid < 0.009 ? "—" : row.paid.toLocaleString()}
                       </td>
-                      <td data-label="المتبقي" className="px-5 py-3"><AmountChip value={row.remaining} /></td>
                     </tr>
                     );
                   })}
@@ -1381,6 +1424,20 @@ export default function CustomerStatementPage() {
         currentNet={netBalanceOf(selectedCustomer)}
         onClose={() => setDeleteEntry(null)}
         onDeleted={refreshAfterRevise}
+      />
+
+      <ChargeBalanceDialog
+        open={chargeOpen}
+        onOpenChange={setChargeOpen}
+        onSaved={() => {
+          setChargeOpen(false);
+          // نفس الأحداث التي تُنعش الكشف عند أيّ تغيّرٍ في الحساب
+          try {
+            window.dispatchEvent(new Event("transactions:changed"));
+            window.dispatchEvent(new Event("customers:changed"));
+          } catch { /* noop */ }
+        }}
+        prefill={selectedCustomer ? { customerId: selectedCustomer.id, customerName: (selectedCustomer as any).name } : null}
       />
 
     </div>

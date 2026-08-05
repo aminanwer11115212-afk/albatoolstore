@@ -29,10 +29,29 @@ type Account = { id: string; name: string; bank_name: string | null; account_typ
 
 type Method = "cash" | "bank_transfer";
 
+/**
+ * تعبئةٌ مسبقة تأتي من شاشةٍ أخرى — العميل والمبلغ لا غير.
+ *
+ * الغرض اختصارُ خطواتٍ لا تخطّي حارس: كلُّ تحقّقات هذا الحوار تبقى كما هي
+ * (التحويل البنكي، والمبلغ الصفري، وقاعدة «الشحن يُخزَّن ولا يُوزَّع»). فمن
+ * كتب رقماً في شاشة الكشوفات يجده هنا مكتوباً، ويؤكّد من مسارٍ واحدٍ محكَم
+ * بدل مسارٍ ثانٍ يُعيد اختراع التحقّق ثم ينساه.
+ *
+ * والمبلغ **بإشارته**: موجبٌ شحنٌ للعميل، وسالبٌ خصمٌ عليه — نفس اصطلاح
+ * `isCustomerDebitAmount` المعتمد في النظام.
+ */
+export interface ChargePrefill {
+  customerId: string;
+  customerName?: string | null;
+  /** موجب = له (شحن) · سالب = عليه (خصم) */
+  amount?: number | null;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onSaved?: () => void;
+  prefill?: ChargePrefill | null;
 }
 
 /**
@@ -42,7 +61,7 @@ interface Props {
  * يُحدّث `credit_balance` و`net_balance` تلقائياً، فيصبح صافي دين العميل الإجمالي
  * أقل بمقدار المبلغ — بغضّ النظر عن أي فاتورة بعينها.
  */
-export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Props) {
+export default function ChargeBalanceDialog({ open, onOpenChange, onSaved, prefill }: Props) {
   const qc = useQueryClient();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
@@ -83,7 +102,19 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved }: Pro
       // الافتراضي دائماً «تحويل بنكي» عند كل فتح (لا نعتمد على آخر طريقة حتى
       // لا يتغيّر الافتراضي). زر التغيير يبقى يعمل واختيار المستخدم يتغلّب.
       setMethod("bank_transfer");
+
+      // التعبئة المسبقة بعد وصول القوائم — قبلها لا اسمَ يُعرض في الحقل
+      if (prefill?.customerId) {
+        setCustomerId(prefill.customerId);
+        const found = (cs || []).find((c: any) => c.id === prefill.customerId);
+        setCustomerSearch(String(prefill.customerName || (found as any)?.name || ""));
+        setShowCustomerSugg(false);
+        if (prefill.amount != null && Number.isFinite(Number(prefill.amount)) && Number(prefill.amount) !== 0) {
+          setAmount(String(prefill.amount));
+        }
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const bankOnly = bankAccounts.filter((a) => (a.account_type || "").toLowerCase() === "bank" && isAllowedBank(a));
