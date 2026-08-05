@@ -152,10 +152,11 @@ describe("أسماء ملفات PDF", () => {
     expect(html).toContain('<meta name="lov-customer-name" content="أمين اسماعيل">');
     expect(html).toContain('<meta name="lov-doc-number" content="INV-93158">');
     expect(html).toContain('<meta name="lov-doc-total" content="126000">');
-    // بانية الاسم تجمع الأربعة
-    expect(html).toContain("var parts = [docLabel, customerNm];");
-    expect(html).toContain("if (docNumber) parts.push(docNumber);");
+    // والبانية تأخذ منها اثنين فقط: العميل والمبلغ
+    expect(html).toContain("if (customerNm) parts.push(customerNm);");
     expect(html).toContain("if (docTotal) parts.push(docTotal);");
+    // والرقم بقي في meta ولم يعد يدخل الاسم
+    expect(html).not.toContain("parts.push(docNumber)");
   });
 
   it("مبلغ صفر أو غير صالح لا يُضاف للاسم", () => {
@@ -205,12 +206,12 @@ describe("كل مسارات PDF للفواتير تحمل المبلغ", () => {
 });
 
 describe("buildDocumentFileName", () => {
-  it("يجمع النوع والعميل والرقم والمبلغ", async () => {
+  it("يجمع العميل والمبلغ — ولا يجمع النوع ولا الرقم", async () => {
     const { buildDocumentFileName } = await import("@/utils/documentFileName");
     expect(buildDocumentFileName({
       docLabel: "فاتورة مبيعات", customerName: "أمين اسماعيل",
       docNumber: "INV-93158", total: 126000,
-    })).toBe("فاتورة مبيعات - أمين اسماعيل - INV-93158 - 126,000.pdf");
+    })).toBe("أمين اسماعيل - 126,000.pdf");
   });
 
   it("يتجاهل الأجزاء الفارغة والمبلغ الصفري", async () => {
@@ -221,8 +222,13 @@ describe("buildDocumentFileName", () => {
 
   it("يحوّل الأرقام العربية ويزيل المحارف الممنوعة", async () => {
     const { buildDocumentFileName } = await import("@/utils/documentFileName");
-    expect(buildDocumentFileName({ docLabel: "فاتورة", customerName: 'أ/ب:ج', docNumber: "INV-٩٩" }))
-      .toBe("فاتورة - أ ب ج - INV-99.pdf");
+    expect(buildDocumentFileName({ docLabel: "فاتورة", customerName: 'أ/ب:ج', total: "١٢٣٤" }))
+      .toBe("أ ب ج - 1,234.pdf");
+  });
+
+  it("وبلا عميلٍ ولا مبلغ يسقط إلى نوع المستند", async () => {
+    const { buildDocumentFileName } = await import("@/utils/documentFileName");
+    expect(buildDocumentFileName({ docLabel: "عرض سعر", docNumber: "QT-1" })).toBe("عرض سعر.pdf");
   });
 
   it("بلا أي جزء صالح يعطي اسماً محايداً لا فارغاً", async () => {

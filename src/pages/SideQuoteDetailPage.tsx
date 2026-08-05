@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { pickCustomerWhatsApp } from "@/utils/whatsapp";
+import { sendQuoteReminder } from "@/utils/quoteReminder";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -140,6 +141,15 @@ export default function SideQuoteDetailPage() {
               title="إرسال رابط المعاينة للعميل عبر واتساب"
             >
               إرسال للعميل
+            </button>
+            <button
+              className="btn-xs"
+              style={{ background: "#f59e0b", color: "#fff" }}
+              onClick={() => sendQuoteReminder((quote as any).customers)}
+              title="تنبيه العميل بمراجعة عرض السعر — واتساب على رقمه المسجّل"
+              data-testid="quote-reminder-btn"
+            >
+              🔔 تنبيه
             </button>
           </div>
         </div>

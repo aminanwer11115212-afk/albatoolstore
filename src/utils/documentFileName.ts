@@ -1,12 +1,24 @@
 /**
  * اسم موحّد لكل ملفات المستندات المُصدَّرة (PDF/صور).
  *
- * الشكل: «نوع المستند - اسم العميل - رقم المستند - المبلغ»
- *   فاتورة مبيعات - أمين اسماعيل - INV-93158 - 126,000.pdf
+ * الشكل: «اسم العميل - المبلغ»
+ *   أمين اسماعيل - 126,000.pdf
  *
  * كل مسار يُنتج ملفاً للعميل يمرّ من هنا: زر تحميل PDF في المعاينة، مشاركة
  * الواتساب، وصفحة رابط المشاركة التي يفتحها العميل بنفسه — فلا يصل إليه ملف
  * باسم عام مثل `document-a1b2c3d4.pdf` لا يدلّ على شيء.
+ *
+ * ## لماذا اسمان لا أربعة
+ * كان الاسم «نوع المستند - العميل - الرقم - المبلغ»، فيخرج:
+ *   `فاتورة مبيعات - أمين اسماعيل - INV-2026-00042 - 126,000.pdf`
+ * وطلب صاحب المستودع اختصاره إلى ما يميّز الملف فعلاً: «أيّ PDF ينزل أو
+ * يُشارَك الفاتورة من أيّ مكان يظهر بإسم العميل ومبلغ الفاتورة فقط».
+ *
+ * وله وجهُه: الملفات تصل الهاتف في قائمةٍ ضيّقة تقصّ آخر الاسم، فيرى المستخدم
+ * «فاتورة مبيعات - أمين اسم…» — نوعٌ يعرفه ورقمٌ لا يحفظه، ويضيع ما يميّزه.
+ * والاسمُ والمبلغ يكفيان للتمييز بين ملفَّين في نفس المجلد.
+ *
+ * والنوعُ والرقم لم يضيعا: هما في الورقة نفسها، وفي `meta` المستند.
  */
 
 const AR_DIGITS: Record<string, string> = {
@@ -39,9 +51,18 @@ export function cleanNamePart(raw: unknown): string {
   return s;
 }
 
-/** المبلغ بفواصل الآلاف — يُهمَل إن كان صفراً أو غير صالح. */
+/**
+ * المبلغ بفواصل الآلاف — يُهمَل إن كان صفراً أو غير صالح.
+ *
+ * ويُقرأ بالأرقام العربية أيضاً: القيمة تصل أحياناً نصّاً من `meta` الورقة أو
+ * من حقلٍ كتبه المستخدم بلوحة مفاتيح عربية، و`Number("١٢٣٤")` يعطي `NaN` —
+ * فيسقط المبلغ من اسم الملف بلا خطأ يُنبّه.
+ */
 export function formatAmountPart(total: unknown): string {
-  const n = Number(total);
+  const raw = typeof total === "string"
+    ? total.replace(/[٠-٩۰-۹]/g, (d) => AR_DIGITS[d] || d).replace(/,/g, "").trim()
+    : total;
+  const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) return "";
   return Math.round(n * 100) / 100 === Math.round(n)
     ? Math.round(n).toLocaleString("en-US")
@@ -49,28 +70,33 @@ export function formatAmountPart(total: unknown): string {
 }
 
 export interface DocFileNameParts {
-  /** نوع المستند: «فاتورة مبيعات» / «عرض سعر» / «كشف حساب عميل» */
+  /**
+   * نوع المستند: «فاتورة مبيعات» / «عرض سعر» / «كشف حساب عميل».
+   *
+   * لا يدخل الاسم — يُستعمل احتياطاً وحده حين لا عميلَ ولا مبلغ (مستندٌ
+   * داخلي، أو معاينةٌ قبل اختيار العميل)، فلا يخرج ملفٌّ اسمه «مستند.pdf».
+   */
   docLabel?: unknown;
   customerName?: unknown;
+  /** رقم المستند — محفوظٌ في الورقة و`meta`، ولا يدخل اسم الملف. */
   docNumber?: unknown;
-  /** إجمالي المستند — يُضاف آخر الاسم */
+  /** إجمالي المستند */
   total?: unknown;
   /** امتداد بلا نقطة (افتراضي pdf) */
   ext?: string;
 }
 
-/** يبني اسم الملف الكامل من أجزائه، مع تجاهل الأجزاء الفارغة. */
+/** يبني اسم الملف من اسم العميل والمبلغ، مع تجاهل الأجزاء الفارغة. */
 export function buildDocumentFileName(parts: DocFileNameParts): string {
   const ext = parts.ext || "pdf";
   const chunks = [
-    cleanNamePart(parts.docLabel),
     cleanNamePart(parts.customerName),
-    cleanNamePart(parts.docNumber),
     formatAmountPart(parts.total),
   ].filter(Boolean);
 
   let name = chunks.join(" - ").trim();
-  if (!name) name = "مستند";
+  // بلا عميلٍ ولا مبلغ: نوع المستند خيرٌ من «مستند» مجرّدة
+  if (!name) name = cleanNamePart(parts.docLabel) || "مستند";
   // حدّ آمن لأسماء الملفات
   if (name.length > 120) name = name.slice(0, 120).trim();
   return `${name}.${ext}`;

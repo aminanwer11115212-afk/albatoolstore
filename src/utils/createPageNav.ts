@@ -3,7 +3,19 @@
  * (Quote / Invoice / Purchase / Stock Return).
  *
  * Flow:
- *   Customer/Supplier  ⇅  Quick row  ⇅  Items table rows
+ *   Quick row  ⇅  Items table rows
+ *
+ * ## حقلُ اسم العميل خارج مسار الأسهم — بالماوس وحده
+ * طلبه صاحب المستودع: «اسحب التنقّل من اسم العميل في شاشات الإدخال كلّها، بل
+ * اضغط عليه بالماوس».
+ *
+ * وله سببٌ عملي: السطر الأوّل من البنود هو أكثر ما يُطرَق بالسهم لأعلى، وكان
+ * السهم يقفز منه إلى صفّ الإضافة ثم إلى **اسم العميل** — فيجد المستخدم نفسه
+ * داخل حقلٍ فيه اسمٌ مضبوط، وأوّل حرفٍ يكتبه يستبدله. والعميل حقلٌ يُملأ مرّةً
+ * في أوّل الفاتورة ثم لا يُمسّ، أمّا البنود فتُطرَق عشرات المرّات — فلا معنى
+ * لأن يشتركا في مسارٍ واحد.
+ *
+ * فالحقل يبقى مقصوداً بالماوس أو بـTab، ولا يصله سهمٌ ولا يخرج منه سهم.
  *
  * Header chips, dates, currency selector, totals row and action buttons
  * are deliberately excluded from the Arrow path — they stay reachable via
@@ -129,11 +141,10 @@ export function useCreatePageNav(opts: CreatePageNavOptions) {
       const customerEl = customerRef.current;
       const zone = detectZone(target, customerEl, itemsTableId);
 
+      // حقل العميل يملك أسهمه: لا يُقفَز منه ولا إليه — يُقصَد بالماوس أو Tab.
+      if (zone.kind === "customer") return;
+
       if (e.key === "ArrowDown") {
-        if (zone.kind === "customer") {
-          if (focusEl(findQuickInput(root, "product"))) e.preventDefault();
-          return;
-        }
         if (zone.kind === "quick") {
           // Use the same column (if it exists in the items table), else fall back to product.
           const col = quickCols.includes(zone.col) ? zone.col : "product";
@@ -150,9 +161,8 @@ export function useCreatePageNav(opts: CreatePageNavOptions) {
       }
 
       if (e.key === "ArrowUp") {
-        if (zone.kind === "customer") return;
         if (zone.kind === "quick") {
-          if (focusEl(customerEl)) e.preventDefault();
+          // نهاية المسار لأعلى: صفّ الإضافة. وما فوقه — اسم العميل — بالماوس.
           return;
         }
         if (zone.kind === "item") {
@@ -164,7 +174,8 @@ export function useCreatePageNav(opts: CreatePageNavOptions) {
           return;
         }
         if (zone.kind === "other") {
-          if (focusEl(customerEl)) e.preventDefault();
+          // كان يقفز إلى اسم العميل — صار إلى صفّ الإضافة، أوّلِ المسار.
+          if (focusEl(findQuickInput(root, "product"))) e.preventDefault();
           return;
         }
       }

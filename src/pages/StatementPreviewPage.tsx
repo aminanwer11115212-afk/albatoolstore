@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Printer, Download, MessageCircle, FileText, Eye, EyeOff, Link as LinkIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { generateStatementHTML, type StatementData } from "@/utils/statementPrintTemplate";
+import { buildDocumentFileName, cleanNamePart } from "@/utils/documentFileName";
 import { openWhatsApp, buildWhatsAppDeepLink } from "@/utils/whatsapp";
 
 /**
@@ -123,7 +124,8 @@ export default function StatementPreviewPage() {
     wrap.appendChild(clone);
     const opt = {
       margin: 8,
-      filename: `${docTitle}.pdf`,
+      // نفس اسم زرّ التنزيل — لا اسمان لملفٍّ واحد
+      filename: buildWaFileNameForStatement("pdf"),
       image: { type: "jpeg", quality: 0.95 },
       html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
@@ -131,25 +133,24 @@ export default function StatementPreviewPage() {
     return await win.html2pdf().set(opt).from(wrap).outputPdf("blob");
   };
 
-  // ===== اسم الملف الموحَّد بنفس منطق buildWaFileName في printTemplate =====
+  /**
+   * اسم ملف الكشف — من `buildDocumentFileName` لا من نسخةٍ محلّية.
+   *
+   * كانت هنا نسخةٌ ثالثة من منظّف الأسماء (خريطة الأرقام العربية، والمحارف
+   * الممنوعة، وحدّ الطول) — والثلاث تنحرف عن بعضها مع أوّل تعديل. صار
+   * التنظيف في مصدره، وبقي للكشف ما يخصّه: أنه يُسمّى **بنوعه واسم صاحبه**
+   * لا بمبلغ، إذ ليس للكشف مبلغٌ واحد يميّزه كما للفاتورة.
+   */
   const buildWaFileNameForStatement = (ext: string): string => {
-    const digitMap: Record<string, string> = {
-      "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
-      "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9",
-    };
-    const clean = (raw?: string): string => {
-      let s = (raw || "").trim();
-      if (!s || s === "-" || s === "—" || s === "_" || s === "undefined" || s === "null") return "";
-      s = s.replace(/[٠-٩۰-۹]/g, (d) => digitMap[d] || d);
-      s = s.replace(/[\\/:*?"<>|\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
-      return s;
-    };
-    const docLabel   = clean(data?.kind === "customer" ? "كشف حساب عميل" : data?.kind === "supplier" ? "كشف حساب مورد" : "كشف حساب") || "مستند";
-    const customerNm = clean(data?.party?.name) || "بدون اسم";
-    let name = `${docLabel} - ${customerNm}`.trim();
-    if (!name) name = "document";
-    if (name.length > 120) name = name.slice(0, 120).trim();
-    return `${name}.${ext}`;
+    const label =
+      data?.kind === "customer" ? "كشف حساب عميل"
+      : data?.kind === "supplier" ? "كشف حساب مورد"
+      : "كشف حساب";
+    const party = cleanNamePart(data?.party?.name);
+    return buildDocumentFileName({
+      docLabel: party ? `${label} - ${party}` : label,
+      ext,
+    });
   };
 
   const handleDownloadPdf = async () => {

@@ -17,7 +17,7 @@ import {
   deriveRowRate,
 } from "@/utils/invoiceCreateHelpers";
 import { toast } from "sonner";
-import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck, Eye, FileDown } from "lucide-react";
+import { Plus, Edit, Printer, Image as ImageIcon, MessageCircle, FileText, StickyNote, Package, Truck, Eye, FileDown, BellRing } from "lucide-react";
 import StatusButton, { QUOTE_STATUS_OPTIONS } from "@/components/StatusButton";
 import RecentItemsSidebar from "@/components/RecentItemsSidebar";
 import { useDocPrintShortcuts } from "@/hooks/useDocPrintShortcuts";
@@ -30,6 +30,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { generateWhatsAppLink, openWhatsApp, pickCustomerWhatsApp} from "@/utils/whatsapp";
+import { sendQuoteReminder } from "@/utils/quoteReminder";
 import { getLatestRate } from "@/utils/currency";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadQuoteExtras } from "@/utils/printExtras";
@@ -2064,6 +2065,34 @@ export default function QuoteCreatePage() {
                       style={btnStyle("#10b981")}
                     >
                       <MessageCircle size={14} /> إرسال للعميل
+                    </button>
+                  ),
+                },
+
+                /**
+                 * === تنبيه ===
+                 *
+                 * رسالةُ متابعةٍ بعد إرسال العرض: تفتح واتساب على رقم العميل
+                 * المسجَّل في العرض مباشرةً — بضغطةٍ واحدة بلا حوارٍ ولا نسخ.
+                 *
+                 * ونصّها في `quoteReminder` وحده، والزرّ هنا وفي شاشات إدارة
+                 * العروض ينادي الدالّة نفسها.
+                 *
+                 * وهذا الزرّ يخدم **العرض الجانبي أيضاً**: صفحته غلافٌ حول هذه
+                 * الشاشة (`SideQuoteCreatePage` تُصيّر `QuoteCreatePage`)، فما
+                 * يُضاف هنا يظهر فيها بلا نسخة ثانية.
+                 */
+                {
+                  id: "quote-reminder",
+                  group: "3-share",
+                  node: (
+                    <button
+                      onClick={() => sendQuoteReminder(customer as any)}
+                      title="تنبيه العميل بمراجعة عرض السعر — واتساب على رقمه المسجّل"
+                      style={btnStyle("#f59e0b")}
+                      data-testid="quote-reminder-btn"
+                    >
+                      <BellRing size={14} /> تنبيه
                     </button>
                   ),
                 },
