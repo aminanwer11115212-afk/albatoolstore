@@ -23,6 +23,8 @@ import { openWhatsApp } from "@/utils/whatsapp";
 
 type Focusable = { focus: () => void } | null;
 import TableColsControl from "@/components/common/TableColsControl";
+import { MIN_FONT_PX } from "@/utils/printDensity";
+import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
 import { useProductColsPref, PRODUCTS_MIDDLE_KEYS, type ProductColKey } from "@/hooks/useProductColsPref";
 import { useColumnWidths, ColumnResizeHandle, useSharedColsLocked, COLS_BTN_SAVE_LABEL, COLS_BTN_EDIT_LABEL, COLS_BTN_SAVE_TITLE, COLS_BTN_EDIT_TITLE, COLS_TOAST_SAVED, COLS_TOAST_EDIT_MODE, COLS_TOAST_SAVE_FAILED } from "@/hooks/useColumnWidths";
 import { userScopedLegacyKey } from "@/lib/userScopedKey";
@@ -1149,6 +1151,9 @@ export default function ProductsPage() {
     return rows;
   }, [filtered, pv]);
 
+  /** اسم ملف الكتالوج — مصدرٌ واحد لكل مخارجه. */
+  const CATALOG_PDF_NAME = "كتالوج-المنتجات.pdf";
+
   const exportFilteredPdf = async (mode: "print" | "preview" | "share" = "print", listOverride?: any[]) => {
     if (isExportingPdf) return;
     const list = listOverride || (filtered as any[]);
@@ -1209,8 +1214,17 @@ export default function ProductsPage() {
         : extraCols === 2 ? 85
         : extraCols === 3 ? 60
         : 40;
-      const rowFontPx = extraCols === 0 ? 15 : extraCols <= 2 ? 13 : 11;
-      const nameFontPx = extraCols === 0 ? 17 : extraCols <= 2 ? 14 : 12;
+      /**
+       * حجم الخطّ في الكتالوج — «لازم يكون كبير وواضح في الـPDF دا».
+       *
+       * كان ينزل إلى 11px مع خمسة أعمدة، وهو مقاسٌ يُقرأ على الشاشة ولا يُقرأ
+       * مطبوعاً ولا مصغَّراً على الهاتف. فرُفعت الدرجات كلّها، وصار **أدناها
+       * `MIN_FONT_PX`** — نفس أرضية القراءة التي تلتزمها ورقة الفاتورة، فلا
+       * ورقتان في النظام بأرضيتين.
+       */
+      const rowFontPx = Math.max(MIN_FONT_PX, extraCols === 0 ? 19 : extraCols <= 2 ? 17 : 14);
+      const nameFontPx = Math.max(MIN_FONT_PX, extraCols === 0 ? 22 : extraCols <= 2 ? 19 : 16);
+      const headFontPx = Math.max(MIN_FONT_PX, rowFontPx - 1);
 
       const priceFmt = (n: any) => Number(n || 0).toLocaleString("ar-EG");
       // ترتيب الخلايا: # → الاسم (يمين) → الصورة (يسار الاسم) → باقي الأعمدة.
@@ -1301,7 +1315,7 @@ export default function ProductsPage() {
     font-size: ${rowFontPx}px; line-height: 1.2;
   }
   table.products thead th {
-    background: #5b4cad; color: #fff; font-weight: 800; font-size: 12px;
+    background: #5b4cad; color: #fff; font-weight: 800; font-size: ${headFontPx}px;
     padding: 6px 6px;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
@@ -1367,41 +1381,7 @@ export default function ProductsPage() {
       <tbody>${rows}</tbody>
     </table>
   </div>
-  ${mode === "share" ? `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
-  <script>
-    (function() {
-      function waitImgs() {
-        const imgs = Array.from(document.images);
-        return Promise.all(imgs.map(img => img.complete ? Promise.resolve() :
-          new Promise(res => { img.onload = img.onerror = () => res(null); })));
-      }
-      window.addEventListener('load', async () => {
-        try {
-          await waitImgs();
-          const el = document.querySelector('.page');
-          const opt = {
-            margin: [6, 4, 8, 4],
-            filename: 'كتالوج-المنتجات.pdf',
-            image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, useCORS: true, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['css', 'legacy'] }
-          };
-          const blob = await window.html2pdf().set(opt).from(el).outputPdf('blob');
-          const file = new File([blob], 'كتالوج-المنتجات.pdf', { type: 'application/pdf' });
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: 'كتالوج المنتجات' });
-            setTimeout(() => window.close(), 400);
-          } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'كتالوج-المنتجات.pdf'; a.click();
-            setTimeout(() => { URL.revokeObjectURL(url); window.close(); }, 800);
-          }
-        } catch (e) { console.error(e); alert('تعذّرت مشاركة الملف — يمكنك الطباعة/الحفظ يدوياً.'); }
-      });
-    })();
-  <\/script>` : mode === "print" ? `<script>
+  ${mode === "print" ? `<script>
     window.addEventListener('load', () => {
       const imgs = Array.from(document.images);
       Promise.all(imgs.map(img => img.complete ? Promise.resolve() :
@@ -1411,6 +1391,64 @@ export default function ProductsPage() {
   </script>` : ``}
 </body>
 </html>`;
+      /**
+       * المشاركة تُبنى **داخل التطبيق** لا في نافذةٍ منبثقة.
+       *
+       * كان زرّ المشاركة يفتح نافذةً تُحمّل `html2pdf` من CDN خارجي ثم تشارك
+       * وتُغلق نفسها. فحين يُحجب الـCDN — بسياسة شبكةٍ أو انقطاع — يسقط
+       * السكربت بصمت، **فتبقى النافذة مفتوحةً على الكتالوج كأنها معاينة**،
+       * وهو ما اشتكى منه صاحب المستودع حرفاً: «الزرّ بتاع المشاركة دا مفروض
+       * يشارك، هو بفتح زي المعاينة عادي».
+       *
+       * والمكتبة موجودةٌ في حزمة التطبيق أصلاً — تُستورَد كسولاً في كل مسارات
+       * الـPDF الأخرى. فلا معنى لجلبها من الشبكة، ولا لتعليق المشاركة على
+       * نافذةٍ قد يحجبها المتصفّح.
+       */
+      if (mode === "share") {
+        const host = document.createElement("div");
+        // خارج الشاشة لا مخفيّاً: `display:none` يجعل القياس صفراً فتخرج
+        // الورقة فارغة — وهي علّةٌ تشبه ما كان يقع في الفاتورة الكبيرة.
+        host.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;background:#fff;";
+        host.innerHTML = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf("</body>"));
+        document.body.appendChild(host);
+        try {
+          // انتظار الصور: صورةٌ لم تُحمَّل تُصوَّر فارغة
+          await Promise.all(Array.from(host.querySelectorAll("img")).map((img) =>
+            img.complete ? Promise.resolve() : new Promise((res) => { img.onload = img.onerror = () => res(null); })));
+          const html2pdf = (await import("html2pdf.js")).default;
+          const target = host.querySelector<HTMLElement>(".page") || host;
+          const blob: Blob = await html2pdf()
+            .set({
+              margin: [6, 4, 8, 4],
+              filename: CATALOG_PDF_NAME,
+              image: { type: "jpeg", quality: 0.95 },
+              html2canvas: { scale: pdfScaleForElement(target), useCORS: true, logging: false },
+              jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+              pagebreak: { mode: ["css", "legacy"] },
+            } as any)
+            .from(target)
+            .outputPdf("blob");
+
+          const file = new File([blob], CATALOG_PDF_NAME, { type: "application/pdf" });
+          const nav: any = navigator;
+          if (nav.canShare?.({ files: [file] })) {
+            await nav.share({ files: [file], title: "كتالوج المنتجات" });
+            toast.success("تمت المشاركة", { id: toastId });
+          } else {
+            // لا مشاركةَ ملفات (سطح المكتب غالباً): ينزل الملف باسمه
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = CATALOG_PDF_NAME;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            toast.success(`تم تنزيل «${CATALOG_PDF_NAME}» — أرفقه في واتساب`, { id: toastId });
+          }
+        } finally {
+          host.remove();
+        }
+        return;
+      }
+
       const w = window.open("", "_blank");
       if (!w) { toast.error("افتح نافذة المتصفح المنبثقة", { id: toastId }); return; }
       w.document.write(html);

@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
 import { toast } from "sonner";
-import { startsWithAny, startsWithMatch, leadsWithMatch } from "@/utils/searchMatch";
+import { startsWithAny, startsWithMatch, leadsWithMatch, leadsWithAny } from "@/utils/searchMatch";
 import { applyStockDeltaForLines } from "@/utils/stockDeduction";
 import { Plus, Edit, Printer, StickyNote } from "lucide-react";
 import StatusButton, { STOCK_RETURN_STATUS_OPTIONS } from "@/components/StatusButton";
@@ -418,9 +418,19 @@ export default function StockReturnCreatePage() {
   }, [editId, navigate]);
 
   // ---------- Customer search ----------
+  /**
+   * «يبدأ بـ» على الاسم كاملاً — لا على بداية كلمةٍ في وسطه.
+   *
+   * طلبه صاحب المستودع: «بحث اسم العميل في الفاتورة، لمّا تكتب الاسم يجيك
+   * طوالي، ما يديك ما يحتوي على الحرف». وهي القاعدة نفسها المطبَّقة في بحث
+   * المنتجات — فيألف المستخدم سلوكاً واحداً في الشاشة الواحدة.
+   *
+   * وثمنُها موثّق: من يبحث عن «أحمد» في «محمد أحمد» لن يجده — يكتب أوّل
+   * الاسم. وهذا ما طُلب صراحةً، والبديل (بداية أيّ كلمة) هو ما اشتُكي منه.
+   */
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    return customers.filter((c) => startsWithAny([c.name, c.phone], customerSearch)).slice(0, 8);
+    return customers.filter((c) => leadsWithAny([c.name, c.phone], customerSearch)).slice(0, 8);
   }, [customerSearch, customers]);
 
   function pickCustomer(c: Customer) {

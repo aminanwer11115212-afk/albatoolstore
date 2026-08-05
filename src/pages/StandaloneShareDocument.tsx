@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from "react";
 import { buildDocumentFileName } from "@/utils/documentFileName";
 import { useDocumentFrameFit } from "@/utils/documentFrameFit";
+import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
 import DocumentFrameZoom from "@/components/common/DocumentFrameZoom";
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL as string;
@@ -148,7 +149,8 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
           // `document-<token>` الذي لا يدلّ العميل على شيء.
           filename: pdfFileNameFrom(doc, token),
           image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+          // الدقّة من حجم الورقة لا رقماً ثابتاً — راجع `pdfCanvasScale`
+          html2canvas: { scale: pdfScaleForElement(body), useCORS: true, backgroundColor: "#ffffff" },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         } as any)
         .from(body)

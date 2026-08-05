@@ -73,6 +73,7 @@ import { resolveLogoUrl } from "@/utils/albatoolLogo";
 import { computeDocumentBalance } from "@/utils/documentBalanceSummary";
 import { signedAmountText } from "@/utils/buildCustomerAccountView";
 import { printDensity, densityClass, DENSITY_CSS } from "@/utils/printDensity";
+import { PDF_SCALE_INLINE_JS } from "@/utils/pdfCanvasScale";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -952,13 +953,16 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     wrap.appendChild(clone);
     return wrap;
   }
+  ${PDF_SCALE_INLINE_JS}
   function genPdfBlob(){
     var el = contentEl();
     var opt = {
       margin: 8,
       filename: buildDocFileName(),
       image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      // الدقّة من حجم الورقة لا رقماً ثابتاً: الثابتة تتجاوز سقف لوحة الرسم
+      // في المستند الطويل فيخرج الملف فارغاً. راجع pdfCanvasScale.
+      html2canvas: { scale: __lovPdfScale(el.scrollWidth, el.scrollHeight), useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
     return window.html2pdf().set(opt).from(el).outputPdf('blob');

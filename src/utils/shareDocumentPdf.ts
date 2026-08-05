@@ -16,6 +16,7 @@
  * المُرسِل. اختبار في `shareDocumentPdf.test.ts` يقارن الفروع الثلاثة.
  */
 import { buildDocumentFileName } from "@/utils/documentFileName";
+import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
 import { buildWhatsAppDeepLink } from "@/utils/whatsapp";
 
 export interface SharePdfInput {
@@ -82,7 +83,7 @@ export async function buildPdfBlob(html: string): Promise<Blob> {
       .set({
         margin: 8,
         image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: { scale: pdfScaleForElement(host), useCORS: true, logging: false },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       } as any)
       .from(host)
