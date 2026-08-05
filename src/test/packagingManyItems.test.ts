@@ -73,13 +73,14 @@ describe("البنود الكثيرة تصل الورقة كاملة", () => {
 
   it("عدد الصفوف = عدد البنود (لا دمج ولا إسقاط)", () => {
     // صفُّ الترويسة + عشرون بنداً + صفُّ المجموع
-    expect(packagingInfo.match(/<tr[ >]/g)).toHaveLength(22);
+    expect(packagingInfo.match(/<tr[ >]/g)).toHaveLength(21);
   });
 
   it("والمجموع في الذيل = مجموع الطرود", () => {
     const total = manyItems.reduce((s, r) => s + r.packs_count, 0);
-    expect(packagingInfo).toContain("عدد القطع");
-    expect(packagingInfo).toContain(`>${total}<`);
+    expect(packagingInfo).toContain("قطعة");
+    // السطر الأخير: «210 قطعة» — لا خليّةَ مستقلّة للرقم بعد صيرورته سطراً
+    expect(packagingInfo).toContain(`${total} قطعة`);
   });
 
   it("مئة بند لا تكسر شيئاً", () => {

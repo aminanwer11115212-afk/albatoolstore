@@ -93,30 +93,55 @@ describe("أكثر من عشرين: كلٌّ بعرض الورقة، والتر�
  * عمود «العدد» إلى اليمين — أوّل ما تقع عليه العين في RTL، وهو المطلوب عند
  * التحميل: تعدّ الطرود ثم تقرأ نوعها. طلبه صاحب المستودع صراحةً.
  */
-describe("ترتيب أعمدة جدول التغليف", () => {
+/**
+ * ## الشكل بعد صورة صاحب المستودع
+ * أسطرٌ لا جدولٌ بعمودين: «2 كرتونة بطارية *10»، والمجموع «20 قطعة» تحته خطّ.
+ */
+describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
   const table = formatPackaging([], pkgItems(3))!;
 
-  it("«العدد» قبل «نوع التغليف» في الترويسة", () => {
-    expect(table.indexOf("العدد")).toBeLessThan(table.indexOf("نوع التغليف"));
+  it("لا ترويسةَ أعمدة", () => {
+    expect(table).not.toContain("نوع التغليف");
+    expect(table).not.toContain("<thead>");
   });
 
-  it("وفي صفوف البنود كذلك: الرقم أوّلاً ثم النوع", () => {
-    const firstRow = table.split("<tbody>")[1].split("</tr>")[0];
-    expect(firstRow.indexOf("text-align:center")).toBeLessThan(firstRow.indexOf("text-align:right"));
+  it("والسطر: العدد ثم النوع ثم الصنف", () => {
+    expect(table).toContain("1 كيس صنف 1");
   });
 
-  it("وفي صفّ المجموع: الرقم ثم «عدد القطع»", () => {
-    // المجموع صار صفّاً في المتن لا في `tfoot` — كي لا يتكرّر على كل صفحة
-    const foot = table.slice(table.lastIndexOf("<tr"));
+  it("و«‎*‎عدد» للقطع في الطرد — لا «X» في طرف الخانة", () => {
+    const many = formatPackaging([], [{ packaging_types: { name: "كرتونة" }, product_name: "بطارية", packs_count: 2, pieces_per_pack: 10, quantity: 1 }])!;
+    expect(many).toContain("2 كرتونة بطارية *10");
+    expect(many).not.toContain("10X");
+  });
+
+  it("والقطعةُ الواحدة لا تُذكر — ضجيجٌ على كل سطر", () => {
+    const one = formatPackaging([], [{ packaging_types: { name: "كيس" }, product_name: "صنف", packs_count: 3, pieces_per_pack: 1, quantity: 1 }])!;
+    expect(one).toContain("3 كيس صنف");
+    expect(one).not.toContain("*1");
+  });
+
+  it("والخطّ عريضٌ — ورقةٌ تُقرأ في المخزن لا على شاشة", () => {
+    expect(table).toContain("font-weight:700");
+  });
+
+  /**
+   * القالبان يحملان `tbody td { text-align:center }` وتظليلَ الصفوف الزوجية،
+   * وترثهما أسطرُ التغليف لأنها `<tr><td>` داخلهما. فخرجت في أوّل تصييرٍ
+   * وسطَ الصندوق مخطّطةً بالرمادي بدل أسطرٍ متتاليةٍ من اليمين — ولا يكشفه
+   * إلا تصييرُ الورقة، فيُثبَّت هنا حارساً.
+   */
+  it("والأسطر من اليمين بخلفيةٍ بيضاء — لا وسطَ الصندوق ولا مخطّطة", () => {
+    expect(table).toContain("text-align:right");
+    expect(table).toContain("background:#fff");
+    expect(table).not.toContain("text-align:center");
+  });
+
+  it("والمجموع سطرٌ أخير تحته خطّ", () => {
     const total = pkgItems(3).reduce((s, r) => s + r.packs_count, 0);
-    expect(foot.indexOf(String(total))).toBeLessThan(foot.indexOf("عدد القطع"));
-  });
-
-  it("ويظهر الترتيب نفسه في الورقة المطبوعة", () => {
-    const html = sheet(3);
-    const box = html.split('data-section="packaging"')[1].split("</div>")[0]
-      + html.split('data-section="packaging"')[1].slice(0, 4000);
-    expect(box.indexOf("العدد")).toBeLessThan(box.indexOf("نوع التغليف"));
+    const last = table.slice(table.lastIndexOf("<tr"));
+    expect(last).toContain(`${total} قطعة`);
+    expect(last).toContain("border-top");
   });
 });
 
@@ -326,8 +351,8 @@ describe("مجموع القطع لا يتكرّر على الصفحات", () => 
 
   it("والمجموع آخرُ صفٍّ في المتن", () => {
     const lastRow = table.slice(table.lastIndexOf("<tr"));
-    expect(lastRow).toContain("عدد القطع");
-    expect(table.indexOf("عدد القطع")).toBeGreaterThan(table.indexOf("<tbody>"));
+    expect(lastRow).toContain("قطعة");
+    expect(table.indexOf("قطعة")).toBeGreaterThan(table.indexOf("<tbody>"));
   });
 
   it("ولا ينقسم عن سطره السابق فيقع وحيداً أعلى صفحة", () => {
@@ -342,20 +367,20 @@ describe("مجموع القطع لا يتكرّر على الصفحات", () => 
 
   it("والمجموع رقمٌ واحد صحيح مهما كثرت البنود", () => {
     const total = pkgItems(40).reduce((s, r) => s + r.packs_count, 0);
-    expect((table.match(new RegExp(`>${total}<`, "g")) || []).length).toBeGreaterThanOrEqual(1);
+    expect(table).toContain(`${total} قطعة`);
   });
 });
 
 describe("والجدول ملمومٌ لا مطّاطي", () => {
   const table = formatPackaging([], pkgItems(7))!;
 
-  it("حشوٌ ضيّق", () => {
-    expect(table).toContain("padding:2px 6px");
-    expect(table).not.toContain("padding:3px 6px");
+  it("حشوٌ ضيّق وسطرٌ قريب — لا يرث 1.5 من الجسم فيضاعف ارتفاع السطر", () => {
+    expect(table).toContain("padding:1px 0");
+    expect(table).toContain("line-height:1.6");
   });
 
-  it("وسطرٌ قريب — لا يرث 1.5 من الجسم فيضاعف ارتفاع الصفّ", () => {
-    expect(table).toContain("line-height:1.25");
+  it("وبلا حدودٍ للخلايا — الصورة أسطرٌ لا شبكة", () => {
+    expect(table).toContain("border:0");
   });
 
   it("والصندوق بقدر ما فيه — بلا ارتفاعٍ أدنى مفروض", () => {
