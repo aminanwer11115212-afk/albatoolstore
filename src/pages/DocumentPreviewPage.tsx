@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoiceDue } from "@/utils/invoiceDue";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,8 @@ import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
 import { toast } from "sonner";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { netBeforeInvoice } from "@/utils/customerNetBefore";
+import { useDocumentFrameFit } from "@/utils/documentFrameFit";
+import DocumentFrameZoom from "@/components/common/DocumentFrameZoom";
 
 /**
  * صفحة معاينة داخلية للمستندات (عرض سعر / فاتورة).
@@ -402,6 +404,13 @@ export default function DocumentPreviewPage({ docType }: Props) {
     [docType],
   );
 
+  /**
+   * الورقة تُلائم عرض الإطار — نفس ما يراه العميل في رابطه بالضبط.
+   * قاعدة الورقة الواحدة تشمل شكلَ عرضها لا تنسيقَها وحده.
+   */
+  const previewFrameRef = useRef<HTMLIFrameElement>(null);
+  const frameFit = useDocumentFrameFit(previewFrameRef, [html]);
+
   return (
     <div dir="rtl" style={{ height: "calc(100vh - 80px)", display: "flex", flexDirection: "column" }}>
       {/* يلتفّ على الهاتف بدل أن ينضغط: بلا `flex-wrap` كانت العناصر تُعصر حتى
@@ -425,6 +434,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
         >
           {toolsOpen ? <EyeOff size={14} /> : <Eye size={14} />} تفاصيل
         </button>
+        <DocumentFrameZoom fit={frameFit} />
         <div
           className={`w-full sm:w-auto sm:ms-auto flex-wrap items-center gap-2 ${
             toolsOpen ? "flex" : "hidden sm:flex"
@@ -534,9 +544,11 @@ export default function DocumentPreviewPage({ docType }: Props) {
       )}
       {!loading && !error && (
         <iframe
+          ref={previewFrameRef}
           title={title}
           srcDoc={html}
           onLoad={(e) => {
+            frameFit.refit();
             // دعم autoprint=1 لطباعة مباشرة عبر اختصار F10
             if (search.get("autoprint") === "1") {
               try {
