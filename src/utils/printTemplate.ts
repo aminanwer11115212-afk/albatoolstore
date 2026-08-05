@@ -72,6 +72,7 @@ interface PrintData {
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
 import { computeDocumentBalance } from "@/utils/documentBalanceSummary";
 import { signedAmountText } from "@/utils/buildCustomerAccountView";
+import { printDensity, densityClass, DENSITY_CSS } from "@/utils/printDensity";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -167,6 +168,15 @@ export function generatePrintHTML(data: PrintData): string {
   const pkgRows = Number(/data-pkg-rows="(\d+)"/.exec(cleanPackaging || "")?.[1] || 0);
   const stackExtras = pkgRows > PACKAGING_STACK_THRESHOLD;
 
+  /**
+   * الكثافة التلقائية — الحدود ومعناها في `printDensity`.
+   *
+   * تُقرأ من عدد البنود وبنود التغليف معاً، وتُوضع صنفاً على `.page` فتسري
+   * على الورقة كلّها: المعاينة والطباعة ورابط العميل — قالبٌ واحد لا ثلاثة.
+   */
+  const density = printDensity(items?.length, pkgRows);
+  const pageDensityClass = densityClass(density);
+
   // Helper: escape value for safe insertion inside an HTML attribute (double-quoted)
   const attr = (v: string) => String(v ?? "")
     .replace(/&/g, "&amp;")
@@ -232,8 +242,23 @@ export function generatePrintHTML(data: PrintData): string {
       width: 210mm; max-width: 210mm; min-height: 297mm;
       margin: 0 auto; background: #fff; padding: 10mm;
       box-shadow: 0 2px 14px rgba(0, 0, 0, 0.18);
+      /**
+       * الهاتف: الورقة كاملةً في عرض الشاشة، ثم يكبّرها القارئ بأصابعه.
+       *
+       * وسمُ viewport في الترويسة يكفي حين يُفتح المستند في تبويبٍ مستقلّ،
+       * ولا يكفي داخل iframe — فالمتصفّحات تتجاهله في الإطارات، فتخرج
+       * الورقة أعرض من الإطار بشريط تمرير أفقي. والمعاينةُ ورابطُ العميل
+       * كلاهما إطار، فهذه هي الحالة الغالبة لا الاستثناء.
+       *
+       * فالنسبةُ تُحسب بسكربتٍ صغير أسفل الصفحة ويكتبها في المتغيّر
+       * --lov-fit. وخاصّية zoom لا transform: الأخيرة تُصغّر المرسوم وتترك
+       * مكانه محجوزاً، فيبقى تحت الورقة بياضٌ بطول ما اختصرته. ولا تُكبَّر
+       * الورقة فوق مقاسها أبداً — التكبير للقارئ لا للصفحة.
+       */
+      zoom: var(--lov-fit, 1);
     }
   }
+${DENSITY_CSS}
 
   /* === HEADER === */
   .header {
@@ -330,6 +355,22 @@ export function generatePrintHTML(data: PrintData): string {
     flex: 1; border: 2px solid #999; border-radius: 6px;
     padding: 12px 16px; min-height: 80px;
   }
+  /**
+   * صندوق الترحيل صغير — طلبه صاحب المستودع: «اجعل تفاصيل الترحيل بسيطة
+   * ومربّعها صغير».
+   *
+   * وله سببٌ في التخطيط: محتواه سطرٌ أو سطران مهما كثرت الفاتورة، بينما
+   * التغليف يمتدّ بعدد بنوده. فتقاسمُهما العرض بالتساوي بـflex واحد يترك
+   * نصفَ الورقة بياضاً إلى جانب جدولٍ مزدحم. فصار يأخذ قدرَه: الثلث حين
+   * يتجاور الصندوقان، وما يكفيه حين ينزل تحت التغليف.
+   */
+  .extra-box--transport {
+    flex: 0 1 32%; min-height: 0; padding: 8px 12px;
+  }
+  .extra-row--transport { margin-top: 8px; }
+  .extra-row--transport .extra-box--transport { flex: 0 0 auto; max-width: 62%; }
+  .tr-main { font-size: 12px; font-weight: 700; color: #1a1a1a; }
+  .tr-sub  { font-size: 10.5px; color: #666; }
   .extra-box-title {
     font-size: 14px; font-weight: 800; color: #5b2c8e;
     border-bottom: 2px dashed #5b2c8e;
@@ -368,7 +409,7 @@ export function generatePrintHTML(data: PrintData): string {
 </style>
 </head>
 <body>
-<div class="page">
+<div class="page ${pageDensityClass}">
 
 ${showHeader ? `
 <!-- Header -->
@@ -601,13 +642,13 @@ ${showExtras ? (() => {
     <div class="extra-content">${cleanPackaging || `لا توجد بيانات تغليف ${docNoun}`}</div>
   </div>` : "";
   const transportBox = showTransport ? `
-  <div class="extra-box" data-section="transport" data-section-label="معلومات الترحيل">
+  <div class="extra-box extra-box--transport" data-section="transport" data-section-label="معلومات الترحيل">
     <div class="extra-box-title">معلومات الترحيل</div>
     <p>${cleanTransport || `لا توجد بيانات ترحيل ${docNoun}`}</p>
   </div>` : "";
   return stackExtras
-    // صندوقان متتاليان بعرض الورقة: التغليف أوّلاً ثم الترحيل تحته.
-    ? `<div class="extra-row">${packagingBox}</div><div class="extra-row">${transportBox}</div>`
+    // صندوقان متتاليان: التغليف بعرض الورقة، والترحيل تحته بقدر محتواه.
+    ? `<div class="extra-row">${packagingBox}</div><div class="extra-row extra-row--transport">${transportBox}</div>`
     : `<div class="extra-row">${packagingBox}${transportBox}</div>`;
 })() : ""}
 
@@ -627,6 +668,38 @@ ${showSignatures ? `
 ` : ""}
 
 </div>
+
+<!--
+  ملاءمة الورقة لعرض الشاشة — الهاتف يراها كاملةً ثم يكبّرها بأصابعه.
+
+  السكربت لا يرسم شيئاً ولا يغيّر محتوى الورقة: يقيس عرض الإطار ويكتب نسبةً
+  في المتغيّر --lov-fit، والتنسيق وحده يستعملها داخل قاعدة الشاشة. فالطباعة
+  والـPDF لا يمرّان به أصلاً.
+
+  وهو محروسٌ بـtry/catch كاملاً: بيئةٌ تمنع السكربتات (رابطٌ مفتوح بسياسة
+  صارمة) تترك النسبة 1، فتظهر الورقة بمقاسها الحقيقي كما كانت قبل هذا —
+  تدهورٌ لطيف لا صفحةٌ بيضاء.
+-->
+<script>
+(function(){
+  var SHEET_PX = 794; /* 210mm بدقّة 96ppi */
+  function fit(){
+    try {
+      var el = document.documentElement;
+      var w = el.clientWidth || window.innerWidth || SHEET_PX;
+      var r = w / SHEET_PX;
+      /* لا تكبير فوق المقاس الحقيقي، ولا تصغير تحت الخُمس مهما ضاقت الشاشة */
+      if (!isFinite(r) || r >= 1) { el.style.setProperty('--lov-fit', '1'); return; }
+      el.style.setProperty('--lov-fit', String(Math.max(r, 0.2)));
+    } catch (e) { /* بلا سكربت: الورقة بمقاسها */ }
+  }
+  fit();
+  try {
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
+  } catch (e) {}
+})();
+</script>
 </body>
 </html>`;
 }
@@ -883,6 +956,10 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
       pg.style.minHeight = '0';
       pg.style.padding = '0';
       pg.style.boxShadow = 'none';
+      // تصغيرُ الملاءمة للشاشة الضيّقة لا يدخل الـPDF: الورقة تُصوَّر بمقاسها
+      // كاملاً ثم يقسّمها html2pdf على A4. ولولا هذا لخرج الملف من الهاتف
+      // بنصف حجم خطّه — ورقةٌ تُقرأ على الشاشة ولا تُقرأ مطبوعة.
+      pg.style.zoom = '1';
     }
     var bar = clone.querySelector('#__lov_print_toolbar');
     if (bar) bar.remove();
@@ -995,7 +1072,9 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     btn.disabled = false; btn.textContent = old;
   };
 
-  // اسم ملف موحّد لكل مخارج الـPDF (تنزيل + واتساب): النوع - العميل - رقم المستند
+  // اسم ملف موحّد لكل مخارج الـPDF (تنزيل + واتساب): «اسم العميل - المبلغ».
+  // نفس قاعدة buildDocumentFileName في documentFileName.ts — ولهذا التطابق
+  // اختبارٌ يقارن المسارين، فهما نسختان لا مفرّ منهما: هذه تعيش داخل الورقة.
   function buildDocFileName(){
     // حوّل الأرقام العربية/الفارسية إلى لاتينية
     var digitMap = { '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
@@ -1011,7 +1090,6 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
       return s;
     }
     var docLabel   = clean(getMeta('lov-doc-label'));
-    var docNumber  = clean(getMeta('lov-doc-number'));
     var customerNm = clean(getMeta('lov-customer-name'));
     // مبلغ المستند بفواصل الآلاف — يصل الملف للعميل باسمه ومبلغه
     var docTotal   = clean(getMeta('lov-doc-total'));
@@ -1020,15 +1098,16 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
       docTotal = isFinite(n) && n > 0 ? n.toLocaleString('en-US') : '';
     }
 
-    // fallbacks افتراضية
-    if (!docLabel)   docLabel   = clean(getDocTitle()) || 'مستند';
-    if (!customerNm) customerNm = 'بدون اسم';
-    // docNumber اختياري — لا نضيف افتراضي (تفادياً لاسم مكرر)
+    // النوع والرقم يبقيان في الورقة وفي meta — ولا يدخلان اسم الملف.
+    // فالمطلوب: «إسم العميل ومبلغ الفاتورة فقط».
+    if (!docLabel) docLabel = clean(getDocTitle()) || 'مستند';
 
-    var parts = [docLabel, customerNm];
-    if (docNumber) parts.push(docNumber);
+    var parts = [];
+    if (customerNm) parts.push(customerNm);
     if (docTotal) parts.push(docTotal);
     var name = parts.join(' - ').trim();
+    // بلا عميلٍ ولا مبلغ: نوع المستند خيرٌ من اسمٍ عامّ لا يدلّ على شيء
+    if (!name) name = docLabel;
     if (!name) name = 'document';
 
     // تقليم الطول لتجنّب حدود نظام الملفات (~120 محرف للاسم)

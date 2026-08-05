@@ -125,6 +125,9 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
         page.style.minHeight = "0";
         page.style.padding = "0";
         page.style.boxShadow = "none";
+        // ولا يدخله تصغيرُ الملاءمة الذي يُري الهاتفَ الورقةَ كاملة: الملف
+        // يُصوَّر بمقاس الورقة الحقيقي وإلا خرج من الهاتف بنصف حجم خطّه.
+        page.style.zoom = "1";
       }
       const html2pdf = (await import("html2pdf.js")).default;
       logEvent("downloaded");

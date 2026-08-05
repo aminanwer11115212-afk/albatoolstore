@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { Loader2, Download, AlertTriangle, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { buildDocumentFileName } from "@/utils/documentFileName";
 
 // عدّاد محاولات الدخول لنفس صفحة المعاينة (ضمن نفس جلسة المتصفح).
 // يحمي من حلقة محتملة إذا أعاد الخادم توجيه الصفحة إلى نفسها.
@@ -187,11 +188,27 @@ export default function PublicDocumentSharePage() {
       const sourceElement = iframeDoc?.body?.cloneNode(true) as HTMLElement | undefined;
       if (!sourceElement) throw new Error("تعذّر قراءة محتوى المعاينة");
 
+      /**
+       * اسم الملف من `meta` الورقة نفسها: «اسم العميل - المبلغ».
+       *
+       * كان `document-a1b2c3d4.pdf` — رمزُ توكينٍ لا يدلّ العميل على شيء،
+       * ويتكرّر شكلُه في كل ملفٍّ فلا يميّز واحداً من آخر في مجلد التنزيلات.
+       * وهذه الصفحة مسارُ سقوطٍ للروابط القديمة، لكنّ العميل الذي يفتحها
+       * ينزّل ملفاً حقيقياً — فيلزمه اسمٌ حقيقي.
+       */
+      const meta = (n: string) =>
+        iframeDoc?.querySelector(`meta[name="${n}"]`)?.getAttribute("content") || "";
+      const pdfName = buildDocumentFileName({
+        docLabel: meta("lov-doc-label") || iframeDoc?.title || "مستند",
+        customerName: meta("lov-customer-name"),
+        total: meta("lov-doc-total"),
+      });
+
       const html2pdf = (await import("html2pdf.js")).default;
       await html2pdf()
         .set({
           margin: 10,
-          filename: `document-${token?.slice(0, 8) || "share"}.pdf`,
+          filename: pdfName === "مستند.pdf" ? `مستند-${token?.slice(0, 8) || "share"}.pdf` : pdfName,
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },

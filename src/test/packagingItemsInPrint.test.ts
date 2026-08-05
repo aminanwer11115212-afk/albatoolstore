@@ -175,6 +175,8 @@ describe("الترحيل — سطرٌ بلا مرحّلٍ مسجَّل لا يخ
     });
     const out = await mod.loadInvoiceExtras("i1");
     expect(out.transportInfo).toContain("الاسم: مرحّل تجريبي");
+    // السطر الرئيسي يحمل الاسم والوجهة، والفرعي الهاتف والعنوان
+    expect(out.transportInfo).toContain('class="tr-main"');
     expect(out.transportInfo).toContain("الهاتف: 0912");
   });
 
@@ -185,7 +187,7 @@ describe("الترحيل — سطرٌ بلا مرحّلٍ مسجَّل لا يخ
       invoice_packaging: [], invoices_packaging_items: [],
     });
     const out = await mod.loadInvoiceExtras("i2");
-    expect(out.transportInfo).toBe("الوجهة: بورتسودان");
+    expect(out.transportInfo).toBe('<span class="tr-main">الوجهة: بورتسودان</span>');
   });
 
   it("سطرٌ بلا مرحّلٍ ولا وجهة يبقى متخطّى — لا سطر فارغ", async () => {

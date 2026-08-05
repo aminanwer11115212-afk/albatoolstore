@@ -92,12 +92,27 @@ export function formatTransports(rows: any[]): string | undefined {
     const key = `${name}|${phone}|${address}|${destination}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const parts: string[] = [];
-    if (name)    parts.push(`الاسم: ${escapeHtml(name)}`);
-    if (phone)   parts.push(`الهاتف: ${escapeHtml(phone)}`);
-    if (address) parts.push(`العنوان: ${escapeHtml(address)}`);
-    if (destination) parts.push(`الوجهة: ${escapeHtml(destination)}`);
-    blocks.push(parts.join(" | "));
+    /**
+     * سطران لا سطرٌ واحد بأربعة حقولٍ مفصولةٍ بـ`|`.
+     *
+     * طلبه صاحب المستودع: «اجعل تفاصيل الترحيل بسيطة». والحقول لم تُحذف —
+     * حذفُ معلومةٍ عن العميل ليس تبسيطاً — بل رُتّبت بأهمّيتها: ما يحتاجه
+     * العميل أوّلاً (إلى أين، ومع من) بخطٍّ واضح، وما يحتاجه عند الاستلام
+     * (الهاتف والعنوان) تحته بخطٍّ أصغر.
+     *
+     * وتبقى الوسوم `span` و`br` لا `div`: المحتوى يُدرَج داخل `<p>` في
+     * القالب، وعنصرُ كتلةٍ داخل فقرةٍ يخرج منها في المتصفّح فينكسر الترتيب.
+     */
+    const main: string[] = [];
+    if (name) main.push(`الاسم: ${escapeHtml(name)}`);
+    if (destination) main.push(`الوجهة: ${escapeHtml(destination)}`);
+    const sub: string[] = [];
+    if (phone) sub.push(`الهاتف: ${escapeHtml(phone)}`);
+    if (address) sub.push(`العنوان: ${escapeHtml(address)}`);
+
+    let block = `<span class="tr-main">${main.join(" — ")}</span>`;
+    if (sub.length) block += `<br><span class="tr-sub">${sub.join(" · ")}</span>`;
+    blocks.push(block);
   }
   if (blocks.length === 0) return undefined;
   return blocks.join("<br>");

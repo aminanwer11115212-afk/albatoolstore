@@ -44,9 +44,10 @@ describe("اسم ملف الـPDF يحمل رقم المستند", () => {
     expect(html).toContain("filename: buildDocFileName()");
   });
 
-  it("بانية الاسم تُدرج رقم المستند ضمن الأجزاء", () => {
-    expect(html).toContain("var docNumber  = clean(getMeta('lov-doc-number'));");
-    expect(html).toContain("if (docNumber) parts.push(docNumber);");
+  it("بانية الاسم تُدرج العميل والمبلغ — والرقم في الورقة لا في الاسم", () => {
+    expect(html).toContain("var customerNm = clean(getMeta('lov-customer-name'));");
+    expect(html).toContain("var docTotal   = clean(getMeta('lov-doc-total'));");
+    expect(html).not.toContain("parts.push(docNumber)");
   });
 
   it("مشاركة الواتساب والتنزيل يستخدمان نفس الدالة — لا اسمان مختلفان", () => {
@@ -127,7 +128,7 @@ describe("اسم الملف لا يحمل محارف غير مرئية تفسد�
       docNumber: "﻿INV-61463",
       total: 350000,
     });
-    expect(name).toBe("فاتورة مبيعات - ايهاب الدين امدرمان - INV-61463 - 350,000.pdf");
+    expect(name).toBe("ايهاب الدين امدرمان - 350,000.pdf");
     // لا يبقى أي محرف غير مرئي في الناتج
     expect(/[​-‏‪-‮⁦-⁩﻿­]/.test(name)).toBe(false);
   });

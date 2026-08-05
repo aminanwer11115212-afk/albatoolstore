@@ -43,7 +43,8 @@ const boxOrder = (html: string) => [
   { key: "transport", at: html.indexOf('data-section="transport"') },
 ].sort((a, b) => a.at - b.at).map((b) => b.key);
 
-const extraRowCount = (html: string) => (html.match(/class="extra-row"/g) || []).length;
+// الصنف قد يحمل مُعدِّلاً (`extra-row extra-row--transport`) فيُعدّ بالبادئة
+const extraRowCount = (html: string) => (html.match(/class="extra-row[ "]/g) || []).length;
 
 describe("عشرون بنداً فأقلّ: الصندوقان متجاوران", () => {
   it("صفٌّ واحد يحمل الاثنين", () => {
