@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { pickCustomerWhatsApp } from "@/utils/whatsapp";
+import { sendQuoteReminder } from "@/utils/quoteReminder";
 import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useQuotes, useCompanySettings } from "@/hooks/useData";
 import { useNavigate } from "react-router-dom";
@@ -349,6 +350,16 @@ export default function QuotesPage() {
                           title={convertingIds.has(q.id) ? "جارٍ التحويل..." : "تحويل لفاتورة"}
                         >
                           {convertingIds.has(q.id) ? "…جارٍ التحويل" : "→ فاتورة"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-xs"
+                          style={{ background: "#f59e0b", color: "#fff" }}
+                          onClick={() => sendQuoteReminder(q.customers)}
+                          title="تنبيه العميل بمراجعة عرض السعر — واتساب على رقمه المسجّل"
+                          data-testid="quote-reminder-btn"
+                        >
+                          🔔 تنبيه
                         </button>
                         <details className="legacy-send-menu" style={{ position: "relative", display: "inline-block" }}>
                           <summary className="btn-xs btn-info" style={{ cursor: "pointer", listStyle: "none" }} title="إرسال">

@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { toast } from "sonner";
 import { startsWithAny } from "@/utils/searchMatch";
+import { sendQuoteReminder } from "@/utils/quoteReminder";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompanySettings } from "@/hooks/useData";
 import { MobileDocCard, mobileDocListCSS } from "@/components/mobile/MobileDocList";
@@ -17,7 +18,7 @@ function useSideQuotes() {
     queryFn: () => fetchAllRows((from, to) =>
       supabase
         .from("quotes")
-        .select("*, customers(name, phone)")
+        .select("*, customers(name, phone, whatsapp)")
         .eq("is_side", true)
         .order("created_at", { ascending: false })
         .range(from, to)
@@ -298,6 +299,7 @@ export default function SideQuotesPage() {
                         <button className="btn-xs btn-warning" onClick={() => navigate(`/quotes/side/edit/${q.id}`)}>تعديل</button>
                         <button className="btn-xs btn-info" onClick={() => handlePrintSide(q)}>طباعة</button>
                         <button className="btn-xs btn-primary" onClick={() => handleConvert(q)} disabled={convertingIds.has(q.id)}>{convertingIds.has(q.id) ? "…" : "→ فاتورة"}</button>
+                        <button className="btn-xs" style={{ background: "#f59e0b", color: "#fff" }} onClick={() => sendQuoteReminder(q.customers)} title="تنبيه العميل بمراجعة عرض السعر — واتساب على رقمه المسجّل" data-testid="quote-reminder-btn">🔔 تنبيه</button>
                         <button className="btn-xs" style={{ background:"#8b5cf6", color:"#fff" }} onClick={() => { setTransferringId(q.id); setTransferTarget(""); setTransferNote(""); }}>نقل ملكية</button>
                         <button className="btn-xs" style={{ background:"#0ea5e9", color:"#fff" }} onClick={() => setHistoryOpenId(historyOpenId === q.id ? null : q.id)}>سجل النقل</button>
                         <button className="btn-xs btn-danger" onClick={() => handleDelete(q.id)}>🗑</button>
@@ -384,6 +386,7 @@ export default function SideQuotesPage() {
                     <button className="btn-xs btn-warning" onClick={() => navigate(`/quotes/side/edit/${q.id}`)}>✎ تعديل</button>
                     <button className="btn-xs btn-info" onClick={() => handlePrintSide(q)}>🖨 طباعة</button>
                     <button className="btn-xs btn-primary" onClick={() => handleConvert(q)} disabled={convertingIds.has(q.id)}>{convertingIds.has(q.id) ? "…" : "→ فاتورة"}</button>
+                    <button className="btn-xs" style={{ background: "#f59e0b", color: "#fff" }} onClick={() => sendQuoteReminder(q.customers)} title="تنبيه العميل بمراجعة عرض السعر — واتساب على رقمه المسجّل" data-testid="quote-reminder-btn">🔔 تنبيه</button>
                     <button className="btn-xs btn-danger" onClick={() => handleDelete(q.id)}>🗑 حذف</button>
                   </>
                 }

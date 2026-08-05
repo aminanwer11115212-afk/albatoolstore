@@ -8,6 +8,7 @@ import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadQuoteExtras } from "@/utils/printExtras";
 import { deductStockForLines } from "@/utils/stockDeduction";
 import { type WhatsAppMessageType, pickCustomerWhatsApp} from "@/utils/whatsapp";
+import { sendQuoteReminder } from "@/utils/quoteReminder";
 import { resolveAttachmentSignedUrls } from "@/utils/signedAttachmentUrl";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { useQuoteConvertedDialog } from "@/hooks/useQuoteConvertedDialog";
 import {
   Edit, Truck, Package, FileText, MessageCircle, Mail, Phone, CreditCard,
-  Printer, Eye, RefreshCw, XCircle, Trash2, PlusCircle, ChevronDown, ArrowRight,
+  Printer, Eye, RefreshCw, XCircle, Trash2, PlusCircle, ChevronDown, ArrowRight, BellRing,
   Paperclip, Download, Image as ImageIcon,
 } from "lucide-react";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
@@ -447,6 +448,17 @@ export default function QuoteViewPage() {
           { id: "preview", node: (
             <Button onClick={() => handlePrint("full", false)} variant="outline" className="gap-1.5 text-xs h-9">
               <Eye size={14} /> معاينة
+            </Button>
+          )},
+          /* تنبيه: متابعةٌ بضغطة — واتساب على رقم العميل المسجّل في العرض */
+          { id: "quote-reminder", node: (
+            <Button
+              onClick={() => sendQuoteReminder(quote.customers)}
+              className="bg-amber-500 hover:bg-amber-600 text-white gap-1.5 text-xs h-9"
+              title="تنبيه العميل بمراجعة عرض السعر — واتساب على رقمه المسجّل"
+              data-testid="quote-reminder-btn"
+            >
+              <BellRing size={14} /> تنبيه
             </Button>
           )},
           { id: "edit", node: (
