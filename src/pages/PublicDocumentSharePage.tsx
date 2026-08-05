@@ -4,6 +4,7 @@ import { Loader2, Download, AlertTriangle, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { buildDocumentFileName } from "@/utils/documentFileName";
+import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
 
 // عدّاد محاولات الدخول لنفس صفحة المعاينة (ضمن نفس جلسة المتصفح).
 // يحمي من حلقة محتملة إذا أعاد الخادم توجيه الصفحة إلى نفسها.
@@ -210,7 +211,7 @@ export default function PublicDocumentSharePage() {
           margin: 10,
           filename: pdfName === "مستند.pdf" ? `مستند-${token?.slice(0, 8) || "share"}.pdf` : pdfName,
           image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+          html2canvas: { scale: pdfScaleForElement(sourceElement), useCORS: true, backgroundColor: "#ffffff" },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         } as any)
         .from(sourceElement)

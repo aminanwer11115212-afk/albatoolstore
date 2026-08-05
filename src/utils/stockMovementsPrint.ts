@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
 
 export interface PrintMove {
   date: string;
@@ -233,7 +234,7 @@ export async function downloadStockMovementsPdf(opts: StockPrintOptions): Promis
         margin: 5,
         filename: `stock-movements-${opts.from}_${opts.to}.pdf`,
         image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+        html2canvas: { scale: pdfScaleForElement(target), useCORS: true, backgroundColor: "#ffffff" },
         jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
         pagebreak: { mode: ["css", "legacy"] },
       })

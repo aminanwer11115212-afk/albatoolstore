@@ -10,6 +10,7 @@ import { startsWithAny } from "@/utils/searchMatch";
 import { customerNetBefore } from "@/utils/customerNetBefore";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { classifyCreditRow, CREDIT_SOURCE_OPTIONS, type CreditSource } from "@/utils/creditSource";
+import { foldOverpayTransactions } from "@/utils/paymentDisplay";
 import { buildCustomerAccountView, signedBalanceText, signedAmountText, accountRowBand } from "@/utils/buildCustomerAccountView";
 import CreditConsumptionOrderControl from "@/components/statement/CreditConsumptionOrderControl";
 import CustomerStatementErrorState from "@/components/statement/CustomerStatementErrorState";
@@ -363,12 +364,35 @@ export default function CustomerStatementPage() {
   };
 
   const filteredTransactions = useMemo(() => {
-    let rows = (transactions || []).filter((t: any) => {
-      // دفعاتٌ وشحناتٌ فقط. المصروفات وسائر القيود لا تخصّ حساب العميل —
-      // ظهورها هنا يوحي بأنها تحرّكه، وهي لا تدخل في `net_balance` أصلاً.
+    // (١) الدفعات والشحنات وحدها، داخل المدى. المصروفات وسائر القيود لا تخصّ
+    //     حساب العميل — ظهورها هنا يوحي بأنها تحرّكه، وهي لا تدخل `net_balance`.
+    const inScope = (transactions || []).filter((t: any) => {
       if (t.category !== "customer_payment" && t.category !== "customer_credit") return false;
       if (fromDate && t.date < fromDate) return false;
       if (toDate && t.date > toDate) return false;
+      return true;
+    });
+
+    /**
+     * (٢) **الضمّ قبل بقيّة المرشِّحات** — والترتيب هنا هو الإصلاح كلّه.
+     *
+     * دفعةُ 70,000 على فاتورةٍ بـ67,200 تُكتب في القاعدة قيدَين: قيدٌ
+     * بالمطبَّق، وقيدٌ بالباقي. فكان الكشف يعرضهما سطرَين — 67,200 ثمّ 2,800 —
+     * فيقرأ صاحب الحساب دفعتين حيث دفع العميل مرّةً واحدة. وقاعدةُ المستودع
+     * صريحة: **الزيادة لا تظهر سطراً مستقلاً في أيّ شاشة**، والمعروض هو
+     * المدفوع كاملاً.
+     *
+     * والضمّ **قبل** مرشِّحات المبلغ والمصدر والنوع، لا بعدها: لو رُشِّح أوّلاً
+     * لسقط أحد القيدين أحياناً فتعذّر إقرانه، فعاد الفائض سطراً وحده — وهو
+     * بالضبط ما يمنعه هذا الترتيب.
+     */
+    const folded = foldOverpayTransactions(
+      inScope as any[],
+      (t: any) => classifyCreditRow(t).source === "overpay_invoice",
+    );
+
+    // (٣) بقيّة المرشِّحات على الصفوف المضمومة — فالمبلغ المفحوص هو المعروض
+    let rows = folded.filter((t: any) => {
       const amt = Math.abs(Number(t.amount || 0));
       if (minAmount && amt < Number(minAmount)) return false;
       if (maxAmount && amt > Number(maxAmount)) return false;

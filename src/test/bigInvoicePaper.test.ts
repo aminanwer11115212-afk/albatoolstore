@@ -202,41 +202,28 @@ describe("تفاصيل الترحيل بسيطة ومربّعها صغير", () 
 
 /* ─────────── ٤) الهاتف يرى الورقة كاملة ─────────── */
 
-describe("ملاءمة الورقة لعرض الهاتف", () => {
+/**
+ * الورقة تعلن أنها تقبل التصغير، والمضيف يقيس ويقرّر كم — وتفصيلُ ذلك
+ * وحسابُ النسبة في `documentFrameFit.test.ts`.
+ */
+describe("الورقة تقبل نسبة الملاءمة", () => {
   const html = sheet(5);
 
-  it("الورقة تقبل نسبةَ ملاءمة", () => {
+  it("موسومةٌ ليعرفها المضيف", () => {
+    expect(html).toContain('data-lov-sheet="1"');
+  });
+
+  it("وتصغُر بالمتغيّر الذي يكتبه", () => {
     expect(html).toMatch(/zoom:\s*var\(--lov-fit,\s*1\)/);
   });
 
-  it("والنسبة تُحسب من عرض الإطار لا تُفترض", () => {
-    expect(html).toContain("var SHEET_PX = 794");
-    expect(html).toContain("clientWidth");
-    expect(html).toContain("--lov-fit");
-  });
-
-  it("ولا تُكبَّر الورقة فوق مقاسها أبداً", () => {
-    // الشاشة الأعرض من الورقة تُبقيها بمقاسها — التكبير للقارئ لا للصفحة
-    expect(html).toContain("r >= 1");
-  });
-
-  it("ولا تُصغَّر إلى ما لا يُرى", () => {
-    expect(html).toContain("Math.max(r, 0.2)");
-  });
-
-  it("وتُعاد الحسبة عند تدوير الهاتف", () => {
-    expect(html).toContain("orientationchange");
-  });
-
-  it("وبلا سكربتٍ تبقى الورقة بمقاسها — تدهورٌ لطيف لا صفحةٌ بيضاء", () => {
-    // القيمة الافتراضية في `var()` هي 1، فغيابُ السكربت لا يُخفي شيئاً
+  it("وبلا مضيفٍ تبقى بمقاسها — القيمة الافتراضية 1", () => {
+    // تدهورٌ لطيف: ورقةٌ بمقاسها الحقيقي، لا صفحةٌ بيضاء
     expect(html).toMatch(/var\(--lov-fit,\s*1\)/);
-    expect(html).toContain("catch (e)");
   });
 
-  it("والتصغير في وسيط الشاشة وحده — الطباعة لا تراه", () => {
-    const screenBlock = html.slice(html.indexOf("@media screen"), html.indexOf("/* === HEADER === */"));
-    expect(screenBlock).toContain("zoom: var(--lov-fit, 1)");
+  it("وفي تبويبٍ مستقلّ يتكفّل بها وسم viewport", () => {
+    expect(html).toContain('<meta name="viewport" content="width=794">');
   });
 });
 

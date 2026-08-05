@@ -6,7 +6,7 @@ import { usePageRenderCount } from "@/hooks/usePageRenderCount";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllProducts } from "@/lib/fetchAllProducts";
-import { startsWithAny } from "@/utils/searchMatch";
+import { startsWithAny, leadsWithAny } from "@/utils/searchMatch";
 import {
   effectiveRowRate,
   resolveDefaultRate,
@@ -665,9 +665,19 @@ export default function QuoteCreatePage() {
   }, [editId, rows.length, defaultRate]);
 
   // ---------- Customer search ----------
+  /**
+   * «يبدأ بـ» على الاسم كاملاً — لا على بداية كلمةٍ في وسطه.
+   *
+   * طلبه صاحب المستودع: «بحث اسم العميل في الفاتورة، لمّا تكتب الاسم يجيك
+   * طوالي، ما يديك ما يحتوي على الحرف». وهي القاعدة نفسها المطبَّقة في بحث
+   * المنتجات — فيألف المستخدم سلوكاً واحداً في الشاشة الواحدة.
+   *
+   * وثمنُها موثّق: من يبحث عن «أحمد» في «محمد أحمد» لن يجده — يكتب أوّل
+   * الاسم. وهذا ما طُلب صراحةً، والبديل (بداية أيّ كلمة) هو ما اشتُكي منه.
+   */
   const customerMatches = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    return customers.filter((c) => startsWithAny([c.name, c.phone], customerSearch)).slice(0, 8);
+    return customers.filter((c) => leadsWithAny([c.name, c.phone], customerSearch)).slice(0, 8);
   }, [customerSearch, customers]);
 
   function pickCustomer(c: Customer) {

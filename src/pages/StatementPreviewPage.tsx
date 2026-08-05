@@ -4,6 +4,7 @@ import { ArrowRight, Printer, Download, MessageCircle, FileText, Eye, EyeOff, Li
 import { supabase } from "@/integrations/supabase/client";
 import { generateStatementHTML, type StatementData } from "@/utils/statementPrintTemplate";
 import { buildDocumentFileName, cleanNamePart } from "@/utils/documentFileName";
+import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
 import { openWhatsApp, buildWhatsAppDeepLink } from "@/utils/whatsapp";
 
 /**
@@ -127,7 +128,7 @@ export default function StatementPreviewPage() {
       // نفس اسم زرّ التنزيل — لا اسمان لملفٍّ واحد
       filename: buildWaFileNameForStatement("pdf"),
       image: { type: "jpeg", quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      html2canvas: { scale: pdfScaleForElement(wrap), useCORS: true, logging: false },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     };
     return await win.html2pdf().set(opt).from(wrap).outputPdf("blob");

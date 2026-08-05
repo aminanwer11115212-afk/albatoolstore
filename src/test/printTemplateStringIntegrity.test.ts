@@ -56,9 +56,17 @@ describe("نصّ القالب موجودٌ فعلاً — فحصٌ لا يُفر
     expect(sheetSrc.length).toBeGreaterThan(5000);
   });
 
-  it("وكتلتا التنسيق والسكربت داخلها", () => {
+  it("وكتلة التنسيق داخلها", () => {
     expect(STYLE.length).toBeGreaterThan(1000);
-    expect(SCRIPT.length).toBeGreaterThan(100);
+  });
+
+  /**
+   * وكتلة `<script>` اختيارية: القياس خرج من الورقة إلى المضيف
+   * (`documentFrameFit`)، فقد تخلو الورقة منها. ويبقى فحصها قائماً إن عادت —
+   * فهي أشدّ المواضع عرضةً لعلامة الـbacktick في تعليقٍ عربي.
+   */
+  it("وكتلة السكربت — إن وُجدت — مفحوصةٌ هي الأخرى", () => {
+    expect(typeof SCRIPT).toBe("string");
   });
 });
 

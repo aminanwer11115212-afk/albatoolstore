@@ -4,6 +4,7 @@ import { ArrowRight, Printer, Download, MessageCircle, FileText } from "lucide-r
 import { toast } from "sonner";
 import { generateFinancialReportHTML, type FinancialReportData } from "@/utils/financialReportPrintTemplate";
 import { openWhatsApp } from "@/utils/whatsapp";
+import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
 
 /**
  * صفحة معاينة موحّدة للتقارير المالية (الدخل/المصروفات/قائمة الدخل/الديون...).
@@ -129,7 +130,7 @@ export default function FinancialReportPreviewPage() {
       margin: 8,
       filename: cleanFileName(pdfDocName, "pdf"),
       image: { type: "jpeg", quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      html2canvas: { scale: pdfScaleForElement(wrap), useCORS: true, logging: false },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     };
     return await win.html2pdf().set(opt).from(wrap).outputPdf("blob");

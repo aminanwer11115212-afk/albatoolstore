@@ -15,6 +15,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { buildDocumentFileName } from "@/utils/documentFileName";
+import { useDocumentFrameFit } from "@/utils/documentFrameFit";
+import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
+import DocumentFrameZoom from "@/components/common/DocumentFrameZoom";
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL as string;
 const ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -25,6 +28,14 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  /**
+   * الورقة تُلائم عرض الإطار فيراها العميل كاملةً — ثم يكبّرها ليقرأ.
+   *
+   * القياس من هنا لا من داخل الورقة: هذه الصفحة قد تحمل ورقة دالّة الحافة
+   * القديمة حين لا تكون الهجرة مطبَّقة، وتلك لا تمرّ بقالبنا فلا تُلائم نفسها.
+   */
+  const frameFit = useDocumentFrameFit(iframeRef, [html]);
 
   useEffect(() => {
     if (!token) {
@@ -138,7 +149,8 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
           // `document-<token>` الذي لا يدلّ العميل على شيء.
           filename: pdfFileNameFrom(doc, token),
           image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+          // الدقّة من حجم الورقة لا رقماً ثابتاً — راجع `pdfCanvasScale`
+          html2canvas: { scale: pdfScaleForElement(body), useCORS: true, backgroundColor: "#ffffff" },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         } as any)
         .from(body)
@@ -216,7 +228,8 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
     <div style={wrap}>
       <div style={bar}>
         <strong style={{ fontSize: 14, color: "#1a1a1a" }}>شركة البتول لإسبارات المواتر والتكاتك</strong>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <DocumentFrameZoom fit={frameFit} compact />
           <button type="button" style={btn("#10b981")} onClick={handlePrint}>
             🖨️ طباعة
           </button>
@@ -234,6 +247,7 @@ export default function StandaloneShareDocument({ token }: { token: string }) {
         ref={iframeRef}
         title="معاينة المستند"
         srcDoc={html}
+        onLoad={frameFit.refit}
         style={{ flex: 1, width: "100%", border: 0, background: "#fff" }}
       />
     </div>

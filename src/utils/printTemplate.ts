@@ -73,6 +73,7 @@ import { resolveLogoUrl } from "@/utils/albatoolLogo";
 import { computeDocumentBalance } from "@/utils/documentBalanceSummary";
 import { signedAmountText } from "@/utils/buildCustomerAccountView";
 import { printDensity, densityClass, DENSITY_CSS } from "@/utils/printDensity";
+import { PDF_SCALE_INLINE_JS } from "@/utils/pdfCanvasScale";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -192,7 +193,10 @@ export function generatePrintHTML(data: PrintData): string {
     .replace(/'/g, "&#39;");
 
   return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<!-- data-lov-sheet: علامةُ أنّ هذه ورقتنا لا ورقةَ دالّة الحافة القديمة.
+     يقرؤها المضيف في documentFrameFit ليعرف كيف يصغّرها: بالمتغيّر الذي
+     يعرفه القالب، أو على الجذر مباشرةً لورقةٍ لا تعرفه. -->
+<html dir="rtl" lang="ar" data-lov-sheet="1">
 <head>
 <meta charset="utf-8">
 <!-- عرضٌ ثابتٌ بمقاس A4 (210mm ≈ 794px): الهاتف يعرض الورقة كاملةً مصغَّرةً
@@ -670,36 +674,17 @@ ${showSignatures ? `
 </div>
 
 <!--
-  ملاءمة الورقة لعرض الشاشة — الهاتف يراها كاملةً ثم يكبّرها بأصابعه.
+  ملاءمة الورقة لعرض الإطار: القالب يقول **كيف** تُصغَّر (بالمتغيّر --lov-fit
+  على .page في قاعدة الشاشة)، والمضيف يقول **كم** بعد أن يقيس ما بداخله.
 
-  السكربت لا يرسم شيئاً ولا يغيّر محتوى الورقة: يقيس عرض الإطار ويكتب نسبةً
-  في المتغيّر --lov-fit، والتنسيق وحده يستعملها داخل قاعدة الشاشة. فالطباعة
-  والـPDF لا يمرّان به أصلاً.
+  وكان القياس هنا بسكربتٍ يقرأ عرض النافذة، فأُخرج إلى المضيف لسببين: أنّ
+  القياس من الخارج يعمل مع ورقة دالّة الحافة القديمة أيضاً وهي لا تمرّ بهذا
+  القالب، وأنّ أزرار التكبير التي يضغطها القارئ تعيش في شريط المضيف — فلا
+  يتنازع اثنان على نسبةٍ واحدة.
 
-  وهو محروسٌ بـtry/catch كاملاً: بيئةٌ تمنع السكربتات (رابطٌ مفتوح بسياسة
-  صارمة) تترك النسبة 1، فتظهر الورقة بمقاسها الحقيقي كما كانت قبل هذا —
-  تدهورٌ لطيف لا صفحةٌ بيضاء.
+  وحين تُفتح الورقة في تبويبٍ مستقلّ بلا مضيف، يتكفّل بها وسمُ viewport في
+  الترويسة: يعرض المتصفّح الورقة كاملةً مصغَّرة كما يفعل قارئ الـPDF.
 -->
-<script>
-(function(){
-  var SHEET_PX = 794; /* 210mm بدقّة 96ppi */
-  function fit(){
-    try {
-      var el = document.documentElement;
-      var w = el.clientWidth || window.innerWidth || SHEET_PX;
-      var r = w / SHEET_PX;
-      /* لا تكبير فوق المقاس الحقيقي، ولا تصغير تحت الخُمس مهما ضاقت الشاشة */
-      if (!isFinite(r) || r >= 1) { el.style.setProperty('--lov-fit', '1'); return; }
-      el.style.setProperty('--lov-fit', String(Math.max(r, 0.2)));
-    } catch (e) { /* بلا سكربت: الورقة بمقاسها */ }
-  }
-  fit();
-  try {
-    window.addEventListener('resize', fit);
-    window.addEventListener('orientationchange', fit);
-  } catch (e) {}
-})();
-</script>
 </body>
 </html>`;
 }
@@ -968,13 +953,16 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     wrap.appendChild(clone);
     return wrap;
   }
+  ${PDF_SCALE_INLINE_JS}
   function genPdfBlob(){
     var el = contentEl();
     var opt = {
       margin: 8,
       filename: buildDocFileName(),
       image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      // الدقّة من حجم الورقة لا رقماً ثابتاً: الثابتة تتجاوز سقف لوحة الرسم
+      // في المستند الطويل فيخرج الملف فارغاً. راجع pdfCanvasScale.
+      html2canvas: { scale: __lovPdfScale(el.scrollWidth, el.scrollHeight), useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
     return window.html2pdf().set(opt).from(el).outputPdf('blob');
