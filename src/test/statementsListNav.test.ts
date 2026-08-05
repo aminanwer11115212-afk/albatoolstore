@@ -174,3 +174,125 @@ describe("الصافي من `netBalanceOf` لا من حسابٍ محلّي", () 
     expect(netBalanceOf({} as any)).toBe(0);
   });
 });
+
+/* ─────────── ٥) الإدخال السريع لا يتخطّى الحارس ─────────── */
+
+/**
+ * أخطرُ ما في اختصارٍ يمسّ المال أن يُعيد اختراع التحقّق ثم ينساه. فالإدخال
+ * السريع هنا **يجمع** الرقم والاتجاه ثم يسلّمهما لحوار الشحن مملوءَين —
+ * فتبقى تحقّقاته كلّها: التحويل البنكي، ورفضُ الصفر، وقاعدةُ «الشحن يُخزَّن
+ * ولا يُوزَّع».
+ */
+describe("الإدخال السريع يمرّ بمسار الشحن المحكَم", () => {
+  it("لا يكتب في القاعدة بنفسه", () => {
+    const cell = LIST.slice(LIST.indexOf("function QuickChargeCell"));
+    expect(cell).not.toContain("supabase");
+    expect(cell).not.toContain(".insert(");
+    expect(cell).not.toContain(".update(");
+  });
+
+  it("بل يفتح حوار الشحن مملوءاً", () => {
+    expect(LIST).toContain("<ChargeBalanceDialog");
+    expect(LIST).toContain("setPrefill({ customerId: c.id, customerName: c.name, amount: signed })");
+  });
+
+  it("والاتجاه بإشارة النظام: له موجب وعليه سالب", () => {
+    const cell = LIST.slice(LIST.indexOf("function QuickChargeCell"));
+    expect(cell).toContain('dir === "owes" ? -Math.abs(value) : Math.abs(value)');
+  });
+
+  it("ولا إشارةَ مزدوجة إن كتب المستخدم سالباً بيده", () => {
+    // `Math.abs` قبل الإشارة — وإلا صار «−100» في خانة «عليه» شحناً موجباً
+    const cell = LIST.slice(LIST.indexOf("function QuickChargeCell"));
+    expect(cell).toContain("Math.abs(value)");
+  });
+
+  it("والصفر لا يُمرَّر", () => {
+    const cell = LIST.slice(LIST.indexOf("function QuickChargeCell"));
+    expect(cell).toContain("Math.abs(value) > 0.009");
+    expect(cell).toContain("disabled={!ready}");
+  });
+
+  it("والاختيار مؤشَّرٌ بعلامة صح كما طُلب", () => {
+    const cell = LIST.slice(LIST.indexOf("function QuickChargeCell"));
+    expect(cell).toContain('{dir === "owed" && "✓ "}له');
+    expect(cell).toContain('{dir === "owes" && "✓ "}عليه');
+  });
+
+  it("ويُدار بالكيبورد: Enter يؤكّد، Escape يلغي، والأسهم تبدّل الاتجاه", () => {
+    const cell = LIST.slice(LIST.indexOf("function QuickChargeCell"));
+    expect(cell).toContain('if (e.key === "Enter") { e.preventDefault(); submit(); }');
+    expect(cell).toContain('else if (e.key === "Escape")');
+    expect(cell).toContain('e.key === "ArrowLeft" || e.key === "ArrowRight"');
+  });
+
+  it("والخليّة تُبلَغ بالكيبورد — Enter عليها يفتح الحقل", () => {
+    expect(LIST).toContain("tabIndex={0}");
+    expect(LIST).toContain('if (e.key === "Enter" && !editing)');
+  });
+
+  it("ومغادرة التركيز لا تُغلق الحقل قبل الضغط على أزراره", () => {
+    // بلا هذا يستحيل الضغط على «له/عليه» — يُغلق الحقل قبل وصول النقرة
+    const cell = LIST.slice(LIST.indexOf("function QuickChargeCell"));
+    expect(cell).toContain("parentElement?.contains(e.relatedTarget as Node)");
+  });
+});
+
+/* ─────────── ٦) شحن الرصيد من الكشف نفسه ─────────── */
+
+describe("كشف العميل فيه شحنٌ باختصار", () => {
+  it("زرٌّ ظاهر", () => {
+    expect(STATEMENT).toContain('data-testid="statement-charge-btn"');
+  });
+
+  it("واختصار Shift+S", () => {
+    expect(STATEMENT).toContain('if (e.key !== "S" && e.key !== "s") return');
+    expect(STATEMENT).toContain("setChargeOpen((v) => !v)");
+  });
+
+  it("ولا يختطف الكتابة في الحقول", () => {
+    expect(STATEMENT).toContain('if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable) return');
+  });
+
+  it("ولا يعمل بلا عميلٍ مختار", () => {
+    expect(STATEMENT).toContain("if (!selectedCustomerId) return;");
+  });
+
+  it("والحوار يُفتح مملوءاً بالعميل المعروض — لا قائمةَ مئاتٍ يُبحث فيها", () => {
+    expect(STATEMENT).toContain("prefill={selectedCustomer ? { customerId: selectedCustomer.id");
+  });
+
+  it("والكشف يُنعش بعد الحفظ", () => {
+    expect(STATEMENT).toContain('window.dispatchEvent(new Event("transactions:changed"))');
+  });
+
+  it("والزرّ لا يدخل الطباعة", () => {
+    const btn = STATEMENT.slice(STATEMENT.indexOf('data-testid="statement-charge-btn"') - 400,
+                                STATEMENT.indexOf('data-testid="statement-charge-btn"') + 400);
+    expect(btn).toContain("print:hidden");
+  });
+});
+
+describe("وحوار الشحن يقبل التعبئة بلا أن يفقد حارساً", () => {
+  const DLG = read("src/components/dashboard/ChargeBalanceDialog.tsx");
+
+  it("يقبل `prefill`", () => {
+    expect(DLG).toContain("prefill?: ChargePrefill | null");
+  });
+
+  it("وتحقّق التحويل البنكي باقٍ", () => {
+    expect(DLG).toContain("validateBankTransferPayment({");
+  });
+
+  it("ورفضُ الصفر باقٍ", () => {
+    expect(DLG).toContain('if (!amt) return toast.error("أدخل مبلغاً صحيحاً")');
+  });
+
+  it("ورفضُ الحفظ بلا عميل باقٍ", () => {
+    expect(DLG).toContain('if (!customerId) return toast.error("اختر العميل")');
+  });
+
+  it("والصفرُ المُمرَّر تعبئةً لا يُكتب في الحقل", () => {
+    expect(DLG).toContain("Number(prefill.amount) !== 0");
+  });
+});

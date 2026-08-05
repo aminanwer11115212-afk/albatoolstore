@@ -4,6 +4,7 @@ import { Search, FileText, X, AlertTriangle, ArrowDownAZ, TrendingDown, Trending
 import { useCustomers } from "@/hooks/useData";
 import { containsAny } from "@/utils/searchMatch";
 import { netBalanceOf, formatMoney } from "@/utils/balanceDisplay";
+import ChargeBalanceDialog, { type ChargePrefill } from "@/components/dashboard/ChargeBalanceDialog";
 
 type SortKey = "debt" | "credit" | "alpha";
 type ToneKey = "all" | "owes" | "owed" | "settled";
@@ -51,6 +52,19 @@ export default function CustomerStatementsPage() {
     () => (searchParams.get("tone") as ToneKey) || "all",
   );
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  /**
+   * إدخالٌ سريع على خليّة الرصيد — رقمٌ ثم «له/عليه» ثم ✓.
+   *
+   * طلبه صاحب المستودع: «الذهاب لمربّع حساب العميل وضغط إنتر، تكتب الرقم
+   * ويظهر اختيار له وعليه في المربّع نفسه، واختاره بعلامة صح».
+   *
+   * و**لا يكتب هذا الحقل في القاعدة**: التأكيد يفتح حوار الشحن مملوءاً بما
+   * كتبت. فتصل بضغطتين بدل خمس، ولا يُفقد حارسٌ من حرّاسه — تحقّقُ التحويل
+   * البنكي، ورفضُ الصفر، وقاعدة «الشحن يُخزَّن ولا يُوزَّع».
+   */
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+  const [prefill, setPrefill] = useState<ChargePrefill | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -269,6 +283,13 @@ export default function CustomerStatementsPage() {
         </div>
       </div>
 
+      <ChargeBalanceDialog
+        open={!!prefill}
+        onOpenChange={(v) => { if (!v) setPrefill(null); }}
+        onSaved={() => { setPrefill(null); refetch(); }}
+        prefill={prefill}
+      />
+
       {paletteOpen && (
         <CustomerJumpPalette
           rows={rows}
@@ -342,7 +363,19 @@ export default function CustomerStatementsPage() {
                         {c.phone || "—"}
                       </td>
                       <td
-                        className={`px-3 py-3 font-bold tabular-nums ${
+                        tabIndex={0}
+                        data-testid={`balance-cell-${i}`}
+                        onFocus={() => setActiveIdx(i)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !editing) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditing({ id: c.id, name: c.name || "" });
+                          }
+                        }}
+                        onClick={(e) => { e.stopPropagation(); setEditing({ id: c.id, name: c.name || "" }); }}
+                        title="Enter لإدخال مبلغٍ سريع — له أو عليه"
+                        className={`px-3 py-3 font-bold tabular-nums cursor-text outline-none focus-visible:ring-2 focus-visible:ring-primary rounded ${
                           net > 0
                             ? "text-destructive"
                             : net < 0
@@ -350,11 +383,23 @@ export default function CustomerStatementsPage() {
                               : "text-foreground"
                         }`}
                       >
-                        {Math.abs(net) < 0.01 ? "خالص" : formatMoney(Math.abs(net))}
-                        {Math.abs(net) >= 0.01 && (
-                          <span className="text-[10px] font-normal mr-1">
-                            {net > 0 ? "عليه" : "له"}
-                          </span>
+                        {editing?.id === c.id ? (
+                          <QuickChargeCell
+                            onCancel={() => setEditing(null)}
+                            onConfirm={(signed) => {
+                              setEditing(null);
+                              setPrefill({ customerId: c.id, customerName: c.name, amount: signed });
+                            }}
+                          />
+                        ) : (
+                          <>
+                            {Math.abs(net) < 0.01 ? "خالص" : formatMoney(Math.abs(net))}
+                            {Math.abs(net) >= 0.01 && (
+                              <span className="text-[10px] font-normal mr-1">
+                                {net > 0 ? "عليه" : "له"}
+                              </span>
+                            )}
+                          </>
                         )}
                       </td>
                       <td className="px-3 py-3">
@@ -511,6 +556,112 @@ function CustomerJumpPalette({
           <kbd className="font-mono"> Shift+C </kbd> يُغلق
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * الإدخال السريع داخل خليّة الرصيد — رقمٌ ثم اتجاه ثم ✓.
+ *
+ * ## لماذا لا يكتب في القاعدة
+ * لأنّ في النظام مساراً واحداً للشحن يحمل تحقّقاتٍ لا يجوز الالتفاف عليها:
+ * التحويل البنكي، ورفضُ الصفر، وقاعدةُ «الشحن يُخزَّن ولا يُوزَّع». وحقلٌ
+ * يكتب بنفسه يتخطّاها، وأوّلُ خطأٍ فيه يقع **في المال لا في العرض**.
+ *
+ * فهذا الحقل يجمع ما يُكتب بسرعة — الرقم والاتجاه — ثمّ يسلّمه للمسار المحكَم
+ * مملوءاً. ضغطتان بدل خمس، وحارسٌ لا يُفقد.
+ *
+ * ## والاتجاه بإشارة النظام
+ * «له» موجب (شحنٌ لصالحه)، و«عليه» سالب (خصمٌ يزيد دَينه) — نفس اصطلاح
+ * `isCustomerDebitAmount`. فلا اصطلاحَ ثانٍ يُترجَم بينهما.
+ */
+function QuickChargeCell({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: (signedAmount: number) => void;
+  onCancel: () => void;
+}) {
+  const [raw, setRaw] = useState("");
+  const [dir, setDir] = useState<"owed" | "owes">("owed");
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { ref.current?.focus(); }, []);
+
+  const value = Number(String(raw).replace(/[^\d.-]/g, ""));
+  const ready = Number.isFinite(value) && Math.abs(value) > 0.009;
+  /** «عليه» خصمٌ فيُرسَل سالباً — والقيمة المطلقة تمنع إشارةً مزدوجة. */
+  const signed = dir === "owes" ? -Math.abs(value) : Math.abs(value);
+
+  const submit = () => { if (ready) onConfirm(signed); };
+
+  return (
+    <div
+      className="flex items-center gap-1"
+      onClick={(e) => e.stopPropagation()}
+      data-testid="quick-charge"
+    >
+      <input
+        ref={ref}
+        value={raw}
+        inputMode="decimal"
+        onChange={(e) => setRaw(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") { e.preventDefault(); submit(); }
+          else if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+          // سهما اليمين واليسار يبدّلان الاتجاه — بلا مغادرة الحقل
+          else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+            e.preventDefault();
+            setDir((d) => (d === "owed" ? "owes" : "owed"));
+          }
+        }}
+        onBlur={(e) => {
+          // لا يُغلق حين ينتقل التركيز إلى أزراره — وإلا تعذّر الضغط عليها
+          if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) onCancel();
+        }}
+        placeholder="المبلغ"
+        data-testid="quick-charge-amount"
+        className="w-24 rounded border border-primary bg-background px-2 py-1 text-sm font-bold tabular-nums outline-none"
+      />
+
+      <div className="flex overflow-hidden rounded border border-border" role="group" aria-label="الاتجاه">
+        <button
+          type="button"
+          onClick={() => setDir("owed")}
+          aria-pressed={dir === "owed"}
+          data-testid="quick-charge-owed"
+          title="له — شحن رصيد لصالح العميل"
+          className={`px-2 py-1 text-[11px] font-bold transition ${
+            dir === "owed" ? "bg-emerald-600 text-white" : "text-muted-foreground hover:bg-muted/60"
+          }`}
+        >
+          {dir === "owed" && "✓ "}له
+        </button>
+        <button
+          type="button"
+          onClick={() => setDir("owes")}
+          aria-pressed={dir === "owes"}
+          data-testid="quick-charge-owes"
+          title="عليه — خصمٌ يزيد دَين العميل"
+          className={`px-2 py-1 text-[11px] font-bold transition ${
+            dir === "owes" ? "bg-destructive text-white" : "text-muted-foreground hover:bg-muted/60"
+          }`}
+        >
+          {dir === "owes" && "✓ "}عليه
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!ready}
+        data-testid="quick-charge-confirm"
+        title="متابعة — يفتح حوار الشحن مملوءاً"
+        className="rounded bg-primary px-2 py-1 text-[11px] font-bold text-primary-foreground disabled:opacity-40"
+      >
+        ✓
+      </button>
     </div>
   );
 }
