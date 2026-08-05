@@ -135,7 +135,7 @@ describe("ورقة الطباعة تحمل المئة كاملة", () => {
 
   it("وكل بند تغليفٍ من المئة موجود", () => {
     // جدول التغليف: صفُّ الترويسة + مئة بند + صفُّ المجموع
-    expect(packagingInfo.match(/<tr>/g)).toHaveLength(ITEM_COUNT + 2);
+    expect(packagingInfo.match(/<tr[ >]/g)).toHaveLength(ITEM_COUNT + 2);
     expect(html).toContain("نوع التغليف");
     expect(html).toContain("عدد القطع");
   });

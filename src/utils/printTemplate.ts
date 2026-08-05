@@ -357,7 +357,8 @@ ${DENSITY_CSS}
   }
   .extra-box {
     flex: 1; border: 2px solid #999; border-radius: 6px;
-    padding: 12px 16px; min-height: 80px;
+    /* بلا ارتفاعٍ أدنى: الصندوق بقدر ما فيه، لا بقدرٍ مفروض */
+    padding: 8px 12px;
   }
   /**
    * صندوق الترحيل صغير — طلبه صاحب المستودع: «اجعل تفاصيل الترحيل بسيطة
@@ -386,6 +387,8 @@ ${DENSITY_CSS}
   /* جدول التغليف يرث تنسيقه من السمات داخله (يُحقن في قالبين)، فلا يأخذ
      تنسيق جدول البنود العام. */
   .extra-content table { width: 100%; border-collapse: collapse; }
+  /* صفُّ المجموع في المتن لا في ذيلٍ يتكرّر على كل صفحة */
+  .extra-content tfoot { display: table-row-group; }
   .extra-content thead th { background: #5b4cad; color: #fff; }
 
   /* === NOTES === */

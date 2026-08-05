@@ -158,12 +158,18 @@ const PKG_BORDER = "1px solid #b8bcc4";
  * كل خاصّية تُذكر في السمة صراحةً — القالبان يحملان قواعد `table` و`thead th`
  * و«تخطيط الصفوف الزوجية» عامّةً، فبلا تصريحٍ يختلف الشكل بين ورقةٍ وأخرى.
  */
+/**
+ * حشوٌ ضيّق وسطرٌ قريب — «الجدول ممتدّ ومطّاطي رغم أنّ العناصر فيه قليلة».
+ *
+ * كان 3px حشواً بلا `line-height`، فيرث سطرَ الجسم 1.5 — فيصير ارتفاع الصفّ
+ * ضعفَ نصّه. والجدولُ الذي فيه سبعة أسطر كان يشغل نصف الورقة.
+ */
 const pkgCell = (align: "right" | "center") =>
-  `border:${PKG_BORDER};padding:3px 6px;text-align:${align};`
-  + `font-size:11.5px;line-height:1.35;background:#fff;color:#1a1a1a;font-weight:400;`;
+  `border:${PKG_BORDER};padding:2px 6px;line-height:1.25;text-align:${align};`
+  + `font-size:11.5px;background:#fff;color:#1a1a1a;font-weight:400;`;
 const pkgHeadCell = (align: "right" | "center") =>
-  `border:${PKG_BORDER};padding:3px 6px;text-align:${align};`
-  + `font-size:11.5px;line-height:1.35;background:#5b4cad;color:#fff;font-weight:700;`;
+  `border:${PKG_BORDER};padding:2px 6px;line-height:1.25;text-align:${align};`
+  + `font-size:11.5px;background:#5b4cad;color:#fff;font-weight:700;`;
 
 export function formatPackaging(headers: any[], items: any[] = []): string | undefined {
   const typeName = (r: any) => r.packaging_types?.name || "";
@@ -237,8 +243,26 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
   const totalCost = (headers || []).reduce((s, r) => s + Number(r.cost || 0), 0);
   const footCell = `${pkgCell("right")}color:#c0392b;font-weight:800;`;
   const footCellC = `${pkgCell("center")}color:#c0392b;font-weight:800;`;
+  /**
+   * صفُّ المجموع في **متن الجدول** لا في `<tfoot>`.
+   *
+   * ## العطل كما بلّغ عنه صاحب المستودع
+   * «يظهر إجمالي عدد قطع التغليف (14 قطعة) في الصفحة الأولى، رغم أنّ بقيّة
+   * أسطر التغليف في الصفحة الثانية».
+   *
+   * ## والسبب قاعدةٌ في قالب الطباعة
+   * `tfoot { display: table-footer-group; }` تجعل المتصفّح يُكرّر الذيل في
+   * **أسفل كل صفحة** يمتدّ إليها الجدول — وهو سلوكٌ مقصودٌ لذيول جداولٍ
+   * أخرى. فظهر مجموعُ القطع في نهاية الصفحة الأولى قبل أن تنتهي البنود.
+   *
+   * فصار المجموع صفّاً عادياً آخرَ `tbody`: لا يتكرّر، ولا يظهر إلا بعد آخر
+   * سطرٍ فعلاً — أي في الصفحة الأخيرة وحدها.
+   *
+   * ويُمنع انقسامه عن سطره السابق بـ`page-break-inside`، فلا يقع وحيداً في
+   * أعلى صفحةٍ بلا ما يجمعه.
+   */
   const foot = rows.length
-    ? `<tr>`
+    ? `<tr style="page-break-inside:avoid;break-inside:avoid;">`
       + `<td style="${footCellC}">${totalPacks}</td>`
       + `<td style="${footCell}">عدد القطع</td>`
       + `</tr>`
@@ -253,8 +277,7 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
       + `<th style="${pkgHeadCell("center")}width:56px;">العدد</th>`
       + `<th style="${pkgHeadCell("right")}">نوع التغليف</th>`
       + `</tr></thead>`
-      + `<tbody>${body}</tbody>`
-      + `<tfoot>${foot}</tfoot>`
+      + `<tbody>${body}${foot}</tbody>`
       + `</table>`
     : "";
 

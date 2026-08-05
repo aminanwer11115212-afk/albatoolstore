@@ -106,7 +106,8 @@ describe("ترتيب أعمدة جدول التغليف", () => {
   });
 
   it("وفي صفّ المجموع: الرقم ثم «عدد القطع»", () => {
-    const foot = table.split("<tfoot>")[1];
+    // المجموع صار صفّاً في المتن لا في `tfoot` — كي لا يتكرّر على كل صفحة
+    const foot = table.slice(table.lastIndexOf("<tr"));
     const total = pkgItems(3).reduce((s, r) => s + r.packs_count, 0);
     expect(foot.indexOf(String(total))).toBeLessThan(foot.indexOf("عدد القطع"));
   });
@@ -302,5 +303,69 @@ describe("PDF مطابقٌ للورقة — لا إطارَ شاشةٍ يتسل�
     const fn = tpl.slice(tpl.indexOf("function contentEl()"), tpl.indexOf("function genPdfBlob()"));
     expect(fn).toContain("document.body.cloneNode(true)");
     expect(share).toContain("cloneNode(true)");
+  });
+});
+
+/* ─────────── مجموع القطع في الصفحة الأخيرة وحدها ─────────── */
+
+/**
+ * ## العطل كما بلّغ عنه صاحب المستودع
+ * «يظهر إجمالي عدد قطع التغليف (14 قطعة) في الصفحة الأولى، رغم أنّ بقيّة
+ * أسطر التغليف في الصفحة الثانية».
+ *
+ * ## والسبب قاعدةٌ عامّة في القالب
+ * `tfoot { display: table-footer-group; }` تجعل المتصفّح يُكرّر الذيل أسفلَ
+ * **كل صفحة** يمتدّ إليها الجدول. وهي مقصودةٌ لجداول أخرى، فأضرّت بهذا.
+ */
+describe("مجموع القطع لا يتكرّر على الصفحات", () => {
+  const table = formatPackaging([], pkgItems(40))!;
+
+  it("لا `tfoot` في جدول التغليف", () => {
+    expect(table).not.toContain("<tfoot>");
+  });
+
+  it("والمجموع آخرُ صفٍّ في المتن", () => {
+    const lastRow = table.slice(table.lastIndexOf("<tr"));
+    expect(lastRow).toContain("عدد القطع");
+    expect(table.indexOf("عدد القطع")).toBeGreaterThan(table.indexOf("<tbody>"));
+  });
+
+  it("ولا ينقسم عن سطره السابق فيقع وحيداً أعلى صفحة", () => {
+    const lastRow = table.slice(table.lastIndexOf("<tr"));
+    expect(lastRow).toContain("page-break-inside:avoid");
+  });
+
+  it("والقالب يُبطل تكرار الذيل داخل صندوق التغليف", () => {
+    const html = sheet(40);
+    expect(html).toContain(".extra-content tfoot { display: table-row-group; }");
+  });
+
+  it("والمجموع رقمٌ واحد صحيح مهما كثرت البنود", () => {
+    const total = pkgItems(40).reduce((s, r) => s + r.packs_count, 0);
+    expect((table.match(new RegExp(`>${total}<`, "g")) || []).length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("والجدول ملمومٌ لا مطّاطي", () => {
+  const table = formatPackaging([], pkgItems(7))!;
+
+  it("حشوٌ ضيّق", () => {
+    expect(table).toContain("padding:2px 6px");
+    expect(table).not.toContain("padding:3px 6px");
+  });
+
+  it("وسطرٌ قريب — لا يرث 1.5 من الجسم فيضاعف ارتفاع الصفّ", () => {
+    expect(table).toContain("line-height:1.25");
+  });
+
+  it("والصندوق بقدر ما فيه — بلا ارتفاعٍ أدنى مفروض", () => {
+    const html = sheet(7);
+    // القاعدة الأولى `.extra-box` هي المقصودة — لا قاعدةُ كسر الصفحات التي
+    // تشترك معها في البادئة
+    const at = html.indexOf(".extra-box {\n    flex: 1;");
+    expect(at).toBeGreaterThan(-1);
+    const box = html.slice(at, html.indexOf("}", at));
+    expect(box).not.toContain("min-height");
+    expect(box).toContain("padding: 8px 12px");
   });
 });

@@ -133,7 +133,7 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     expect(out.packagingInfo).toContain("الأبعاد: 40×30×20");
     expect(out.packagingInfo).toContain("الإجمالي:");
     // والترويسة لا تُضيف صفّاً فوق البند: صفُّ بندٍ واحد + صفُّ المجموع
-    expect(out.packagingInfo!.match(/<tr>/g)).toHaveLength(3);
+    expect(out.packagingInfo!.match(/<tr[ >]/g)).toHaveLength(3);
   });
 
   it("بنودٌ متعدّدة ⇒ سطرٌ لكلٍّ منها", async () => {
@@ -151,7 +151,7 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     // قطع الطرد تُذكر بعلامة «6X» الحمراء حين تتجاوز الواحدة
     expect(out.packagingInfo).toContain("6X");
     // صفّان للبندين + صفُّ الترويسة + صفُّ المجموع
-    expect(out.packagingInfo!.match(/<tr>/g)).toHaveLength(4);
+    expect(out.packagingInfo!.match(/<tr[ >]/g)).toHaveLength(4);
   });
 });
 

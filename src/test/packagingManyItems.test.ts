@@ -73,7 +73,7 @@ describe("البنود الكثيرة تصل الورقة كاملة", () => {
 
   it("عدد الصفوف = عدد البنود (لا دمج ولا إسقاط)", () => {
     // صفُّ الترويسة + عشرون بنداً + صفُّ المجموع
-    expect(packagingInfo.match(/<tr>/g)).toHaveLength(22);
+    expect(packagingInfo.match(/<tr[ >]/g)).toHaveLength(22);
   });
 
   it("والمجموع في الذيل = مجموع الطرود", () => {
