@@ -590,7 +590,14 @@ export default function CustomerStatementPage() {
             { key: "statement", label: "البيان", align: "right" as const },
             { key: "total", label: "القيمة", numeric: true },
             { key: "paid", label: "المدفوع", numeric: true },
-            { key: "remaining", label: "المتبقي", align: "center" as const },
+            /**
+             * عمود «المتبقي» مخفيّ — طلبه صاحب المستودع صراحةً.
+             *
+             * وله وجهُه: المتبقّي على **سطرٍ واحد** ليس رصيد العميل، بل بقيّة
+             * فاتورةٍ بعينها. وقارئُ الكشف يقرأ آخر رقمٍ في السطر فيظنّه
+             * الرصيد — وهو ليس إيّاه. والرصيد الحقيقي في بطاقة «رصيد العميل
+             * الحالي» أعلى الكشف، وفي سطر المجموع.
+             */
           ],
           // جدول مسطّح: فاتورة / شحن رصيد / سداد منه — كلها أسطر متساوية.
           // الأعمدة الرقمية تستقبل رقماً أو "—" فقط — لا نص يُحوَّل إلى NaN.
@@ -971,7 +978,6 @@ export default function CustomerStatementPage() {
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">البيان</th>
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">القيمة</th>
                   <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المدفوع</th>
-                  <th className="text-right px-5 py-3 font-semibold text-muted-foreground">المتبقي</th>
                 </tr></thead>
                 <tbody>
                   {isLoading ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
@@ -990,7 +996,6 @@ export default function CustomerStatementPage() {
                       <td data-label="المدفوع" className="px-5 py-3 text-success tabular-nums">
                         {row.paid == null || row.paid < 0.009 ? "—" : row.paid.toLocaleString()}
                       </td>
-                      <td data-label="المتبقي" className="px-5 py-3"><AmountChip value={row.remaining} /></td>
                     </tr>
                     );
                   })}

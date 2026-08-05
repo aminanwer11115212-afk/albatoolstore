@@ -1,9 +1,25 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, FileText, X, AlertTriangle } from "lucide-react";
+import { Search, FileText, X, AlertTriangle, ArrowDownAZ, TrendingDown, TrendingUp, Command } from "lucide-react";
 import { useCustomers } from "@/hooks/useData";
 import { containsAny } from "@/utils/searchMatch";
 import { netBalanceOf, formatMoney } from "@/utils/balanceDisplay";
+
+type SortKey = "debt" | "credit" | "alpha";
+type ToneKey = "all" | "owes" | "owed" | "settled";
+
+const SORTS: Array<{ key: SortKey; label: string; hint: string }> = [
+  { key: "debt",   label: "الأعلى مديونية", hint: "من عليه أكثر أوّلاً" },
+  { key: "credit", label: "الأعلى رصيداً",  hint: "من له أكثر أوّلاً" },
+  { key: "alpha",  label: "أبجدي",          hint: "بالاسم من الألف" },
+];
+
+const TONES: Array<{ key: ToneKey; label: string }> = [
+  { key: "all",      label: "الكل" },
+  { key: "owes",     label: "عليه" },
+  { key: "owed",     label: "له" },
+  { key: "settled",  label: "خالص" },
+];
 
 /**
  * صفحة "كشوفات حسابات العملاء" — نقطة وصول موحّدة.
@@ -21,6 +37,21 @@ export default function CustomerStatementsPage() {
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * الترتيب والتصفية — قرارٌ في يد المستخدم بدل ترتيبٍ واحدٍ مفروض.
+   *
+   * كان الترتيب ثابتاً بالأعلى مبلغاً مطلقاً، وهو مفيدٌ لمن يلاحق الديون
+   * ومُرهقٌ لمن يبحث عن اسمٍ يعرفه. فصار الترتيب ثلاثةً والتصفية أربعاً،
+   * وكلاهما محفوظٌ في الرابط فتعود الصفحة كما تركتَها.
+   */
+  const [sortBy, setSortBy] = useState<SortKey>(
+    () => (searchParams.get("sort") as SortKey) || "debt",
+  );
+  const [tone, setTone] = useState<ToneKey>(
+    () => (searchParams.get("tone") as ToneKey) || "all",
+  );
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
@@ -32,9 +63,33 @@ export default function CustomerStatementsPage() {
     const next = new URLSearchParams(searchParams);
     if (q) next.set("q", q);
     else next.delete("q");
+    if (sortBy !== "debt") next.set("sort", sortBy); else next.delete("sort");
+    if (tone !== "all") next.set("tone", tone); else next.delete("tone");
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [q, sortBy, tone]);
+
+  /**
+   * Shift+C — لوحةُ قفزٍ سريعة بين العملاء.
+   *
+   * طلبها صاحب المستودع: «اختصارٌ منبثق للتنقّل في صفحات العملاء بشكلٍ سريع
+   * وبالكيبورد، والضغط مرّةً أخرى يُغلقه».
+   *
+   * ولمَ Shift+C لا حرفٌ مجرّد: حقلُ البحث في هذه الصفحة يأخذ التركيز تلقائياً
+   * عند فتحها، فاختصارٌ بحرفٍ واحد كان سيُكتب في الحقل بدل أن يفتح شيئاً.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.shiftKey && (e.key === "C" || e.key === "c") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+        return;
+      }
+      if (e.key === "Escape") setPaletteOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
 
   const rows = useMemo(() => {
@@ -43,12 +98,31 @@ export default function CustomerStatementsPage() {
     const filtered = query
       ? list.filter((c) => containsAny([c.name, c.phone, c.company], query))
       : list;
-    return filtered
-      .map((c) => ({ ...c, _net: netBalanceOf(c) }))
-      .sort((a, b) => Math.abs(b._net) - Math.abs(a._net));
-  }, [customers, q]);
+    const withNet = filtered.map((c) => ({ ...c, _net: netBalanceOf(c) }));
 
-  useEffect(() => setActiveIdx(0), [q]);
+    // التصفية بالاتجاه: عليه / له / خالص
+    const byTone = withNet.filter((c) => {
+      if (tone === "owes") return c._net > 0.009;
+      if (tone === "owed") return c._net < -0.009;
+      if (tone === "settled") return Math.abs(c._net) <= 0.009;
+      return true;
+    });
+
+    const sorted = [...byTone];
+    if (sortBy === "alpha") {
+      // ترتيبٌ عربيّ صحيح: `localeCompare` بلغة العربية يرتّب الألف قبل الباء
+      sorted.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ar"));
+    } else if (sortBy === "credit") {
+      // الأعلى رصيداً **له** أوّلاً — الصافي السالب هو الدائن
+      sorted.sort((a, b) => a._net - b._net);
+    } else {
+      // الأعلى مديونيةً أوّلاً — وهو الافتراضي الذي كان
+      sorted.sort((a, b) => b._net - a._net);
+    }
+    return sorted;
+  }, [customers, q, sortBy, tone]);
+
+  useEffect(() => setActiveIdx(0), [q, sortBy, tone]);
 
   const openStatement = (id: string) => navigate(`/customers/${id}/statement`);
 
@@ -125,7 +199,83 @@ export default function CustomerStatementsPage() {
             </button>
           )}
         </div>
+
+        {/* الترتيب والتصفية — شرائحُ تُقرأ بضغطةٍ لا قوائمُ تُفتح */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-center gap-1.5" role="group" aria-label="الترتيب">
+            <span className="text-[11px] font-bold text-muted-foreground">الترتيب</span>
+            {SORTS.map((s) => {
+              const on = sortBy === s.key;
+              const Icon = s.key === "alpha" ? ArrowDownAZ : s.key === "credit" ? TrendingUp : TrendingDown;
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => setSortBy(s.key)}
+                  title={s.hint}
+                  aria-pressed={on}
+                  data-testid={`sort-${s.key}`}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
+                    on
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  <Icon size={12} />
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-1.5" role="group" aria-label="التصفية">
+            <span className="text-[11px] font-bold text-muted-foreground">إظهار</span>
+            {TONES.map((t) => {
+              const on = tone === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTone(t.key)}
+                  aria-pressed={on}
+                  data-testid={`tone-${t.key}`}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
+                    on
+                      ? t.key === "owes"
+                        ? "border-destructive bg-destructive/10 text-destructive"
+                        : t.key === "owed"
+                          ? "border-emerald-600 bg-emerald-600/10 text-emerald-600"
+                          : "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            data-testid="open-palette"
+            className="ms-auto inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:bg-muted/60"
+            title="قفزٌ سريع بين العملاء"
+          >
+            <Command size={12} />
+            <kbd className="font-mono">Shift</kbd>+<kbd className="font-mono">C</kbd>
+            قفزٌ سريع
+          </button>
+        </div>
       </div>
+
+      {paletteOpen && (
+        <CustomerJumpPalette
+          rows={rows}
+          onPick={(id) => { setPaletteOpen(false); openStatement(id); }}
+          onClose={() => setPaletteOpen(false)}
+        />
+      )}
 
       <div className="legacy-card card-block">
         <div className="overflow-x-auto">
@@ -257,3 +407,110 @@ function TotalPill({
   );
 }
 
+
+/**
+ * لوحةُ القفز السريع — Shift+C.
+ *
+ * غرضُها واحد: الوصول إلى كشف عميلٍ بلا ماوس وبلا مغادرة الصفحة. تُفتح فوق
+ * ما يُعرَض، وتُغلق بـEscape أو بالضغطة نفسها، وتُعيد التركيز إلى ما كان.
+ *
+ * وتبدأ من القائمة المعروضة حالياً — بترتيبها وتصفيتها — لا من كل العملاء.
+ * فما تراه أمامك هو ما تقفز بينه، ولا تُفاجأ باسمٍ رشّحتَه بعيداً.
+ */
+function CustomerJumpPalette({
+  rows,
+  onPick,
+  onClose,
+}: {
+  rows: Array<{ id: string; name?: string | null; phone?: string | null; _net: number }>;
+  onPick: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [term, setTerm] = useState("");
+  const [idx, setIdx] = useState(0);
+  const boxRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { boxRef.current?.focus(); }, []);
+
+  const list = useMemo(() => {
+    const t = term.trim();
+    const filtered = t ? rows.filter((c) => containsAny([c.name, c.phone], t)) : rows;
+    return filtered.slice(0, 40);
+  }, [rows, term]);
+
+  useEffect(() => { setIdx(0); }, [term]);
+
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setIdx((i) => Math.min(i + 1, list.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setIdx((i) => Math.max(i - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); const t = list[idx]; if (t) onPick(t.id); }
+    else if (e.key === "Escape") { e.preventDefault(); onClose(); }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[12vh]"
+      onClick={onClose}
+      data-testid="jump-palette"
+    >
+      <div
+        dir="rtl"
+        className="w-full max-w-lg overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label="قفزٌ سريع بين العملاء"
+      >
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+          <Search size={15} className="text-muted-foreground" />
+          <input
+            ref={boxRef}
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            onKeyDown={onKey}
+            placeholder="اكتب اسم العميل ثم Enter"
+            data-testid="palette-input"
+            className="w-full bg-transparent text-sm text-foreground outline-none"
+          />
+          <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">Esc</kbd>
+        </div>
+
+        <div className="max-h-[50vh] overflow-y-auto p-1.5">
+          {list.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">لا نتائج</p>
+          ) : (
+            list.map((c, i) => {
+              const on = i === idx;
+              const net = c._net;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onMouseEnter={() => setIdx(i)}
+                  onClick={() => onPick(c.id)}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-right transition ${
+                    on ? "bg-primary/10" : "hover:bg-muted/60"
+                  }`}
+                >
+                  <span className="truncate text-sm font-semibold text-foreground">{c.name}</span>
+                  <span
+                    className={`shrink-0 tabular-nums text-xs font-bold ${
+                      net > 0.009 ? "text-destructive" : net < -0.009 ? "text-emerald-600" : "text-muted-foreground"
+                    }`}
+                  >
+                    {Math.abs(net) < 0.01 ? "خالص" : `${formatMoney(Math.abs(net))} ${net > 0 ? "عليه" : "له"}`}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t border-border px-3 py-2 text-[10px] text-muted-foreground">
+          <kbd className="font-mono">↑</kbd> <kbd className="font-mono">↓</kbd> للتنقّل ·
+          <kbd className="font-mono"> Enter </kbd> يفتح الكشف ·
+          <kbd className="font-mono"> Shift+C </kbd> يُغلق
+        </div>
+      </div>
+    </div>
+  );
+}
