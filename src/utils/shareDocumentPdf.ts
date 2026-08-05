@@ -17,6 +17,7 @@
  */
 import { buildDocumentFileName } from "@/utils/documentFileName";
 import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
+import { neutralizeSheetFrame, stripScreenOnlyCss } from "@/utils/pdfSheetFrame";
 import { buildWhatsAppDeepLink } from "@/utils/whatsapp";
 
 export interface SharePdfInput {
@@ -54,24 +55,50 @@ function mountOffscreen(html: string): HTMLElement {
   const doc = new DOMParser().parseFromString(html, "text/html");
   host.innerHTML = doc.body.innerHTML;
   for (const style of Array.from(doc.querySelectorAll("style"))) {
-    host.appendChild(style.cloneNode(true));
+    const copy = style.cloneNode(true) as HTMLStyleElement;
+    // إطارُ الشاشة لا يدخل الورق، ولا يُلبَس لعناصر التطبيق أثناء التوليد.
+    // راجع `pdfSheetFrame`.
+    copy.textContent = stripScreenOnlyCss(copy.textContent || "");
+    host.appendChild(copy);
   }
   document.body.appendChild(host);
+  // بعد الإلحاق: الإعلانات السطرية تغلب ما بقي من أنماطٍ في القالب الآخر.
+  neutralizeSheetFrame(host);
   return host;
 }
 
+/**
+ * مهلةُ انتظار الصور — بعدها يُولَّد الملف بما تحمّل.
+ *
+ * الانتظارُ بلا مهلة يعلّق الزرّ إلى الأبد: طلبٌ لا يُجيب ولا يفشل (شبكةٌ
+ * بطيئة، أو شعارٌ من نطاقٍ محجوب) لا يُطلق `load` ولا `error`، فيبقى الوعد
+ * معلّقاً ويبقى الزرّ «جاري التجهيز...» بلا نهاية ولا رسالة.
+ *
+ * وشعارٌ ناقصٌ أهون من زرٍّ لا يستجيب.
+ */
+export const IMAGE_WAIT_MS = 4000;
+
 /** ينتظر تحميل الصور حتى لا يخرج الشعار فارغاً في PDF. */
-async function waitForImages(root: HTMLElement): Promise<void> {
-  const imgs = Array.from(root.querySelectorAll("img"));
-  await Promise.all(
-    imgs.map((img) =>
-      img.complete
-        ? Promise.resolve()
-        : new Promise<void>((res) => {
-            img.onload = img.onerror = () => res();
-          }),
+export async function waitForImages(root: HTMLElement, timeoutMs = IMAGE_WAIT_MS): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll("img")).filter((img) => !img.complete);
+  if (imgs.length === 0) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<void>((res) => {
+    timer = setTimeout(res, timeoutMs);
+  });
+  const all = Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((res) => {
+          img.onload = img.onerror = () => res();
+        }),
     ),
-  );
+  ).then(() => undefined);
+  try {
+    await Promise.race([all, deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export async function buildPdfBlob(html: string): Promise<Blob> {

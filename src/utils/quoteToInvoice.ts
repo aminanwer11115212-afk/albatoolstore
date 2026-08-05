@@ -192,6 +192,11 @@ export async function convertQuoteToInvoice(
     const { error } = await supabase.from("invoice_transports").insert(payload);
     if (error) console.error("[convertQuoteToInvoice] transports copy failed", error);
     else copied.transports = payload.length;
+  } else {
+    // عرضُ سعرٍ بلا ترحيل: الفاتورة تأخذ افتراضيات العميل بدل أن تخرج فارغة.
+    const { seedTransportFromCustomerDefaults } = await import("@/utils/customerTransportDefaults");
+    const seed = await seedTransportFromCustomerDefaults("invoice", inv.id, (inv as any).customer_id);
+    if (seed.seeded) copied.transports = 1;
   }
 
   // 5c. Copy packaging headers + build old→new id map, then items
