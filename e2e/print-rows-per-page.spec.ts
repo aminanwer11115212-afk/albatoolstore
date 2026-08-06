@@ -296,3 +296,69 @@ test.describe("المعاينة تُقسَّم صفحاتٍ مرقّمة", () =>
     expect(m.foots).toEqual([]);
   });
 });
+
+/* ─────────── الشكل واحدٌ في كل مخرج — بالتصيير لا بالنصّ ─────────── */
+
+/**
+ * «تحقّق من هذا الشكل في جميع مكان إنشاء ومعاينة وطباعة وتعديل وPDF».
+ *
+ * والفحصُ هنا **هندسيّ**: يقيس موضعَ اسم العميل من حافّة اليمين، وانحرافَ
+ * العنوان عن منتصف الورقة، وموضعَ التاريخ من حافّة اليسار، ومقاسَ الخطّ —
+ * في أنواع المستندات كلِّها. فاختلافُ مخرجٍ واحدٍ يظهر رقماً لا انطباعاً.
+ *
+ * ويكمّله `src/test/docHeadEverywhere.test.ts` على البنية، وهذا على المقاس.
+ */
+test.describe("شريطُ الترويسة هندسةٌ واحدة في المستندات كلّها", () => {
+  const DOCS: Array<[string, Record<string, unknown>]> = [
+    ["فاتورة", { type: "invoice" }],
+    ["فاتورة كاش", { type: "invoice", isCash: true }],
+    ["عرض سعر", { type: "quote" }],
+    ["أمر شراء", { type: "purchase" }],
+    ["مرتجع", { type: "return" }],
+    ["كشف جرد", { type: "invoice", variant: "stocktake" }],
+    ["منتجات بلا أسعار", { type: "invoice", variant: "no-account" }],
+  ];
+
+  test("العميل يميناً، والعنوان في المنتصف، والتاريخ يساراً — بنفس المقاس", async ({ page }) => {
+    const seen: Array<[string, string]> = [];
+
+    for (const [name, extra] of DOCS) {
+      const list = items(8);
+      const total = list.reduce((s, r) => s + r.total, 0);
+      const html = generatePrintHTML({
+        number: "INV-89170", date: "2026-08-06",
+        customer: { name: "امين انور" },
+        items: list, subtotal: total, taxTotal: 0, discountTotal: 0, grandTotal: total,
+        company: null, transportInfo: transportHtml,
+        ...extra,
+      } as any);
+
+      await page.emulateMedia({ media: "screen" });
+      await page.setContent(html, { waitUntil: "networkidle" });
+
+      const geom = await page.evaluate(() => {
+        const pg = document.querySelector(".page")!.getBoundingClientRect();
+        const right = document.querySelector(".doc-head-right")!.getBoundingClientRect();
+        const title = document.querySelector(".doc-title")!.getBoundingClientRect();
+        const left = document.querySelector(".doc-head-left")!.getBoundingClientRect();
+        const line = document.querySelector(".info-line") as HTMLElement;
+        return [
+          Math.round(pg.right - right.right),                                  // العميل من اليمين
+          Math.round((title.left + title.right) / 2 - (pg.left + pg.right) / 2), // انحرافُ العنوان
+          Math.round(left.left - pg.left),                                     // التاريخ من اليسار
+          getComputedStyle(line).fontSize,
+        ].join("|");
+      });
+      seen.push([name, geom]);
+    }
+
+    // العنوانُ في المنتصف الحقيقي: انحرافُه صفر
+    for (const [name, g] of seen) {
+      expect(g.split("|")[1], `${name}: انحرافُ العنوان عن المنتصف`).toBe("0");
+      expect(g.split("|")[3], `${name}: مقاسُ خطّ التفاصيل`).toBe("15px");
+    }
+    // وهندسةُ الشريط واحدةٌ في الجميع
+    const distinct = new Set(seen.map(([, g]) => g));
+    expect(Array.from(distinct), seen.map(([n, g]) => `${n}=${g}`).join(" · ")).toHaveLength(1);
+  });
+});
