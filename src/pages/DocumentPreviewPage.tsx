@@ -11,6 +11,7 @@ import DiscountInput from "@/components/shared/DiscountInput";
 import { computeInvoiceStatusAfterPayment } from "@/utils/invoiceStatus";
 import { toast } from "sonner";
 import { netBalanceOf } from "@/utils/balanceDisplay";
+import { accountArgsForQuote } from "@/utils/documentAccountArgs";
 import { netBeforeInvoice } from "@/utils/customerNetBefore";
 import { useDocumentFrameFit } from "@/utils/documentFrameFit";
 import DocumentFrameZoom from "@/components/common/DocumentFrameZoom";
@@ -126,8 +127,8 @@ export default function DocumentPreviewPage({ docType }: Props) {
             variant,
             noHeader,
             oldBalance: netBalanceOf(qCust),
-            previousDebt: Number(qCust?.balance || 0),
-            previousCredit: Number(qCust?.credit_balance || 0),
+            // مصدرٌ واحد مع شاشة عرض السعر — راجع `documentAccountArgs`
+            ...accountArgsForQuote(qCust),
             hidePaidBox: false,
             ...extras,
           });

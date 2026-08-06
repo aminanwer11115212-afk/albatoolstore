@@ -64,6 +64,11 @@ import { ALLOWED_INVOICE_STATUSES, computeInvoiceStatusAfterPayment, isAllowedIn
 import { splitPayment } from "@/utils/overpayment";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { CustomerInfoStrip, netBalanceOf } from "@/utils/balanceDisplay";
+import {
+  accountArgsForInvoice,
+  NO_ACCOUNT,
+  type DocumentAccountArgs,
+} from "@/utils/documentAccountArgs";
 import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
 
 import { useInvoiceKeyboardNav } from "@/hooks/document/useInvoiceKeyboardNav";
@@ -561,6 +566,33 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
     })();
     return () => { alive = false; };
   }, [invoiceIdForExtras, packagingDialogOpen, transportDialogOpen]);
+
+  /**
+   * حسابُ العميل في الورقة — كما تحسبه المعاينة تماماً.
+   *
+   * كانت هذه الشاشة لا تمرّره أصلاً، فيسقط القالب إلى أصفاره: لا حسابَ قديم،
+   * ولا مدفوع، والرصيدُ الحالي = جملةُ الفاتورة كلُّها على العميل. فيستلم
+   * العميل ورقةً بدَينٍ ليس عليه. راجع `documentAccountArgs`.
+   */
+  const [accountArgs, setAccountArgs] = useState<DocumentAccountArgs>(NO_ACCOUNT);
+  useEffect(() => {
+    if (pos || !customer?.id) { setAccountArgs(NO_ACCOUNT); return; }
+    let alive = true;
+    (async () => {
+      const args = await accountArgsForInvoice(
+        invoiceIdForExtras,
+        {
+          balance: Number(customerBalances?.debt || 0),
+          credit_balance: Number(customerBalances?.credit || 0),
+          net_balance: customerBalances?.net,
+        },
+        savedPaid,
+        customer.id,
+      );
+      if (alive) setAccountArgs(args);
+    })();
+    return () => { alive = false; };
+  }, [pos, customer?.id, invoiceIdForExtras, customerBalances, savedPaid]);
 
   // ---------- Search ----------
   /**
@@ -1598,6 +1630,8 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       company,
       variant,
       noHeader,
+      // حسابُ العميل — بلا هذا تخرج الورقةُ بدَينٍ ليس عليه. راجع أعلاه.
+      ...accountArgs,
       ...printExtras,
     } as any);
   }

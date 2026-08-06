@@ -72,7 +72,10 @@ interface PrintData {
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
 import { computeDocumentBalance } from "@/utils/documentBalanceSummary";
 import { signedAmountText } from "@/utils/buildCustomerAccountView";
-import { printDensity, densityClass, DENSITY_CSS } from "@/utils/printDensity";
+import {
+  printDensity, densityClass, DENSITY_CSS,
+  ACCOUNT_FONT_PX, ACCOUNT_ROW_H_PX,
+} from "@/utils/printDensity";
 import { PDF_SCALE_INLINE_JS } from "@/utils/pdfCanvasScale";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
@@ -322,6 +325,21 @@ ${DENSITY_CSS}
     padding: 7px 10px; text-align: center; font-size: 13px;
     border: 1px solid #999;
   }
+  /*
+   * عمودا الكمية والسعر أكبرُ من بقيّة الخلايا وأثقلُ خطّاً.
+   *
+   * شكا صاحبُ المستودع صِغَرَهما، وسببُه أنهما كانا الخليّتين الوحيدتين بلا
+   * ثقلٍ ولا زيادة: عمودُ الجملة سميك وعمودُ الاسم عريض، وهما رقمان رفيعان
+   * بمقاس الخلية العام — وهما أوّلُ ما يراجعه العميل.
+   *
+   * والمقاسُ يتبع الكثافة كبقيّة الورقة — قواعدُه في وحدة الكثافة وحدها.
+   *
+   * ولا تُكتب هنا نصوصُ الأقسام كما تظهر للعميل: تعليقاتُ هذا المقطع تخرج
+   * في الورقة، وفحوصُ الإخفاء تبحث عن تلك النصوص فتجدها في تعليقٍ فتسقط.
+   */
+  .col-qty, .col-price {
+    font-size: 15px; font-weight: 800; color: #111;
+  }
   tbody tr:nth-child(even) { background: #f8f8f8; }
   .total-row td {
     font-weight: 800; font-size: 14px;
@@ -379,9 +397,46 @@ ${DENSITY_CSS}
   /**
    * الحساب بقدر أرقامه: عرضٌ ثابتٌ لا يتمدّد ولا ينضغط، فتبقى الأعمدة على
    * محاذاةٍ واحدة مهما طالت أسماء الصفوف.
+   *
+   * ## ومكانُه لا يتحرّك بإخفاء غيره
+   * طلبه صاحبُ المستودع: يبقى في مكانه مهما أُخفي حوله. وكان يتحرّك من طرفين،
+   * قِيسا بالتصيير:
+   *   1. **عرضاً بإخفاء جاره في السطر.** السطرُ موزَّعٌ بـspace-between، وهي
+   *      بعنصرٍ واحد تُلصقه بالبداية — والبدايةُ يمينٌ في RTL. فبإخفاء جاره
+   *      قفز 458px من طرفٍ إلى طرف. وهامشُ inline-start التلقائي يدفعه إلى
+   *      الطرف الآخر دائماً، بجارٍ أو بلا جار.
+   *   2. **علوّاً بإخفاء صفٍّ منه.** إخفاءُ صفٍّ واحد أنزل ارتفاعه من 122 إلى
+   *      99 فصعد ما تحته 24px. فيُحجز ارتفاعُه بمتغيّر --acct-h يكتبه القالب
+   *      من عدد صفوفه المرسومة — فالإخفاء يُفرغ مكان الصفّ ولا يزيله.
+   *
+   * ولا تُكتب أسماءُ الصفوف هنا كما تظهر للعميل: التعليقُ يخرج في الورقة،
+   * وفحوصُ الإخفاء تبحث عن تلك الأسماء فتجدها في تعليقٍ فتسقط.
    */
   .account-box {
-    flex: 0 0 auto; width: 260px; max-width: 44%; margin: 0;
+    flex: 0 0 auto; width: auto; min-width: 260px; max-width: 46%; margin: 0;
+    margin-inline-start: auto;
+    min-height: var(--acct-h, 0);
+  }
+  /*
+   * صفٌّ واحدٌ لكل بند مهما كبر المبلغ — وإلا سقط الارتفاعُ المحجوز.
+   *
+   * الحجزُ عددُ صفوفٍ × ارتفاعِ صفّ، وهو صحيحٌ ما دام الصفُّ سطراً. وبعرضٍ
+   * ثابتٍ 260px يلتفّ الرقمُ عند **تسعة أرقام** — أي مئاتِ الملايين، وهي في
+   * متناول هذا المستند. قِيس: 968,125,000 رفع الصندوق 125 ← 134، فتجاوز
+   * حجزَه وعاد يتحرّك بإخفاء صفّ.
+   *
+   * فالصندوقُ يتّسع بالرقم بدل أن يلتفّ به: عرضُه من محتواه فوق أرضيةِ
+   * 260px، وسقفُه 46% من الورقة. قِيس إلى اثني عشر رقماً: العرضُ 260 ← 308
+   * والارتفاعُ 125 ثابت، ولا يفيض عن الورقة.
+   */
+  .account-box td { white-space: nowrap; }
+  /*
+   * ولا يُشطر بين صفحتين. هو جدولٌ، والقاعدة العامّة تسمح بقسمة الجداول —
+   * فوقع القطعُ بين صفوفه وذهب آخرُها وحده إلى الصفحة التالية، وهو صفُّ
+   * الرصيد الذي جاء العميلُ لأجله. والقاعدة أخصُّ من العامّة فتغلبها.
+   */
+  .account-box, .account-box tbody, .account-box tr {
+    page-break-inside: avoid; break-inside: avoid;
   }
   /** والتغليف وحده في سطره، بعرض الورقة كاملاً. */
   .extra-row--pkg { margin-top: 10px; }
@@ -505,9 +560,9 @@ ${showItems ? (variant === "stocktake" ? `
   <tbody>
     ${items.map((it, i) => `
       <tr>
-        <td style="font-weight:800;font-size:14px;">${it.quantity}</td>
+        <td class="col-qty">${it.quantity}</td>
         <td class="product-name">${esc(it.product_name)}</td>
-        <td>${(Number(it.unit_price) || 0).toLocaleString()}</td>
+        <td class="col-price">${(Number(it.unit_price) || 0).toLocaleString()}</td>
         <td style="font-weight:700;">${(Number(it.total) || 0).toLocaleString()}</td>
         <td style="text-align:center;"><span style="display:inline-block;width:18px;height:18px;border:1.5px solid #333;border-radius:50%;"></span></td>
         <td>${i + 1}</td>
@@ -535,7 +590,7 @@ ${showItems ? (variant === "stocktake" ? `
       <tr>
         <td>${i + 1}</td>
         <td class="product-name">${esc(it.product_name)}</td>
-        <td>${it.quantity}</td>
+        <td class="col-qty">${it.quantity}</td>
       </tr>
     `).join("")}
   </tbody>
@@ -557,8 +612,8 @@ ${showItems ? (variant === "stocktake" ? `
       <tr>
         <td>${i + 1}</td>
         <td class="product-name">${esc(it.product_name)}</td>
-        <td>${it.quantity}</td>
-        <td>${it.unit_price.toLocaleString()}</td>
+        <td class="col-qty">${it.quantity}</td>
+        <td class="col-price">${it.unit_price.toLocaleString()}</td>
         <td style="font-weight:700;">${it.total.toLocaleString()}</td>
       </tr>
     `).join("")}
@@ -628,9 +683,15 @@ const accountBox = !showAccount ? "" : (() => {
   const finalDisplay = finalSigned.text;
   const finalBadge = isSettled ? "" : finalNet > 0 ? "عليه" : "له";
   const finalColor = TONE_COLOR[finalSigned.tone];
-  // خلايا بنمط Excel: حدود رفيعة رمادية، خلفية عنوان فاتحة، خط رقمي أحادي المسافات، مضغوط في الأسفل.
-  const cellR = "padding:3px 6px;text-align:right;font-weight:700;color:#111;background:#f4f6f8;border:1px solid #b8bcc4;line-height:1.1;font-size:10px;";
-  const cellL = "padding:3px 6px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.1;font-family:'Consolas','Courier New',monospace;font-size:10.5px;letter-spacing:0.2px;";
+  /*
+   * خلايا بنمط Excel: حدود رفيعة رمادية، خلفية عنوان فاتحة، خط رقمي أحادي
+   * المسافات. ومقاساتُها من `ACCOUNT_FONT_PX` وحده — «مربّع تفاصيل الحساب
+   * الخط صغير كبّره»، وكان أدناها 9.5px أي **تحت أرضية القراءة** نفسها التي
+   * تحرسها الكثافة (`MIN_FONT_PX`). فصارت الأرقامُ تُقرأ بلا عدسة.
+   */
+  const A = ACCOUNT_FONT_PX;
+  const cellR = `padding:4px 7px;text-align:right;font-weight:700;color:#111;background:#f4f6f8;border:1px solid #b8bcc4;line-height:1.15;font-size:${A.label}px;`;
+  const cellL = `padding:4px 7px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.15;font-family:'Consolas','Courier New',monospace;font-size:${A.value}px;letter-spacing:0.2px;`;
   const row = (opts: {
     section: string; label: string; value: string;
     valColor?: string; strong?: boolean; sideBadge?: string; badgeColor?: string;
@@ -638,16 +699,13 @@ const accountBox = !showAccount ? "" : (() => {
   }) => `
     <tr data-section="${opts.section}" data-section-label="${opts.label}">
       <td style="${cellR}${opts.strong ? "background:#e8eef7;" : ""}">${opts.label}</td>
-      <td class="${opts.valueClass || "summary-box-value"}" style="${cellL}${opts.valColor ? `color:${opts.valColor};` : ""}${opts.strong ? "background:#eef4fb;font-size:11.5px;" : ""}">${opts.value}</td>
-      <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:9.5px;color:${opts.badgeColor || "#111"};white-space:nowrap;">${opts.sideBadge || ""}</td>
+      <td class="${opts.valueClass || "summary-box-value"}" style="${cellL}${opts.valColor ? `color:${opts.valColor};` : ""}${opts.strong ? `background:#eef4fb;font-size:${A.strong}px;` : ""}">${opts.value}</td>
+      <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:${A.badge}px;color:${opts.badgeColor || "#111"};white-space:nowrap;">${opts.sideBadge || ""}</td>
     </tr>`;
-  return `
-<!-- ملخّص الحساب على شكل خلايا Excel: أصغر من جدول البنود، مضغوط في الأسفل -->
-<table class="account-box" data-section="account-summary" data-section-label="ملخص الحساب" style="border-collapse:collapse;font-size:10px;">
-  <tbody>
-    ${row({ section: "invoice-value", label: isQuote ? "قيمة عرض السعر" : "قيمة الفاتورة", value: fmt(invoiceValue) })}
-    ${generalDiscount > 0.01 ? row({ section: "discount-row", label: isQuote ? "الخصم على العرض" : "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : ""}
-    ${!isQuote && hasPrev ? (() => {
+  const rows = [
+    row({ section: "invoice-value", label: isQuote ? "قيمة عرض السعر" : "قيمة الفاتورة", value: fmt(invoiceValue) }),
+    generalDiscount > 0.01 ? row({ section: "discount-row", label: isQuote ? "الخصم على العرض" : "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : "",
+    !isQuote && hasPrev ? (() => {
       const prevSigned = signedAmountText(-prevNet);
       return row({
         section: "prev-account-row",
@@ -657,15 +715,27 @@ const accountBox = !showAccount ? "" : (() => {
         sideBadge: prevNet > 0 ? "عليه" : "له",
         badgeColor: TONE_COLOR[prevSigned.tone],
       });
-    })() : ""}
-    ${row({ section: "majmoo-row", label: isQuote ? "إجمالي عرض السعر" : "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
-    ${isQuote ? "" : row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
-    ${isQuote && !hasPrev ? "" : `
+    })() : "",
+    row({ section: "majmoo-row", label: isQuote ? "إجمالي عرض السعر" : "جملة الحساب", value: fmt(jomlaHesab), strong: true }),
+    isQuote ? "" : row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" }),
+    isQuote && !hasPrev ? "" : `
     <tr data-section="final-status" data-section-label="رصيد العميل الحالي">
       <td style="${cellR}background:#e8eef7;">رصيد العميل الحالي</td>
-      <td data-section="final-total" data-section-label="رصيد العميل الحالي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:11.5px;color:${finalColor};">${finalDisplay}</td>
-      <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:9.5px;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
-    </tr>`}
+      <td data-section="final-total" data-section-label="رصيد العميل الحالي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:${A.strong}px;color:${finalColor};">${finalDisplay}</td>
+      <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:${A.badge}px;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
+    </tr>`,
+  ].filter(Boolean);
+  /*
+   * الارتفاعُ محجوزٌ بعدد الصفوف المرسومة — لا بما يبقى منها بعد الإخفاء.
+   * فمن أخفى «الحساب القديم» أو «المدفوع» بزرّ تخصيص الرؤية يجد الفراغَ
+   * مكانَه ولا يصعد ما تحته. راجع `.account-box` في الأنماط.
+   */
+  const reservedH = rows.length * ACCOUNT_ROW_H_PX;
+  return `
+<!-- ملخّص الحساب على شكل خلايا Excel: أصغر من جدول البنود، مضغوط في الأسفل -->
+<table class="account-box" data-section="account-summary" data-section-label="ملخص الحساب" data-acct-rows="${rows.length}" style="border-collapse:collapse;font-size:${A.label}px;--acct-h:${reservedH}px;">
+  <tbody>
+    ${rows.join("")}
   </tbody>
 </table>
 `;

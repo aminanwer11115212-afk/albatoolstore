@@ -30,7 +30,20 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        /*
+         * متصفّحٌ مثبَّتٌ مسبقاً حين لا يطابق ما نزّله Playwright.
+         *
+         * بيئاتُ التشغيل المُدارة تأتي بكروم في مسارٍ ثابت، ونسختُه لا تطابق
+         * ما تطلبه نسخةُ Playwright في package.json — فيسقط كلُّ ملفّ e2e
+         * بـ«Executable doesn't exist» قبل أن يبدأ. فيُمرَّر المسار بمتغيّر
+         * بيئة بدل تنزيلٍ لا يُسمح به.
+         */
+        launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH
+          ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
+          : undefined,
+      },
     },
   ],
 });

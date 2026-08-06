@@ -62,6 +62,7 @@ import type { ParsedLine } from "@/hooks/useMessageImport";
 import ColumnsEditFloatingPanel from "@/components/ColumnsEditFloatingPanel";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { CustomerInfoStrip, netBalanceOf } from "@/utils/balanceDisplay";
+import { accountArgsForQuote } from "@/utils/documentAccountArgs";
 
 
 /**
@@ -928,7 +929,8 @@ export default function QuoteCreatePage() {
       grandTotal: totals.total,
       notes,
       company: company as any,
-      oldBalance: netBalanceOf(customer as any),
+      // حسابُ العميل — مصدرٌ واحد مع المعاينة. راجع `documentAccountArgs`.
+      ...accountArgsForQuote(customer as any),
       variant,
       noHeader,
       // تفاصيل التغليف والترحيل — كانت `loadQuoteExtras` مستوردةً بلا استعمال،

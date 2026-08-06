@@ -151,8 +151,19 @@ export async function waitForImages(root: HTMLElement, timeoutMs = IMAGE_WAIT_MS
 /**
  * العناصرُ التي لا يُشطر جسمُها بين صفحتين — تُجمع مواضعُ رؤوسها حدوداً
  * للقطع. صفُّ بندٍ منشطرٌ نصفين أقبحُ من فراغٍ في ذيل الصفحة.
+ *
+ * ومربّعُ الحساب فيها **بجملته لا بصفوفه**: هو جدول، فكلُّ `tr` منه حدُّ قطعٍ
+ * مستحسن — فوقع القطعُ بين صفوفه، وخرجت الصفحةُ الأولى بأربعةٍ منه وذهب
+ * «رصيد العميل الحالي» وحده إلى الثانية. وهو الرقمُ الذي جاء العميل لأجله.
+ *
+ * فمنعُ القسمة يقع في موضعين: قاعدةٌ في القالب (`page-break-inside: avoid`)
+ * لمسار الطباعة، وإسقاطُ حدود صفوفه من قائمة القطع هنا — في `safeBreaks`
+ * أسفله — لمسار الـPDF.
  */
-const UNSPLITTABLE = "tr, .extra-box, .signatures, [data-pkg-rows], [data-pkg-line], .notes-section";
+const UNSPLITTABLE = "tr, .extra-box, .account-box, .signatures, [data-pkg-rows], [data-pkg-line], .notes-section";
+
+/** عناصرُ لا يُقطع **داخلها** — فتُسقط حدودُ ما بداخلها من قائمة القطع. */
+const ATOMIC = ".account-box";
 
 /** مواضعُ القطع المستحسنة داخل الورقة، بالبكسل المصوَّر. */
 function safeBreaks(sheet: HTMLElement, scale: number): number[] {
@@ -161,6 +172,18 @@ function safeBreaks(sheet: HTMLElement, scale: number): number[] {
   for (const el of Array.from(sheet.querySelectorAll<HTMLElement>(UNSPLITTABLE))) {
     const y = (el.getBoundingClientRect().top - top) * scale;
     if (y > 0) out.push(Math.round(y));
+  }
+  /*
+   * حدودُ ما بداخل العنصر الذرّي تُسقط: رأسُه وحده حدُّ قطع، وما بين صفوفه
+   * ليس كذلك. وإلا قُطع المربّعُ من داخله وذهب آخرُ صفوفه إلى صفحةٍ تالية.
+   */
+  for (const box of Array.from(sheet.querySelectorAll<HTMLElement>(ATOMIC))) {
+    const r = box.getBoundingClientRect();
+    const from = (r.top - top) * scale;
+    const to = (r.bottom - top) * scale;
+    for (let i = out.length - 1; i >= 0; i--) {
+      if (out[i] > from + 1 && out[i] < to) out.splice(i, 1);
+    }
   }
   return out;
 }
