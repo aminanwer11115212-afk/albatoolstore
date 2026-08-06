@@ -47,24 +47,62 @@ export function pdfNameFor(input: SharePdfInput): string {
   });
 }
 
-/** حاوية مخفية خارج الشاشة — html2pdf يحتاج عنصراً مُلحقاً بالمستند فعلاً. */
-function mountOffscreen(html: string): HTMLElement {
-  const host = document.createElement("div");
+/**
+ * حاوية مخفية خارج الشاشة — html2pdf يحتاج عنصراً مُلحقاً بالمستند فعلاً.
+ *
+ * ## غلافان لا غلافٌ واحد: الإزاحةُ خارجاً والورقةُ داخلاً
+ *
+ * كان الغلافُ واحداً يحمل الإزاحة والورقة معاً:
+ *
+ *     position: fixed; left: -10000px; ...
+ *
+ * ويُسلَّم إلى html2pdf كما هو. و`toContainer` في html2pdf يستنسخ ما يُعطى
+ * ثمّ يفرض عليه سطراً واحداً:
+ *
+ *     container.firstChild.style.position = 'relative';
+ *
+ * فيبطل `fixed` ويبقى `left: -10000px` — و`left` تحت `relative` **إزاحةٌ
+ * فعلية** لا تموضعٌ مطلق. فتنزاح الورقةُ المرسومة عشرةَ آلاف بكسلٍ يساراً
+ * خارج الحاوية التي يصوّرها html2canvas، فيخرج الملفُّ **صفحةً بيضاء**:
+ * صفحةٌ واحدة بلا صورةٍ أصلاً — لا `/Subtype /Image` فيها ولا علامةُ JPEG.
+ *
+ * وأثرُه لا يظهر في المعاينة لأن شريط الأدوات داخل الورقة يُسلّم html2pdf
+ * غلافاً ساكناً (`contentEl`) لا مزاحاً.
+ *
+ * فصار الغلافُ الخارجيُّ يحمل الإزاحة وحدها، والداخليُّ ساكنٌ يحمل الورقة —
+ * وهو ما يُسلَّم إلى html2pdf. فلا إزاحةَ تنجو إلى الاستنساخ.
+ *
+ * وقيس الفرق: 3,058 بايت بلا صورة ← 382,783 بايت بصورةٍ مُضمَّنة.
+ */
+interface MountedSheet {
+  /** يُزال بعد التوليد */
+  outer: HTMLElement;
+  /** يُسلَّم إلى html2pdf — ساكنٌ بلا إزاحة */
+  sheet: HTMLElement;
+}
+
+function mountOffscreen(html: string): MountedSheet {
   // بعيداً عن الشاشة لا `display:none`: المخفي بلا أبعاد يُنتج صفحة فارغة
-  host.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;background:#fff;";
+  const outer = document.createElement("div");
+  outer.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;";
+
+  const sheet = document.createElement("div");
+  sheet.style.cssText = "width:794px;background:#fff;";
+
   const doc = new DOMParser().parseFromString(html, "text/html");
-  host.innerHTML = doc.body.innerHTML;
+  sheet.innerHTML = doc.body.innerHTML;
   for (const style of Array.from(doc.querySelectorAll("style"))) {
     const copy = style.cloneNode(true) as HTMLStyleElement;
     // إطارُ الشاشة لا يدخل الورق، ولا يُلبَس لعناصر التطبيق أثناء التوليد.
     // راجع `pdfSheetFrame`.
     copy.textContent = stripScreenOnlyCss(copy.textContent || "");
-    host.appendChild(copy);
+    sheet.appendChild(copy);
   }
-  document.body.appendChild(host);
+  outer.appendChild(sheet);
+  document.body.appendChild(outer);
   // بعد الإلحاق: الإعلانات السطرية تغلب ما بقي من أنماطٍ في القالب الآخر.
-  neutralizeSheetFrame(host);
-  return host;
+  neutralizeSheetFrame(sheet);
+  return { outer, sheet };
 }
 
 /**
@@ -102,21 +140,22 @@ export async function waitForImages(root: HTMLElement, timeoutMs = IMAGE_WAIT_MS
 }
 
 export async function buildPdfBlob(html: string): Promise<Blob> {
-  const host = mountOffscreen(html);
+  const { outer, sheet } = mountOffscreen(html);
   try {
-    await waitForImages(host);
+    await waitForImages(sheet);
     const html2pdf = (await import("html2pdf.js")).default;
+    // `sheet` لا `outer`: المزاحُ يخرج مرسومه من الحاوية المصوَّرة. راجع أعلاه.
     return await html2pdf()
       .set({
         margin: 8,
         image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: pdfScaleForElement(host), useCORS: true, logging: false },
+        html2canvas: { scale: pdfScaleForElement(sheet), useCORS: true, logging: false },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       } as any)
-      .from(host)
+      .from(sheet)
       .outputPdf("blob");
   } finally {
-    host.remove();
+    outer.remove();
   }
 }
 
