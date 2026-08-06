@@ -187,16 +187,24 @@ describe("تفاصيل الترحيل بسيطة ومربّعها صغير", () 
     expect(transportInfo).not.toContain("<div");
   });
 
+  /**
+   * الترحيلُ يتقاسم سطرَه مع الحساب، فلا يتمدّد بعرض الورقة: نصفُ السطر حدُّه
+   * الأعلى، ويبقى إلى جانبه الحسابُ بقدره لا مضغوطاً.
+   */
   it("والصندوق يأخذ قدره لا نصف الورقة", () => {
     const html = sheet(5, 3);
     expect(html).toContain("extra-box--transport");
-    expect(html).toMatch(/\.extra-box--transport\s*\{[^}]*flex:\s*0 1 32%/);
+    expect(html).toMatch(/\.extra-row--head \.extra-box--transport\s*\{[^}]*max-width:\s*50%/);
   });
 
-  it("وحين ينزل تحت تغليفٍ طويل لا يتمدّد بعرض الورقة", () => {
+  it("ولا يتمدّد ولو كثر التغليف — التغليفُ في سطرٍ آخر أصلاً", () => {
     const html = sheet(5, 30);
-    expect(html).toContain('class="extra-row extra-row--transport"');
-    expect(html).toMatch(/\.extra-row--transport \.extra-box--transport\s*\{[^}]*max-width:\s*62%/);
+    expect(html).toContain('class="extra-row extra-row--head"');
+    expect(html).toContain('class="extra-row extra-row--pkg"');
+    // الترحيل في صفّ الرأس لا في صفّ التغليف. والقياس بالسمة كاملةً: اسم
+    // الصنف مكتوبٌ في قواعد `<style>` أعلى الورقة أيضاً.
+    expect(html.indexOf('data-section="transport"'))
+      .toBeLessThan(html.indexOf('class="extra-row extra-row--pkg"'));
   });
 });
 

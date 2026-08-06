@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { formatPackaging, formatTransports } from "@/utils/printExtras";
+import { formatPackaging, formatTransports, packagingColumns } from "@/utils/printExtras";
 import { generatePrintHTML, buildPrintWindowHtml } from "@/utils/printTemplate";
 
 const pkgItems = (n: number) =>
@@ -43,48 +43,68 @@ const boxOrder = (html: string) => [
   { key: "transport", at: html.indexOf('data-section="transport"') },
 ].sort((a, b) => a.at - b.at).map((b) => b.key);
 
-// الصنف قد يحمل مُعدِّلاً (`extra-row extra-row--transport`) فيُعدّ بالبادئة
+// الصنف يحمل مُعدِّلاً دائماً (`extra-row extra-row--head`) فيُعدّ بالبادئة
 const extraRowCount = (html: string) => (html.match(/class="extra-row[ "]/g) || []).length;
 
-describe("عشرون بنداً فأقلّ: الصندوقان متجاوران", () => {
-  it("صفٌّ واحد يحمل الاثنين", () => {
-    expect(extraRowCount(sheet(20))).toBe(1);
-  });
-
-  it("والاثنان موجودان", () => {
-    const html = sheet(20);
-    expect(html).toContain('data-section="packaging"');
-    expect(html).toContain('data-section="transport"');
-  });
-
-  it("وحتى بندٍ واحد", () => {
-    expect(extraRowCount(sheet(1))).toBe(1);
-  });
-});
-
-describe("أكثر من عشرين: كلٌّ بعرض الورقة، والترحيل بعد التغليف", () => {
-  const html = sheet(21);
-
-  it("صفّان لا صفّ", () => {
+/**
+ * سطرٌ للترحيل والحساب، وسطرٌ للتغليف تحتهما — أرسل صاحب المستودع الشكل
+ * مقصوصاً مُعاد الترتيب.
+ *
+ * وله سببٌ في التخطيط: الترحيلُ سطران والحسابُ أربعةُ صفوف، كلاهما ثابتُ
+ * الطول مهما كبرت الفاتورة، فيملآن سطراً تماماً. والتغليفُ وحده يمتدّ بعدد
+ * بنوده فيُفرَد بسطره.
+ *
+ * وكان الحسابُ وحده في سطر ثم التغليفُ والترحيلُ في سطر — فيقف الترحيلُ
+ * القصير إلى جانب التغليف الطويل تاركاً ثلثَ الورقة بياضاً.
+ */
+describe("سطرُ الترحيل والحساب، ثمّ التغليف تحتهما", () => {
+  it("صفّان: رأسٌ وتغليف", () => {
+    const html = sheet(7);
     expect(extraRowCount(html)).toBe(2);
+    expect(html).toContain('class="extra-row extra-row--head"');
+    expect(html).toContain('class="extra-row extra-row--pkg"');
   });
 
-  it("التغليف أوّلاً ثم الترحيل — ترتيب الأهمّية", () => {
-    expect(boxOrder(html)).toEqual(["packaging", "transport"]);
+  /**
+   * المواضع تُقاس بالسمة كاملةً لا باسم الصنف: الاسم مكتوبٌ في قواعد
+   * `<style>` أعلى الورقة أيضاً، فـ`indexOf` عليه يقع على القاعدة لا على
+   * العنصر — ويعطي ترتيباً مقلوباً لا معنى له.
+   */
+  it("والحسابُ في صفّ الرأس مع الترحيل لا في صفٍّ وحده", () => {
+    const html = sheet(7);
+    const headAt = html.indexOf('class="extra-row extra-row--head"');
+    const pkgRowAt = html.indexOf('class="extra-row extra-row--pkg"');
+    const accountAt = html.indexOf('data-section="account-summary"');
+    const transportAt = html.indexOf('data-section="transport"');
+    expect(headAt).toBeGreaterThan(-1);
+    expect(accountAt).toBeGreaterThan(headAt);
+    expect(accountAt).toBeLessThan(pkgRowAt);
+    expect(transportAt).toBeGreaterThan(headAt);
+    expect(transportAt).toBeLessThan(pkgRowAt);
   });
 
-  it("الحدّ عند 21 لا 20 — «إذا تجاوزت»", () => {
-    expect(extraRowCount(sheet(20))).toBe(1);
-    expect(extraRowCount(sheet(21))).toBe(2);
+  it("والترحيل قبل الحساب — أوّلُ عنصرٍ إلى اليمين في RTL", () => {
+    const html = sheet(7);
+    expect(html.indexOf('data-section="transport"'))
+      .toBeLessThan(html.indexOf('data-section="account-summary"'));
   });
 
-  it("وستّون بنداً كذلك", () => {
-    const long = sheet(60);
-    expect(extraRowCount(long)).toBe(2);
-    expect(boxOrder(long)).toEqual(["packaging", "transport"]);
+  it("والتغليف بعدهما، وحده في صفّه", () => {
+    const html = sheet(7);
+    expect(html.indexOf('data-section="packaging"'))
+      .toBeGreaterThan(html.indexOf('data-section="transport"'));
+    expect(boxOrder(html)).toEqual(["transport", "packaging"]);
   });
 
-  it("العدد يأتي من مُنتِج الجدول لا من عدٍّ للوسوم", () => {
+  /** ولا يتغيّر الترتيب بكثرة البنود — لا حدَّ يُتجاوز بعد اليوم. */
+  it("والترتيب واحدٌ ببندٍ وبستّين", () => {
+    for (const n of [1, 20, 21, 60]) {
+      expect(extraRowCount(sheet(n))).toBe(2);
+      expect(boxOrder(sheet(n))).toEqual(["transport", "packaging"]);
+    }
+  });
+
+  it("العدد يأتي من مُنتِج الأسطر لا من عدٍّ للوسوم", () => {
     expect(formatPackaging([], pkgItems(21))).toContain('data-pkg-rows="21"');
   });
 });
@@ -137,11 +157,54 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
     expect(table).not.toContain("text-align:center");
   });
 
-  it("والمجموع سطرٌ أخير تحته خطّ", () => {
+  /**
+   * شريطُ المجموع — «اجعل عدد القطع واضح أكثر بتنسيق مميّز».
+   *
+   * كان سطراً كسائر الأسطر تحته خطّ: رقمٌ في آخر عمودٍ طويل لا تقع عليه
+   * العين، وهو أهمُّ رقمٍ في الصندوق — عليه يُستلم الشحن ويُعدّ. وكان عارياً
+   * بلا وصفٍ أيضاً، فلا يُعرف مِمَّ هو.
+   */
+  it("والمجموع شريطٌ مميّز موصوفٌ بعدده", () => {
     const total = pkgItems(3).reduce((s, r) => s + r.packs_count, 0);
-    const last = table.slice(table.lastIndexOf("<tr"));
+    const last = table.slice(table.lastIndexOf('<div data-pkg-line'));
+    expect(last).toContain("إجمالي القطع");
     expect(last).toContain(`${total} قطعة`);
-    expect(last).toContain("border-top");
+    // أرضيةٌ وإطارٌ بلون العنوان — يُقرأ الصندوق كتلةً واحدة
+    expect(last).toContain("background:#f1eefb");
+    expect(last).toContain("#5b2c8e");
+  });
+
+  /**
+   * الأسطرُ تتوزّع أعمدةً: صار للتغليف سطرُه وحده بعرض الورقة، فخرجت سبعةُ
+   * بنودٍ عموداً نحيلاً من اليمين وإلى جانبه أربعةُ أخماس الصندوق بياضاً،
+   * وأربعون بنداً تمتدّ صفحةً كاملة.
+   */
+  it("والأسطر تتوزّع أعمدةً — لا عموداً نحيلاً وبياضاً", () => {
+    expect(formatPackaging([], pkgItems(2))).toContain("column-count:1");
+    expect(formatPackaging([], pkgItems(7))).toContain("column-count:2");
+    expect(formatPackaging([], pkgItems(40))).toContain("column-count:3");
+  });
+
+  /**
+   * ثلاثةٌ حدُّ الأعلى: أضيقُ من ذلك يكسر السطر فيصير بندٌ واحدٌ سطرين —
+   * وقراءةُ البند أهمّ من ملء العرض.
+   */
+  it("ولا تتجاوز ثلاثة مهما كثرت", () => {
+    for (const n of [40, 100, 300]) {
+      expect(packagingColumns(n)).toBeLessThanOrEqual(3);
+    }
+    expect(packagingColumns(2)).toBe(1);
+    expect(packagingColumns(11)).toBe(3);
+  });
+
+  /**
+   * الكتلة لا تنقسم بين صفحتين. جُرّب بإزالة المنع: ثمانيةَ عشرَ بنداً إلى
+   * اثنين وعشرين مع أربعةَ عشرَ بندَ تغليفٍ تُرسم كتلتُها في صفحتين لا واحدة.
+   */
+  it("والكتلة لا تنقسم بين صفحتين", () => {
+    const html = formatPackaging([], pkgItems(14))!;
+    const wrapper = html.slice(html.indexOf("data-pkg-rows"));
+    expect(wrapper.slice(0, 120)).toContain("break-inside:avoid");
   });
 });
 
@@ -349,15 +412,30 @@ describe("مجموع القطع لا يتكرّر على الصفحات", () => 
     expect(table).not.toContain("<tfoot>");
   });
 
-  it("والمجموع آخرُ صفٍّ في المتن", () => {
-    const lastRow = table.slice(table.lastIndexOf("<tr"));
-    expect(lastRow).toContain("قطعة");
-    expect(table.indexOf("قطعة")).toBeGreaterThan(table.indexOf("<tbody>"));
+  it("والمجموع آخرُ سطرٍ في الكتلة", () => {
+    const last = table.slice(table.lastIndexOf("<div"));
+    expect(last).toContain("قطعة");
+  });
+
+  /**
+   * والمجموع **خارج** الأعمدة: لو بقي داخلها لجرى مع البنود فوقع في ذيل
+   * عمودٍ من الأعمدة لا في آخر الصندوق.
+   */
+  it("وخارجَ الأعمدة لا داخلها", () => {
+    const doc = new DOMParser().parseFromString(`<div>${table}</div>`, "text/html");
+    const cols = doc.querySelector("[style*='column-count']")!;
+    const lines = Array.from(doc.querySelectorAll("[data-pkg-line]"));
+    const totalEl = lines[lines.length - 1];
+    expect(cols).toBeTruthy();
+    expect(totalEl.textContent).toContain("قطعة");
+    expect(cols.contains(totalEl)).toBe(false);
+    // وبنودُه داخلها
+    expect(cols.contains(lines[0])).toBe(true);
   });
 
   it("ولا ينقسم عن سطره السابق فيقع وحيداً أعلى صفحة", () => {
-    const lastRow = table.slice(table.lastIndexOf("<tr"));
-    expect(lastRow).toContain("page-break-inside:avoid");
+    const last = table.slice(table.lastIndexOf("<div"));
+    expect(last).toContain("page-break-inside:avoid");
   });
 
   it("والقالب يُبطل تكرار الذيل داخل صندوق التغليف", () => {

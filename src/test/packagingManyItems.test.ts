@@ -17,6 +17,7 @@ import path from "node:path";
 import { formatPackaging } from "@/utils/printExtras";
 import { generatePrintHTML } from "@/utils/printTemplate";
 import { buildDocHTML } from "../../supabase/functions/document-share/template";
+import { pkgLines } from "./helpers/pkgLines";
 
 const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 
@@ -71,9 +72,9 @@ describe("البنود الكثيرة تصل الورقة كاملة", () => {
     expect(packagingInfo).toContain("ملاحظة البند 5");
   });
 
-  it("عدد الصفوف = عدد البنود (لا دمج ولا إسقاط)", () => {
-    // صفُّ الترويسة + عشرون بنداً + صفُّ المجموع
-    expect(packagingInfo.match(/<tr[ >]/g)).toHaveLength(21);
+  it("عدد الأسطر = عدد البنود (لا دمج ولا إسقاط)", () => {
+    // عشرون بنداً + سطرُ المجموع
+    expect(pkgLines(packagingInfo)).toBe(21);
   });
 
   it("والمجموع في الذيل = مجموع الطرود", () => {

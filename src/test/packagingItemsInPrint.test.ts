@@ -23,6 +23,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { pkgLines } from "./helpers/pkgLines";
 
 const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 
@@ -132,8 +133,8 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     expect(out.packagingInfo).toContain("الوزن: 12.5");
     expect(out.packagingInfo).toContain("الأبعاد: 40×30×20");
     expect(out.packagingInfo).toContain("الإجمالي:");
-    // والترويسة لا تُضيف صفّاً فوق البند: صفُّ بندٍ واحد + صفُّ المجموع
-    expect(out.packagingInfo!.match(/<tr[ >]/g)).toHaveLength(2);
+    // والترويسة لا تُضيف سطراً فوق البند: سطرُ بندٍ واحد + سطرُ المجموع
+    expect(pkgLines(out.packagingInfo!)).toBe(2);
   });
 
   it("بنودٌ متعدّدة ⇒ سطرٌ لكلٍّ منها", async () => {
@@ -150,8 +151,8 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     expect(out.packagingInfo).toContain("كيس زيت");
     // قطع الطرد تُذكر بعلامة «6X» الحمراء حين تتجاوز الواحدة
     expect(out.packagingInfo).toContain("*6");
-    // صفّان للبندين + صفُّ الترويسة + صفُّ المجموع
-    expect(out.packagingInfo!.match(/<tr[ >]/g)).toHaveLength(3);
+    // سطران للبندين + سطرُ المجموع
+    expect(pkgLines(out.packagingInfo!)).toBe(3);
   });
 });
 

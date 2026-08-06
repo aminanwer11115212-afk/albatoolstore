@@ -119,6 +119,32 @@ export function formatTransports(rows: any[]): string | undefined {
 }
 
 /**
+ * عددُ أعمدة أسطر التغليف.
+ *
+ * ## العطل الذي عالجه
+ * صار للتغليف سطرُه وحده بعرض الورقة، فخرجت سبعةُ بنودٍ عموداً نحيلاً من
+ * اليمين وإلى جانبه أربعةُ أخماس الصندوق بياضاً. وأربعون بنداً تنزل أربعين
+ * سطراً فتمتدّ صفحةً كاملة — والورقة عندها بنودها وترحيلها وحسابها.
+ *
+ * فالأسطر تتوزّع أعمدةً: عرضُ الصندوق يُملأ، والطولُ يقصر إلى الثلث.
+ * أربعون بنداً تصير أربعةَ عشرَ سطراً في ثلاثة أعمدة.
+ *
+ * ## والحدود
+ * العمودُ الواحد لبندٍ أو بندين — عمودان لسطرٍ واحدٍ في كلٍّ منهما تبعثرٌ لا
+ * تنسيق. وثلاثةٌ حدُّ الأعلى: أضيقُ من ذلك يكسر السطر («4 جوال طبلون جي ان
+ * ‎*‎15» أطولُ ما يقع) فيصير بندٌ واحدٌ سطرين — وقراءةُ البند أهمّ من ملء
+ * العرض.
+ */
+/** لونُ عنوان الصندوق — يتبعه شريطُ المجموع وخطُّ الفصل فتُقرأ الكتلة واحدة. */
+const PKG_ACCENT = "#5b2c8e";
+
+export function packagingColumns(rowCount: number): number {
+  if (rowCount <= 3) return 1;
+  if (rowCount <= 10) return 2;
+  return 3;
+}
+
+/**
  * تفاصيل التغليف — **أسطرٌ** كما أرسل صاحب المستودع صورتها.
  *
  * ## من أين تُقرأ البيانات
@@ -219,36 +245,71 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
     const note = r.note
       ? `<div style="color:#666;font-size:11px;font-weight:400;">${escapeHtml(r.note)}</div>`
       : "";
-    return `<tr><td style="${lineStyle}">`
+    // السطرُ لا ينقسم بين عمودين ولا بين صفحتين — نصفُ بندٍ لا يُقرأ
+    return `<div data-pkg-line style="${lineStyle}page-break-inside:avoid;break-inside:avoid;">`
       + `${r.packs || ""} ${escapeHtml(r.label)}${xMark}`
-      + `${note}</td></tr>`;
+      + `${note}</div>`;
   }).join("");
 
   const totalPacks = rows.reduce((s, r) => s + r.packs, 0);
   const totalCost = (headers || []).reduce((s, r) => s + Number(r.cost || 0), 0);
 
   /**
-   * صفُّ المجموع في **متن الجدول** لا في `<tfoot>`.
+   * ## شريطُ المجموع — «اجعل عدد القطع واضح أكثر بتنسيق مميّز»
    *
-   * `tfoot { display: table-footer-group; }` تجعل المتصفّح يُكرّر الذيل أسفلَ
-   * **كل صفحة** يمتدّ إليها الجدول. فظهر «14 قطعة» في نهاية الصفحة الأولى
-   * قبل أن تنتهي البنود — وهو ما بلّغ عنه صاحب المستودع.
+   * كان سطراً كسائر الأسطر تحته خطّ: رقمٌ في آخر عمودٍ طويل لا تقع عليه
+   * العين، وهو أهمُّ رقمٍ في الصندوق — عليه يُستلم الشحن ويُعدّ.
    *
-   * فصار صفّاً عادياً آخرَ المتن: لا يتكرّر، ولا يظهر إلا في الصفحة الأخيرة.
-   * ولا ينقسم عن سابقه فيقع وحيداً أعلى صفحة.
+   * فصار شريطاً بعرض الصندوق: أرضيةٌ بنفسجية فاتحة بإطارٍ من لونه، والوصفُ
+   * («إجمالي القطع») يميناً والرقمُ يساراً بخطٍّ أكبر. ولم يُذكر الوصف قبلُ
+   * أصلاً — فكان الرقم عارياً لا يُعرف مِمَّ هو.
+   *
+   * ## وهو خارج الأعمدة
+   * لو بقي داخلها لجرى مع البنود فوقع في ذيل عمودٍ من الأعمدة لا في آخر
+   * الصندوق. وكان قبلها في `<tfoot>`، و`display: table-footer-group` تجعل
+   * المتصفّح يُكرّره أسفلَ **كل صفحة** يمتدّ إليها الجدول: فظهر «14 قطعة»
+   * في نهاية الصفحة الأولى قبل أن تنتهي البنود.
    */
   const foot = rows.length
-    ? `<tr style="page-break-inside:avoid;break-inside:avoid;">`
-      + `<td style="${lineStyle}padding-top:6px;border-top:1px solid #1a1a1a;">`
-      + `${totalPacks} قطعة</td></tr>`
+    ? `<div data-pkg-line style="margin-top:8px;padding:5px 10px;`
+      + `background:#f1eefb;border:1px solid ${PKG_ACCENT};border-radius:5px;`
+      + `display:flex;justify-content:space-between;align-items:center;`
+      + `page-break-inside:avoid;break-inside:avoid;">`
+      + `<span style="font-size:12px;font-weight:800;color:${PKG_ACCENT};">إجمالي القطع</span>`
+      + `<span style="font-size:15px;font-weight:900;color:${PKG_ACCENT};letter-spacing:0.3px;">`
+      + `${totalPacks} قطعة</span>`
+      + `</div>`
     : "";
 
+  /**
+   * الكتلةُ لا تنقسم بين صفحتين — والتصريحُ سطريّ لا في ورقة أنماط.
+   *
+   * الأعمدةُ قصّرتها إلى الثلث، فصارت تسعُ صفحةً كاملةً دائماً تقريباً. ولولا
+   * المنعُ لانقسمت على حرفٍ من الصفحة: بندٌ أو بندان والمجموعُ وحدهما أعلى
+   * الصفحة التالية — وهو أقبحُ من دفع الكتلة كلّها.
+   *
+   * وكان المنعُ متعذّراً قبل الأعمدة: أربعون بنداً في عمودٍ واحد أطولُ من
+   * صفحة، والمتصفّح يتجاهل المنعَ عندئذٍ ويقسم — وهو نفسُه المخرجُ الآمن لو
+   * جاءت مئتا بند.
+   *
+   * والتصريحُ هنا لا في CSS لأن السلسلة تُحقن في قالبين، وقاعدةُ
+   * «page-break-inside: auto» على الصندوق مكتوبةٌ في كليهما فتغلب أيَّ صنف.
+   */
+  /**
+   * خطٌّ فاصلٌ بين الأعمدة — أشّر عليه صاحب المستودع بقلمٍ أخضر على الصورة.
+   *
+   * وله سببٌ يتجاوز الزينة: الأعمدة متلاصقةٌ بفراغٍ وحده، والسطر فيها يبدأ
+   * من اليمين وينتهي حيث ينتهي نصّه — فتختلط نهايةُ سطرٍ في عمودٍ ببداية
+   * سطرٍ في العمود الذي يليه، ويُقرأ البندان بنداً واحداً. والخطُّ يفصلهما
+   * فصلاً لا يحتاج تدقيقاً.
+   */
+  const columns = packagingColumns(rows.length);
   const table = rows.length
-    // `data-pkg-rows` يُبلِّغ القالبَ عدد البنود: عند كثرتها يأخذ الصندوق
-    // عرض الورقة كاملاً وينزل الترحيل تحته.
-    ? `<table data-pkg-rows="${rows.length}" style="width:100%;border-collapse:collapse;border:0;margin:0;">`
-      + `<tbody>${body}${foot}</tbody>`
-      + `</table>`
+    // `data-pkg-rows` يُبلِّغ القالبَ عدد البنود — تقرؤه الكثافة.
+    ? `<div data-pkg-rows="${rows.length}" style="page-break-inside:avoid;break-inside:avoid;">`
+      + `<div data-pkg-cols="${columns}" style="column-count:${columns};column-gap:22px;column-fill:balance;`
+      + `column-rule:1px solid #cfc7e8;">${body}</div>`
+      + `${foot}</div>`
     : "";
 
   const extras = [...headerNotes];

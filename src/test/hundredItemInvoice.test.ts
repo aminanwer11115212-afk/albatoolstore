@@ -20,6 +20,7 @@ import { calcTotal, computeUnitPrice, type InvRow } from "@/utils/invoiceCreateH
 import { formatPackaging, formatTransports } from "@/utils/printExtras";
 import { generatePrintHTML } from "@/utils/printTemplate";
 import { buildCustomerAccountView } from "@/utils/buildCustomerAccountView";
+import { pkgLines } from "./helpers/pkgLines";
 
 const RATE = 1400;
 const ITEM_COUNT = 100;
@@ -134,8 +135,8 @@ describe("ورقة الطباعة تحمل المئة كاملة", () => {
   });
 
   it("وكل بند تغليفٍ من المئة موجود", () => {
-    // جدول التغليف: صفُّ الترويسة + مئة بند + صفُّ المجموع
-    expect(packagingInfo.match(/<tr[ >]/g)).toHaveLength(ITEM_COUNT + 1);
+    // أسطر التغليف: مئة بند + سطرُ المجموع
+    expect(pkgLines(packagingInfo)).toBe(ITEM_COUNT + 1);
     expect(html).toContain("كرتونة");
     expect(html).toContain("قطعة");
   });
