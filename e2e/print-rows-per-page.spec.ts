@@ -174,4 +174,40 @@ test.describe("مربّعُ الحساب لا يتحرّك بإخفاء شيء",
       expect(await probe(sel), `بإخفاء ${sel}`).toEqual(base);
     }
   });
+
+  /**
+   * الحجزُ عددُ صفوفٍ × ارتفاعِ صفّ — صحيحٌ ما دام الصفُّ سطراً واحداً.
+   * وبعرضٍ ثابت التفّ الرقمُ عند تسعة أرقام (مئاتِ الملايين) فتجاوز الصندوقُ
+   * حجزَه: 125 ← 134. فيتّسع بالرقم بدل أن يلتفّ به.
+   */
+  test("والحجزُ يصمد للمبالغ الكبيرة — لا يلتفّ رقمٌ فيرفع الصندوق", async ({ page }) => {
+    for (const amount of [377_860, 96_812_500, 968_125_000, 9_681_250_000, 987_654_321_987]) {
+      const list = [{ product_name: "صنف", quantity: 1, unit_price: amount, tax_amount: 0, discount: 0, total: amount }];
+      const html = generatePrintHTML({
+        type: "invoice", number: "INV-1", date: "2026-08-06",
+        customer: { name: "عميل" }, items: list,
+        subtotal: amount, taxTotal: 0, discountTotal: 0, grandTotal: amount,
+        company: null, transportInfo: transportHtml,
+        previousDebt: amount, previousCredit: 0, paidAmount: Math.floor(amount / 3),
+      } as any);
+      await page.setContent(html, { waitUntil: "networkidle" });
+
+      const m = await page.evaluate(() => {
+        const p = document.querySelector(".page")!.getBoundingClientRect();
+        const box = document.querySelector(".account-box")!;
+        const b = box.getBoundingClientRect();
+        return {
+          rows: box.querySelectorAll("tbody tr").length,
+          reserved: parseFloat(getComputedStyle(box as HTMLElement).minHeight),
+          actual: Math.round(b.height),
+          // ولا يفيض عن الورقة مهما اتّسع
+          overflows: Math.round(b.left) < Math.round(p.left),
+        };
+      });
+
+      expect(m.actual, `بمبلغ ${amount}`).toBe(m.reserved);
+      expect(m.actual, `بمبلغ ${amount}`).toBe(m.rows * ACCOUNT_ROW_H_PX);
+      expect(m.overflows, `بمبلغ ${amount}`).toBe(false);
+    }
+  });
 });

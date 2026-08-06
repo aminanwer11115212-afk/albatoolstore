@@ -156,9 +156,9 @@ export async function waitForImages(root: HTMLElement, timeoutMs = IMAGE_WAIT_MS
  * مستحسن — فوقع القطعُ بين صفوفه، وخرجت الصفحةُ الأولى بأربعةٍ منه وذهب
  * «رصيد العميل الحالي» وحده إلى الثانية. وهو الرقمُ الذي جاء العميل لأجله.
  *
- * فيُذكر `.account-box` بعد `tr` — والمقارنةُ في `splitAt` تُفضّل الحدَّ
- * الأعلى، لكنّ منعَ القسمة هنا يقع في القالب (`page-break-inside: avoid`)
- * وفي إسقاط حدود صفوفه من القائمة. راجع `dropInnerBreaks`.
+ * فمنعُ القسمة يقع في موضعين: قاعدةٌ في القالب (`page-break-inside: avoid`)
+ * لمسار الطباعة، وإسقاطُ حدود صفوفه من قائمة القطع هنا — في `safeBreaks`
+ * أسفله — لمسار الـPDF.
  */
 const UNSPLITTABLE = "tr, .extra-box, .account-box, .signatures, [data-pkg-rows], [data-pkg-line], .notes-section";
 
