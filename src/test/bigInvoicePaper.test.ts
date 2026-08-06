@@ -80,10 +80,12 @@ describe("الكثافة تُقاس بالأسطر لا بالصفحات", () =>
   });
 
   it("والبنود والتغليف يتقاسمان الورقة فيُجمعان", () => {
-    // عشرون بنداً وحدها عادية، ومعها عشرون تغليفاً تصير الورقة مزدحمة
-    expect(printDensity(20)).toBe("normal");
-    expect(printDensity(20, 20)).toBe("compact");
-    expect(printDensity(40, 40)).toBe("dense");
+    // بنودٌ تحت الحدّ وحدها عادية، ومعها مثلُها تغليفاً تصير الورقة مزدحمة.
+    // والحدُّ يُقرأ من الوحدة لا يُكتب رقماً: قياسُه بالتصيير يحرّكه.
+    const under = COMPACT_AT - 1;
+    expect(printDensity(under)).toBe("normal");
+    expect(printDensity(under, under)).toBe("compact");
+    expect(printDensity(DENSE_AT, DENSE_AT)).toBe("dense");
   });
 
   it("والمدخل الفاسد يُقرأ صفراً — لا فاتورةَ صغيرةٌ تنقلب كثيفة", () => {

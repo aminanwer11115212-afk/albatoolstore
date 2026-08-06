@@ -34,8 +34,21 @@
 
 export type PrintDensity = "normal" | "compact" | "dense";
 
-/** فوق هذا العدد من الأسطر تبدأ الورقة تضغط نفسها. */
-export const COMPACT_AT = 25;
+/**
+ * فوق هذا العدد من الأسطر تبدأ الورقة تضغط نفسها.
+ *
+ * وليس رقماً مختاراً بالذوق: هو ما تحمله الصفحةُ فعلاً في الدرجة العادية
+ * **مع صفّ «جملة الفاتورة»**، مقيساً في **أضيق** المسارين — الطباعة، إذ
+ * عرضُ محتواها 190mm (‎@page A4 بهامش 10mm) لا 194mm كالـPDF، فتلتفّ أسماءُ
+ * الأصناف أكثر وترتفع الصفوف:
+ *
+ *     ارتفاعُ الصفحة 277mm ≈ 1047px، ترويسةٌ 267px، صفٌّ عاديّ 37.5px
+ *     ⇒ (1047 − 267 − 37) ÷ 37.5 ≈ 19
+ *
+ * وكان 25 ثمّ 20، فخرجت فاتورةُ العشرين بجملتها في الصفحة الثانية بينما
+ * تسع فاتورةُ الثلاثين جملتَها في الأولى — الأصغرُ أسوأ من الأكبر.
+ */
+export const COMPACT_AT = 19;
 /** وفوق هذا تضغط ترويستها أيضاً. */
 export const DENSE_AT = 60;
 
@@ -48,6 +61,36 @@ export const DENSE_AT = 60;
 export const MIN_FONT_PX = 10;
 
 /**
+ * مقاسات خطّ «مربّع تفاصيل الحساب» — بالبكسل.
+ *
+ * «مربّع تفاصيل الحساب الخط صغير كبّره». وكان أدناه **9.5px**: تحت أرضية
+ * القراءة نفسها التي تحرسها الكثافة في بقيّة الورقة. فالمربّع الذي يقرأ منه
+ * العميلُ رصيدَه كان أصغرَ ما في الصفحة.
+ *
+ * ولا يتبع الكثافة: صفوفُه ستّةٌ على الأكثر مهما كبرت الفاتورة، فلا يوفّر
+ * تصغيرُه سطراً واحداً — ويُخسر به الرقمُ الذي جاء العميل لأجله.
+ */
+export const ACCOUNT_FONT_PX = {
+  /** اسم الصفّ: «الحساب القديم»، «المدفوع»… */
+  label: 12,
+  /** الرقم — بخطٍّ أحادي المسافات كي تصطفّ الخانات. */
+  value: 12.5,
+  /** صفَّا «جملة الحساب» و«رصيد العميل الحالي» — أثقلُ ما في المربّع. */
+  strong: 13.5,
+  /** وسمُ «عليه/له» بجانب الرقم. */
+  badge: 11,
+} as const;
+
+/**
+ * ارتفاعُ صفٍّ واحد في مربّع الحساب — بالبكسل.
+ *
+ * يُحجز به ارتفاعُ المربّع (`--acct-h`) من عدد صفوفه المرسومة، فإخفاءُ صفٍّ
+ * بزرّ «تخصيص الرؤية» يترك مكانه ولا يرفع ما تحته. يقيسه
+ * `accountBoxStable.test.ts` بتصييرٍ حقيقي فلا يبقى تقديراً.
+ */
+export const ACCOUNT_ROW_H_PX = 25;
+
+/**
  * ما يجب أن تحمله الصفحة الأولى من بنود في درجة `compact`.
  *
  * طلبه صاحب المستودع: «عايز الورقة تشيل لي أصناف كتير زي الإكسس، بشيل ٣٠
@@ -57,8 +100,9 @@ export const MIN_FONT_PX = 10;
  * «ارفع العنوان دا فوق شوية، وتفاصيل العميل والتاريخ ارفعهم برضو». فتفرّغ
  * نحو أربعين بكسلاً فوق الجدول — تكفي صفّاً إضافيّاً وزيادةً في الخطّ معاً.
  *
- * يحرسه `printRowsPerPage.test.ts` بتصييرٍ حقيقي: يعدّ ما يقع فوق حدّ
- * الصفحة، فلا يكفي أن تُكتب الأرقام هنا.
+ * يحرسه `e2e/print-rows-per-page.spec.ts` بتصييرٍ حقيقي في متصفّح — jsdom لا
+ * يخطّط فلا يعرف ارتفاع صفٍّ ولا موضع صندوق، فلا يكفي أن تُكتب الأرقام هنا.
+ * والقياسُ هناك بعرض **الطباعة** لأنه الأضيق: من مرّ منه مرّ من الـPDF.
  */
 export const ROWS_PER_PAGE_TARGET = 30;
 
@@ -95,13 +139,17 @@ export const DENSITY_CSS = `
      المساحةُ تُؤخذ من الترويسة لا من الخطّ: رفعُ العنوان وبيانات العميل
      والتاريخ يفرّغ نحو أربعين بكسلاً فوق الجدول، فيتّسع صفٌّ إضافيّ ويكبر
      الخطُّ معاً. راجع ROWS_PER_PAGE_TARGET. */
-  .d-compact .header { padding-bottom: 5px; margin-bottom: 5px; }
-  .d-compact .header-logo img { height: 58px; }
-  .d-compact .doc-title { margin: 4px 0 5px; }
-  .d-compact .doc-title h1 { font-size: 19px; }
-  .d-compact .info-row { margin-bottom: 5px; }
+  .d-compact .header { padding-bottom: 2px; margin-bottom: 2px; }
+  .d-compact .header-logo img { height: 48px; }
+  .d-compact .header-title { font-size: 19px; margin-bottom: 2px; }
+  .d-compact .header-address { font-size: 12px; line-height: 1.3; }
+  .d-compact .header-phones { font-size: 13px; margin-top: 0; }
+  .d-compact .doc-title { margin: 2px 0 3px; }
+  .d-compact .doc-title h1 { font-size: 17px; }
+  .d-compact .info-row { margin-bottom: 2px; font-size: 12px; }
   .d-compact thead th { padding: 4px 6px; font-size: 12px; }
-  .d-compact tbody td { padding: 3.5px 6px; font-size: 12.5px; }
+  .d-compact tbody td { padding: 2.5px 6px; font-size: 12.5px; }
+  .d-compact .col-qty, .d-compact .col-price { font-size: 14px; }
   .d-compact .total-row td { font-size: 12.5px; }
   .d-compact .extra-content table td, .d-compact .extra-content table th { font-size: 11px; padding: 3px 5px; }
 
@@ -113,6 +161,7 @@ export const DENSITY_CSS = `
   .d-dense .info-row { margin-bottom: 4px; font-size: 12px; }
   .d-dense thead th { padding: 3px 5px; font-size: 11.5px; }
   .d-dense tbody td { padding: 2.5px 5px; font-size: 11.5px; }
+  .d-dense .col-qty, .d-dense .col-price { font-size: 13px; }
   .d-dense .total-row td { font-size: 12px; }
   .d-dense .extra-content table td, .d-dense .extra-content table th { font-size: 10.5px; padding: 2px 4px; }
   .d-dense .signatures { padding: 10px 50px 6px; margin-top: 10px; }
