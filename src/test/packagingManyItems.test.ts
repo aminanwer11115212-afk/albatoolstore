@@ -85,7 +85,7 @@ describe("البنود الكثيرة تصل الورقة كاملة", () => {
     const packs = manyItems.reduce((s, r) => s + r.packs_count, 0);
     const pieces = manyItems.reduce((s, r) => s + r.packs_count * r.pieces_per_pack, 0);
     expect(pieces).not.toBe(packs);
-    expect(packagingInfo).toContain(`${pieces.toLocaleString()} قطعة`);
+    expect(packagingInfo).toContain(`>${pieces.toLocaleString()}</span>`);
     expect(packagingInfo).not.toContain("طرداً");
   });
 

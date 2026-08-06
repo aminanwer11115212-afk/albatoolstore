@@ -211,3 +211,88 @@ test.describe("مربّعُ الحساب لا يتحرّك بإخفاء شيء",
     }
   });
 });
+
+/* ─────────── المعاينة تُقسَّم صفحاتٍ مرقّمة ─────────── */
+
+/**
+ * «إذا زاد عن الـA4 تُقسم، وأضِف ترقيم صفحات — 1 من 3 وهكذا».
+ *
+ * والقياسُ هنا على حارسين لا على الشكل: **لا عنصرَ يعبر حدَّ صفحة**، و**لا
+ * عنصرَ يقع تحت شريط الترقيم**. أوّلُهما يمنع بنداً منشطراً، وثانيهما يمنع
+ * رقماً مكتوباً فوق بند.
+ */
+test.describe("المعاينة تُقسَّم صفحاتٍ مرقّمة", () => {
+  const CONTENT_MM = 277;
+  const FOOT = 22;
+  const TOL = 1.5;
+
+  async function paginate(page: import("@playwright/test").Page, html: string) {
+    await page.emulateMedia({ media: "screen" });
+    await page.setContent(
+      `<!doctype html><body style="margin:0"><iframe id="f" style="width:1000px;height:100vh;border:0"></iframe></body>`,
+    );
+    await page.evaluate((h) => {
+      (document.getElementById("f") as HTMLIFrameElement).srcdoc = h;
+    }, html);
+    await page.waitForTimeout(700);
+    return page.evaluate(
+      ({ mm, foot, tol }) => {
+        const d = (document.getElementById("f") as HTMLIFrameElement).contentDocument!;
+        const el = d.querySelector<HTMLElement>(".page")!;
+        const cs = getComputedStyle(el);
+        const padTop = parseFloat(cs.paddingTop);
+        const probe = d.createElement("div");
+        probe.style.cssText = `position:absolute;visibility:hidden;height:${mm}mm`;
+        el.appendChild(probe);
+        const ph = probe.getBoundingClientRect().height;
+        probe.remove();
+        const top0 = el.getBoundingClientRect().top + padTop;
+        const foots = Array.from(d.querySelectorAll(".lov-pgfoot")).map((n) => n.textContent || "");
+        let cross = 0;
+        let under = 0;
+        for (const n of Array.from(
+          d.querySelectorAll("tr, .extra-box, .account-box, .signatures, [data-pkg-line], .notes-section"),
+        )) {
+          if (n.classList.contains("lov-pgbreak")) continue;
+          if (n.closest(".account-box") && !n.classList.contains("account-box")) continue;
+          const r = n.getBoundingClientRect();
+          const t = r.top - top0;
+          const b = r.bottom - top0;
+          if (b - t >= ph - foot) continue; // أطولُ من صفحة: يُشطر حتماً
+          if (Math.floor((b - tol) / ph) > Math.floor((t + tol) / ph)) cross++;
+          for (let k = 1; k * ph <= b + foot; k++) {
+            if (b > k * ph - foot + tol && t < k * ph - tol) under++;
+          }
+        }
+        return { foots, cross, under };
+      },
+      { mm: CONTENT_MM, foot: FOOT, tol: TOL },
+    );
+  }
+
+  test("فاتورةٌ تفيض عن ورقةٍ تُرقَّم «1 من 2» ثمّ «2 من 2»", async ({ page }) => {
+    const m = await paginate(page, sheet({ n: 30, pkg: 6 }));
+    expect(m.foots.length).toBeGreaterThanOrEqual(2);
+    expect(m.foots[0]).toBe(`1 من ${m.foots.length}`);
+    expect(m.foots.at(-1)).toBe(`${m.foots.length} من ${m.foots.length}`);
+  });
+
+  test("وثلاثُ صفحاتٍ تُرقَّم إلى «3 من 3»", async ({ page }) => {
+    const m = await paginate(page, sheet({ n: 60, pkg: 12 }));
+    expect(m.foots.length).toBeGreaterThanOrEqual(3);
+    expect(m.foots).toEqual(m.foots.map((_, i) => `${i + 1} من ${m.foots.length}`));
+  });
+
+  test("ولا بندَ يعبر حدَّ صفحة، ولا بندَ تحت الترقيم", async ({ page }) => {
+    for (const opts of [{ n: 30 }, { n: 30, pkg: 30 }, { n: 60, pkg: 12 }, { n: 100, pkg: 40 }]) {
+      const m = await paginate(page, sheet(opts));
+      expect(m.cross, `عابرٌ في ${JSON.stringify(opts)}`).toBe(0);
+      expect(m.under, `تحت الترقيم في ${JSON.stringify(opts)}`).toBe(0);
+    }
+  });
+
+  test("وصفحةٌ واحدة بلا ترقيم — الرقمُ يفيد حين تتعدّد", async ({ page }) => {
+    const m = await paginate(page, sheet({ n: 8 }));
+    expect(m.foots).toEqual([]);
+  });
+});

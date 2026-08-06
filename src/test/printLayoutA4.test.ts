@@ -151,10 +151,19 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
    * وسطَ الصندوق مخطّطةً بالرمادي بدل أسطرٍ متتاليةٍ من اليمين — ولا يكشفه
    * إلا تصييرُ الورقة، فيُثبَّت هنا حارساً.
    */
-  it("والأسطر من اليمين بخلفيةٍ بيضاء — لا وسطَ الصندوق ولا مخطّطة", () => {
+  it("والأسطر من اليمين — لا وسطَ الصندوق ولا مخطّطة", () => {
     expect(table).toContain("text-align:right");
-    expect(table).toContain("background:#fff");
     expect(table).not.toContain("text-align:center");
+  });
+
+  /**
+   * ولا خلفيةَ للسطر: كانت تطمس ما يفيض من حروف السطر الذي قبله في التصوير،
+   * فيصل العميلَ ملفٌّ نصفُ كلّ بندٍ فيه مقطوع. راجع `formatPackaging`.
+   */
+  it("ولا خلفيةَ تطمس ما فوقها في التصوير", () => {
+    const lineStart = table.indexOf("<div data-pkg-line");
+    const firstLine = table.slice(lineStart, table.indexOf(">", lineStart));
+    expect(firstLine).not.toContain("background");
   });
 
   /**
@@ -168,7 +177,7 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
     const pieces = pkgItems(3).reduce((s, r) => s + r.packs_count * r.pieces_per_pack, 0);
     const last = table.slice(table.lastIndexOf('<div data-pkg-line'));
     expect(last).toContain("إجمالي عدد القطع");
-    expect(last).toContain(`${pieces.toLocaleString()} قطعة`);
+    expect(last).toContain(`>${pieces.toLocaleString()}</span>`);
     // أرضيةٌ وإطارٌ بلون العنوان — يُقرأ الصندوق كتلةً واحدة
     expect(last).toContain("background:#f1eefb");
     expect(last).toContain("#5b2c8e");
@@ -191,7 +200,7 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
 
     it("كرتونتان في كلٍّ عشرٌ ⇒ عشرون قطعة لا اثنتان", () => {
       const html = formatPackaging([], twoCartonsOfTen)!;
-      expect(html).toContain("20 قطعة");
+      expect(html).toContain(">20</span>");
       expect(html).toContain("إجمالي عدد القطع");
     });
 
@@ -209,7 +218,7 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
         { packaging_types: { name: "كيس" }, product_name: "ب", packs_count: 2, pieces_per_pack: 5, quantity: 1 },
       ];
       // 3×4 + 2×5 = 22 قطعة
-      expect(formatPackaging([], mixed)).toContain("22 قطعة");
+      expect(formatPackaging([], mixed)).toContain(">22</span>");
     });
 
     /** بندٌ بلا قطعٍ مسجَّلة = قطعةٌ في الطرد، لا صفرٌ يبتلع البند. */
@@ -217,14 +226,14 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
       const noPieces = [
         { packaging_types: { name: "كيس" }, product_name: "أ", packs_count: 4, pieces_per_pack: 0, quantity: 1 },
       ];
-      expect(formatPackaging([], noPieces)).toContain("4 قطعة");
+      expect(formatPackaging([], noPieces)).toContain(">4</span>");
     });
 
     it("وقطعةٌ في كل طردٍ ⇒ الرقم عدد الطرود نفسه", () => {
       const html = formatPackaging([], [
         { packaging_types: { name: "كيس" }, product_name: "أ", packs_count: 4, pieces_per_pack: 1, quantity: 1 },
       ])!;
-      expect(html).toContain("4 قطعة");
+      expect(html).toContain(">4</span>");
     });
 
     it("والرقم الكبير بفواصله — 2,696 لا 2696", () => {
@@ -232,7 +241,7 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
         packaging_types: { name: "كرتونة" }, product_name: "أ", packs_count: 10, pieces_per_pack: 20, quantity: 1,
       }));
       // 20 × 10 × 20 = 4,000
-      expect(formatPackaging([], many)).toContain("4,000 قطعة");
+      expect(formatPackaging([], many)).toContain(">4,000</span>");
     });
   });
 
@@ -242,9 +251,24 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
    * وأربعون بنداً تمتدّ صفحةً كاملة.
    */
   it("والأسطر تتوزّع أعمدةً — لا عموداً نحيلاً وبياضاً", () => {
-    expect(formatPackaging([], pkgItems(2))).toContain("column-count:1");
-    expect(formatPackaging([], pkgItems(7))).toContain("column-count:2");
-    expect(formatPackaging([], pkgItems(40))).toContain("column-count:3");
+    const cols = (n: number) => {
+      const html = formatPackaging([], pkgItems(n))!;
+      return (html.match(/data-pkg-col="/g) || []).length;
+    };
+    expect(cols(2)).toBe(1);
+    expect(cols(7)).toBe(2);
+    expect(cols(40)).toBe(3);
+  });
+
+  /**
+   * والأعمدةُ عناصرُ صريحة لا `column-count`: الخاصّيةُ صحيحةٌ على الشاشة
+   * وفي الطباعة، و**html2canvas لا يدعمها** — فكان ملفُّ العميل يخرج بأسطرٍ
+   * مقطوعةٍ من نصفها كلّما زادت البنودُ على ثلاثة.
+   */
+  it("وهي عناصرُ صريحة لا خاصّيةُ أعمدة", () => {
+    const html = formatPackaging([], pkgItems(7))!;
+    expect(html).not.toContain("column-count");
+    expect(html).toContain("display:flex");
   });
 
   /**
@@ -485,7 +509,7 @@ describe("مجموع القطع لا يتكرّر على الصفحات", () => 
    */
   it("وخارجَ الأعمدة لا داخلها", () => {
     const doc = new DOMParser().parseFromString(`<div>${table}</div>`, "text/html");
-    const cols = doc.querySelector("[style*='column-count']")!;
+    const cols = doc.querySelector("[data-pkg-cols]")!;
     const lines = Array.from(doc.querySelectorAll("[data-pkg-line]"));
     const totalEl = lines[lines.length - 1];
     expect(cols).toBeTruthy();
@@ -506,8 +530,8 @@ describe("مجموع القطع لا يتكرّر على الصفحات", () => 
   });
 
   it("والمجموع رقمٌ واحد صحيح مهما كثرت البنود", () => {
-    const total = pkgItems(40).reduce((s, r) => s + r.packs_count, 0);
-    expect(table).toContain(`${total} قطعة`);
+    const total = pkgItems(40).reduce((s, r) => s + r.packs_count * r.pieces_per_pack, 0);
+    expect(table).toContain(`>${total.toLocaleString()}</span>`);
   });
 });
 

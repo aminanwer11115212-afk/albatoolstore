@@ -191,6 +191,7 @@ describe("الضبط واحدٌ في الوحدة وفي شريط الأدوات
 let captured: HTMLElement | null = null;
 let capturedPageStyle: Record<string, string> = {};
 let capturedOpts: any = null;
+let capturedText = "";
 
 /**
  * html2canvas وjsPDF مباشرةً — لا html2pdf.
@@ -202,6 +203,8 @@ vi.mock("html2canvas", () => ({
   default: async (el: HTMLElement, opts: any) => {
     captured = el;
     capturedOpts = opts;
+    // النصُّ يُلتقط **هنا**: الإطارُ يُزال بعد التوليد، وإزالتُه تُفرغ مستنده
+    capturedText = el.textContent || "";
     const page = el.querySelector<HTMLElement>(".page");
     capturedPageStyle = page
       ? {
@@ -244,6 +247,7 @@ describe("buildPdfBlob يُسلّم المُصوِّر ورقةً محيَّدة
   let origComplete: PropertyDescriptor | undefined;
   beforeEach(() => {
     captured = null;
+    capturedText = "";
     capturedPageStyle = {};
     // jsdom لا يجلب الصور فلا يُطلق `load` ولا `error` — والشعار في الورقة.
     origComplete = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "complete");
@@ -270,16 +274,47 @@ describe("buildPdfBlob يُسلّم المُصوِّر ورقةً محيَّدة
   it("والأنماط المحقونة بلا كتلة الشاشة — فلا تُلبَس لعناصر التطبيق", async () => {
     const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
     await buildPdfBlob(SHEET);
-    const css = Array.from(captured!.querySelectorAll("style")).map((s) => s.textContent).join("\n");
+    const css = Array.from(captured!.ownerDocument.querySelectorAll("style"))
+      .map((s) => s.textContent).join("\n");
     expect(css).not.toContain("@media screen");
     expect(css).toContain("@media print");
+  });
+
+  /**
+   * ## والورقةُ في مستندٍ مستقلّ لا في مستند التطبيق
+   *
+   * html2canvas يستنسخ **المستند كلَّه** لا العنصر وحده. فحين تُركَّب الورقة
+   * في صفحة التطبيق يُستنسخ التطبيقُ كلُّه معها ثمّ يُنقّى — بعد أن دُفع ثمنُ
+   * النسخ. قِيس على مضيفٍ بأربعمئة عنصر: 772ms داخل الصفحة مقابل 370ms في
+   * إطارٍ معزول لفاتورة الثلاثين بنداً.
+   *
+   * وربحٌ ثانٍ لا يقلّ: العزلُ يصير بنيوياً لا تنقيةً — وثلاثةُ أعطالٍ سابقة
+   * خرجت من تسرّب أنماط التطبيق إلى الورقة المصوَّرة.
+   */
+  it("والورقةُ في مستندٍ مستقلّ — فلا يُستنسخ التطبيقُ معها", async () => {
+    const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
+    await buildPdfBlob(SHEET);
+    expect(captured!.ownerDocument).not.toBe(document);
+    expect(captured!.ownerDocument.defaultView!.frameElement).toBeTruthy();
+  });
+
+  /**
+   * والسكربتاتُ تُنزع قبل الكتابة: `document.write` يُشغّلها بخلاف
+   * `innerHTML`، وفي الورقة سكربتُ ترقيم الصفحات — ولو عمل لأضاف فواصلَ
+   * الصفحات إلى الملفّ الذي يُقطَّع بحسابه هو. قِيس: 2184 ← 3774 من ارتفاع
+   * اللوحة.
+   */
+  it("ولا سكربتَ فيها — الترقيمُ للمعاينة لا للملفّ", async () => {
+    const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
+    await buildPdfBlob(SHEET);
+    expect(captured!.ownerDocument.querySelectorAll("script").length).toBe(0);
   });
 
   it("والمحتوى كامل — التحييد للإطار لا للبنود", async () => {
     const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
     await buildPdfBlob(SHEET);
-    expect(captured!.textContent).toContain("بطارية");
-    expect(captured!.textContent).toContain("توقيع المستلم");
+    expect(capturedText).toContain("بطارية");
+    expect(capturedText).toContain("توقيع المستلم");
   });
 
   it("والحاوية تُزال بعد التوليد — لا تتراكم في المستند", async () => {
@@ -314,12 +349,12 @@ describe("buildPdfBlob يُسلّم المُصوِّر ورقةً محيَّدة
     }
   });
 
-  it("والإزاحةُ على غلافه الخارجي — فيبقى بعيداً عن الشاشة", async () => {
+  it("والإزاحةُ على إطاره — فيبقى بعيداً عن الشاشة", async () => {
     const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
     await buildPdfBlob(SHEET);
-    const outer = captured!.parentElement!;
-    expect(outer.style.position).toBe("fixed");
-    expect(parseInt(outer.style.left, 10)).toBeLessThan(-1000);
+    const frame = captured!.ownerDocument.defaultView!.frameElement as HTMLElement;
+    expect(frame.style.position).toBe("fixed");
+    expect(parseInt(frame.style.left, 10)).toBeLessThan(-1000);
   });
 
   /**
@@ -350,7 +385,8 @@ describe("buildPdfBlob يُسلّم المُصوِّر ورقةً محيَّدة
     const { SHEET_WIDTH_PX } = await import("@/utils/pdfSheetFrame");
     await buildPdfBlob(SHEET);
     expect(captured!.style.width).toBe(`${SHEET_WIDTH_PX}px`);
-    expect(captured!.parentElement!.style.width).toBe(`${SHEET_WIDTH_PX}px`);
+    const frame = captured!.ownerDocument.defaultView!.frameElement as HTMLElement;
+    expect(frame.style.width).toBe(`${SHEET_WIDTH_PX}px`);
   });
 });
 
