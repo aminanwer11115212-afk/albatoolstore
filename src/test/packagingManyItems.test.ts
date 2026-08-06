@@ -77,11 +77,16 @@ describe("البنود الكثيرة تصل الورقة كاملة", () => {
     expect(pkgLines(packagingInfo)).toBe(21);
   });
 
-  it("والمجموع في الذيل = مجموع الطرود", () => {
-    const total = manyItems.reduce((s, r) => s + r.packs_count, 0);
-    expect(packagingInfo).toContain("قطعة");
-    // السطر الأخير: «210 قطعة» — لا خليّةَ مستقلّة للرقم بعد صيرورته سطراً
-    expect(packagingInfo).toContain(`${total} قطعة`);
+  /**
+   * القطعُ لا الطرود: السطر يقول «6 كرتونة صنف ‎*‎6» — ستُّ كراتين في كلٍّ
+   * ستُّ قطع. فمن جمع الكراتين وسمّاها قطعاً أخطأ في ورقةِ استلام.
+   */
+  it("والمجموع في الذيل = مجموع القطع، والطرود بجانبه باسمها", () => {
+    const packs = manyItems.reduce((s, r) => s + r.packs_count, 0);
+    const pieces = manyItems.reduce((s, r) => s + r.packs_count * r.pieces_per_pack, 0);
+    expect(pieces).not.toBe(packs);
+    expect(packagingInfo).toContain(`${pieces.toLocaleString()} قطعة`);
+    expect(packagingInfo).toContain(`${packs.toLocaleString()} طرداً`);
   });
 
   it("مئة بند لا تكسر شيئاً", () => {

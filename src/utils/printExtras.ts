@@ -137,6 +137,8 @@ export function formatTransports(rows: any[]): string | undefined {
  */
 /** لونُ عنوان الصندوق — يتبعه شريطُ المجموع وخطُّ الفصل فتُقرأ الكتلة واحدة. */
 const PKG_ACCENT = "#5b2c8e";
+/** وخطُّ الفصل بين الأعمدة من اللون نفسه مخفَّفاً — ظاهرٌ على الورق لا باهت. */
+const PKG_RULE = "#a08cc9";
 
 export function packagingColumns(rowCount: number): number {
   if (rowCount <= 3) return 1;
@@ -255,29 +257,39 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
   const totalCost = (headers || []).reduce((s, r) => s + Number(r.cost || 0), 0);
 
   /**
-   * ## شريطُ المجموع — «اجعل عدد القطع واضح أكثر بتنسيق مميّز»
+   * ## شريطُ المجموع — «مجموع القطع خلّيه واضح، ووضّح للعميل أنّ هذا عدد قطع»
    *
    * كان سطراً كسائر الأسطر تحته خطّ: رقمٌ في آخر عمودٍ طويل لا تقع عليه
-   * العين، وهو أهمُّ رقمٍ في الصندوق — عليه يُستلم الشحن ويُعدّ.
+   * العين، وهو أهمُّ رقمٍ في الصندوق — عليه يُستلم الشحن ويُعدّ. فصار شريطاً
+   * بعرض الصندوق: أرضيةٌ بنفسجية فاتحة بإطارٍ من لونه، والوصفُ يميناً
+   * والرقمُ يساراً بخطٍّ أكبر.
    *
-   * فصار شريطاً بعرض الصندوق: أرضيةٌ بنفسجية فاتحة بإطارٍ من لونه، والوصفُ
-   * («إجمالي القطع») يميناً والرقمُ يساراً بخطٍّ أكبر. ولم يُذكر الوصف قبلُ
-   * أصلاً — فكان الرقم عارياً لا يُعرف مِمَّ هو.
+   * ## والرقمُ كان مسمّىً بغير اسمه
+   * «136 قطعة» لم تكن قطعاً بل **طروداً**: مجموعُ `packs_count` وحده. والسطر
+   * يقول «1 كرتونة بطارية ‎*‎10» — كرتونةٌ واحدة فيها عشرُ قطع. فمن جمع
+   * الكرتونات وسمّاها قطعاً أخطأ في ورقةٍ يستلم بها العميلُ بضاعته.
    *
-   * ## وهو خارج الأعمدة
-   * لو بقي داخلها لجرى مع البنود فوقع في ذيل عمودٍ من الأعمدة لا في آخر
-   * الصندوق. وكان قبلها في `<tfoot>`، و`display: table-footer-group` تجعل
-   * المتصفّح يُكرّره أسفلَ **كل صفحة** يمتدّ إليها الجدول: فظهر «14 قطعة»
-   * في نهاية الصفحة الأولى قبل أن تنتهي البنود.
+   * ولمّا طُلب أن يُوضَّح للعميل أنّ هذا عددُ قطع، لم يصحّ أن يُلصق الوصفُ
+   * الصحيح برقمٍ خاطئ. فصار الرقمان معاً، كلٌّ باسمه:
+   *
+   *     إجمالي عدد القطع        1,240 قطعة · 136 طرداً
+   *
+   * وهما ما يحتاجه المستلم فعلاً: الطرودُ يعدّها عند التسليم، والقطعُ يعدّها
+   * عند الفتح. والطرودُ تُذكر حين تخالف القطع فقط — فبضاعةٌ قطعةٌ في كل طرد
+   * رقمُها واحد، وذكرُه مرّتين تشويش.
    */
+  const totalPieces = rows.reduce((s, r) => s + r.packs * (r.pieces > 0 ? r.pieces : 1), 0);
+  const packsNote = totalPieces !== totalPacks
+    ? `<span style="font-size:11px;font-weight:700;color:#6b5b95;"> · ${fmt(totalPacks)} طرداً</span>`
+    : "";
   const foot = rows.length
     ? `<div data-pkg-line style="margin-top:8px;padding:5px 10px;`
       + `background:#f1eefb;border:1px solid ${PKG_ACCENT};border-radius:5px;`
       + `display:flex;justify-content:space-between;align-items:center;`
       + `page-break-inside:avoid;break-inside:avoid;">`
-      + `<span style="font-size:12px;font-weight:800;color:${PKG_ACCENT};">إجمالي القطع</span>`
+      + `<span style="font-size:12px;font-weight:800;color:${PKG_ACCENT};">إجمالي عدد القطع</span>`
       + `<span style="font-size:15px;font-weight:900;color:${PKG_ACCENT};letter-spacing:0.3px;">`
-      + `${totalPacks} قطعة</span>`
+      + `${fmt(totalPieces)} قطعة${packsNote}</span>`
       + `</div>`
     : "";
 
@@ -307,8 +319,10 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
   const table = rows.length
     // `data-pkg-rows` يُبلِّغ القالبَ عدد البنود — تقرؤه الكثافة.
     ? `<div data-pkg-rows="${rows.length}" style="page-break-inside:avoid;break-inside:avoid;">`
-      + `<div data-pkg-cols="${columns}" style="column-count:${columns};column-gap:22px;column-fill:balance;`
-      + `column-rule:1px solid #cfc7e8;">${body}</div>`
+      + `<div data-pkg-cols="${columns}" style="column-count:${columns};column-gap:26px;column-fill:balance;`
+      // خطٌّ ظاهرٌ لا تلميحٌ باهت: يُطبع على ورقٍ ويُقرأ في مخزن، والرمادي
+      // الفاتح يختفي في النسخ والتصوير — أشّر عليه صاحب المستودع بقلمٍ عريض.
+      + `column-rule:1px solid ${PKG_RULE};">${body}</div>`
       + `${foot}</div>`
     : "";
 

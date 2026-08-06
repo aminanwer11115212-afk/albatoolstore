@@ -165,13 +165,72 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
    * بلا وصفٍ أيضاً، فلا يُعرف مِمَّ هو.
    */
   it("والمجموع شريطٌ مميّز موصوفٌ بعدده", () => {
-    const total = pkgItems(3).reduce((s, r) => s + r.packs_count, 0);
+    const pieces = pkgItems(3).reduce((s, r) => s + r.packs_count * r.pieces_per_pack, 0);
     const last = table.slice(table.lastIndexOf('<div data-pkg-line'));
-    expect(last).toContain("إجمالي القطع");
-    expect(last).toContain(`${total} قطعة`);
+    expect(last).toContain("إجمالي عدد القطع");
+    expect(last).toContain(`${pieces.toLocaleString()} قطعة`);
     // أرضيةٌ وإطارٌ بلون العنوان — يُقرأ الصندوق كتلةً واحدة
     expect(last).toContain("background:#f1eefb");
     expect(last).toContain("#5b2c8e");
+  });
+
+  /**
+   * ## الرقمُ كان مسمّىً بغير اسمه
+   *
+   * «136 قطعة» لم تكن قطعاً بل **طروداً**: مجموعَ `packs_count` وحده. والسطر
+   * يقول «1 كرتونة بطارية ‎*‎10» — كرتونةٌ واحدة فيها عشرُ قطع. فمن جمع
+   * الكرتونات وسمّاها قطعاً أخطأ في ورقةٍ يستلم بها العميلُ بضاعته.
+   *
+   * ولمّا طُلب أن يُوضَّح للعميل أنّ هذا عددُ قطع، لم يصحّ أن يُلصق الوصفُ
+   * الصحيح برقمٍ خاطئ — فصار الرقمان معاً كلٌّ باسمه.
+   */
+  describe("القطعُ لا الطرود", () => {
+    const twoCartonsOfTen = [
+      { packaging_types: { name: "كرتونة" }, product_name: "بطارية", packs_count: 2, pieces_per_pack: 10, quantity: 1 },
+    ];
+
+    it("كرتونتان في كلٍّ عشرٌ ⇒ عشرون قطعة لا اثنتان", () => {
+      const html = formatPackaging([], twoCartonsOfTen)!;
+      expect(html).toContain("20 قطعة");
+      expect(html).toContain("2 طرداً");
+      expect(html).toContain("إجمالي عدد القطع");
+    });
+
+    it("والمجموع يضرب كلَّ بندٍ في قطع طرده", () => {
+      const mixed = [
+        { packaging_types: { name: "كرتونة" }, product_name: "أ", packs_count: 3, pieces_per_pack: 4, quantity: 1 },
+        { packaging_types: { name: "كيس" }, product_name: "ب", packs_count: 2, pieces_per_pack: 5, quantity: 1 },
+      ];
+      // 3×4 + 2×5 = 22 قطعة، و5 طرود
+      const html = formatPackaging([], mixed)!;
+      expect(html).toContain("22 قطعة");
+      expect(html).toContain("5 طرداً");
+    });
+
+    /** بندٌ بلا قطعٍ مسجَّلة = قطعةٌ في الطرد، لا صفرٌ يبتلع البند. */
+    it("وبندٌ بلا قطعٍ مسجَّلة يُحسب قطعةً في الطرد", () => {
+      const noPieces = [
+        { packaging_types: { name: "كيس" }, product_name: "أ", packs_count: 4, pieces_per_pack: 0, quantity: 1 },
+      ];
+      expect(formatPackaging([], noPieces)).toContain("4 قطعة");
+    });
+
+    /** وحين يتساوى الرقمان لا يُذكر الطرود — رقمٌ واحد مرّتين تشويش. */
+    it("وحين تتساوى القطع والطرود يُذكر رقمٌ واحد", () => {
+      const html = formatPackaging([], [
+        { packaging_types: { name: "كيس" }, product_name: "أ", packs_count: 4, pieces_per_pack: 1, quantity: 1 },
+      ])!;
+      expect(html).toContain("4 قطعة");
+      expect(html).not.toContain("طرداً");
+    });
+
+    it("والرقم الكبير بفواصله — 2,696 لا 2696", () => {
+      const many = Array.from({ length: 20 }, () => ({
+        packaging_types: { name: "كرتونة" }, product_name: "أ", packs_count: 10, pieces_per_pack: 20, quantity: 1,
+      }));
+      // 20 × 10 × 20 = 4,000
+      expect(formatPackaging([], many)).toContain("4,000 قطعة");
+    });
   });
 
   /**

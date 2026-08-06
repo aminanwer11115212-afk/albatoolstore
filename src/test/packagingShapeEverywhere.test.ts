@@ -48,7 +48,7 @@ function pkgBlockOf(html: string): string {
   const at = html.indexOf("data-pkg-rows");
   expect(at, "الورقة بلا كتلة تغليف").toBeGreaterThan(-1);
   const start = html.lastIndexOf("<div", at);
-  const end = html.indexOf("</div>", html.indexOf("إجمالي القطع", at)) + "</div>".length;
+  const end = html.indexOf("</div>", html.indexOf("إجمالي عدد القطع", at)) + "</div>".length;
   return html.slice(start, end);
 }
 
@@ -144,9 +144,11 @@ describe("والملامح تصل كل ورقة", () => {
       });
 
       it("وشريطُ المجموع موصوفٌ بعدده", () => {
-        expect(html).toContain("إجمالي القطع");
-        // 2+2+1+4+2 = 11
-        expect(html).toContain("11 قطعة");
+        expect(html).toContain("إجمالي عدد القطع");
+        // القطع = Σ(طرود × قطعِ الطرد) = 20+20+20+60+100 = 220
+        expect(html).toContain("220 قطعة");
+        // والطرود بجانبها باسمها: 2+2+1+4+2 = 11
+        expect(html).toContain("11 طرداً");
       });
 
       it("والخطّ عريض", () => {
