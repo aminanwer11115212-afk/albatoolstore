@@ -37,6 +37,83 @@ export function resolveDefaultsFromCache(
   };
 }
 
+/**
+ * بذرُ ترحيل المستند من افتراضيات العميل — **كتابةً لا استنتاجاً وقتَ العرض**.
+ *
+ * ## العطل
+ * المرحّل والوجهة يُسجَّلان للعميل في جدول العملاء، ثم تُنشأ له فاتورة فتخرج
+ * ورقتُها بلا ترحيل: `loadInvoiceExtras` لا تقرأ إلا `invoice_transports`،
+ * وهذا الجدول لا يُكتب فيه شيء ما لم يفتح المستخدم نافذة الترحيل ويحفظ.
+ * فالبيانات موجودةٌ عند العميل ولا تصل فاتورته.
+ *
+ * ## ولماذا الكتابة لا السقوطُ عند القراءة
+ * أسهلُ إصلاحٍ أن تسقط `loadInvoiceExtras` إلى افتراضيات العميل حين تجد
+ * الجدول فارغاً. لكنّ ورقة العميل لا تمرّ بها: تقرأ `transports` من
+ * `get_shared_document`، وهي دالّة قاعدةٍ لا تعرف هذا السقوط — ولا يملك
+ * التوكن العامّ قراءة `customer_preferred_transporter` أصلاً. فتفترق الورقتان:
+ * ترحيلٌ في المعاينة وفراغٌ عند العميل، وهو ما تمنعه «قاعدة الورقة الواحدة».
+ *
+ * فالبذرُ عند الحفظ يجعلها بياناً واحداً يقرؤه الجميع: المعاينة، والطباعة،
+ * ورابط العميل، ونافذة الترحيل، ولوحة الجاهز للشحن.
+ *
+ * ## وحارسان
+ * لا يُكتب فوق ترحيلٍ قائم — صفٌّ واحدٌ في الجدول يعني أن أحداً قرّر، ولو
+ * تركه فارغاً. ولا يُكتب صفٌّ فارغ: عميلٌ بلا افتراضيات يبقى بلا ترحيل، لا
+ * بصفٍّ لا يحمل شيئاً.
+ *
+ * ولا يرمي: فشلُ البذر لا يُسقِط حفظ الفاتورة — الفاتورة هي الأصل والترحيل
+ * تكملةٌ تُستدرك من نافذتها.
+ */
+export type SeedTransportResult = {
+  seeded: boolean;
+  reason: "no-ids" | "already-set" | "no-defaults" | "insert-failed" | "ok";
+};
+
+const DOC_TABLES = {
+  invoice: { table: "invoice_transports", fk: "invoice_id" },
+  quote: { table: "quote_transports", fk: "quote_id" },
+} as const;
+
+export async function seedTransportFromCustomerDefaults(
+  kind: "invoice" | "quote",
+  docId: string | null | undefined,
+  customerId: string | null | undefined
+): Promise<SeedTransportResult> {
+  if (!docId || !customerId) return { seeded: false, reason: "no-ids" };
+  const { table, fk } = DOC_TABLES[kind];
+  try {
+    const { data: existing, error: readErr } = await (supabase as any)
+      .from(table)
+      .select("id")
+      .eq(fk, docId)
+      .limit(1);
+    // القراءة الفاشلة لا تُقرأ «فارغاً»: لو رفضت السياسة القراءة لكتبنا صفّاً
+    // فوق ترحيلٍ قائمٍ لا نراه. فعند الخطأ نمتنع.
+    if (readErr) {
+      console.warn("[seedTransportFromCustomerDefaults] تعذّرت قراءة الترحيل القائم", readErr);
+      return { seeded: false, reason: "already-set" };
+    }
+    if ((existing || []).length > 0) return { seeded: false, reason: "already-set" };
+
+    const { transporterId, destinationId } = await fetchCustomerTransportDefaults(customerId);
+    if (!transporterId && !destinationId) return { seeded: false, reason: "no-defaults" };
+
+    const { error: insErr } = await (supabase as any).from(table).insert({
+      [fk]: docId,
+      transporter_id: transporterId,
+      destination_id: destinationId,
+    });
+    if (insErr) {
+      console.warn("[seedTransportFromCustomerDefaults] تعذّرت كتابة الترحيل", insErr);
+      return { seeded: false, reason: "insert-failed" };
+    }
+    return { seeded: true, reason: "ok" };
+  } catch (e) {
+    console.warn("[seedTransportFromCustomerDefaults] failed:", e);
+    return { seeded: false, reason: "insert-failed" };
+  }
+}
+
 /** يجلب الافتراضيات من قاعدة البيانات (للصفحات التي لا تستخدم React Query). */
 export async function fetchCustomerTransportDefaults(
   customerId: string | null | undefined

@@ -119,6 +119,21 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved, prefi
 
   const bankOnly = bankAccounts.filter((a) => (a.account_type || "").toLowerCase() === "bank" && isAllowedBank(a));
 
+  /**
+   * النقديّ لا يدخل بنكاً — فلا تُعرض عليه الحسابات البنكية.
+   *
+   * كانت القائمة تُظهر «المصرف الصرافي» و«أولاد جابر» وغيرها مع اختيار
+   * «نقدي»، وهو ما لا يستقيم: المال النقديّ يدخل **الصندوق** لا حساباً
+   * بنكياً. واختيارُ بنكٍ مع نقديٍّ يكتب قيداً يقول إن المال في البنك وهو في
+   * الدرج — وأثرُه يظهر في مطابقة البنك آخر الشهر.
+   *
+   * فالقائمة تُرشَّح بطريقة الدفع: النقديّ يرى الصناديق النقدية وحدها.
+   */
+  const cashOnly = bankAccounts.filter(
+    (a) => (a.account_type || "").toLowerCase() !== "bank",
+  );
+  const receivingAccounts = method === "cash" ? cashOnly : bankAccounts;
+
   const selectedCustomer = customers.find((c) => c.id === customerId);
   const netBefore = netBalanceOf(selectedCustomer);
   const amt = Number(amount) || 0;
@@ -378,7 +393,17 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved, prefi
           {/* Payment method */}
           <div>
             <Label>طريقة الدفع</Label>
-            <Select value={method} onValueChange={(v) => setMethod(v as Method)}>
+            <Select
+              value={method}
+              onValueChange={(v) => {
+                const next = v as Method;
+                setMethod(next);
+                // حسابٌ بنكيٌّ اختير قبل التبديل لا يبقى تحت «نقدي»
+                if (next === "cash" && accountId && !cashOnly.some((a) => a.id === accountId)) {
+                  setAccountId(cashOnly[0]?.id || "");
+                }
+              }}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="cash">نقدي</SelectItem>
@@ -395,11 +420,18 @@ export default function ChargeBalanceDialog({ open, onOpenChange, onSaved, prefi
           {/* Cash/card destination account */}
           {method !== "bank_transfer" && (
             <div className="md:col-span-2">
-              <Label>الحساب المستلم (اختياري)</Label>
+              <Label>{method === "cash" ? "الصندوق المستلم (اختياري)" : "الحساب المستلم (اختياري)"}</Label>
               <Select value={accountId} onValueChange={setAccountId}>
-                <SelectTrigger><SelectValue placeholder="اختر حساباً..." /></SelectTrigger>
+                <SelectTrigger data-testid="charge-receiving-account">
+                  <SelectValue placeholder={method === "cash" ? "اختر الصندوق..." : "اختر حساباً..."} />
+                </SelectTrigger>
                 <SelectContent>
-                  {bankAccounts.map((a) => (
+                  {receivingAccounts.length === 0 && (
+                    <SelectItem value="__none__" disabled>
+                      {method === "cash" ? "لا توجد صناديق نقدية" : "لا توجد حسابات"}
+                    </SelectItem>
+                  )}
+                  {receivingAccounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                   ))}
                 </SelectContent>

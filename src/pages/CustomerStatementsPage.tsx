@@ -92,18 +92,7 @@ export default function CustomerStatementsPage() {
    * ولمَ Shift+C لا حرفٌ مجرّد: حقلُ البحث في هذه الصفحة يأخذ التركيز تلقائياً
    * عند فتحها، فاختصارٌ بحرفٍ واحد كان سيُكتب في الحقل بدل أن يفتح شيئاً.
    */
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.shiftKey && (e.key === "C" || e.key === "c") && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        setPaletteOpen((v) => !v);
-        return;
-      }
-      if (e.key === "Escape") setPaletteOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+
 
 
   const rows = useMemo(() => {
@@ -139,6 +128,84 @@ export default function CustomerStatementsPage() {
   useEffect(() => setActiveIdx(0), [q, sortBy, tone]);
 
   const openStatement = (id: string) => navigate(`/customers/${id}/statement`);
+
+  /**
+   * خريطة المفاتيح كما طلبها صاحب المستودع:
+   *
+   *   ↑ ↓            تنقّلٌ بين العملاء
+   *   Enter          يفتح كشف حساب الصفّ النشط
+   *   Shift (وحده)   يفتح تعديل الرصيد على الصفّ النشط
+   *   Shift + C      لوحةُ القفز السريع — وضغطةٌ ثانية تُغلقها
+   *   Alt + Backspace  رجوعٌ إلى صفحة العملاء
+   *
+   * ## و«Shift وحده» ليست `shiftKey`
+   * `shiftKey` صحيحةٌ مع كلّ حرفٍ كبير يُكتب في البحث، فربطُ التعديل بها كان
+   * سيفتح المحرّر كلّما كتب المستخدم اسماً بحرفٍ كبير. فتُقرأ **نقرةً
+   * مفردة**: تُرصد عند الضغط، وتُلغى إن تلاها أيّ مفتاحٍ آخر، ولا تقع إلا عند
+   * الإفلات وحدها. فـShift+C تبقى للّوحة، وShift المجرّدة للتعديل.
+   */
+  const shiftAloneRef = useRef(false);
+
+  useEffect(() => {
+    /**
+     * حقولٌ تملك مفاتيحها.
+     *
+     * وحقلُ البحث **ليس منها** لـShift المجرّدة: التركيز فيه دائماً في هذه
+     * الصفحة، فاستثناؤه يُبطل الاختصار عملياً. أمّا Enter فيعالجه الحقل نفسه
+     * (`handleKey`) فلا يصل هنا مرّتين.
+     */
+    const inField = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      const tag = el?.tagName;
+      return tag === "TEXTAREA" || tag === "SELECT" || !!el?.isContentEditable;
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      // أيّ مفتاحٍ غير Shift يُلغي النقرة المفردة
+      if (e.key !== "Shift") shiftAloneRef.current = false;
+      else if (!e.repeat) shiftAloneRef.current = true;
+
+      if (e.altKey && e.key === "Backspace") {
+        e.preventDefault();
+        navigate("/customers");
+        return;
+      }
+      if (e.shiftKey && (e.key === "C" || e.key === "c") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+        return;
+      }
+      if (e.key === "Enter" && !paletteOpen && !editing && !prefill && !inField(e.target)) {
+        const target = rows[activeIdx] || rows[0];
+        if (target) { e.preventDefault(); openStatement(target.id); }
+        return;
+      }
+      if (e.key === "Escape") { setPaletteOpen(false); setEditing(null); }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== "Shift") return;
+      const alone = shiftAloneRef.current;
+      shiftAloneRef.current = false;
+      // لا يُفتح فوق شيءٍ مفتوح، ولا في حقلٍ نصّيٍّ متعدّد الأسطر
+      if (!alone || paletteOpen || editing || prefill || inField(e.target)) return;
+      const target = rows[activeIdx] || rows[0];
+      if (!target) return;
+      e.preventDefault();
+      setEditing({ id: target.id, name: target.name || "" });
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    // فقدُ التركيز يترك Shift «مضغوطة» في الذاكرة — فتُصفَّر
+    const onBlur = () => { shiftAloneRef.current = false; };
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [navigate, rows, activeIdx, paletteOpen, editing, prefill, openStatement]);
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
@@ -269,11 +336,17 @@ export default function CustomerStatementsPage() {
             })}
           </div>
 
+          <span className="ms-auto hidden text-[10px] text-muted-foreground sm:inline" data-testid="keys-hint">
+            <kbd className="font-mono">↑↓</kbd> تنقّل ·
+            <kbd className="font-mono"> Enter </kbd> كشف الحساب ·
+            <kbd className="font-mono"> Shift </kbd> تعديل الرصيد ·
+            <kbd className="font-mono"> Alt+⌫ </kbd> رجوع
+          </span>
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
             data-testid="open-palette"
-            className="ms-auto inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:bg-muted/60"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:bg-muted/60"
             title="قفزٌ سريع بين العملاء"
           >
             <Command size={12} />
@@ -366,15 +439,8 @@ export default function CustomerStatementsPage() {
                         tabIndex={0}
                         data-testid={`balance-cell-${i}`}
                         onFocus={() => setActiveIdx(i)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !editing) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setEditing({ id: c.id, name: c.name || "" });
-                          }
-                        }}
                         onClick={(e) => { e.stopPropagation(); setEditing({ id: c.id, name: c.name || "" }); }}
-                        title="Enter لإدخال مبلغٍ سريع — له أو عليه"
+                        title="Shift لإدخال مبلغٍ سريع — له أو عليه"
                         className={`px-3 py-3 font-bold tabular-nums cursor-text outline-none focus-visible:ring-2 focus-visible:ring-primary rounded ${
                           net > 0
                             ? "text-destructive"

@@ -1385,6 +1385,20 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         originalItemsHashRef.current = currentItemsHash;
       }
 
+      // المرحّل والوجهة المسجَّلان للعميل يصيران ترحيلَ الفاتورة — كتابةً مرّةً
+      // واحدة عند الحفظ، فتقرأهما المعاينةُ وورقةُ العميل ونافذةُ الترحيل من
+      // مصدرٍ واحد. ولا يُكتب فوق ترحيلٍ قائم. راجع `customerTransportDefaults`.
+      if (!pos && activeCustomer?.id && invId) {
+        const { seedTransportFromCustomerDefaults } = await import("@/utils/customerTransportDefaults");
+        const seed = await seedTransportFromCustomerDefaults("invoice", invId, activeCustomer.id);
+        // للقراءة ذاكرةٌ بعمر دقيقة: بلا إبطالها تُطبع الفاتورة بلا الترحيل
+        // الذي كُتب للتوّ.
+        if (seed.seeded) {
+          const { clearPrintExtrasCache } = await import("@/utils/printExtras");
+          clearPrintExtrasCache("invoice", invId);
+        }
+      }
+
       if (!pos && activeCustomer?.id) {
         await (supabase as any).rpc("recompute_customer_balance", { _customer_id: activeCustomer.id });
       }

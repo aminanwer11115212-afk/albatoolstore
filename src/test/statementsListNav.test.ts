@@ -95,12 +95,12 @@ describe("Shift+C يفتح ويغلق", () => {
     expect(LIST).toContain("!e.ctrlKey && !e.metaKey && !e.altKey");
   });
 
-  it("وEscape يُغلق أيضاً", () => {
-    expect(LIST).toContain('if (e.key === "Escape") setPaletteOpen(false)');
+  it("وEscape يُغلق اللوحة والمحرّر معاً", () => {
+    expect(LIST).toContain('if (e.key === "Escape") { setPaletteOpen(false); setEditing(null); }');
   });
 
   it("والمستمع يُنزَع عند مغادرة الصفحة — لا اختصارَ يبقى معلّقاً", () => {
-    expect(LIST).toContain('window.removeEventListener("keydown", onKey)');
+    expect(LIST).toContain('window.removeEventListener("keydown", onKeyDown)');
   });
 });
 
@@ -133,27 +133,27 @@ describe("واللوحة تُدار بالكيبورد وحده", () => {
   });
 });
 
-/* ─────────── ٣) «المتبقي» مخفيّ في الكشف ─────────── */
+/* ─────────── ٣) عمود «المتبقي» — أُخفي ثمّ أُرجع ─────────── */
 
 /**
- * المتبقّي على **سطرٍ واحد** ليس رصيد العميل بل بقيّة فاتورةٍ بعينها. وقارئ
- * الكشف يقرأ آخر رقمٍ في السطر فيظنّه الرصيد — وهو ليس إيّاه.
+ * أُخفي بطلبٍ ثمّ أُرجع بطلبٍ آخر: «لا يوجد عمود مخصّص للمتبقي — رجّعه».
+ * فصاحبُ الكشف يقرؤه على وجهه الصحيح — كم بقي على هذه الفاتورة بعينها.
  */
-describe("كشف العميل بلا عمود «المتبقي»", () => {
-  it("لا ترويسةَ له في الجدول", () => {
-    expect(STATEMENT).not.toContain('font-semibold text-muted-foreground">المتبقي</th>');
+describe("كشف العميل فيه عمود «المتبقي»", () => {
+  it("ترويسةٌ في الجدول", () => {
+    expect(STATEMENT).toContain('font-semibold text-muted-foreground">المتبقي</th>');
   });
 
-  it("ولا خليّةَ في الصفوف", () => {
-    expect(STATEMENT).not.toContain('data-label="المتبقي"');
+  it("وخليّةٌ في كل صفّ", () => {
+    expect(STATEMENT).toContain('data-label="المتبقي"');
   });
 
-  it("ولا في أعمدة الطباعة والمعاينة — ورقةٌ واحدة لا ورقتان", () => {
-    expect(STATEMENT).not.toContain('{ key: "remaining", label: "المتبقي"');
+  it("وفي أعمدة الطباعة والمعاينة — ورقةٌ واحدة لا ورقتان", () => {
+    expect(STATEMENT).toContain('{ key: "remaining", label: "المتبقي"');
   });
 
-  it("والرصيد الحقيقي باقٍ حيث ينبغي أن يُقرأ", () => {
-    expect(STATEMENT).toContain("BalanceChip");
+  it("والرقم بإشارته: أخضر لصالح العميل وأحمر عليه", () => {
+    expect(STATEMENT).toContain("<AmountChip value={row.remaining} />");
   });
 });
 
@@ -226,9 +226,8 @@ describe("الإدخال السريع يمرّ بمسار الشحن المحك�
     expect(cell).toContain('e.key === "ArrowLeft" || e.key === "ArrowRight"');
   });
 
-  it("والخليّة تُبلَغ بالكيبورد — Enter عليها يفتح الحقل", () => {
+  it("والخليّة تُبلَغ بالكيبورد", () => {
     expect(LIST).toContain("tabIndex={0}");
-    expect(LIST).toContain('if (e.key === "Enter" && !editing)');
   });
 
   it("ومغادرة التركيز لا تُغلق الحقل قبل الضغط على أزراره", () => {
@@ -294,5 +293,68 @@ describe("وحوار الشحن يقبل التعبئة بلا أن يفقد ح�
 
   it("والصفرُ المُمرَّر تعبئةً لا يُكتب في الحقل", () => {
     expect(DLG).toContain("Number(prefill.amount) !== 0");
+  });
+});
+
+
+/* ─────────── ٧) خريطة المفاتيح كما طلبها صاحب المستودع ─────────── */
+
+/**
+ *   ↑ ↓             تنقّل
+ *   Enter           كشف حساب الصفّ النشط
+ *   Shift (وحدها)   تعديل رصيده
+ *   Alt + Backspace رجوعٌ لصفحة العملاء
+ */
+describe("خريطة المفاتيح", () => {
+  it("Enter يفتح كشف الصفّ النشط", () => {
+    expect(LIST).toContain('if (e.key === "Enter" && !paletteOpen && !editing && !prefill && !inField(e.target))');
+    expect(LIST).toContain("openStatement(target.id)");
+  });
+
+  it("وShift المجرّدة تفتح تعديل الرصيد", () => {
+    expect(LIST).toContain("setEditing({ id: target.id, name: target.name || \"\" })");
+  });
+
+  /**
+   * `shiftKey` صحيحةٌ مع كلّ حرفٍ كبير يُكتب في البحث، فربطُ التعديل بها كان
+   * سيفتح المحرّر كلّما كتب المستخدم اسماً بحرفٍ كبير.
+   */
+  it("و«المجرّدة» تعني نقرةً مفردة لا `shiftKey`", () => {
+    expect(LIST).toContain("shiftAloneRef");
+    expect(LIST).toContain('if (e.key !== "Shift") shiftAloneRef.current = false');
+    expect(LIST).toContain("else if (!e.repeat) shiftAloneRef.current = true");
+  });
+
+  it("وتقع عند الإفلات لا عند الضغط", () => {
+    expect(LIST).toContain('const onKeyUp = (e: KeyboardEvent) => {');
+    expect(LIST).toContain('window.addEventListener("keyup", onKeyUp)');
+  });
+
+  it("فلا تتعارض مع Shift+C — الحرف يُلغي النقرة المفردة", () => {
+    const down = LIST.slice(LIST.indexOf("const onKeyDown"), LIST.indexOf("const onKeyUp"));
+    expect(down).toContain('if (e.key !== "Shift") shiftAloneRef.current = false;');
+  });
+
+  it("ولا تفتح فوق شيءٍ مفتوح", () => {
+    expect(LIST).toContain("if (!alone || paletteOpen || editing || prefill || inField(e.target)) return");
+  });
+
+  it("وفقدُ تركيز النافذة يُصفّرها — لا Shift تبقى «مضغوطة» في الذاكرة", () => {
+    expect(LIST).toContain('window.addEventListener("blur", onBlur)');
+  });
+
+  it("وAlt+Backspace يرجع لصفحة العملاء", () => {
+    expect(LIST).toContain('if (e.altKey && e.key === "Backspace")');
+    expect(LIST).toContain('navigate("/customers")');
+  });
+
+  it("والمفاتيح معروضةٌ للمستخدم — اختصارٌ لا يُعلَم لا يُستعمَل", () => {
+    expect(LIST).toContain('data-testid="keys-hint"');
+  });
+
+  it("وكلُّ المستمعين يُنزَعون عند مغادرة الصفحة", () => {
+    for (const ev of ['"keydown", onKeyDown', '"keyup", onKeyUp', '"blur", onBlur']) {
+      expect(LIST).toContain(`window.removeEventListener(${ev})`);
+    }
   });
 });

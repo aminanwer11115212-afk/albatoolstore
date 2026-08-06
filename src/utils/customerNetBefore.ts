@@ -1,3 +1,4 @@
+import { isManualDebitRow } from "@/utils/customerDebitEntry";
 /**
  * صافي حساب العميل **قبل لحظة معيّنة** — يُحسب بإعادة تشغيل الأحداث زمنياً.
  *
@@ -81,8 +82,18 @@ export function accountEvents(input: NetBeforeInput): Event[] {
     if (pairedPaymentIds.has(t.id)) continue; // النصف الآخر من زوج السداد
     const amt = num(t.amount);
     if (t.category === "customer_credit") {
-      // السالب استهلاك (النصف الأول من الزوج) — أثره صفر مع دفعته
-      if (amt < 0) continue;
+      /**
+       * السالب نوعان لا نوعٌ واحد:
+       *
+       *   • **استهلاكُ رصيد** — النصف الأول من زوجٍ يقابله دفعة، فأثرهما معاً
+       *     صفر، فيُتخطّى.
+       *   • **خصمٌ يدويّ على العميل** — يقف وحده ويرفع الدَّين، فلا يُتخطّى.
+       *
+       * وخلطُهما أسقط الخصم من كل حسابٍ تاريخي: قرأ «الحساب القديم» 500,000
+       * بدل 700,000 لأنّ خصماً بـ200,000 عُومل استهلاكاً. والأثرُ الصحيح يأتي
+       * من الصيغة نفسها: `-(-200000) = +200000`، أي يرفع ما عليه.
+       */
+      if (amt < 0 && !isManualDebitRow(t)) continue;
       events.push({ at: stampKey(t), effect: -r2(amt) });
       continue;
     }

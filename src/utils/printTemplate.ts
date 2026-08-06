@@ -155,19 +155,16 @@ export function generatePrintHTML(data: PrintData): string {
   const cleanTransport = cleanExtraHTML(transportInfo);
 
   /**
-   * صندوقا التغليف والترحيل متجاوران ما دام التغليف قصيراً.
+   * عدد بنود التغليف — تقرؤه الكثافةُ وحدها الآن.
    *
-   * فإذا تجاوزت بنودُ التغليف عشرين صار الصندوق أطول من صفحة، وبقي نصفُ
-   * الورقة الأيسر بياضاً إلى جانبه ثلاث صفحاتٍ أو أربعاً — لأن الترحيل سطران
-   * أو ثلاثة لا أكثر. فعندها ينزل كلٌّ منهما بعرض الورقة: التغليف أوّلاً ثم
-   * الترحيل تحته، وهو ترتيب الأهمّية أيضاً.
+   * وكان يُستعمل قبله لقرارِ تخطيطٍ ثانٍ: صندوقا التغليف والترحيل متجاوران ما
+   * دام التغليف قصيراً، فإذا تجاوز عشرين بنداً نزل كلٌّ منهما بعرض الورقة.
+   * سقط ذلك القرار حين صار للتغليف سطرُه دائماً — فلا حدَّ يُتجاوز.
    *
    * والعدد يأتي من `data-pkg-rows` الذي يكتبه `formatPackaging` — أي من
    * مُنتِج الجدول، لا من عدٍّ لوسوم `<tr>` هنا يخطئ إن تغيّر الشكل.
    */
-  const PACKAGING_STACK_THRESHOLD = 20;
   const pkgRows = Number(/data-pkg-rows="(\d+)"/.exec(cleanPackaging || "")?.[1] || 0);
-  const stackExtras = pkgRows > PACKAGING_STACK_THRESHOLD;
 
   /**
    * الكثافة التلقائية — الحدود ومعناها في `printDensity`.
@@ -357,22 +354,38 @@ ${DENSITY_CSS}
   }
   .extra-box {
     flex: 1; border: 2px solid #999; border-radius: 6px;
-    padding: 12px 16px; min-height: 80px;
+    /* بلا ارتفاعٍ أدنى: الصندوق بقدر ما فيه، لا بقدرٍ مفروض */
+    padding: 8px 12px;
+  }
+  /*
+   * سطرُ الترحيل والحساب.
+   *
+   * صندوقان ثابتا الطول يتقاسمان سطراً واحداً: الترحيلُ يميناً (أوّلُ عنصرٍ
+   * في RTL) والحسابُ يساراً، مشدودين إلى حافّتَي الورقة بـspace-between فلا
+   * يطفو أحدهما في الوسط.
+   *
+   * والترحيل صغير — «اجعل تفاصيل الترحيل بسيطة ومربّعها صغير»: يمتدّ حتى
+   * نصف السطر ولا يتجاوزه، فيبقى إلى جانبه الحسابُ بقدره لا مضغوطاً.
+   *
+   * وalign-items: flex-start كي لا يُمطَّ الأقصرُ إلى طول الأطول: صندوقُ
+   * ترحيلٍ فيه سطران يخرج بارتفاع أربعة صفوفٍ من الحساب، فيه فراغٌ ظاهر.
+   */
+  .extra-row--head {
+    justify-content: space-between; align-items: flex-start;
+  }
+  .extra-row--head .extra-box--transport {
+    flex: 1 1 auto; max-width: 50%; min-height: 0; padding: 8px 12px;
   }
   /**
-   * صندوق الترحيل صغير — طلبه صاحب المستودع: «اجعل تفاصيل الترحيل بسيطة
-   * ومربّعها صغير».
-   *
-   * وله سببٌ في التخطيط: محتواه سطرٌ أو سطران مهما كثرت الفاتورة، بينما
-   * التغليف يمتدّ بعدد بنوده. فتقاسمُهما العرض بالتساوي بـflex واحد يترك
-   * نصفَ الورقة بياضاً إلى جانب جدولٍ مزدحم. فصار يأخذ قدرَه: الثلث حين
-   * يتجاور الصندوقان، وما يكفيه حين ينزل تحت التغليف.
+   * الحساب بقدر أرقامه: عرضٌ ثابتٌ لا يتمدّد ولا ينضغط، فتبقى الأعمدة على
+   * محاذاةٍ واحدة مهما طالت أسماء الصفوف.
    */
-  .extra-box--transport {
-    flex: 0 1 32%; min-height: 0; padding: 8px 12px;
+  .account-box {
+    flex: 0 0 auto; width: 260px; max-width: 44%; margin: 0;
   }
-  .extra-row--transport { margin-top: 8px; }
-  .extra-row--transport .extra-box--transport { flex: 0 0 auto; max-width: 62%; }
+  /** والتغليف وحده في سطره، بعرض الورقة كاملاً. */
+  .extra-row--pkg { margin-top: 10px; }
+  .extra-row--pkg .extra-box { flex: 1 1 100%; }
   .tr-main { font-size: 12px; font-weight: 700; color: #1a1a1a; }
   .tr-sub  { font-size: 10.5px; color: #666; }
   .extra-box-title {
@@ -386,6 +399,8 @@ ${DENSITY_CSS}
   /* جدول التغليف يرث تنسيقه من السمات داخله (يُحقن في قالبين)، فلا يأخذ
      تنسيق جدول البنود العام. */
   .extra-content table { width: 100%; border-collapse: collapse; }
+  /* صفُّ المجموع في المتن لا في ذيلٍ يتكرّر على كل صفحة */
+  .extra-content tfoot { display: table-row-group; }
   .extra-content thead th { background: #5b4cad; color: #fff; }
 
   /* === NOTES === */
@@ -539,7 +554,8 @@ ${showItems ? (variant === "stocktake" ? `
 </table>
 `) : ""}
 
-${showAccount ? (() => {
+${(() => {
+const accountBox = !showAccount ? "" : (() => {
   const prevNet = (Number(previousDebt) || 0) - (Number(previousCredit) || 0);
   const hasPrev = Math.abs(prevNet) > 0.01;
   const generalDiscount = balSum.hasDiscount ? balSum.discount : 0;
@@ -609,7 +625,7 @@ ${showAccount ? (() => {
     </tr>`;
   return `
 <!-- ملخّص الحساب على شكل خلايا Excel: أصغر من جدول البنود، مضغوط في الأسفل -->
-<table data-section="account-summary" data-section-label="ملخص الحساب" style="width:38%;max-width:260px;margin:6px 0 4px;border-collapse:collapse;font-size:10px;">
+<table class="account-box" data-section="account-summary" data-section-label="ملخص الحساب" style="border-collapse:collapse;font-size:10px;">
   <tbody>
     ${row({ section: "invoice-value", label: isQuote ? "قيمة عرض السعر" : "قيمة الفاتورة", value: fmt(invoiceValue) })}
     ${generalDiscount > 0.01 ? row({ section: "discount-row", label: isQuote ? "الخصم على العرض" : "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : ""}
@@ -635,9 +651,8 @@ ${showAccount ? (() => {
   </tbody>
 </table>
 `;
-})() : ""}
+})();
 
-${showExtras ? (() => {
   // عنصرُ كتلةٍ لا p للتغليف: هو جدولٌ الآن، والجدول داخل فقرةٍ يخرج منها في
   // المتصفّح فينكسر الترتيب. راجع formatPackaging في printExtras.
   const packagingBox = showPackaging ? `
@@ -650,11 +665,34 @@ ${showExtras ? (() => {
     <div class="extra-box-title">معلومات الترحيل</div>
     <p>${cleanTransport || `لا توجد بيانات ترحيل ${docNoun}`}</p>
   </div>` : "";
-  return stackExtras
-    // صندوقان متتاليان: التغليف بعرض الورقة، والترحيل تحته بقدر محتواه.
-    ? `<div class="extra-row">${packagingBox}</div><div class="extra-row extra-row--transport">${transportBox}</div>`
-    : `<div class="extra-row">${packagingBox}${transportBox}</div>`;
-})() : ""}
+
+  /**
+   * ## سطرٌ للترحيل والحساب، وسطرٌ للتغليف تحتهما
+   *
+   * أرسل صاحب المستودع الشكلَ مقصوصاً مُعاد الترتيب: الترحيلُ والحسابُ
+   * متجاوران في سطرٍ واحد، والتغليفُ تحتهما.
+   *
+   * وله سببٌ في التخطيط لا في الذوق وحده: الترحيلُ سطران والحسابُ أربعةُ
+   * صفوف — كلاهما **ثابتُ الطول** مهما كبرت الفاتورة، فيملآن سطراً واحداً
+   * تماماً. والتغليفُ وحده هو الذي يمتدّ بعدد بنوده، فإفرادُه بسطرٍ يعطيه
+   * عرض الورقة كاملاً: عشرون بنداً تُقرأ في عمودٍ عريضٍ قصير بدل عمودٍ ضيّقٍ
+   * يمتدّ صفحتين.
+   *
+   * وكان الحسابُ وحده في سطر ثم التغليفُ والترحيلُ في سطر — فيقف الترحيلُ
+   * القصير إلى جانب التغليف الطويل تاركاً ثلثَ الورقة بياضاً، ويبقى إلى جانب
+   * الحساب بياضٌ آخر. سطران فيهما فراغان، صارا سطرين ممتلئين.
+   *
+   * والترتيب في RTL: أوّلُ عنصرٍ إلى اليمين. فالترحيل يميناً والحساب يساراً،
+   * كما في الصورة.
+   */
+  const headRow = transportBox || accountBox
+    ? `<div class="extra-row extra-row--head">${transportBox}${accountBox}</div>`
+    : "";
+  const pkgRow = packagingBox
+    ? `<div class="extra-row extra-row--pkg">${packagingBox}</div>`
+    : "";
+  return headRow + pkgRow;
+})()}
 
 ${notes ? `
 <div class="notes-section" data-section="notes" data-section-label="الملاحظات">

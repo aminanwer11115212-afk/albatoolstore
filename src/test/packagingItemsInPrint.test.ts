@@ -23,6 +23,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { pkgLines } from "./helpers/pkgLines";
 
 const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 
@@ -88,7 +89,7 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     const out = await loadInvoiceExtras("inv-49417");
     expect(out.packagingInfo).toBeTruthy();
     // الجدول: عمود «نوع التغليف» يجمع النوع واسم الصنف في خانةٍ واحدة
-    expect(out.packagingInfo).toContain("نوع التغليف");
+    expect(out.packagingInfo).toContain("كرتونة");
     expect(out.packagingInfo).toContain("كرتونة بطارية 125 سي جي");
     // قيمة الترويسة الفارغة لا تُعرض فوق تفصيلٍ أدقّ منها
     expect(out.packagingInfo).not.toBe("الكمية: 1");
@@ -132,8 +133,8 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     expect(out.packagingInfo).toContain("الوزن: 12.5");
     expect(out.packagingInfo).toContain("الأبعاد: 40×30×20");
     expect(out.packagingInfo).toContain("الإجمالي:");
-    // والترويسة لا تُضيف صفّاً فوق البند: صفُّ بندٍ واحد + صفُّ المجموع
-    expect(out.packagingInfo!.match(/<tr>/g)).toHaveLength(3);
+    // والترويسة لا تُضيف سطراً فوق البند: سطرُ بندٍ واحد + سطرُ المجموع
+    expect(pkgLines(out.packagingInfo!)).toBe(2);
   });
 
   it("بنودٌ متعدّدة ⇒ سطرٌ لكلٍّ منها", async () => {
@@ -149,9 +150,9 @@ describe("loadInvoiceExtras — البنود هي المصدر", () => {
     const out = await loadInvoiceExtras("inv-multi");
     expect(out.packagingInfo).toContain("كيس زيت");
     // قطع الطرد تُذكر بعلامة «6X» الحمراء حين تتجاوز الواحدة
-    expect(out.packagingInfo).toContain("6X");
-    // صفّان للبندين + صفُّ الترويسة + صفُّ المجموع
-    expect(out.packagingInfo!.match(/<tr>/g)).toHaveLength(4);
+    expect(out.packagingInfo).toContain("*6");
+    // سطران للبندين + سطرُ المجموع
+    expect(pkgLines(out.packagingInfo!)).toBe(3);
   });
 });
 

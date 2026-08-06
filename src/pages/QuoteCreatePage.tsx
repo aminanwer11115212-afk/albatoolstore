@@ -446,6 +446,36 @@ export default function QuoteCreatePage() {
   useKeyboardNav(pageRef);
   useCreatePageNav({ rootRef: pageRef, customerRef: customerInputRef, itemsTableId: "quote-items" });
 
+  /**
+   * تفريغُ ما على الشاشة — مصدرٌ واحد للمسار اليدويّ ولمسار الحذف.
+   *
+   * ## العطل الذي أصلحه
+   * «بعد الحذف لا تنحذف البنود وبيانات عرض السعر المعروضة في الشاشة».
+   *
+   * وسببُه أنّ `navigate("/quotes/create")` من `/quotes/edit/:id` **لا يُعيد
+   * تركيب المكوّن**: الراوتر يرى الصفحة نفسها فيبقي نسختها وحالتها. فيُحذف
+   * العرض من القاعدة وتبقى بنوده أمام العين — فيظنّ المستخدم أن الحذف لم يقع،
+   * أو أسوأ: يحفظ ما بقي فينشئ عرضاً جديداً بنفس البنود.
+   *
+   * فالتفريغ يقع **قبل** الانتقال لا بعده، ومن هنا وحده كي لا ينحرف مسارٌ عن
+   * الآخر ويُنسى حقلٌ في أحدهما.
+   */
+  const resetQuoteForm = () => {
+    setRows([]);
+    setCustomer(null);
+    setCustomerSearch("");
+    setNotes("");
+    setInternalNote("");
+    setGeneralDiscount(0);
+    setQuoteDate(new Date().toISOString().slice(0, 10));
+    setQuoteNumber("");
+    setQuickRow(newRow(defaultRate));
+    setTableSearch("");
+    setQuoteWorkflowStatus("draft");
+  };
+
+
+
   // ---------- Fetch initial data ----------
   useEffect(() => {
     (async () => {
@@ -2508,26 +2538,30 @@ export default function QuoteCreatePage() {
                         : "تم حذف عرض السعر بالكامل من قاعدة البيانات",
                       { duration: 5000, description: "تم حذف البنود والمرفقات والتغليف والنقل" }
                     );
-                    setClearConfirmOpen(false);
+                    // الشاشة تُفرَّغ **قبل** الانتقال: الراوتر يبقي المكوّن
+                    // نفسه فلا يُعيد تركيبه، فتبقى البنود لو لم تُفرَّغ هنا.
+                    resetQuoteForm();
                     navigate(isSideMode ? "/quotes/side/new" : "/quotes/create");
                     return;
                   }
-                  setRows([]);
-                  setCustomer(null);
-                  setCustomerSearch("");
-                  setNotes("");
-                  setInternalNote("");
-                  setGeneralDiscount(0);
-                  setQuoteDate(new Date().toISOString().slice(0, 10));
-                  setQuoteNumber("");
-                  setQuickRow(newRow(defaultRate));
-                  setTableSearch("");
-                  setQuoteWorkflowStatus("draft");
+                  resetQuoteForm();
                   toast.success("تم مسح بيانات عرض السعر — سيتم استخدام رقم جديد عند الحفظ");
-                  setClearConfirmOpen(false);
                 } catch (err: any) {
                   toast.error(err?.message || "فشل المسح");
                 } finally {
+                  /**
+                   * الحوار يُغلق **مهما كان المخرج**.
+                   *
+                   * كان يُغلق في مسار النجاح وحده. فحين يفشل الحذف — بسياسة
+                   * RLS أو بانقطاع — يبقى `AlertDialog` مفتوحاً، وهو **حاجزٌ
+                   * مودالٌ يغطّي الصفحة**: لا زرَّ يُضغط ولا رابطَ يُفتح خلفه.
+                   * وهذا بعينه ما وصفه صاحب المستودع: «يعلّق بالسستم كامل لا
+                   * أستطيع الخروج من الصفحة».
+                   *
+                   * والرسالةُ وحدها لا تكفي: المستخدم يقرأ الخطأ ثم يجد نفسه
+                   * محبوساً خلف حوارٍ لا يعرف أنه هو الحابس.
+                   */
+                  setClearConfirmOpen(false);
                   setClearing(false);
                 }
               }}

@@ -72,6 +72,30 @@ export function buildManualDebitPayload(input: ManualDebitInput): Record<string,
  * أثر الخصم على صافي الحساب — بإشارة الدفاتر: موجب = عليه.
  * يُستعمل في المعاينة قبل الحفظ، وهو نفسه ما تحسبه القاعدة بعده.
  */
+/**
+ * هل هذا القيد **خصمٌ يدويّ** على العميل لا استهلاكَ رصيد؟
+ *
+ * كلاهما `customer_credit` بمبلغٍ سالب، فلا يميّزهما المبلغ. والفارق في
+ * الأثر: استهلاكُ الرصيد يقابله دفعةٌ فيصير أثرهما معاً صفراً، والخصمُ اليدويّ
+ * يقف وحده فيرفع الدَّين.
+ *
+ * فمن خلط بينهما أسقط الخصم من كل حسابٍ تاريخي — وهو ما وقع: «الحساب القديم»
+ * قرأ 500,000 بدل 700,000 لأن خصماً بـ200,000 عُومل استهلاكاً فطُرح.
+ */
+export function isManualDebitRow(t: any): boolean {
+  if (!t) return false;
+  if (String(t.category || "") !== "customer_credit") return false;
+  if (!(Number(t.amount) < 0)) return false;
+  const alloc = t.allocation;
+  const kind = typeof alloc === "string" ? safeKind(alloc) : alloc?.kind;
+  return String(kind || "") === MANUAL_DEBIT_KIND;
+}
+
+/** `allocation` يصل أحياناً نصّاً من PostgREST — يُقرأ بلا أن يُسقط الصفحة. */
+function safeKind(raw: string): string {
+  try { return JSON.parse(raw)?.kind || ""; } catch { return ""; }
+}
+
 export function netAfterDebit(netBefore: number, amount: number): number {
   const before = Number(netBefore) || 0;
   const amt = Number(amount) || 0;

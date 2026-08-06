@@ -17,6 +17,7 @@ import path from "node:path";
 import { formatPackaging } from "@/utils/printExtras";
 import { generatePrintHTML } from "@/utils/printTemplate";
 import { buildDocHTML } from "../../supabase/functions/document-share/template";
+import { pkgLines } from "./helpers/pkgLines";
 
 const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 
@@ -71,15 +72,21 @@ describe("البنود الكثيرة تصل الورقة كاملة", () => {
     expect(packagingInfo).toContain("ملاحظة البند 5");
   });
 
-  it("عدد الصفوف = عدد البنود (لا دمج ولا إسقاط)", () => {
-    // صفُّ الترويسة + عشرون بنداً + صفُّ المجموع
-    expect(packagingInfo.match(/<tr>/g)).toHaveLength(22);
+  it("عدد الأسطر = عدد البنود (لا دمج ولا إسقاط)", () => {
+    // عشرون بنداً + سطرُ المجموع
+    expect(pkgLines(packagingInfo)).toBe(21);
   });
 
-  it("والمجموع في الذيل = مجموع الطرود", () => {
-    const total = manyItems.reduce((s, r) => s + r.packs_count, 0);
-    expect(packagingInfo).toContain("عدد القطع");
-    expect(packagingInfo).toContain(`>${total}<`);
+  /**
+   * القطعُ لا الطرود: السطر يقول «6 كرتونة صنف ‎*‎6» — ستُّ كراتين في كلٍّ
+   * ستُّ قطع. فمن جمع الكراتين وسمّاها قطعاً أخطأ في ورقةِ استلام.
+   */
+  it("والمجموع في الذيل = مجموع القطع لا الطرود", () => {
+    const packs = manyItems.reduce((s, r) => s + r.packs_count, 0);
+    const pieces = manyItems.reduce((s, r) => s + r.packs_count * r.pieces_per_pack, 0);
+    expect(pieces).not.toBe(packs);
+    expect(packagingInfo).toContain(`${pieces.toLocaleString()} قطعة`);
+    expect(packagingInfo).not.toContain("طرداً");
   });
 
   it("مئة بند لا تكسر شيئاً", () => {
