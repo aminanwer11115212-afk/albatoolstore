@@ -235,13 +235,25 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
    * والخطّ **عريضٌ في كل الصفحات** كما طُلب: هذه ورقةٌ تُقرأ في المخزن على
    * ضوءٍ ضعيف، لا على شاشة.
    */
+  /*
+   * ## ولا خلفيةَ للسطر — وهي كانت تقصّ نصفَ كلّ بندٍ في ملفّ العميل
+   *
+   * الخلفيةُ البيضاء بقيّةٌ من زمنٍ كان التغليفُ فيه جدولاً: تُبطل تظليلَ
+   * الصفوف الزوجية وتوسيطَ الخلايا. وهو اليوم `div` لا صفّ، فلا قاعدةَ
+   * جدوليّةٌ تصل إليه — والخلفيةُ باقيةٌ بلا عمل.
+   *
+   * إلا أنها لم تكن بلا ضرر: html2canvas يرسم في ترتيب المستند، وحين تفيض
+   * حروفُ سطرٍ عن صندوقه (وهو ما يقع حين يختلف الخطُّ المتاح عن المطلوب)
+   * تأتي **خلفيةُ السطر التالي فتطمس ما فاض**. فيصل العميلَ ملفٌّ نصفُ كلّ
+   * بندٍ فيه مقطوع، ولا يسلم إلا آخرُ سطرٍ في كل عمود — إذ لا سطرَ بعده.
+   *
+   * قيس بعدّ البكسلات الداكنة في الصندوق: 12,995 بالخلفية، و**17,324**
+   * بدونها — وهو عينُ ما يُرسم حين لا يكون هناك تداخلٌ أصلاً.
+   */
   const lineStyle = "font-size:12.5px;font-weight:700;color:#1a1a1a;line-height:1.6;"
-    // محاذاةٌ لليمين وخلفيةٌ بيضاء صراحةً: القالبان يحملان قاعدة
-    // `tbody td { text-align:center }` وتظليلَ الصفوف الزوجية، فبلا تصريحٍ
-    // تخرج الأسطر وسطَ الصندوق مخطّطةً — والصورة أسطرٌ متتاليةٌ من اليمين.
-    + "padding:1px 0;border:0;text-align:right;background:#fff;";
+    + "padding:1px 0;border:0;text-align:right;";
 
-  const body = rows.map((r) => {
+  const lines = rows.map((r) => {
     // «*10» عددُ القطع في الطرد الواحد — تُذكر حين تتجاوز الواحدة فقط
     const xMark = r.pieces > 1 ? ` *${r.pieces}` : "";
     const note = r.note
@@ -251,7 +263,7 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
     return `<div data-pkg-line style="${lineStyle}page-break-inside:avoid;break-inside:avoid;">`
       + `${r.packs || ""} ${escapeHtml(r.label)}${xMark}`
       + `${note}</div>`;
-  }).join("");
+  });
 
   const totalCost = (headers || []).reduce((s, r) => s + Number(r.cost || 0), 0);
 
@@ -285,8 +297,22 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
       + `display:flex;justify-content:space-between;align-items:center;`
       + `page-break-inside:avoid;break-inside:avoid;">`
       + `<span style="font-size:12px;font-weight:800;color:${PKG_ACCENT};">إجمالي عدد القطع</span>`
-      + `<span style="font-size:15px;font-weight:900;color:${PKG_ACCENT};letter-spacing:0.3px;">`
-      + `${fmt(totalPieces)} قطعة</span>`
+      // الفصلُ بهامشٍ لا بفراغ: المصوِّر يُسقط الفراغَ بين الرقم ووحدته —
+      // ولا يُنجيه `&nbsp;` — فيخرج «108قطعة» ملتصقةً في ملفّ العميل، وهو
+      // أهمُّ رقمٍ في الصندوق. والهامشُ تخطيطٌ لا حرفٌ يُسقَط.
+      /*
+       * الرقمُ ووحدتُه في وعاءٍ مرنٍ بفجوةٍ صريحة — لا فراغٍ ولا هامش.
+       *
+       * جُرّبت أربعُ صيغٍ بالتصوير الحقيقي: الفراغُ العادي والهامشُ المنطقي
+       * كلاهما يخرج «42قطعة» ملتصقةً أو متراكبة، والحشوُ على أخوين يباعد
+       * بينهما بعرض الصندوق. والفجوةُ وحدها تخرج «42 قطعة» كما تُكتب.
+       *
+       * ووعاءٌ واحد لا أخوان: الشريطُ موزَّعٌ بـspace-between، وثلاثةُ أبناءٍ
+       * فيه تتباعد فيقع الرقمُ في وسط الصندوق بعيداً عن وحدته.
+       */
+      + `<span style="display:flex;gap:6px;align-items:baseline;`
+      + `font-size:15px;font-weight:900;color:${PKG_ACCENT};letter-spacing:0.3px;">`
+      + `<span>${fmt(totalPieces)}</span><span>قطعة</span></span>`
       + `</div>`
     : "";
 
@@ -312,14 +338,44 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
    * سطرٍ في العمود الذي يليه، ويُقرأ البندان بنداً واحداً. والخطُّ يفصلهما
    * فصلاً لا يحتاج تدقيقاً.
    */
+  /**
+   * ## الأعمدةُ مبنيّةٌ صراحةً لا بـ`column-count`
+   *
+   * كانت الأعمدةُ بخاصّية `column-count` — وهي صحيحةٌ على الشاشة وفي الطباعة،
+   * لكنّ **html2canvas لا يدعمها**. فكلُّ ملفّ PDF فيه أكثرُ من ثلاثة بنود
+   * تغليفٍ كان يخرج بأسطرٍ **مقطوعةٍ من نصفها**: لا يسلم منها إلا آخرُ سطرٍ
+   * في كلّ عمود. صُوِّر بثمانية بنود فخرجت ستّةٌ منها مبتورة.
+   *
+   * وهو عطلٌ في ورقة العميل لا في المعاينة — أي في المخرج الذي لا يراه
+   * صاحبُ المستودع إلا بعد أن يصل الزبون.
+   *
+   * فتُبنى الأعمدةُ عناصرَ صريحةً في سطرِ مرونة: يفهمها html2canvas، ويبقى
+   * الشكلُ على الشاشة والورق كما كان. والتوزيعُ عموديٌّ كما كان
+   * (`column-fill: balance`): أوّلُ البنود في العمود الأوّل.
+   *
+   * ## والخطُّ الفاصل بخصائصَ فيزيائية لا منطقية
+   * أشّر عليه صاحب المستودع بقلمٍ أخضر، وله سببٌ يتجاوز الزينة: الأعمدة
+   * متلاصقةٌ بفراغٍ وحده، والسطر فيها يبدأ من اليمين وينتهي حيث ينتهي نصّه —
+   * فتختلط نهايةُ سطرٍ في عمودٍ ببداية سطرٍ في العمود الذي يليه. والورقةُ
+   * دائماً RTL، فاليسارُ هو نهايةُ العمود — و`border-left` يفهمه المصوِّر
+   * بينما `border-inline-end` قد لا يفهمه.
+   */
   const columns = packagingColumns(rows.length);
+  const perCol = Math.ceil(lines.length / columns) || 1;
+  const colsHtml = Array.from({ length: columns }, (_, c) => {
+    const part = lines.slice(c * perCol, (c + 1) * perCol).join("");
+    if (!part) return "";
+    // خطٌّ ظاهرٌ لا تلميحٌ باهت: يُطبع على ورقٍ ويُقرأ في مخزن، والرمادي
+    // الفاتح يختفي في النسخ والتصوير — أشّر عليه صاحب المستودع بقلمٍ عريض.
+    const rule = c < columns - 1 ? `border-left:1px solid ${PKG_RULE};padding-left:13px;` : "";
+    const pad = c > 0 ? "padding-right:13px;" : "";
+    return `<div data-pkg-col="${c + 1}" style="flex:1 1 0;min-width:0;${rule}${pad}">${part}</div>`;
+  }).join("");
+
   const table = rows.length
     // `data-pkg-rows` يُبلِّغ القالبَ عدد البنود — تقرؤه الكثافة.
     ? `<div data-pkg-rows="${rows.length}" style="page-break-inside:avoid;break-inside:avoid;">`
-      + `<div data-pkg-cols="${columns}" style="column-count:${columns};column-gap:26px;column-fill:balance;`
-      // خطٌّ ظاهرٌ لا تلميحٌ باهت: يُطبع على ورقٍ ويُقرأ في مخزن، والرمادي
-      // الفاتح يختفي في النسخ والتصوير — أشّر عليه صاحب المستودع بقلمٍ عريض.
-      + `column-rule:1px solid ${PKG_RULE};">${body}</div>`
+      + `<div data-pkg-cols="${columns}" style="display:flex;align-items:flex-start;">${colsHtml}</div>`
       + `${foot}</div>`
     : "";
 

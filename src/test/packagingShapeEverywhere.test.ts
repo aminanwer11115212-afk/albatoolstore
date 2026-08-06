@@ -139,14 +139,16 @@ describe("والملامح تصل كل ورقة", () => {
       const html = build();
 
       it("أعمدةٌ بينها خطٌّ فاصل", () => {
-        expect(html).toContain("column-count:2");
-        expect(html).toContain("column-rule:1px solid");
+        // عمودان صريحان — لا خاصّيةُ `column-count`، فهي لا تصل ملفَّ العميل
+        expect((html.match(/data-pkg-col="/g) || []).length).toBe(2);
+        expect(html).toContain("border-left:1px solid");
+        expect(html).not.toContain("column-count");
       });
 
       it("وشريطُ المجموع موصوفٌ بعدده", () => {
         expect(html).toContain("إجمالي عدد القطع");
         // القطع = Σ(طرود × قطعِ الطرد) = 20+20+20+60+100 = 220
-        expect(html).toContain("220 قطعة");
+        expect(html).toContain(">220</span>");
         // والطرودُ مخفيّة بطلبه — محسوبةٌ في الأسطر فوقها على أي حال
         expect(html).not.toContain("طرداً");
       });
@@ -180,7 +182,8 @@ describe("عددُ الأعمدة واحدٌ في المخارج كلّها", ()
         packs_count: 1, pieces_per_pack: 10, quantity: 1,
       }));
       const pkg = formatPackaging([], items)!;
-      const expected = `column-count:${packagingColumns(n)}`;
+      const expected = packagingColumns(n);
+      const countCols = (h: string) => (h.match(/data-pkg-col="/g) || []).length;
 
       const preview = generatePrintHTML({
         type: "invoice", number: "INV-1", date: "2026-08-06", customer: { name: "ياسين" },
@@ -194,8 +197,8 @@ describe("عددُ الأعمدة واحدٌ في المخارج كلّها", ()
         packaging: [], packaging_items: items, transports: [],
       } as any);
 
-      expect(preview).toContain(expected);
-      expect(shared).toContain(expected);
+      expect(countCols(preview)).toBe(expected);
+      expect(countCols(shared)).toBe(expected);
     });
   }
 });

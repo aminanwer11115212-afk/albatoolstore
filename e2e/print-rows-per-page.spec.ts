@@ -211,3 +211,154 @@ test.describe("مربّعُ الحساب لا يتحرّك بإخفاء شيء",
     }
   });
 });
+
+/* ─────────── المعاينة تُقسَّم صفحاتٍ مرقّمة ─────────── */
+
+/**
+ * «إذا زاد عن الـA4 تُقسم، وأضِف ترقيم صفحات — 1 من 3 وهكذا».
+ *
+ * والقياسُ هنا على حارسين لا على الشكل: **لا عنصرَ يعبر حدَّ صفحة**، و**لا
+ * عنصرَ يقع تحت شريط الترقيم**. أوّلُهما يمنع بنداً منشطراً، وثانيهما يمنع
+ * رقماً مكتوباً فوق بند.
+ */
+test.describe("المعاينة تُقسَّم صفحاتٍ مرقّمة", () => {
+  const CONTENT_MM = 277;
+  const FOOT = 22;
+  const TOL = 1.5;
+
+  async function paginate(page: import("@playwright/test").Page, html: string) {
+    await page.emulateMedia({ media: "screen" });
+    await page.setContent(
+      `<!doctype html><body style="margin:0"><iframe id="f" style="width:1000px;height:100vh;border:0"></iframe></body>`,
+    );
+    await page.evaluate((h) => {
+      (document.getElementById("f") as HTMLIFrameElement).srcdoc = h;
+    }, html);
+    await page.waitForTimeout(700);
+    return page.evaluate(
+      ({ mm, foot, tol }) => {
+        const d = (document.getElementById("f") as HTMLIFrameElement).contentDocument!;
+        const el = d.querySelector<HTMLElement>(".page")!;
+        const cs = getComputedStyle(el);
+        const padTop = parseFloat(cs.paddingTop);
+        const probe = d.createElement("div");
+        probe.style.cssText = `position:absolute;visibility:hidden;height:${mm}mm`;
+        el.appendChild(probe);
+        const ph = probe.getBoundingClientRect().height;
+        probe.remove();
+        const top0 = el.getBoundingClientRect().top + padTop;
+        const foots = Array.from(d.querySelectorAll(".lov-pgfoot")).map((n) => n.textContent || "");
+        let cross = 0;
+        let under = 0;
+        for (const n of Array.from(
+          d.querySelectorAll("tr, .extra-box, .account-box, .signatures, [data-pkg-line], .notes-section"),
+        )) {
+          if (n.classList.contains("lov-pgbreak")) continue;
+          if (n.closest(".account-box") && !n.classList.contains("account-box")) continue;
+          const r = n.getBoundingClientRect();
+          const t = r.top - top0;
+          const b = r.bottom - top0;
+          if (b - t >= ph - foot) continue; // أطولُ من صفحة: يُشطر حتماً
+          if (Math.floor((b - tol) / ph) > Math.floor((t + tol) / ph)) cross++;
+          for (let k = 1; k * ph <= b + foot; k++) {
+            if (b > k * ph - foot + tol && t < k * ph - tol) under++;
+          }
+        }
+        return { foots, cross, under };
+      },
+      { mm: CONTENT_MM, foot: FOOT, tol: TOL },
+    );
+  }
+
+  test("فاتورةٌ تفيض عن ورقةٍ تُرقَّم «1 من 2» ثمّ «2 من 2»", async ({ page }) => {
+    const m = await paginate(page, sheet({ n: 30, pkg: 6 }));
+    expect(m.foots.length).toBeGreaterThanOrEqual(2);
+    expect(m.foots[0]).toBe(`1 من ${m.foots.length}`);
+    expect(m.foots.at(-1)).toBe(`${m.foots.length} من ${m.foots.length}`);
+  });
+
+  test("وثلاثُ صفحاتٍ تُرقَّم إلى «3 من 3»", async ({ page }) => {
+    const m = await paginate(page, sheet({ n: 60, pkg: 12 }));
+    expect(m.foots.length).toBeGreaterThanOrEqual(3);
+    expect(m.foots).toEqual(m.foots.map((_, i) => `${i + 1} من ${m.foots.length}`));
+  });
+
+  test("ولا بندَ يعبر حدَّ صفحة، ولا بندَ تحت الترقيم", async ({ page }) => {
+    for (const opts of [{ n: 30 }, { n: 30, pkg: 30 }, { n: 60, pkg: 12 }, { n: 100, pkg: 40 }]) {
+      const m = await paginate(page, sheet(opts));
+      expect(m.cross, `عابرٌ في ${JSON.stringify(opts)}`).toBe(0);
+      expect(m.under, `تحت الترقيم في ${JSON.stringify(opts)}`).toBe(0);
+    }
+  });
+
+  test("وصفحةٌ واحدة بلا ترقيم — الرقمُ يفيد حين تتعدّد", async ({ page }) => {
+    const m = await paginate(page, sheet({ n: 8 }));
+    expect(m.foots).toEqual([]);
+  });
+});
+
+/* ─────────── الشكل واحدٌ في كل مخرج — بالتصيير لا بالنصّ ─────────── */
+
+/**
+ * «تحقّق من هذا الشكل في جميع مكان إنشاء ومعاينة وطباعة وتعديل وPDF».
+ *
+ * والفحصُ هنا **هندسيّ**: يقيس موضعَ اسم العميل من حافّة اليمين، وانحرافَ
+ * العنوان عن منتصف الورقة، وموضعَ التاريخ من حافّة اليسار، ومقاسَ الخطّ —
+ * في أنواع المستندات كلِّها. فاختلافُ مخرجٍ واحدٍ يظهر رقماً لا انطباعاً.
+ *
+ * ويكمّله `src/test/docHeadEverywhere.test.ts` على البنية، وهذا على المقاس.
+ */
+test.describe("شريطُ الترويسة هندسةٌ واحدة في المستندات كلّها", () => {
+  const DOCS: Array<[string, Record<string, unknown>]> = [
+    ["فاتورة", { type: "invoice" }],
+    ["فاتورة كاش", { type: "invoice", isCash: true }],
+    ["عرض سعر", { type: "quote" }],
+    ["أمر شراء", { type: "purchase" }],
+    ["مرتجع", { type: "return" }],
+    ["كشف جرد", { type: "invoice", variant: "stocktake" }],
+    ["منتجات بلا أسعار", { type: "invoice", variant: "no-account" }],
+  ];
+
+  test("العميل يميناً، والعنوان في المنتصف، والتاريخ يساراً — بنفس المقاس", async ({ page }) => {
+    const seen: Array<[string, string]> = [];
+
+    for (const [name, extra] of DOCS) {
+      const list = items(8);
+      const total = list.reduce((s, r) => s + r.total, 0);
+      const html = generatePrintHTML({
+        number: "INV-89170", date: "2026-08-06",
+        customer: { name: "امين انور" },
+        items: list, subtotal: total, taxTotal: 0, discountTotal: 0, grandTotal: total,
+        company: null, transportInfo: transportHtml,
+        ...extra,
+      } as any);
+
+      await page.emulateMedia({ media: "screen" });
+      await page.setContent(html, { waitUntil: "networkidle" });
+
+      const geom = await page.evaluate(() => {
+        const pg = document.querySelector(".page")!.getBoundingClientRect();
+        const right = document.querySelector(".doc-head-right")!.getBoundingClientRect();
+        const title = document.querySelector(".doc-title")!.getBoundingClientRect();
+        const left = document.querySelector(".doc-head-left")!.getBoundingClientRect();
+        const line = document.querySelector(".info-line") as HTMLElement;
+        return [
+          Math.round(pg.right - right.right),                                  // العميل من اليمين
+          Math.round((title.left + title.right) / 2 - (pg.left + pg.right) / 2), // انحرافُ العنوان
+          Math.round(left.left - pg.left),                                     // التاريخ من اليسار
+          getComputedStyle(line).fontSize,
+        ].join("|");
+      });
+      seen.push([name, geom]);
+    }
+
+    // العنوانُ في المنتصف الحقيقي: انحرافُه صفر
+    for (const [name, g] of seen) {
+      expect(g.split("|")[1], `${name}: انحرافُ العنوان عن المنتصف`).toBe("0");
+      expect(g.split("|")[3], `${name}: مقاسُ خطّ التفاصيل`).toBe("15px");
+    }
+    // وهندسةُ الشريط واحدةٌ في الجميع
+    const distinct = new Set(seen.map(([, g]) => g));
+    expect(Array.from(distinct), seen.map(([n, g]) => `${n}=${g}`).join(" · ")).toHaveLength(1);
+  });
+});

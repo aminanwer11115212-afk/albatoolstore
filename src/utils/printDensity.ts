@@ -93,7 +93,7 @@ export const ACCOUNT_FONT_PX = {
  * يقيسه `e2e/print-rows-per-page.spec.ts` بتصييرٍ حقيقي، وإلى اثني عشر رقماً،
  * فلا يبقى تقديراً.
  */
-export const ACCOUNT_ROW_H_PX = 25;
+export const ACCOUNT_ROW_H_PX = 29;
 
 /**
  * ما يجب أن تحمله الصفحة الأولى من بنود في درجة `compact`.
@@ -149,9 +149,10 @@ export const DENSITY_CSS = `
   .d-compact .header-title { font-size: 19px; margin-bottom: 2px; }
   .d-compact .header-address { font-size: 12px; line-height: 1.3; }
   .d-compact .header-phones { font-size: 13px; margin-top: 0; }
-  .d-compact .doc-title { margin: 2px 0 3px; }
+  .d-compact .doc-head { margin: 3px 0 3px; }
+  .d-compact .doc-title { margin: 0; }
   .d-compact .doc-title h1 { font-size: 17px; }
-  .d-compact .info-row { margin-bottom: 2px; font-size: 12px; }
+  .d-compact .info-line { font-size: 13.5px; line-height: 1.35; }
   .d-compact thead th { padding: 4px 6px; font-size: 12px; }
   .d-compact tbody td { padding: 2.5px 6px; font-size: 12.5px; }
   .d-compact .col-qty, .d-compact .col-price { font-size: 14px; }
@@ -161,9 +162,10 @@ export const DENSITY_CSS = `
   .d-dense .header { padding-bottom: 4px; margin-bottom: 4px; }
   .d-dense .header-logo img { height: 46px; }
   .d-dense .header-title { font-size: 18px; }
-  .d-dense .doc-title { margin: 3px 0 4px; }
+  .d-dense .doc-head { margin: 3px 0 4px; }
+  .d-dense .doc-title { margin: 0; }
   .d-dense .doc-title h1 { font-size: 17px; }
-  .d-dense .info-row { margin-bottom: 4px; font-size: 12px; }
+  .d-dense .info-line { font-size: 12.5px; line-height: 1.3; }
   .d-dense thead th { padding: 3px 5px; font-size: 11.5px; }
   .d-dense tbody td { padding: 2.5px 5px; font-size: 11.5px; }
   .d-dense .col-qty, .d-dense .col-price { font-size: 13px; }

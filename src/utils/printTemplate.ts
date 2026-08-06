@@ -77,6 +77,7 @@ import {
   ACCOUNT_FONT_PX, ACCOUNT_ROW_H_PX,
 } from "@/utils/printDensity";
 import { PDF_SCALE_INLINE_JS } from "@/utils/pdfCanvasScale";
+import { PAGINATION_CSS, PAGINATION_INLINE_JS } from "@/utils/sheetPagination";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -263,6 +264,7 @@ export function generatePrintHTML(data: PrintData): string {
     }
   }
 ${DENSITY_CSS}
+${PAGINATION_CSS}
 
   /* === HEADER === */
   .header {
@@ -290,23 +292,39 @@ ${DENSITY_CSS}
     font-size: 13px; color: #555; margin-top: 2px;
   }
 
-  /* === DOC TITLE === */
-  .doc-title {
-    text-align: center; margin: 14px 0 10px;
+  /* === DOC HEAD: العميل يميناً، العنوان وسطاً، التاريخ والرقم يساراً ===
+     أرسل صاحبُ المستودع الشكل مصوَّراً: الثلاثةُ في شريطٍ واحد لا في ثلاثة
+     أسطر. وله سببٌ في التخطيط لا في الذوق: العنوانُ كان سطراً وحده والبياناتُ
+     سطرين تحته — ثلاثةُ أسطرٍ لمعلوماتٍ تسع سطراً واحداً، ونحو 30px من رأس
+     الصفحة تُؤخذ من الجدول.
+
+     والجانبان بمرونةٍ متساوية (1 1 0) كي يقع العنوانُ في المنتصف الحقيقي
+     مهما طال اسمُ العميل أو قصُر — لا في منتصفِ ما تبقّى. */
+  .doc-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 10px; margin: 8px 0 8px;
   }
+  .doc-head-side { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .doc-head-right { text-align: right; }
+  .doc-head-left { text-align: left; }
+  .doc-title { flex: 0 0 auto; text-align: center; margin: 0; }
   .doc-title h1 {
     font-size: 22px; color: #2c3e50; font-weight: 800;
     display: inline-block; border-bottom: 3px solid #5b2c8e;
     padding-bottom: 3px;
   }
 
-  /* === INFO ROW === */
-  .info-row {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 12px; font-size: 14px;
+  /* === INFO LINE ===
+     مقاسُه 15px لا 14: «كبّر خط تفاصيل الفاتورة لكي يكون واضح». وهو اسمُ
+     العميل وتاريخُه ورقمُ فاتورته — أوّلُ ما يُتحقَّق منه في الورقة.
+
+     ولا يُقصّ بـoverflow: اسمٌ طويل يلتفّ سطرين ولا يُبتر بثلاث نقاط. وهو
+     حارسُ الورقة نفسه: لا شيء يُخفى. ولذلك سببٌ ثانٍ: html2canvas يقصّ
+     صندوقَ النصّ بحسابه هو، فظهرت أسطرُ الترويسة **مقطوعةً من نصفها** في
+     الملفّ الناتج بينما هي سليمةٌ على الشاشة. */
+  .info-line {
+    font-size: 15px; line-height: 1.45;
   }
-  .info-row .right { display: flex; gap: 8px; }
-  .info-row .left { display: flex; gap: 8px; }
   .info-label { color: #1a1a1a; font-weight: 700; }
   .info-value { color: #c0392b; font-weight: 700; }
   .info-value-blue { color: #2980b9; font-weight: 800; }
@@ -518,29 +536,30 @@ ${showHeader ? `
 </div>
 ` : ""}
 
-<!-- Document Title -->
-<div class="doc-title">
-  <h1>${esc(title)}</h1>
-</div>
-
-<!-- Info Row -->
-<div class="info-row">
-  <div class="right">
-    <span class="info-label">اسم العميل:</span>
-    <span class="info-value">${esc(customer?.name || "كاش")}</span>
+<!-- Document Head: العميل · العنوان · التاريخ والرقم — في شريطٍ واحد -->
+<div class="doc-head">
+  <div class="doc-head-side doc-head-right">
+    <div class="info-line">
+      <span class="info-label">اسم العميل:</span>
+      <span class="info-value">${esc(customer?.name || "كاش")}</span>
+    </div>
+    ${customer?.address ? `<div class="info-line">
+      <span class="info-label">العنوان:</span>
+      <span class="info-value">${esc(customer.address)}</span>
+    </div>` : ""}
   </div>
-  <div class="left">
-    <span class="info-label">التاريخ:</span>
-    <span class="info-value">${date}</span>
+  <div class="doc-title">
+    <h1>${esc(title)}</h1>
   </div>
-</div>
-<div class="info-row">
-  <div class="right">
-    ${customer?.address ? `<span class="info-label">العنوان:</span><span class="info-value">${esc(customer.address)}</span>` : ""}
-  </div>
-  <div class="left">
-    <span class="info-label">رقم ${type === "invoice" ? "الفاتورة" : type === "quote" ? "عرض السعر" : "المشتريات"}:</span>
-    <span class="info-value-blue">${esc(number || "")}</span>
+  <div class="doc-head-side doc-head-left">
+    <div class="info-line">
+      <span class="info-label">التاريخ:</span>
+      <span class="info-value">${date}</span>
+    </div>
+    <div class="info-line">
+      <span class="info-label">رقم ${type === "invoice" ? "الفاتورة" : type === "quote" ? "عرض السعر" : "المشتريات"}:</span>
+      <span class="info-value-blue">${esc(number || "")}</span>
+    </div>
   </div>
 </div>
 
@@ -690,8 +709,8 @@ const accountBox = !showAccount ? "" : (() => {
    * تحرسها الكثافة (`MIN_FONT_PX`). فصارت الأرقامُ تُقرأ بلا عدسة.
    */
   const A = ACCOUNT_FONT_PX;
-  const cellR = `padding:4px 7px;text-align:right;font-weight:700;color:#111;background:#f4f6f8;border:1px solid #b8bcc4;line-height:1.15;font-size:${A.label}px;`;
-  const cellL = `padding:4px 7px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.15;font-family:'Consolas','Courier New',monospace;font-size:${A.value}px;letter-spacing:0.2px;`;
+  const cellR = `padding:4px 7px;text-align:right;font-weight:700;color:#111;background:#f4f6f8;border:1px solid #b8bcc4;line-height:1.5;font-size:${A.label}px;`;
+  const cellL = `padding:4px 7px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.5;font-family:'Consolas','Courier New',monospace;font-size:${A.value}px;letter-spacing:0.2px;`;
   const row = (opts: {
     section: string; label: string; value: string;
     valColor?: string; strong?: boolean; sideBadge?: string; badgeColor?: string;
@@ -811,6 +830,7 @@ ${showSignatures ? `
   وحين تُفتح الورقة في تبويبٍ مستقلّ بلا مضيف، يتكفّل بها وسمُ viewport في
   الترويسة: يعرض المتصفّح الورقة كاملةً مصغَّرة كما يفعل قارئ الـPDF.
 -->
+<script>${PAGINATION_INLINE_JS}</script>
 </body>
 </html>`;
 }

@@ -84,34 +84,75 @@ export function pdfNameFor(input: SharePdfInput): string {
 interface MountedSheet {
   /** يُزال بعد التوليد */
   outer: HTMLElement;
-  /** يُسلَّم إلى html2pdf — ساكنٌ بلا إزاحة */
+  /** يُسلَّم إلى html2canvas — ساكنٌ بلا إزاحة */
   sheet: HTMLElement;
 }
 
+/**
+ * ## ولماذا إطارٌ لا عنصرٌ في صفحة التطبيق
+ *
+ * html2canvas **يستنسخ المستند كلَّه** لا العنصر وحده: يبني إطاراً ويكتب فيه
+ * نسخةً من `documentElement` بأنماطه، ثمّ يرسم منها. فحين تُركَّب الورقة في
+ * صفحة التطبيق يُستنسخ التطبيقُ كلُّه معها — شجرتُه وTailwind وما بُني عليه —
+ * ثمّ يُنقّى بـ`onclone`، بعد أن دُفع ثمنُ النسخ كاملاً.
+ *
+ * قِيس على مضيفٍ بأربعمئة عنصر (كصفحةٍ حقيقية):
+ *
+ *     المستند   في صفحة التطبيق   في إطارٍ معزول
+ *     11 بنداً        915ms            269ms
+ *     30 بنداً        772ms            370ms
+ *     60 بنداً       1024ms            583ms
+ *     100 بند       1370ms            863ms
+ *
+ * فالإطارُ يوفّر بين 40% و60% من زمن التصوير — وهو ثلثا زمن التوليد كلِّه.
+ *
+ * وربحٌ ثانٍ لا يقلّ: العزلُ يصير **بنيوياً لا تنقيةً**. ثلاثةُ أعطالٍ سابقة
+ * خرجت من تسرّب أنماط التطبيق إلى الورقة المصوَّرة؛ وفي مستندٍ لا يحوي إلا
+ * الورقة لا يوجد ما يتسرّب.
+ *
+ * ### والسكربتات تُنزع قبل الكتابة
+ * `document.write` **يُشغّل** السكربتات — بخلاف `innerHTML`. وفي الورقة سكربتُ
+ * ترقيم الصفحات، فلو عمل لأضاف فواصلَ الصفحات وأطالها: قِيس 2184 ← 3774 من
+ * ارتفاع اللوحة. والملفُّ يُقطَّع بحسابه هو، فالفواصلُ فيه ازدواجٌ لا فائدة له.
+ */
 function mountOffscreen(html: string): MountedSheet {
   // بعيداً عن الشاشة لا `display:none`: المخفي بلا أبعاد يُنتج صفحة فارغة
-  const outer = document.createElement("div");
-  outer.style.cssText = `position:fixed;left:-10000px;top:0;width:${SHEET_WIDTH_PX}px;`;
-
-  const sheet = document.createElement("div");
-  sheet.style.cssText = `width:${SHEET_WIDTH_PX}px;background:#fff;`;
-
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  sheet.innerHTML = doc.body.innerHTML;
-  for (const style of Array.from(doc.querySelectorAll("style"))) {
-    const copy = style.cloneNode(true) as HTMLStyleElement;
-    // إطارُ الشاشة لا يدخل الورق، ولا يُلبَس لعناصر التطبيق أثناء التوليد.
-    // راجع `pdfSheetFrame`.
-    copy.textContent = stripScreenOnlyCss(copy.textContent || "");
-    // وسمٌ يميّزها من أنماط التطبيق حين تُنقّى النسخة. راجع `SHEET_STYLE_ATTR`.
-    copy.setAttribute(SHEET_STYLE_ATTR, "");
-    sheet.appendChild(copy);
-  }
-  outer.appendChild(sheet);
+  const outer = document.createElement("iframe");
+  outer.setAttribute("aria-hidden", "true");
+  outer.setAttribute("tabindex", "-1");
+  outer.style.cssText =
+    `position:fixed;left:-10000px;top:0;width:${SHEET_WIDTH_PX}px;height:${SHEET_WIDTH_PX}px;border:0;`;
   document.body.appendChild(outer);
-  // بعد الإلحاق: الإعلانات السطرية تغلب ما بقي من أنماطٍ في القالب الآخر.
+
+  const fdoc = outer.contentDocument;
+  if (!fdoc) {
+    outer.remove();
+    throw new Error("تعذّر تجهيز إطار التوليد");
+  }
+
+  // نزعُ السكربتات قبل الكتابة — راجع أعلاه
+  const parsed = new DOMParser().parseFromString(html, "text/html");
+  parsed.querySelectorAll("script").forEach((s) => s.remove());
+  for (const style of Array.from(parsed.querySelectorAll("style"))) {
+    // إطارُ الشاشة لا يدخل الورق. راجع `pdfSheetFrame`.
+    style.textContent = stripScreenOnlyCss(style.textContent || "");
+    style.setAttribute(SHEET_STYLE_ATTR, "");
+  }
+
+  /*
+   * الاستيرادُ لا `document.write`: الأخيرةُ تُشغّل السكربتات (وقد نُزعت
+   * أصلاً)، ولا يدعمها jsdom فتخرج الورقةُ فارغةً في الاختبار — فلا يبقى
+   * حارسٌ يقرأ محتواها. والاستيرادُ يبني نفسَ الشجرة في المستندين معاً.
+   */
+  fdoc.replaceChild(fdoc.importNode(parsed.documentElement, true), fdoc.documentElement);
+
+  const sheet = fdoc.body;
+  sheet.style.cssText = `margin:0;padding:0;width:${SHEET_WIDTH_PX}px;background:#fff;`;
+  // بعد الكتابة: الإعلانات السطرية تغلب ما بقي من أنماطٍ في القالب الآخر.
   neutralizeSheetFrame(sheet);
-  return { outer, sheet };
+  // الإطارُ بطول محتواه: مستندٌ أقصرُ من ورقته يخطّط بعضَ ما فيه بمقاسٍ آخر
+  outer.style.height = `${Math.max(SHEET_WIDTH_PX, Math.ceil(sheet.scrollHeight))}px`;
+  return { outer: outer as unknown as HTMLElement, sheet };
 }
 
 /**
@@ -124,6 +165,17 @@ function mountOffscreen(html: string): MountedSheet {
  * وشعارٌ ناقصٌ أهون من زرٍّ لا يستجيب.
  */
 export const IMAGE_WAIT_MS = 4000;
+
+/**
+ * جودةُ ترميز JPEG لصفحات الملف.
+ *
+ * تُشارَك هذه الملفّات على الواتساب من الهاتف، فحجمُها زمنُ انتظارٍ للمرسِل
+ * وللعميل معاً. وبين 0.95 و0.90 لا فرقَ يُرى في نصٍّ مصوَّرٍ بضعفَي الدقّة —
+ * وبينهما في فاتورة الستّين بنداً نحو 15% من حجم الملف.
+ *
+ * ولا تنزل أكثر: الورقةُ نصٌّ دقيق، والضغطُ الزائد يُهدّب حروفها.
+ */
+export const JPEG_QUALITY = 0.9;
 
 /** ينتظر تحميل الصور حتى لا يخرج الشعار فارغاً في PDF. */
 export async function waitForImages(root: HTMLElement, timeoutMs = IMAGE_WAIT_MS): Promise<void> {
@@ -208,8 +260,10 @@ function safeBreaks(sheet: HTMLElement, scale: number): number[] {
 export async function buildPdfBlob(html: string): Promise<Blob> {
   const { outer, sheet } = mountOffscreen(html);
   try {
-    await waitForImages(sheet);
-    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    // المكتبتان تُجلبان **مع** انتظار الصور لا بعده: كلاهما انتظارُ شبكةٍ،
+    // وتسلسلُهما يجمع الزمنين بلا سبب. وأثقلُهما 590KB على أوّل توليد.
+    const [, { default: html2canvas }, { jsPDF }] = await Promise.all([
+      waitForImages(sheet),
       import("html2canvas"),
       import("jspdf"),
     ]);
@@ -250,7 +304,7 @@ export async function buildPdfBlob(html: string): Promise<Blob> {
       ctx.drawImage(canvas, 0, starts[i], canvas.width, h, 0, 0, canvas.width, h);
       if (i > 0) pdf.addPage();
       pdf.addImage(
-        slice.toDataURL("image/jpeg", 0.95),
+        slice.toDataURL("image/jpeg", JPEG_QUALITY),
         "JPEG",
         margin,
         margin,

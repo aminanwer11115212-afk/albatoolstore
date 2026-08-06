@@ -288,8 +288,9 @@ describe("الخطّ أكبر والورقة تحمل ثلاثين", () => {
   it("والترويسةُ ترتفع في الدرجتين: الشعار والعنوان وسطرُ البيانات", () => {
     for (const d of ["d-compact", "d-dense"]) {
       expect(DENSITY_CSS, `${d} .header`).toMatch(new RegExp(`\\.${d} \\.header \\{[^}]*padding-bottom`));
-      expect(DENSITY_CSS, `${d} .doc-title`).toMatch(new RegExp(`\\.${d} \\.doc-title \\{[^}]*margin`));
-      expect(DENSITY_CSS, `${d} .info-row`).toMatch(new RegExp(`\\.${d} \\.info-row \\{[^}]*margin-bottom`));
+      expect(DENSITY_CSS, `${d} .doc-head`).toMatch(new RegExp(`\\.${d} \\.doc-head \\{[^}]*margin`));
+      expect(DENSITY_CSS, `${d} .doc-title h1`).toMatch(new RegExp(`\\.${d} \\.doc-title h1 \\{[^}]*font-size`));
+      expect(DENSITY_CSS, `${d} .info-line`).toMatch(new RegExp(`\\.${d} \\.info-line \\{[^}]*font-size`));
       expect(DENSITY_CSS, `${d} logo`).toMatch(new RegExp(`\\.${d} \\.header-logo img \\{[^}]*height`));
     }
   });
