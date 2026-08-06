@@ -9,7 +9,6 @@ import {
   Wallet, ArrowLeftRight, Building2, Globe, HeadsetIcon, CalendarDays, Info
 } from "lucide-react";
 import logo from "@/assets/logo.png";
-import deliveryMan from "@/assets/delivery-man.png";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import InstallPwaDialog from "@/components/InstallPwaDialog";
 import { prefetchHandlers, prefetchRoute } from "@/lib/routePrefetch";
