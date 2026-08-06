@@ -191,10 +191,13 @@ describe("الضبط واحدٌ في الوحدة وفي شريط الأدوات
 let captured: HTMLElement | null = null;
 let capturedPageStyle: Record<string, string> = {};
 
+let capturedOpts: any = null;
+
 vi.mock("html2pdf.js", () => ({
   default: () => ({
-    set: () => ({
+    set: (opts: any) => ({
       from: (el: HTMLElement) => {
+        capturedOpts = opts;
         captured = el;
         const page = el.querySelector<HTMLElement>(".page");
         capturedPageStyle = page
@@ -291,6 +294,37 @@ describe("buildPdfBlob يُسلّم html2pdf ورقةً محيَّدة", () => {
     const outer = captured!.parentElement!;
     expect(outer.style.position).toBe("fixed");
     expect(parseInt(outer.style.left, 10)).toBeLessThan(-1000);
+  });
+
+  /**
+   * ## نافذةُ الاستنساخ بعرض الورقة لا بعرض شاشة الجهاز
+   *
+   * html2canvas يستنسخ المستند في إطارٍ بعرض `window.innerWidth`. فعلى هاتفٍ
+   * أضيق من الورقة تُخطَّط الورقةُ في إطارٍ ضيّق فتفيض منه — وفي RTL يكون
+   * الفيضان **يساراً بإحداثيّاتٍ سالبة**، خارج المنطقة المصوَّرة. فخرج عمودُ
+   * «الإجمالي» والتاريخُ ورقمُ الفاتورة مقصوصةً من الحافّة، وصوّره صاحب
+   * المستودع في الفاتورة وعرض السعر معاً.
+   *
+   * ولا يظهر في المعاينة لأن ورقتها مستندٌ قائمٌ بذاته نافذتُه بعرض الورقة —
+   * ولهذا طُلب «اربطه بمعاينة الفاتورة من ناحية الشكل».
+   *
+   * وقيس بالتصيير: العمودُ المقصوص عاد كاملاً، والزمنُ نزل من 848ms إلى
+   * 430ms — التخطيطُ يقع مرّةً بمقاسٍ صحيح لا مرّتين.
+   */
+  it("نافذةُ الاستنساخ بعرض الورقة — وإلا قُصّت حافّتها على الهاتف", async () => {
+    const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
+    const { SHEET_WIDTH_PX } = await import("@/utils/pdfSheetFrame");
+    await buildPdfBlob(SHEET);
+    expect(capturedOpts?.html2canvas?.windowWidth).toBe(SHEET_WIDTH_PX);
+    expect(capturedOpts?.html2canvas?.width).toBe(SHEET_WIDTH_PX);
+  });
+
+  it("وهي عرضُ الحاوية نفسه — مقاسٌ واحد لا مقاسان", async () => {
+    const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
+    const { SHEET_WIDTH_PX } = await import("@/utils/pdfSheetFrame");
+    await buildPdfBlob(SHEET);
+    expect(captured!.style.width).toBe(`${SHEET_WIDTH_PX}px`);
+    expect(captured!.parentElement!.style.width).toBe(`${SHEET_WIDTH_PX}px`);
   });
 });
 
