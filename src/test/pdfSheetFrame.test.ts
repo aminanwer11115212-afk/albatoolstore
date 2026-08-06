@@ -258,6 +258,40 @@ describe("buildPdfBlob يُسلّم html2pdf ورقةً محيَّدة", () => {
     await buildPdfBlob(SHEET);
     expect(document.body.querySelector(".page")).toBeNull();
   });
+
+  /**
+   * ## العنصرُ المُسلَّم إلى html2pdf ساكنٌ بلا إزاحة
+   *
+   * `toContainer` في html2pdf يستنسخ ما يُعطى ثمّ يفرض عليه:
+   *
+   *     container.firstChild.style.position = 'relative';
+   *
+   * فلو حمل العنصرُ إزاحةَ الإخفاء (`left: -10000px`) بطل `fixed` وبقيت
+   * `left` — وهي تحت `relative` **إزاحةٌ فعلية**، فتنزاح الورقةُ المرسومة
+   * خارج الحاوية التي يصوّرها html2canvas ويخرج الملفُّ **صفحةً بيضاء**.
+   *
+   * قيس بالتصيير الحقيقي: 3,058 بايت بلا صورةٍ مُضمَّنة ← 382,783 بايت
+   * بصورة. فالإزاحةُ على غلافٍ خارجيّ، والمُسلَّمُ داخليٌّ ساكن.
+   */
+  it("العنصرُ المُسلَّم إلى html2pdf بلا إزاحةٍ تُخرج مرسومه من الحاوية", async () => {
+    const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
+    await buildPdfBlob(SHEET);
+    const el = captured!;
+    expect(el.style.position).not.toBe("fixed");
+    expect(el.style.position).not.toBe("absolute");
+    for (const side of ["left", "top", "right", "bottom"] as const) {
+      const v = el.style[side];
+      expect(v === "" || /^0(px)?$/.test(v), `${side}=${v}`).toBe(true);
+    }
+  });
+
+  it("والإزاحةُ على غلافه الخارجي — فيبقى بعيداً عن الشاشة", async () => {
+    const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
+    await buildPdfBlob(SHEET);
+    const outer = captured!.parentElement!;
+    expect(outer.style.position).toBe("fixed");
+    expect(parseInt(outer.style.left, 10)).toBeLessThan(-1000);
+  });
 });
 
 /* ─────────── ٦) انتظارُ الصور لا يعلّق الزرّ ─────────── */
