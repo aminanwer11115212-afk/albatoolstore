@@ -111,6 +111,26 @@ describe("السكربتُ محروسٌ من نفسه", () => {
     expect(PAGINATION_INLINE_JS).toMatch(/clear\(page\);/);
   });
 
+  /**
+   * ## التصغيرُ لا يخلط الوحدتين
+   *
+   * المعاينةُ على الهاتف مصغَّرةٌ بـzoom (ملاءمة 46%). و`getBoundingClientRect`
+   * يُرجع المقاسَ **مصغَّراً**، بينما `offsetHeight` و`scrollHeight` وما يُكتب
+   * في `style.top` بكسلاتُ CSS **غير مصغَّرة**.
+   *
+   * وخلطُهما صوّره صاحبُ المستودع: عددُ الصفحات خرج **ثلاثاً وهي اثنتان**،
+   * وشرائطُ الترقيم وقعت **فوق البنود** لأن مواضعها كُتبت بنسبة 46% من مكانها.
+   */
+  it("والتصغيرُ لا يخلط الوحدتين — قياسٌ مصغَّرٌ وكتابةٌ غيرُ مصغَّرة", () => {
+    // النسبةُ تُشتقّ من المسبار نفسه: مقاسُه المعروض على مقاسه بالـCSS
+    expect(PAGINATION_INLINE_JS).toContain("probe.offsetHeight");
+    expect(PAGINATION_INLINE_JS).toMatch(/zoom = \(css > 0 && shown > 0\) \? shown \/ css : 1/);
+    // وكلُّ ما يُقاس بـrect يُقسَّم عليها قبل أن يُكتب
+    expect(PAGINATION_INLINE_JS).toMatch(/\(r\.top - top0\) \/ zoom/);
+    expect(PAGINATION_INLINE_JS).toMatch(/\(r\.bottom - top0\) \/ zoom/);
+    expect(PAGINATION_INLINE_JS).toContain("padTop * zoom");
+  });
+
   it("وخطؤُه لا يُسقط الورقة", () => {
     expect(PAGINATION_INLINE_JS).toMatch(/try \{ paginate\(\); \} catch/);
   });

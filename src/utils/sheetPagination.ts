@@ -56,20 +56,22 @@ export const PAGINATION_CSS = `
      فاصلٍ عنده: صفحةٌ ينتهي حدُّها في فراغٍ ترقَّم كغيرها. */
   .lov-pgbreak { padding: 0 !important; border: 0 !important; background: transparent !important; overflow: hidden; }
   /*
-   * شريطُ الترقيم هو الفاصلُ نفسه — لا شريطَ رماديٌّ ثانٍ تحته.
+   * ترقيمٌ بسيط — «اجعله شيئاً بسيطاً».
    *
-   * كان الفراغُ الرمادي يُرسم عند الحدّ بموضعٍ مطلق **فوق** ما بعده، فيغطّي
-   * أعلى أوّل بندٍ في الصفحة التالية. والمكانُ المحجوز هو ما قبل الحدّ لا ما
-   * بعده، فصار الشريطُ كلُّه داخل الحجز: أرضيةٌ رمادية بحدَّين يُقرأ منها
-   * انتهاءُ الورقة، ولا يقع على محتوى.
+   * كان شريطاً رمادياً بحدَّين يقطع الورقة عرضاً، فيثقل صفحةً هي أصلاً
+   * مزدحمة. فصار خطّاً رفيعاً ورقماً صغيراً عليه: يُعرَف به انتهاءُ الورقة
+   * ولا يزاحم ما فيها.
+   *
+   * ومكانُه محجوزٌ قبل الحدّ لا بعده — وإلا وقع فوق أوّل بندٍ في التالية.
    */
   .lov-pgfoot {
     position: absolute; left: 0; right: 0;
-    text-align: center; height: ${FOOTER_H_PX}px; line-height: ${FOOTER_H_PX - 2}px;
-    font-size: 11px; font-weight: 700; color: #64748b;
-    letter-spacing: 0.4px;
-    background: #f1f5f9;
-    border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1;
+    height: ${FOOTER_H_PX}px; line-height: ${FOOTER_H_PX}px;
+    text-align: center;
+    font-size: 10px; font-weight: 600; color: #94a3b8;
+    letter-spacing: 0.3px;
+    border-top: 1px solid #e2e8f0;
+    background: #fff;
   }
   @media print {
     /* الطباعةُ تقسّم بنفسها — وفاصلٌ مرسومٌ فوق تقسيمها يزيح المحتوى */
@@ -89,15 +91,29 @@ export const PAGINATION_INLINE_JS = `
   var FOOT = ${FOOTER_H_PX};
   var ATOMS = ${JSON.stringify(ATOM_SELECTOR)};
 
-  function mmToPx(page){
-    // قياسٌ بمسبارٍ داخل الورقة نفسها: أدقُّ من 96dpi المفترضة، ويصمد
-    // للتصغير (zoom) لأن المسبار يخضع له كالمحتوى.
+  /*
+   * المسبارُ يعطي شيئين معاً: ارتفاعَ الصفحة ببكسلات CSS، ونسبةَ التصغير.
+   *
+   * ## وهذا هو موضعُ العطل الذي صُوِّر
+   * المعاينةُ على الهاتف مصغَّرةٌ بـzoom (ملاءمة 46%). و getBoundingClientRect
+   * يُرجع المقاسَ **مصغَّراً**، بينما getComputedStyle وscrollHeight وما نكتبه
+   * في style.top يُقاس ببكسلات CSS **غير مصغَّرة**. فكان الحسابُ يخلط
+   * الوحدتين: تُقسَّم الورقةُ على ارتفاعٍ مصغَّر فيخرج عددُ الصفحات ضعفَي
+   * الصحيح (ثلاثٌ بدل اثنتين)، وتُكتب مواضعُ الترقيم بنسبةِ 46% من مكانها
+   * **فتقع فوق البنود**.
+   *
+   * فتُوحَّد الوحدة: كلُّ ما يُقاس بـrect يُقسَّم على النسبة، فيصير الحسابُ
+   * كلُّه ببكسلات CSS كما تُكتب.
+   */
+  function probePage(page){
     var probe = document.createElement('div');
     probe.style.cssText = 'position:absolute;visibility:hidden;height:' + CONTENT_MM + 'mm;';
     page.appendChild(probe);
-    var h = probe.getBoundingClientRect().height;
+    var shown = probe.getBoundingClientRect().height;   // مصغَّر
+    var css = probe.offsetHeight;                       // بكسلات CSS
     probe.remove();
-    return h;
+    var zoom = (css > 0 && shown > 0) ? shown / css : 1;
+    return { pageH: css, zoom: zoom };
   }
 
   function clear(page){
@@ -111,11 +127,13 @@ export const PAGINATION_INLINE_JS = `
     if (!page) return;
     clear(page);
 
-    var pageH = mmToPx(page);
+    var probed = probePage(page);
+    var pageH = probed.pageH, zoom = probed.zoom;
     if (!(pageH > FOOT * 3)) return;
 
     var padTop = parseFloat(getComputedStyle(page).paddingTop || '0');
-    var top0 = page.getBoundingClientRect().top + padTop;
+    // حافّةُ المحتوى في إحداثيّات الشاشة: الحشوُ مصغَّرٌ كالمحتوى
+    var top0 = page.getBoundingClientRect().top + padTop * zoom;
 
     /*
      * ١) اجمع العناصر الذرّية، ثمّ ارفع كلَّ واحدٍ إلى **مرساه في التدفّق**.
@@ -168,8 +186,9 @@ export const PAGINATION_INLINE_JS = `
     var shift = 0;
     for (var j = 0; j < atoms.length; j++) {
       var r = atoms[j].getBoundingClientRect();
-      var t = r.top - top0 + shift;
-      var b = r.bottom - top0 + shift;
+      // إلى بكسلات CSS: القياسُ مصغَّرٌ وما يُكتب غيرُ مصغَّر
+      var t = (r.top - top0) / zoom + shift;
+      var b = (r.bottom - top0) / zoom + shift;
       if (b - t >= pageH - FOOT) continue;     // أطولُ من صفحة: لا مفرّ من شطره
       var p = Math.floor(t / pageH);
       if (b > (p + 1) * pageH - FOOT) {
