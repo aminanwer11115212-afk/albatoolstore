@@ -186,35 +186,61 @@ describe("الضبط واحدٌ في الوحدة وفي شريط الأدوات
   });
 });
 
-/* ─────────── ٥) المسار كاملاً: ما يصل html2pdf ─────────── */
+/* ─────────── ٥) المسار كاملاً: ما يصل المُصوِّر ─────────── */
 
 let captured: HTMLElement | null = null;
 let capturedPageStyle: Record<string, string> = {};
-
 let capturedOpts: any = null;
 
-vi.mock("html2pdf.js", () => ({
-  default: () => ({
-    set: (opts: any) => ({
-      from: (el: HTMLElement) => {
-        capturedOpts = opts;
-        captured = el;
-        const page = el.querySelector<HTMLElement>(".page");
-        capturedPageStyle = page
-          ? {
-              padding: page.style.padding,
-              minHeight: page.style.minHeight,
-              boxShadow: page.style.boxShadow,
-              zoom: page.style.zoom,
-            }
-          : {};
-        return { outputPdf: async () => new Blob(["%PDF-1.4"], { type: "application/pdf" }) };
-      },
-    }),
-  }),
+/**
+ * html2canvas وjsPDF مباشرةً — لا html2pdf.
+ *
+ * حُذفت طبقةُ html2pdf من المسار بعد ثلاثة أعطالٍ خرجت منها: صفحةٌ بيضاء،
+ * ثمّ ورقةٌ مزاحة، ثمّ ورقةٌ مقصوصةُ الحافّة. راجع `buildPdfBlob`.
+ */
+vi.mock("html2canvas", () => ({
+  default: async (el: HTMLElement, opts: any) => {
+    captured = el;
+    capturedOpts = opts;
+    const page = el.querySelector<HTMLElement>(".page");
+    capturedPageStyle = page
+      ? {
+          padding: page.style.padding,
+          minHeight: page.style.minHeight,
+          boxShadow: page.style.boxShadow,
+          zoom: page.style.zoom,
+        }
+      : {};
+    // لوحةٌ صوريّة: jsdom لا يرسم، فيكفي المقاسُ ودالّةُ التصدير
+    return {
+      width: 794,
+      height: 1600,
+      getContext: () => ({ fillRect() {}, drawImage() {}, set fillStyle(_v: string) {} }),
+      toDataURL: () => "data:image/jpeg;base64,AAAA",
+    } as any;
+  },
 }));
 
-describe("buildPdfBlob يُسلّم html2pdf ورقةً محيَّدة", () => {
+/**
+ * jsdom بلا دعم canvas: `getContext("2d")` تُعيد `null` و`toDataURL` غير
+ * مدعومة. تُسدّان هنا — نقصٌ في بيئة الاختبار لا في الشيفرة.
+ */
+beforeEach(() => {
+  (HTMLCanvasElement.prototype as any).getContext = () => ({
+    fillRect() {}, drawImage() {}, fillStyle: "",
+  });
+  (HTMLCanvasElement.prototype as any).toDataURL = () => "data:image/jpeg;base64,AAAA";
+});
+
+vi.mock("jspdf", () => ({
+  jsPDF: class {
+    addPage() {}
+    addImage() {}
+    output() { return new Blob(["%PDF-1.4"], { type: "application/pdf" }); }
+  },
+}));
+
+describe("buildPdfBlob يُسلّم المُصوِّر ورقةً محيَّدة", () => {
   let origComplete: PropertyDescriptor | undefined;
   beforeEach(() => {
     captured = null;
@@ -276,7 +302,7 @@ describe("buildPdfBlob يُسلّم html2pdf ورقةً محيَّدة", () => {
    * قيس بالتصيير الحقيقي: 3,058 بايت بلا صورةٍ مُضمَّنة ← 382,783 بايت
    * بصورة. فالإزاحةُ على غلافٍ خارجيّ، والمُسلَّمُ داخليٌّ ساكن.
    */
-  it("العنصرُ المُسلَّم إلى html2pdf بلا إزاحةٍ تُخرج مرسومه من الحاوية", async () => {
+  it("العنصرُ المُسلَّم إلى المُصوِّر بلا إزاحةٍ تُخرج مرسومه من الحاوية", async () => {
     const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
     await buildPdfBlob(SHEET);
     const el = captured!;
@@ -315,8 +341,8 @@ describe("buildPdfBlob يُسلّم html2pdf ورقةً محيَّدة", () => {
     const { buildPdfBlob } = await import("@/utils/shareDocumentPdf");
     const { SHEET_WIDTH_PX } = await import("@/utils/pdfSheetFrame");
     await buildPdfBlob(SHEET);
-    expect(capturedOpts?.html2canvas?.windowWidth).toBe(SHEET_WIDTH_PX);
-    expect(capturedOpts?.html2canvas?.width).toBe(SHEET_WIDTH_PX);
+    expect(capturedOpts?.windowWidth).toBe(SHEET_WIDTH_PX);
+    expect(capturedOpts?.width).toBe(SHEET_WIDTH_PX);
   });
 
   it("وهي عرضُ الحاوية نفسه — مقاسٌ واحد لا مقاسان", async () => {

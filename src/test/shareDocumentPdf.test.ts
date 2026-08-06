@@ -25,13 +25,24 @@ const DOC = {
  */
 const EXPECTED = "ايهاب الدين امدرمان - 350,000.pdf";
 
-// html2pdf غير قابل للتشغيل في jsdom — نستبدله بـblob ثابت
-vi.mock("html2pdf.js", () => ({
-  default: () => ({
-    set: () => ({
-      from: () => ({ outputPdf: async () => new Blob(["%PDF-1.4"], { type: "application/pdf" }) }),
-    }),
+/**
+ * المُصوِّرُ غيرُ قابلٍ للتشغيل في jsdom — يُستبدل بلوحةٍ صوريّة وblob ثابت.
+ * (حُذف html2pdf من المسار — راجع `buildPdfBlob`.)
+ */
+vi.mock("html2canvas", () => ({
+  default: async () => ({
+    width: 794,
+    height: 1200,
+    getContext: () => ({ fillRect() {}, drawImage() {}, fillStyle: "" }),
+    toDataURL: () => "data:image/jpeg;base64,AAAA",
   }),
+}));
+vi.mock("jspdf", () => ({
+  jsPDF: class {
+    addPage() {}
+    addImage() {}
+    output() { return new Blob(["%PDF-1.4"], { type: "application/pdf" }); }
+  },
 }));
 
 let sharedFiles: File[] = [];
@@ -39,6 +50,9 @@ let downloadedNames: string[] = [];
 let opened: string[] = [];
 
 beforeEach(() => {
+  // jsdom بلا دعم canvas — نقصُ بيئةٍ لا نقصُ شيفرة
+  (HTMLCanvasElement.prototype as any).getContext = () => ({ fillRect() {}, drawImage() {}, fillStyle: "" });
+  (HTMLCanvasElement.prototype as any).toDataURL = () => "data:image/jpeg;base64,AAAA";
   sharedFiles = [];
   downloadedNames = [];
   opened = [];

@@ -17,7 +17,14 @@
  */
 import { buildDocumentFileName } from "@/utils/documentFileName";
 import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
-import { neutralizeSheetFrame, stripScreenOnlyCss, SHEET_WIDTH_PX } from "@/utils/pdfSheetFrame";
+import {
+  neutralizeSheetFrame,
+  stripScreenOnlyCss,
+  onlySheetStyles,
+  SHEET_WIDTH_PX,
+  SHEET_STYLE_ATTR,
+} from "@/utils/pdfSheetFrame";
+import { planPages, pageHeights, A4_MM } from "@/utils/sheetPagePlan";
 import { buildWhatsAppDeepLink } from "@/utils/whatsapp";
 
 export interface SharePdfInput {
@@ -96,6 +103,8 @@ function mountOffscreen(html: string): MountedSheet {
     // إطارُ الشاشة لا يدخل الورق، ولا يُلبَس لعناصر التطبيق أثناء التوليد.
     // راجع `pdfSheetFrame`.
     copy.textContent = stripScreenOnlyCss(copy.textContent || "");
+    // وسمٌ يميّزها من أنماط التطبيق حين تُنقّى النسخة. راجع `SHEET_STYLE_ATTR`.
+    copy.setAttribute(SHEET_STYLE_ATTR, "");
     sheet.appendChild(copy);
   }
   outer.appendChild(sheet);
@@ -139,38 +148,94 @@ export async function waitForImages(root: HTMLElement, timeoutMs = IMAGE_WAIT_MS
   }
 }
 
+/**
+ * العناصرُ التي لا يُشطر جسمُها بين صفحتين — تُجمع مواضعُ رؤوسها حدوداً
+ * للقطع. صفُّ بندٍ منشطرٌ نصفين أقبحُ من فراغٍ في ذيل الصفحة.
+ */
+const UNSPLITTABLE = "tr, .extra-box, .signatures, [data-pkg-rows], [data-pkg-line], .notes-section";
+
+/** مواضعُ القطع المستحسنة داخل الورقة، بالبكسل المصوَّر. */
+function safeBreaks(sheet: HTMLElement, scale: number): number[] {
+  const top = sheet.getBoundingClientRect().top;
+  const out: number[] = [];
+  for (const el of Array.from(sheet.querySelectorAll<HTMLElement>(UNSPLITTABLE))) {
+    const y = (el.getBoundingClientRect().top - top) * scale;
+    if (y > 0) out.push(Math.round(y));
+  }
+  return out;
+}
+
+/**
+ * يبني الـPDF من الورقة — لوحةٌ واحدة ثمّ تقطيعٌ بحسابٍ معلوم.
+ *
+ * ## لماذا لا html2pdf
+ * كان يُستعمل، فأخرج ثلاثةَ أعطالٍ متتالية كلُّها من طبقته الداخلية: يضع
+ * المستنسخ في طبقةٍ `left:-100000px; right:0` ويوسّطه بـ`margin:auto`، فموضعُ
+ * الحاوية يتبع عرضَ النافذة ويختلف بين المستند ونسخةِ html2canvas. فخرجت
+ * صفحةٌ بيضاء، ثمّ ورقةٌ مزاحة، ثمّ ورقةٌ مقصوصةُ الحافّة — عمودُ «الإجمالي»
+ * والتاريخُ ورقمُ الفاتورة.
+ *
+ * وثبت بالقياس أن html2canvas وحده **يصوّر الورقة صحيحةً** (794×1161)، وأن
+ * الخلل بعده. فحُذفت الطبقة من المسار: تُصوَّر الورقةُ مرّةً، ثمّ تُقطَّع
+ * وتُركَّب في jsPDF مباشرةً.
+ *
+ * وبهذا يصير الناتجُ **مستقلّاً عن الصفحة المستضيفة**: لا عرضُ الجهاز يغيّره
+ * ولا أنماطُ التطبيق — وهو ما يجعله يطابق المعاينة، كما طُلب.
+ */
 export async function buildPdfBlob(html: string): Promise<Blob> {
   const { outer, sheet } = mountOffscreen(html);
   try {
     await waitForImages(sheet);
-    const html2pdf = (await import("html2pdf.js")).default;
-    // `sheet` لا `outer`: المزاحُ يخرج مرسومه من الحاوية المصوَّرة. راجع أعلاه.
-    return await html2pdf()
-      .set({
-        margin: 8,
-        image: { type: "jpeg", quality: 0.95 },
-        html2canvas: {
-          scale: pdfScaleForElement(sheet),
-          useCORS: true,
-          logging: false,
-          /**
-           * نافذةُ الاستنساخ بعرض الورقة لا بعرض شاشة الجهاز.
-           *
-           * html2canvas يستنسخ المستند في إطارٍ بعرض `window.innerWidth`.
-           * فعلى هاتفٍ أضيق من الورقة تُخطَّط الورقةُ في إطارٍ ضيّق فتفيض
-           * منه — وفي RTL يكون الفيضان يساراً بإحداثيّاتٍ سالبة خارج المنطقة
-           * المصوَّرة، فيخرج عمودُ «الإجمالي» والتاريخُ ورقمُ الفاتورة
-           * مقصوصةً. راجع `SHEET_WIDTH_PX`.
-           *
-           * وهو أسرعُ أيضاً: التخطيطُ يقع مرّةً بمقاسٍ صحيح لا مرّتين.
-           */
-          windowWidth: SHEET_WIDTH_PX,
-          width: SHEET_WIDTH_PX,
-        },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      } as any)
-      .from(sheet)
-      .outputPdf("blob");
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
+
+    const scale = pdfScaleForElement(sheet);
+    const canvas = await html2canvas(sheet, {
+      scale,
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+      // نافذةُ الاستنساخ بعرض الورقة لا بعرض الجهاز — وإلا خُطِّطت في إطارٍ
+      // أضيق منها فمالت. وأنماطُ التطبيق تُنزع: الورقة تحمل أنماطها.
+      windowWidth: SHEET_WIDTH_PX,
+      width: SHEET_WIDTH_PX,
+      onclone: onlySheetStyles,
+    } as any);
+
+    const { width: pw, height: ph, margin } = A4_MM;
+    const usableW = pw - 2 * margin;
+    const usableH = ph - 2 * margin;
+    // بكسلاتُ اللوحة لكل مليمترٍ على الورق
+    const pxPerMm = canvas.width / usableW;
+    const starts = planPages(canvas.height, usableH * pxPerMm, safeBreaks(sheet, scale));
+    const heights = pageHeights(starts, canvas.height);
+
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    const slice = document.createElement("canvas");
+    const ctx = slice.getContext("2d")!;
+
+    for (let i = 0; i < starts.length; i++) {
+      const h = heights[i];
+      if (h <= 0) continue;
+      slice.width = canvas.width;
+      slice.height = h;
+      // أرضيةٌ بيضاء: الشرائح شفّافةٌ بلا رسمٍ فتخرج سوداء في JPEG
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, slice.width, slice.height);
+      ctx.drawImage(canvas, 0, starts[i], canvas.width, h, 0, 0, canvas.width, h);
+      if (i > 0) pdf.addPage();
+      pdf.addImage(
+        slice.toDataURL("image/jpeg", 0.95),
+        "JPEG",
+        margin,
+        margin,
+        usableW,
+        h / pxPerMm,
+      );
+    }
+    return pdf.output("blob");
   } finally {
     outer.remove();
   }
