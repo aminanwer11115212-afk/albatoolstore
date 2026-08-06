@@ -362,3 +362,78 @@ test.describe("شريطُ الترويسة هندسةٌ واحدة في المس
     expect(Array.from(distinct), seen.map(([n, g]) => `${n}=${g}`).join(" · ")).toHaveLength(1);
   });
 });
+
+/**
+ * ## والترقيمُ يصمد للتصغير
+ *
+ * المعاينةُ على الهاتف مصغَّرةٌ بـzoom (ملاءمة 46%). صوّره صاحبُ المستودع:
+ * عددُ الصفحات ثلاثٌ وهي اثنتان، وشرائطُ الترقيم فوق البنود.
+ *
+ * فالحكمُ هنا: **نفسُ عدد الصفحات ونفسُ الحرّاس** مصغَّرةً وغيرَ مصغَّرة.
+ */
+test.describe("الترقيمُ لا يتأثّر بتصغير الملاءمة", () => {
+  async function paginateAt(page: import("@playwright/test").Page, html: string, fit: number) {
+    await page.emulateMedia({ media: "screen" });
+    await page.setContent(
+      `<!doctype html><body style="margin:0"><iframe id="f" style="width:412px;height:100vh;border:0"></iframe></body>`,
+    );
+    await page.evaluate(
+      ({ h, f }) => {
+        const fr = document.getElementById("f") as HTMLIFrameElement;
+        fr.srcdoc = h;
+        fr.addEventListener("load", () => {
+          fr.contentDocument!.documentElement.style.setProperty("--lov-fit", String(f));
+        }, { once: true });
+      },
+      { h: html, f: fit },
+    );
+    await page.waitForTimeout(1000);
+    return page.evaluate(() => {
+      const TOL = 1.5, FOOT = 22;
+      const d = (document.getElementById("f") as HTMLIFrameElement).contentDocument!;
+      const pg = d.querySelector<HTMLElement>(".page")!;
+      const padTop = parseFloat(d.defaultView!.getComputedStyle(pg).paddingTop);
+      const probe = d.createElement("div");
+      probe.style.cssText = "position:absolute;visibility:hidden;height:277mm";
+      pg.appendChild(probe);
+      const ph = probe.offsetHeight;
+      const zoom = probe.getBoundingClientRect().height / ph;
+      probe.remove();
+      const top0 = pg.getBoundingClientRect().top + padTop * zoom;
+      let cross = 0, under = 0;
+      for (const el of Array.from(
+        d.querySelectorAll("tr, .extra-box, .account-box, .signatures, [data-pkg-line], .notes-section"),
+      )) {
+        if (el.classList.contains("lov-pgbreak")) continue;
+        if (el.closest(".account-box") && !el.classList.contains("account-box")) continue;
+        const r = el.getBoundingClientRect();
+        const t = (r.top - top0) / zoom;
+        const b = (r.bottom - top0) / zoom;
+        if (b - t >= ph - FOOT) continue;
+        if (Math.floor((b - TOL) / ph) > Math.floor((t + TOL) / ph)) cross++;
+        for (let k = 1; k * ph <= b + FOOT; k++) {
+          if (b > k * ph - FOOT + TOL && t < k * ph - TOL) under++;
+        }
+      }
+      return {
+        foots: Array.from(d.querySelectorAll(".lov-pgfoot")).map((n) => n.textContent || ""),
+        cross, under, zoom: Math.round(zoom * 100) / 100,
+      };
+    });
+  }
+
+  for (const [name, opts] of [["30 بنداً", { n: 30, pkg: 8 }], ["60 بنداً", { n: 60, pkg: 12 }]] as const) {
+    test(`${name}: نفسُ الصفحات مصغَّرةً وغيرَ مصغَّرة`, async ({ page }) => {
+      const html = sheet(opts as any);
+      const full = await paginateAt(page, html, 1);
+      const fit = await paginateAt(page, html, 0.46);
+
+      expect(fit.zoom, "التصغيرُ لم يُطبَّق فالفحصُ لا يقيس شيئاً").toBeLessThan(0.6);
+      expect(fit.foots, "عددُ الصفحات تغيّر بالتصغير").toEqual(full.foots);
+      for (const m of [full, fit]) {
+        expect(m.cross, `${name} عند ${m.zoom}: بندٌ يعبر الحدّ`).toBe(0);
+        expect(m.under, `${name} عند ${m.zoom}: بندٌ تحت الترقيم`).toBe(0);
+      }
+    });
+  }
+});

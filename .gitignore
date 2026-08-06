@@ -25,3 +25,9 @@ dist-ssr
 
 # Lockfile الوحيد المعتمد في المشروع هو bun.lock
 package-lock.json
+
+# مخرجاتُ Playwright — تُولَّد مع كل تشغيلٍ لـe2e ولا تُتبَّع
+test-results
+playwright-report
+blob-report
+.playwright
