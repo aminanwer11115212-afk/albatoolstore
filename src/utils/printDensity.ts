@@ -48,6 +48,21 @@ export const DENSE_AT = 60;
 export const MIN_FONT_PX = 10;
 
 /**
+ * ما يجب أن تحمله الصفحة الأولى من بنود في درجة `compact`.
+ *
+ * طلبه صاحب المستودع: «عايز الورقة تشيل لي أصناف كتير زي الإكسس، بشيل ٣٠
+ * صنف في الورقة الواحدة» — ومعه: «الخطّ صغار ما بتشاف».
+ *
+ * والمطلبان يتعارضان ما دامت المساحةُ تُؤخذ من الخطّ. فأُخذت من الترويسة:
+ * «ارفع العنوان دا فوق شوية، وتفاصيل العميل والتاريخ ارفعهم برضو». فتفرّغ
+ * نحو أربعين بكسلاً فوق الجدول — تكفي صفّاً إضافيّاً وزيادةً في الخطّ معاً.
+ *
+ * يحرسه `printRowsPerPage.test.ts` بتصييرٍ حقيقي: يعدّ ما يقع فوق حدّ
+ * الصفحة، فلا يكفي أن تُكتب الأرقام هنا.
+ */
+export const ROWS_PER_PAGE_TARGET = 30;
+
+/**
  * الدرجة من عدد بنود المستند وبنود التغليف.
  *
  * المدخلات تُصان: قيمةٌ سالبةٌ أو غير رقمية تُقرأ صفراً، فلا تنقلب فاتورةٌ
@@ -76,23 +91,30 @@ export function densityClass(d: PrintDensity): string {
  * على نيّة كاتبه.
  */
 export const DENSITY_CSS = `
-  /* === كثافة تلقائية: فاتورةٌ كبيرة تضغط نفسها، ولا تُخفي شيئاً === */
-  .d-compact thead th { padding: 5px 6px; font-size: 11.5px; }
-  .d-compact tbody td { padding: 4px 6px; font-size: 11.5px; }
-  .d-compact .total-row td { font-size: 12px; }
-  .d-compact .extra-content table td, .d-compact .extra-content table th { font-size: 10.5px; padding: 3px 5px; }
-  .d-compact .doc-title { margin: 10px 0 8px; }
+  /* === كثافة تلقائية: فاتورةٌ كبيرة تضغط نفسها، ولا تُخفي شيئاً ===
+     المساحةُ تُؤخذ من الترويسة لا من الخطّ: رفعُ العنوان وبيانات العميل
+     والتاريخ يفرّغ نحو أربعين بكسلاً فوق الجدول، فيتّسع صفٌّ إضافيّ ويكبر
+     الخطُّ معاً. راجع ROWS_PER_PAGE_TARGET. */
+  .d-compact .header { padding-bottom: 5px; margin-bottom: 5px; }
+  .d-compact .header-logo img { height: 58px; }
+  .d-compact .doc-title { margin: 4px 0 5px; }
   .d-compact .doc-title h1 { font-size: 19px; }
+  .d-compact .info-row { margin-bottom: 5px; }
+  .d-compact thead th { padding: 4px 6px; font-size: 12px; }
+  .d-compact tbody td { padding: 3.5px 6px; font-size: 12.5px; }
+  .d-compact .total-row td { font-size: 12.5px; }
+  .d-compact .extra-content table td, .d-compact .extra-content table th { font-size: 11px; padding: 3px 5px; }
 
-  .d-dense thead th { padding: 3px 5px; font-size: 10.5px; }
-  .d-dense tbody td { padding: 2.5px 5px; font-size: 10.5px; }
-  .d-dense .total-row td { font-size: 11px; }
-  .d-dense .extra-content table td, .d-dense .extra-content table th { font-size: 10px; padding: 2px 4px; }
-  .d-dense .header-logo img { height: 52px; }
+  .d-dense .header { padding-bottom: 4px; margin-bottom: 4px; }
+  .d-dense .header-logo img { height: 46px; }
   .d-dense .header-title { font-size: 18px; }
-  .d-dense .doc-title { margin: 6px 0 5px; }
+  .d-dense .doc-title { margin: 3px 0 4px; }
   .d-dense .doc-title h1 { font-size: 17px; }
-  .d-dense .info-row { margin-bottom: 7px; font-size: 12px; }
+  .d-dense .info-row { margin-bottom: 4px; font-size: 12px; }
+  .d-dense thead th { padding: 3px 5px; font-size: 11.5px; }
+  .d-dense tbody td { padding: 2.5px 5px; font-size: 11.5px; }
+  .d-dense .total-row td { font-size: 12px; }
+  .d-dense .extra-content table td, .d-dense .extra-content table th { font-size: 10.5px; padding: 2px 4px; }
   .d-dense .signatures { padding: 10px 50px 6px; margin-top: 10px; }
   .d-dense .sig-line { margin-top: 28px; }
 `;

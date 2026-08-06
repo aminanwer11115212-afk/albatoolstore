@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { printDensity, densityClass, COMPACT_AT, DENSE_AT, MIN_FONT_PX, DENSITY_CSS } from "@/utils/printDensity";
+import { printDensity, densityClass, COMPACT_AT, DENSE_AT, MIN_FONT_PX, DENSITY_CSS, ROWS_PER_PAGE_TARGET } from "@/utils/printDensity";
 import { formatPackaging, formatTransports } from "@/utils/printExtras";
 import { generatePrintHTML } from "@/utils/printTemplate";
 
@@ -246,5 +246,55 @@ describe("الـPDF يخرج بمقاس الورقة لا بمقاس الهات�
     const share = read("src/pages/StandaloneShareDocument.tsx");
     const fn = share.slice(share.indexOf("handleDownloadPdf"), share.indexOf("html2pdf()"));
     expect(fn).toContain('page.style.zoom = "1"');
+  });
+});
+
+/**
+ * ## «الخطّ صغار ما بتشاف» و«عايز ٣٠ صنف في الورقة»
+ *
+ * المطلبان يتعارضان ما دامت المساحةُ تُؤخذ من الخطّ. فأُخذت من الترويسة كما
+ * طلب: «ارفع العنوان دا فوق شوية، وتفاصيل العميل والتاريخ ارفعهم برضو».
+ *
+ * وقيس بالتصيير الحقيقي بعد التعديل:
+ *
+ * | البنود | الدرجة   | الخطّ  | رأسُ الصفحة | يسع الصفحة الأولى |
+ * |--------|----------|--------|-------------|--------------------|
+ * | 30     | compact  | 12.5px | 258px       | **30**             |
+ * | 45     | compact  | 12.5px | 258px       | 30                 |
+ * | 80     | dense    | 11.5px | 235px       | 35                 |
+ *
+ * وكان قبله: خطُّ 11.5px ورأسٌ 286px ويسع **29** فقط.
+ */
+describe("الخطّ أكبر والورقة تحمل ثلاثين", () => {
+  const px = (re: RegExp) => Number(re.exec(DENSITY_CSS)?.[1]);
+
+  it("الهدفُ ثلاثون بنداً في الصفحة", () => {
+    expect(ROWS_PER_PAGE_TARGET).toBe(30);
+  });
+
+  it("وخطُّ البنود في `compact` أكبر ممّا كان (11.5px)", () => {
+    const f = px(/\.d-compact tbody td \{[^}]*font-size:\s*([\d.]+)px/);
+    expect(f).toBeGreaterThan(11.5);
+  });
+
+  it("وفي `dense` كذلك (10.5px)", () => {
+    const f = px(/\.d-dense tbody td \{[^}]*font-size:\s*([\d.]+)px/);
+    expect(f).toBeGreaterThan(10.5);
+  });
+
+  /** المساحةُ تُؤخذ من الترويسة — وهذه هي القواعد التي ترفعها. */
+  it("والترويسةُ ترتفع في الدرجتين: الشعار والعنوان وسطرُ البيانات", () => {
+    for (const d of ["d-compact", "d-dense"]) {
+      expect(DENSITY_CSS, `${d} .header`).toMatch(new RegExp(`\\.${d} \\.header \\{[^}]*padding-bottom`));
+      expect(DENSITY_CSS, `${d} .doc-title`).toMatch(new RegExp(`\\.${d} \\.doc-title \\{[^}]*margin`));
+      expect(DENSITY_CSS, `${d} .info-row`).toMatch(new RegExp(`\\.${d} \\.info-row \\{[^}]*margin-bottom`));
+      expect(DENSITY_CSS, `${d} logo`).toMatch(new RegExp(`\\.${d} \\.header-logo img \\{[^}]*height`));
+    }
+  });
+
+  /** ولا يُخترق حدُّ القراءة مهما ضُغطت الورقة. */
+  it("وكلُّ المقاسات ما زالت فوق أرضية القراءة", () => {
+    const sizes = Array.from(DENSITY_CSS.matchAll(/font-size:\s*([\d.]+)px/g)).map((m) => Number(m[1]));
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(MIN_FONT_PX);
   });
 });

@@ -9,6 +9,7 @@ import {
   filterAccountsForPayment,
 } from "@/lib/bankTransferValidation";
 import { computeInvoicePaymentAdjustment } from "@/utils/invoicePaymentMath";
+import { availableCredit, creditUsed } from "@/utils/creditAvailability";
 import { logDiscountEvent } from "@/utils/discountAuditLogger";
 import { refetchAndToastCustomerBalance } from "@/utils/balanceRefreshToast";
 import { netBalanceOf, CustomerAccountSummary } from "@/utils/balanceDisplay";
@@ -256,7 +257,8 @@ export default function CustomerPaymentDialog({
   };
 
   const applyAllCredit = useCallback(() => {
-    const avail = custBalance?.credit || 0;
+    // المتاحُ لا يكون سالباً: خصمٌ على العميل ليس رصيداً يدفع منه
+    const avail = availableCredit(custBalance?.credit);
     const rem = Math.max(0, remaining - (Number(discount) || 0));
     const use = Math.min(avail, rem);
     setCreditUse(String(use));
@@ -330,7 +332,7 @@ export default function CustomerPaymentDialog({
     const n = Number(amount) || 0;
     const disc = Math.max(0, Number(discount) || 0);
     const cu = Math.max(0, Number(creditUse) || 0);
-    const availCredit = custBalance?.credit || 0;
+    const availCredit = availableCredit(custBalance?.credit);
     if (n < 0 || (Number(discount) || 0) < 0 || cu < 0) return toast.error("لا يُسمح بقيم سالبة");
     if (n <= 0 && disc <= 0 && cu <= 0) return toast.error("أدخل مبلغ أو خصم أو استخدام رصيد أكبر من صفر");
     if (cu > availCredit + 0.01) return toast.error(`لا يمكن استخدام أكثر من الرصيد الدائن المتاح (${availCredit.toLocaleString()})`);
@@ -745,7 +747,7 @@ export default function CustomerPaymentDialog({
             const combinedDue = Math.max(0, rawDue);
             const preSettleCredit = rawDue < -0.01 ? Math.abs(rawDue) : 0;
             const paidCash = Number(amount) || 0;
-            const cu = Math.min(Math.max(0, Number(creditUse) || 0), credit);
+            const cu = creditUsed(creditUse, credit);
             const paid = paidCash + cu;
             const afterPayment = combinedDue - paid;
             const isSettled = combinedDue < 0.01 && paid < 0.01 ? preSettleCredit < 0.01 : Math.abs(afterPayment) < 0.01;
@@ -1121,7 +1123,7 @@ export default function CustomerPaymentDialog({
             const rem = Math.max(0, remaining - disc);
             const debt = custBalance?.debt || 0;
             const credit = custBalance?.credit || 0;
-            const cu = Math.min(Math.max(0, Number(creditUse) || 0), credit);
+            const cu = creditUsed(creditUse, credit);
             const creditAppliedOnInv = Math.min(cu, rem);
             const afterCredit = Math.max(0, rem - creditAppliedOnInv);
             const cashApplied = Math.min(n, afterCredit);
@@ -1162,7 +1164,7 @@ export default function CustomerPaymentDialog({
           {(() => {
             const disc = Math.max(0, Number(discount) || 0);
             const credit = custBalance?.credit || 0;
-            const cu = Math.min(Math.max(0, Number(creditUse) || 0), credit);
+            const cu = creditUsed(creditUse, credit);
             const needsAck = disc > 0 || cu > 0;
             return (
               <>
