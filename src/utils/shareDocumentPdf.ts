@@ -17,7 +17,7 @@
  */
 import { buildDocumentFileName } from "@/utils/documentFileName";
 import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
-import { neutralizeSheetFrame, stripScreenOnlyCss } from "@/utils/pdfSheetFrame";
+import { neutralizeSheetFrame, stripScreenOnlyCss, SHEET_WIDTH_PX } from "@/utils/pdfSheetFrame";
 import { buildWhatsAppDeepLink } from "@/utils/whatsapp";
 
 export interface SharePdfInput {
@@ -84,10 +84,10 @@ interface MountedSheet {
 function mountOffscreen(html: string): MountedSheet {
   // بعيداً عن الشاشة لا `display:none`: المخفي بلا أبعاد يُنتج صفحة فارغة
   const outer = document.createElement("div");
-  outer.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;";
+  outer.style.cssText = `position:fixed;left:-10000px;top:0;width:${SHEET_WIDTH_PX}px;`;
 
   const sheet = document.createElement("div");
-  sheet.style.cssText = "width:794px;background:#fff;";
+  sheet.style.cssText = `width:${SHEET_WIDTH_PX}px;background:#fff;`;
 
   const doc = new DOMParser().parseFromString(html, "text/html");
   sheet.innerHTML = doc.body.innerHTML;
@@ -149,7 +149,24 @@ export async function buildPdfBlob(html: string): Promise<Blob> {
       .set({
         margin: 8,
         image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: pdfScaleForElement(sheet), useCORS: true, logging: false },
+        html2canvas: {
+          scale: pdfScaleForElement(sheet),
+          useCORS: true,
+          logging: false,
+          /**
+           * نافذةُ الاستنساخ بعرض الورقة لا بعرض شاشة الجهاز.
+           *
+           * html2canvas يستنسخ المستند في إطارٍ بعرض `window.innerWidth`.
+           * فعلى هاتفٍ أضيق من الورقة تُخطَّط الورقةُ في إطارٍ ضيّق فتفيض
+           * منه — وفي RTL يكون الفيضان يساراً بإحداثيّاتٍ سالبة خارج المنطقة
+           * المصوَّرة، فيخرج عمودُ «الإجمالي» والتاريخُ ورقمُ الفاتورة
+           * مقصوصةً. راجع `SHEET_WIDTH_PX`.
+           *
+           * وهو أسرعُ أيضاً: التخطيطُ يقع مرّةً بمقاسٍ صحيح لا مرّتين.
+           */
+          windowWidth: SHEET_WIDTH_PX,
+          width: SHEET_WIDTH_PX,
+        },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       } as any)
       .from(sheet)
