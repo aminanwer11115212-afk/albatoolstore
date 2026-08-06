@@ -253,7 +253,6 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
       + `${note}</div>`;
   }).join("");
 
-  const totalPacks = rows.reduce((s, r) => s + r.packs, 0);
   const totalCost = (headers || []).reduce((s, r) => s + Number(r.cost || 0), 0);
 
   /**
@@ -270,18 +269,16 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
    * الكرتونات وسمّاها قطعاً أخطأ في ورقةٍ يستلم بها العميلُ بضاعته.
    *
    * ولمّا طُلب أن يُوضَّح للعميل أنّ هذا عددُ قطع، لم يصحّ أن يُلصق الوصفُ
-   * الصحيح برقمٍ خاطئ. فصار الرقمان معاً، كلٌّ باسمه:
+   * الصحيح برقمٍ خاطئ. فصار الرقمُ قطعاً فعلاً:
    *
-   *     إجمالي عدد القطع        1,240 قطعة · 136 طرداً
+   *     إجمالي عدد القطع        2,696 قطعة
    *
-   * وهما ما يحتاجه المستلم فعلاً: الطرودُ يعدّها عند التسليم، والقطعُ يعدّها
-   * عند الفتح. والطرودُ تُذكر حين تخالف القطع فقط — فبضاعةٌ قطعةٌ في كل طرد
-   * رقمُها واحد، وذكرُه مرّتين تشويش.
+   * ## والطرودُ لا تُذكر — قرارُ صاحب المستودع
+   * عُرضت إلى جانبها («2,696 قطعة · 136 طرداً») فطلب إخفاءها. والطرودُ
+   * محسوبةٌ في الأسطر فوقها على أي حال: كلُّ سطرٍ يبدأ بعددها («2 كرتونة
+   * بطارية ‎*‎10»)، فمن أراد عدّها عدّها من مواضعها.
    */
   const totalPieces = rows.reduce((s, r) => s + r.packs * (r.pieces > 0 ? r.pieces : 1), 0);
-  const packsNote = totalPieces !== totalPacks
-    ? `<span style="font-size:11px;font-weight:700;color:#6b5b95;"> · ${fmt(totalPacks)} طرداً</span>`
-    : "";
   const foot = rows.length
     ? `<div data-pkg-line style="margin-top:8px;padding:5px 10px;`
       + `background:#f1eefb;border:1px solid ${PKG_ACCENT};border-radius:5px;`
@@ -289,7 +286,7 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
       + `page-break-inside:avoid;break-inside:avoid;">`
       + `<span style="font-size:12px;font-weight:800;color:${PKG_ACCENT};">إجمالي عدد القطع</span>`
       + `<span style="font-size:15px;font-weight:900;color:${PKG_ACCENT};letter-spacing:0.3px;">`
-      + `${fmt(totalPieces)} قطعة${packsNote}</span>`
+      + `${fmt(totalPieces)} قطعة</span>`
       + `</div>`
     : "";
 

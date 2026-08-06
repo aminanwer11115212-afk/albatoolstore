@@ -192,8 +192,15 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
     it("كرتونتان في كلٍّ عشرٌ ⇒ عشرون قطعة لا اثنتان", () => {
       const html = formatPackaging([], twoCartonsOfTen)!;
       expect(html).toContain("20 قطعة");
-      expect(html).toContain("2 طرداً");
       expect(html).toContain("إجمالي عدد القطع");
+    });
+
+    /**
+     * والطرودُ لا تُذكر — عُرضت إلى جانب القطع فطلب صاحب المستودع إخفاءها.
+     * وهي محسوبةٌ في الأسطر فوقها: كلُّ سطرٍ يبدأ بعددها.
+     */
+    it("ولا يُذكر عدد الطرود في الشريط", () => {
+      expect(formatPackaging([], twoCartonsOfTen)).not.toContain("طرداً");
     });
 
     it("والمجموع يضرب كلَّ بندٍ في قطع طرده", () => {
@@ -201,10 +208,8 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
         { packaging_types: { name: "كرتونة" }, product_name: "أ", packs_count: 3, pieces_per_pack: 4, quantity: 1 },
         { packaging_types: { name: "كيس" }, product_name: "ب", packs_count: 2, pieces_per_pack: 5, quantity: 1 },
       ];
-      // 3×4 + 2×5 = 22 قطعة، و5 طرود
-      const html = formatPackaging([], mixed)!;
-      expect(html).toContain("22 قطعة");
-      expect(html).toContain("5 طرداً");
+      // 3×4 + 2×5 = 22 قطعة
+      expect(formatPackaging([], mixed)).toContain("22 قطعة");
     });
 
     /** بندٌ بلا قطعٍ مسجَّلة = قطعةٌ في الطرد، لا صفرٌ يبتلع البند. */
@@ -215,13 +220,11 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
       expect(formatPackaging([], noPieces)).toContain("4 قطعة");
     });
 
-    /** وحين يتساوى الرقمان لا يُذكر الطرود — رقمٌ واحد مرّتين تشويش. */
-    it("وحين تتساوى القطع والطرود يُذكر رقمٌ واحد", () => {
+    it("وقطعةٌ في كل طردٍ ⇒ الرقم عدد الطرود نفسه", () => {
       const html = formatPackaging([], [
         { packaging_types: { name: "كيس" }, product_name: "أ", packs_count: 4, pieces_per_pack: 1, quantity: 1 },
       ])!;
       expect(html).toContain("4 قطعة");
-      expect(html).not.toContain("طرداً");
     });
 
     it("والرقم الكبير بفواصله — 2,696 لا 2696", () => {
