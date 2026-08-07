@@ -62,6 +62,7 @@ const esc = (s: any) => String(s ?? "")
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#39;");
 
+import { packagingCountSum } from "@/utils/packagingCount";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
 
 const baseStyles = (accent: string) => `
@@ -72,7 +73,12 @@ const baseStyles = (accent: string) => `
   tfoot { display: table-footer-group; }
   tr, td, th { page-break-inside: avoid; break-inside: avoid; }
   .total-row, .summary-box, .signatures, .sig-box { page-break-inside: avoid; break-inside: avoid; }
-  @media print { body { padding: 0; } .page { max-width: none; } }
+  @media print {
+    body { padding: 0; } .page { max-width: none; }
+    /* الأرضياتُ تُطبع كما تُعرض — المتصفّحاتُ تُسقطها افتراضاً توفيراً
+       للحبر، فيخرج خطٌّ أبيضُ على ورقٍ أبيض. راجع printTemplate. */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
   body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; color:#1a1a1a; background:#fff; padding:20px; line-height:1.5; font-size:14px; }
   .page { max-width: 800px; margin: 0 auto; }
   .header { text-align:center; padding-bottom:10px; border-bottom: 3px solid ${accent}; margin-bottom:10px; }
@@ -276,7 +282,15 @@ ${rows.length === 0 ? `<div class="empty">لا توجد سجلات تغليف ل
 </table>
 
 ${(() => {
-  const totalPacks = rows.reduce((s, r) => s + Number(r.packs_count ?? 1), 0);
+  /*
+   * «عدد القطع» من المصدر الواحد — لا بحسابٍ خاصٍّ بهذه الورقة.
+   *
+   * كان يجمع `packs_count ?? 1`، وهو يوافق القاعدة في الغالب ويخالفها حيث
+   * تُقرأ الكمية: صفٌّ بـ`packs_count = 0` و`quantity = 9` يخرج هنا **0**
+   * وفي ورقة الفاتورة **9**. فرقمان لمستندٍ واحد باسمٍ واحد — وهي العلّةُ
+   * التي عولجت في الورقة وتقرير الإرسال، بقيت هنا حتى مُسحت المواضع كلُّها.
+   */
+  const totalPacks = packagingCountSum(rows as any);
   return `
 <table style="width:auto; margin: 12px 0 18px auto; border:2px solid #1a1a1a;">
   <thead>

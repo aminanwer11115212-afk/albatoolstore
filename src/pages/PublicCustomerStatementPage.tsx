@@ -311,6 +311,8 @@ export default function PublicCustomerStatementPage() {
         }
 
         @media print {
+          /* الأرضياتُ تُطبع كما تُعرض — راجع printTemplate. */
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .ps-actions { display: none !important; }
           .public-statement { background: #fff !important; padding: 0 !important; }
           .ps-page { box-shadow: none !important; padding: 8mm !important; max-width: 100% !important; }

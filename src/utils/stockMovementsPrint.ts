@@ -120,6 +120,8 @@ export async function renderStockMovementsHTML(opts: StockPrintOptions, includeT
   .footer { margin-top: 10px; padding-top: 6px; border-top: 1px dashed #cbd5e1; font-size: 10px; color: #64748b; display: flex; justify-content: space-between; }
   .empty { text-align: center; padding: 30px; color: #64748b; font-size: 13px; }
   @media print {
+    /* الأرضياتُ تُطبع كما تُعرض — راجع printTemplate. */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     body { background:#fff; padding:0; }
     .sheet { box-shadow:none; padding:0; max-width:none; }
     .noprint { display: none !important; }

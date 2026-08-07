@@ -296,7 +296,12 @@ export function generateStatementHTML(data: StatementData): string {
   tfoot { display: table-footer-group; }
   tr, td, th { page-break-inside: avoid; break-inside: avoid; }
   .total-row, .summary-row, .summary-box { page-break-inside: avoid; break-inside: avoid; }
-  @media print { body { padding: 0; } .page { max-width: none; } }
+  @media print {
+    body { padding: 0; } .page { max-width: none; }
+    /* الأرضياتُ تُطبع كما تُعرض — المتصفّحاتُ تُسقطها افتراضاً توفيراً
+       للحبر، فيخرج خطٌّ أبيضُ على ورقٍ أبيض. راجع printTemplate. */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
   body {
     font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
     color: #1a1a1a; background: #fff; padding: 20px; line-height: 1.5;

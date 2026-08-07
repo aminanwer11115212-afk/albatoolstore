@@ -108,7 +108,12 @@ export function buildUnavailableItemsPrintHTML(opts: UnavailableShareOpts): stri
   tbody tr:nth-child(even) { background:#fdf6f6; }
   .product-name { text-align:right; font-weight:600; }
   .footer-note { margin: 20px 0 10px; padding: 12px; border:1px dashed #c0392b; background:#fdf6f6; border-radius:6px; text-align:center; font-weight:700; color:#7a1f1f; }
-  @media print { .toolbar { display: none !important; } body { padding:0; } .page { margin-top: 0; } }
+  @media print {
+    .toolbar { display: none !important; } body { padding:0; } .page { margin-top: 0; }
+    /* الأرضياتُ تُطبع كما تُعرض — المتصفّحاتُ تُسقطها افتراضاً توفيراً
+       للحبر، فيخرج خطٌّ أبيضُ على ورقٍ أبيض. راجع printTemplate. */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
 </style>
 </head>
 <body>
