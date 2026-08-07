@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { validateBankTransferPayment, isAllowedBank, filterAccountsForPayment } from "@/lib/bankTransferValidation";
 import { validatePaymentAmount, computePaymentStatus } from "@/utils/paymentValidation";
 import { splitPayment } from "@/utils/overpayment";
+import { writeInvoicePayment, sumInvoicePayments } from "@/utils/invoicePaymentWrite";
 import { generatePrintHTML, openPrintWindow } from "@/utils/printTemplate";
 import { loadInvoiceExtras } from "@/utils/printExtras";
 import { type WhatsAppMessageType, pickCustomerWhatsApp} from "@/utils/whatsapp";
@@ -163,30 +164,37 @@ export default function InvoiceViewPage() {
     const finalNote = `${payNote || ""}${refSuffix}`.trim();
 
     try {
-      await supabase.from("invoices").update({
-        paid_amount: split.newPaid, due_amount: split.newDue, status: newSt, payment_method: payMethod || invoice.payment_method,
-      }).eq("id", invoice.id);
-
-      // 1) قيد الدفعة المطبَّقة على الفاتورة
-      //    الفئة صريحة: قيدُ دفعةٍ بلا `category` لا يعرفه كشف الحساب دفعةً،
-      //    ولا يُزاوَج بفائضه في جدول المعاملات، ولا يمنعه حارس الحذف. وكان
-      //    هذا المسار وحده يكتبها بلا فئة بينما يكتبها حوار الدفع بها.
-      if (payAccount && split.applied > 0) {
-        await supabase.from("transactions").insert({
-          type: "income", amount: split.applied, date: payDate, description: finalNote,
-          account_id: payAccount, customer_id: invoice.customer_id, reference_id: invoice.id,
-          category: "customer_payment",
-        } as any);
-      }
-      // 2) قيد الفائض كسلفة/دائن للعميل (يرفع رصيده الدائن تلقائياً)
-      if (payAccount && split.overpay > 0) {
-        const overNote = `فائض دفعة فاتورة ${invoice.invoice_number} - سلفة عميل${refSuffix}`;
-        await supabase.from("transactions").insert({
-          type: "income", amount: split.overpay, date: payDate, description: overNote,
-          account_id: payAccount, customer_id: invoice.customer_id, reference_id: invoice.id,
-          category: "customer_credit",
-        } as any);
-      }
+      /*
+       * القيودُ أوّلاً ثمّ الفاتورة — حارسُ القاعدة مؤجَّلٌ إلى الإيداع،
+       * وPostgREST يُودع كلَّ طلبٍ وحده. شرحُه في `invoicePaymentWrite`.
+       *
+       * والفئةُ صريحة: قيدُ دفعةٍ بلا فئةٍ لا يعرفه كشف الحساب دفعةً، ولا
+       * يُزاوَج بفائضه في جدول المعاملات، ولا يمنعه حارس الحذف.
+       */
+      const overNote = `فائض دفعة فاتورة ${invoice.invoice_number} - سلفة عميل${refSuffix}`;
+      await writeInvoicePayment(supabase as any, {
+        invoiceId: invoice.id,
+        rows: [
+          // ١) قيد الدفعة المطبَّقة على الفاتورة
+          ...(split.applied > 0 ? [{
+            type: "income" as const, category: "customer_payment" as const,
+            amount: split.applied, date: payDate, description: finalNote,
+            account_id: payAccount || null, customer_id: invoice.customer_id,
+            reference_id: invoice.id,
+          }] : []),
+          // ٢) قيد الفائض كسلفة/دائن للعميل (يرفع رصيده الدائن تلقائياً)
+          ...(split.overpay > 0 ? [{
+            type: "income" as const, category: "customer_credit" as const,
+            amount: split.overpay, date: payDate, description: overNote,
+            account_id: payAccount || null, customer_id: invoice.customer_id,
+            reference_id: invoice.id,
+          }] : []),
+        ],
+        patch: {
+          paid_amount: split.newPaid, due_amount: split.newDue, status: newSt,
+          payment_method: payMethod || invoice.payment_method,
+        },
+      });
 
       await recordInvoiceRevision({
         invoiceId: invoice.id,
@@ -257,8 +265,31 @@ export default function InvoiceViewPage() {
     try {
       const before = { status: invoice.status, paid_amount: invoice.paid_amount, due_amount: invoice.due_amount };
       const updates: any = { status: newStatus };
-      if (newStatus === "paid") { updates.paid_amount = invoice.total; updates.due_amount = 0; }
-      await supabase.from("invoices").update(updates).eq("id", invoice.id);
+      /*
+       * «مدفوعة» من قائمة الحالة كانت ترفع `paid_amount` إلى الإجمالي بلا
+       * قيدِ دفعةٍ أصلاً — فتصير الفاتورة مدفوعةً ولا مالَ دخل أيَّ حساب.
+       * وهي أرجحُ ما أنتج فاتورةَ «paid_amount=400000 وΣ=0».
+       *
+       * فيُكتب الفرقُ قيدَ دفعةٍ صريحاً — وهو نفسُ ما يفعله `bot_repair_invoice`
+       * حين يُصلح مثلَها (`backfill_missing_payment`). ويُقرأ المجموعُ من
+       * القيود لا من `paid_amount`: استنتاجُه منه يفترض تساويَهما، وهو عينُ
+       * ما نتحقّق منه.
+       */
+      const rows: any[] = [];
+      if (newStatus === "paid") {
+        updates.paid_amount = invoice.total;
+        updates.due_amount = 0;
+        const gap = Number(invoice.total || 0) - await sumInvoicePayments(supabase as any, invoice.id);
+        if (gap > 0.01) {
+          rows.push({
+            type: "income", category: "customer_payment", amount: gap,
+            date: new Date().toISOString().slice(0, 10),
+            description: `تسوية: تعليم الفاتورة ${invoice.invoice_number} مدفوعة`,
+            account_id: null, customer_id: invoice.customer_id, reference_id: invoice.id,
+          });
+        }
+      }
+      await writeInvoicePayment(supabase as any, { invoiceId: invoice.id, rows, patch: updates });
       await recordInvoiceRevision({
         invoiceId: invoice.id,
         action: "status_change",
