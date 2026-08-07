@@ -307,3 +307,76 @@ describe("الصفوفُ أقصر والحدُّ تبعها", () => {
     }
   });
 });
+
+/* ═══════════ ٨) علاماتُ صفوف مربّع الحساب ═══════════ */
+
+/**
+ * أرسل صاحبُ المستودع صورةَ المربّع وقد أحاط بعمود العلامات: «لم تضف هذه
+ * اللقو في تفاصيل العميل».
+ *
+ * ولكلّ صفٍّ علامتُه: ورقةٌ للقيمة، وساعةٌ للقديم، وآلةُ حسابٍ للجملة، ومالٌ
+ * للمدفوع، ومحفظةٌ للرصيد. فالعينُ تجد الصفَّ بشكله قبل أن تقرأ اسمه.
+ */
+describe("لكلّ صفٍّ في مربّع الحساب علامتُه", () => {
+  const box = (html: string) => {
+    const at = html.indexOf('class="account-box"');
+    return html.slice(at, html.indexOf("</table>", at));
+  };
+
+  it("خمسةُ صفوفٍ وخمسُ علامات — لا صفَّ بلا علامة", () => {
+    const b = box(sheet({ previousDebt: 980000, previousCredit: 0, paidAmount: 2500000 }));
+    expect((b.match(/<tr /g) || []).length).toBe(5);
+    expect((b.match(/<svg /g) || []).length).toBe(5);
+  });
+
+  it("والعلاماتُ رسومٌ لا إيموجي — تخرج حبراً لا مربّعاتٍ في ملفّ العميل", () => {
+    const b = box(sheet());
+    for (const e of ["📄", "🕐", "🧮", "💵", "👛", "🧾"]) expect(b).not.toContain(e);
+  });
+
+  /**
+   * ولكلٍّ علامتُها هي: الساعةُ للقديم لا للمدفوع. ويُتحقَّق بالترتيب — كلُّ
+   * علامةٍ تسبق اسمَ صفّها مباشرةً في RTL.
+   */
+  it("ولكلّ صفٍّ علامتُه هو لا علامةُ جاره", () => {
+    const b = box(sheet({ previousDebt: 980000, previousCredit: 0, paidAmount: 2500000 }));
+    const rows = b.split("<tr ").slice(1);
+    const has = (r: string, frag: string) => r.slice(0, r.indexOf("</td>")).includes(frag);
+    expect(has(rows[0], "M14 2v5h5")).toBe(true);        // ورقة   ← قيمة الفاتورة
+    expect(has(rows[1], 'cx="12" cy="12" r="9"')).toBe(true); // ساعة   ← الحساب القديم
+    expect(has(rows[2], "M8 6h8")).toBe(true);            // آلةُ حساب ← جملة الحساب
+    expect(has(rows[3], 'cx="12" cy="12" r="2.5"')).toBe(true); // مال ← المدفوع
+    expect(has(rows[4], "M21 10h-4")).toBe(true);         // محفظة  ← الرصيد الحالي
+    // والأسماءُ في صفوفها
+    expect(rows[1]).toContain("الحساب القديم");
+    expect(rows[3]).toContain("المدفوع");
+    expect(rows[4]).toContain("رصيد العميل الحالي");
+  });
+
+  /** وصفُّ الخصم يظهر بعلامته حين يوجد خصم — لا صفَّ بلا علامة مهما تغيّرت. */
+  it("وصفُّ الخصم بعلامته حين يوجد", () => {
+    const b = box(sheet({ discountTotal: 50000, grandTotal: 7510000 }));
+    expect(b).toContain("الخصم على الفاتورة");
+    expect((b.match(/<svg /g) || []).length).toBe((b.match(/<tr /g) || []).length);
+    // وعلامتُه علامةُ خصمٍ لا علامةُ جاره
+    const disc = b.split("<tr ").find((r) => r.includes("الخصم على الفاتورة"))!;
+    expect(disc.slice(0, disc.indexOf("</td>"))).toContain("M20.6 13.4");
+  });
+
+  /**
+   * والعلامةُ لا تُدخل صفّاً جديداً ولا قسماً جديداً: الارتفاعُ المحجوز
+   * (--acct-h) يُحسب من عدد الصفوف، وزرُّ تخصيص الرؤية يُعدّ الأقسام. فخليّةٌ
+   * زائدةٌ في صفٍّ قائم لا تمسّ واحداً منهما.
+   */
+  it("ولا تُغيّر عددَ الصفوف ولا الارتفاعَ المحجوز", () => {
+    const html = sheet({ previousDebt: 980000, previousCredit: 0, paidAmount: 2500000 });
+    expect(html).toContain('data-acct-rows="5"');
+    expect(html).toMatch(/--acct-h:145px/);
+  });
+
+  /** وعرضُ السعر لا مدفوعَ فيه ولا قديم — فعلاماتُه بقدر صفوفه. */
+  it("وعرضُ السعر بعلاماتِ صفوفه لا أكثر", () => {
+    const b = box(sheet({ type: "quote" }));
+    expect((b.match(/<tr /g) || []).length).toBe((b.match(/<svg /g) || []).length);
+  });
+});
