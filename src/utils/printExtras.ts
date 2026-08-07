@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { piecesTotalOf, piecesTotalSum } from "@/utils/piecesTotal";
+import { packagingCountOf, packagingCountSum } from "@/utils/packagingCount";
 import {
   attachLookups,
   PACKAGING_TYPE_LOOKUP,
@@ -171,11 +171,13 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
     const product = r.product_name || "";
     // النوع ثم الصنف: «كرتونه باكم فرامل فوق جي ان» — كما في الصورة.
     const label = [type, product].filter(Boolean).join(" ");
-    // العدد = عدد الطرود، فإن لم يُسجَّل فالكمية (بيانات أُدخلت قبل العمود).
-    const packs = Number(r.packs_count || 0) || Number(r.quantity || 0) || 0;
+    /*
+     * الرقمُ في أوّل السطر — وهو نفسُه ما يُجمع في الشريط أسفل الصندوق.
+     * فمن المصدر الواحد يُشتقّان معاً، فلا يمكن أن يختلفا.
+     */
+    const packs = packagingCountOf(r);
     const pieces = Number(r.pieces_per_pack || 0);
-    const total = piecesTotalOf(r);
-    return { label, packs, pieces, total, note: r.description || "" };
+    return { label, packs, pieces, note: r.description || "" };
   }).filter((r) => r.label || r.packs);
 
   /**
@@ -196,12 +198,11 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
   if (rows.length === 0) {
     for (const r of realHeaders) {
       const type = typeName(r);
-      const packs = Number(r.packs_count || 0) || Number(r.quantity || 0) || 0;
+      const packs = packagingCountOf(r);
       if (type || packs) {
         rows.push({
           label: type, packs,
           pieces: Number(r.pieces_per_pack || 0),
-          total: piecesTotalOf(r),
           note: "",
         });
       }
@@ -312,7 +313,11 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
    * نقطتين مباشرةً. والوحدةُ باقيةٌ بعده: الوصفُ يقول «عدد القطع» والرقم
    * يقول «90 قطعة» — من قرأ الرقم وحده عرف ما يعدّ.
    */
-  const totalPieces = rows.reduce((s, r) => s + r.total, 0);
+  /*
+   * المجموعُ من أرقام الأسطر نفسِها — لا من حقلٍ ثانٍ يُحسب على حدة. فما
+   * يقرؤه العميلُ في الأعلى هو ما يُجمع في الأسفل، عدّاً لا اشتقاقاً.
+   */
+  const totalPieces = rows.reduce((s, r) => s + r.packs, 0);
   const foot = rows.length
     ? `<div data-pkg-line style="margin-top:8px;padding:5px 10px;`
       + `background:#f1eefb;border:1px solid ${PKG_ACCENT};border-radius:5px;`
@@ -503,6 +508,6 @@ export async function loadQuoteExtras(quoteId: string | undefined | null): Promi
 
 /**
  * يُعاد تصديرُه من هنا لأن مستوردين قائمين يعرفونه في هذا الملفّ.
- * والحسابُ نفسُه في `piecesTotal` وحده — لا نسخةَ ثانية.
+ * والحسابُ نفسُه في `packagingCount` وحده — لا نسخةَ ثانية.
  */
-export { piecesTotalOf, piecesTotalSum };
+export { packagingCountOf, packagingCountSum };

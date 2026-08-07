@@ -193,15 +193,21 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
    * ولمّا طُلب أن يُوضَّح للعميل أنّ هذا عددُ قطع، لم يصحّ أن يُلصق الوصفُ
    * الصحيح برقمٍ خاطئ — فصار الرقمان معاً كلٌّ باسمه.
    */
-  describe("القطعُ لا الطرود", () => {
+  describe("المجموعُ = مجموعُ أرقام الأسطر", () => {
     const twoCartonsOfTen = [
       { packaging_types: { name: "كرتونة" }, product_name: "بطارية", packs_count: 2, pieces_per_pack: 10, quantity: 1 },
     ];
 
-    it("كرتونتان في كلٍّ عشرٌ ⇒ عشرون قطعة لا اثنتان", () => {
+    /**
+     * قرارُ صاحب المستودع: «عدد القطع على الرقم في الأول قبل كلمة كرتونة
+     * كبيرة». فسطرٌ يبدأ بـ2 يُعدّ 2 وإن كان في كل كرتونةٍ عشرُ قطع —
+     * و‎*‎10 وصفُ الطرد لا عاملُ ضرب.
+     */
+    it("سطرٌ يبدأ بـ2 يُعدّ اثنين وإن كان ‎*‎10", () => {
       const html = formatPackaging([], twoCartonsOfTen)!;
-      expect(html).toContain(">20</span>");
+      expect(html).toContain(">2</span>");
       expect(html).toContain("إجمالي عدد القطع");
+      expect(html).toContain("*10");   // والوصفُ باقٍ
     });
 
     /**
@@ -212,36 +218,36 @@ describe("تفاصيل التغليف أسطرٌ لا جدول", () => {
       expect(formatPackaging([], twoCartonsOfTen)).not.toContain("طرداً");
     });
 
-    it("والمجموع يضرب كلَّ بندٍ في قطع طرده", () => {
+    it("والمجموع يجمع أرقامَ الأسطر لا يضربها", () => {
       const mixed = [
         { packaging_types: { name: "كرتونة" }, product_name: "أ", packs_count: 3, pieces_per_pack: 4, quantity: 1 },
         { packaging_types: { name: "كيس" }, product_name: "ب", packs_count: 2, pieces_per_pack: 5, quantity: 1 },
       ];
-      // 3×4 + 2×5 = 22 قطعة
-      expect(formatPackaging([], mixed)).toContain(">22</span>");
+      // 3 + 2 = 5 (وبالضرب كانت 22)
+      expect(formatPackaging([], mixed)).toContain(">5</span>");
     });
 
-    /** بندٌ بلا قطعٍ مسجَّلة = قطعةٌ في الطرد، لا صفرٌ يبتلع البند. */
-    it("وبندٌ بلا قطعٍ مسجَّلة يُحسب قطعةً في الطرد", () => {
+    /** وبندٌ بلا ‎*‎N يُعدّ برقمه كغيره. */
+    it("وبندٌ بلا قطعٍ مسجَّلة يُعدّ برقمه", () => {
       const noPieces = [
         { packaging_types: { name: "كيس" }, product_name: "أ", packs_count: 4, pieces_per_pack: 0, quantity: 1 },
       ];
       expect(formatPackaging([], noPieces)).toContain(">4</span>");
     });
 
-    it("وقطعةٌ في كل طردٍ ⇒ الرقم عدد الطرود نفسه", () => {
+    it("و‎*‎1 لا تغيّر شيئاً — الرقمُ كما كُتب", () => {
       const html = formatPackaging([], [
         { packaging_types: { name: "كيس" }, product_name: "أ", packs_count: 4, pieces_per_pack: 1, quantity: 1 },
       ])!;
       expect(html).toContain(">4</span>");
     });
 
-    it("والرقم الكبير بفواصله — 2,696 لا 2696", () => {
+    it("والرقم الكبير بفواصله — 2,000 لا 2000", () => {
       const many = Array.from({ length: 20 }, () => ({
-        packaging_types: { name: "كرتونة" }, product_name: "أ", packs_count: 10, pieces_per_pack: 20, quantity: 1,
+        packaging_types: { name: "كرتونة" }, product_name: "أ", packs_count: 100, pieces_per_pack: 20, quantity: 1,
       }));
-      // 20 × 10 × 20 = 4,000
-      expect(formatPackaging([], many)).toContain(">4,000</span>");
+      // 20 سطراً يبدأ كلٌّ بـ100 ⇒ 2,000
+      expect(formatPackaging([], many)).toContain(">2,000</span>");
     });
   });
 

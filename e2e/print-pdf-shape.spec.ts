@@ -190,21 +190,45 @@ test.describe("ما يصل العميل بعد التصوير", () => {
          فتفاوتٌ واسعٌ يلتقط بياضَ الورقة ويقول إنّ الشريط بعرض الصفحة. */
       const near = (i: number, t: number[]) =>
         Math.abs(px[i] - t[0]) < 6 && Math.abs(px[i + 1] - t[1]) < 6 && Math.abs(px[i + 2] - t[2]) < 6;
-      const widest = (t: number[]) => {
+      /**
+       * قياسان لا واحد — لكلٍّ ما يناسب شكلَه:
+       *
+       * • `widestRun` أطولُ تتابعٍ من اللون. يصلح لشريطٍ بأرضيةٍ واحدة
+       *   (شريطُ القطع)، ولا يُخدع بحبرٍ متناثرٍ من التنعيم في مكانٍ آخر من
+       *   السطر.
+       * • `colorExtent` المسافةُ من أوّل لونٍ إلى آخره في السطر. يصلح لشريط
+       *   الجملة: صار مربّعين بأرضيتين بينهما فاصلٌ فاتحٌ بعرض بكسل، فقياسُ
+       *   التتابع يقف عند الفاصل ويقرأ نصفَه.
+       *
+       * وتبادلُهما يُفسد القياس: جُرّب الامتدادُ على شريط القطع فقرأ 666px
+       * بدل 183 — التقط بكسلاتِ تنعيمٍ باهتةً عند طرفَي الصندوق.
+       */
+      const widestRun = (...ts: number[][]) => {
         let best = 0;
         for (let y = 0; y < height; y += 2) {
           let run = 0;
           for (let x = 0; x < width; x++) {
-            if (near((y * width + x) * 4, t)) { run++; if (run > best) best = run; }
+            if (ts.some((t) => near((y * width + x) * 4, t))) { run++; if (run > best) best = run; }
             else run = 0;
           }
         }
         return best / 2;
       };
+      const colorExtent = (...ts: number[][]) => {
+        let best = 0;
+        for (let y = 0; y < height; y += 2) {
+          let first = -1, last = -1;
+          for (let x = 0; x < width; x++) {
+            if (ts.some((t) => near((y * width + x) * 4, t))) { if (first < 0) first = x; last = x; }
+          }
+          if (first >= 0 && last - first + 1 > best) best = last - first + 1;
+        }
+        return best / 2;
+      };
       const dom = (s: string) => Math.round(document.querySelector(s)!.getBoundingClientRect().width);
       return {
-        bandDrawn: widest([31, 45, 90]), bandDom: dom(".grand-band"),
-        footDrawn: widest([241, 238, 251]), footDom: dom('[data-pkg-line][style*="fit-content"]'),
+        bandDrawn: colorExtent([31, 45, 90], [22, 34, 74]), bandDom: dom(".grand-band"),
+        footDrawn: widestRun([241, 238, 251]), footDom: dom('[data-pkg-line][style*="fit-content"]'),
         pageW: Math.round(page_.getBoundingClientRect().width),
       };
     });
@@ -266,5 +290,72 @@ test.describe("ما يصل العميل بعد التصوير", () => {
     /* أوّلُ ورودٍ للاسم في تعليقٍ شارح لا في الوسم — فيُقصد الوسمُ نفسُه. */
     const foot = src.slice(src.indexOf(">إجمالي عدد القطع :<"));
     expect(foot.slice(0, 1600)).toContain("display:flex;gap:6px");
+  });
+});
+
+/**
+ * ## والأرضياتُ تُطبع — «الجملة في الطباعة لا تظهر»
+ *
+ * المتصفّحات تُسقط أرضياتِ الألوان عند الطباعة توفيراً للحبر. وشريطُ الجملة
+ * خطُّه أبيضُ على أرضيةٍ داكنة، فتسقط الأرضيةُ ويبقى أبيضُ على أبيض — أي
+ * لا شيء. صوّره صاحبُ المستودع من ورقةٍ مطبوعة.
+ *
+ * ويُقاس هنا في **وسط الطباعة نفسِه** (emulateMedia print) لا بقراءة CSS:
+ * القاعدةُ قد تُكتب ولا تسري لخطأٍ في مداها.
+ */
+test.describe("الطباعة", () => {
+  test("أرضياتُ الألوان تسري في وسط الطباعة", async ({ page }) => {
+    await mount(page);
+    await page.emulateMedia({ media: "print" });
+    const m = await page.evaluate(() => {
+      const band = document.querySelector(".grand-band") as HTMLElement;
+      const th = document.querySelector("thead th") as HTMLElement;
+      const cs = getComputedStyle(band);
+      const adjust = (el: Element) => {
+        const s = getComputedStyle(el) as any;
+        return s.printColorAdjust || s.webkitPrintColorAdjust || "";
+      };
+      return {
+        bandBg: cs.backgroundColor, bandColor: cs.color,
+        bandAdjust: adjust(band), thAdjust: adjust(th),
+        thBg: getComputedStyle(th).backgroundColor,
+      };
+    });
+    // الأرضيةُ الداكنة والخطُّ الأبيض باقيان في وسط الطباعة
+    expect(m.bandBg).toBe("rgb(31, 45, 90)");
+    expect(m.bandColor).toBe("rgb(255, 255, 255)");
+    // والمتصفّحُ مُلزَمٌ برسمهما
+    expect(m.bandAdjust).toBe("exact");
+    expect(m.thAdjust).toBe("exact");
+    expect(m.thBg).toBe("rgb(91, 76, 173)");
+  });
+
+  /** والشريطُ شمالَ الورقة كما طُلب — يُقاس بالموضع لا بالقاعدة. */
+  test("وشريطُ الجملة شمالَ الورقة", async ({ page }) => {
+    await mount(page);
+    const m = await page.evaluate(() => {
+      const band = document.querySelector(".grand-band")!.getBoundingClientRect();
+      /* الحافّةُ المقصودة حافّةُ **المحتوى** لا صندوقُ الورقة: للورقة حشوٌ
+         10mm، فقياسُ المسافة من صندوقها يقرأ الحشوَ إزاحةً. والجدولُ فوقه
+         يشغل عرضَ المحتوى كلَّه، فحافّتُه هي المرجع. */
+      const tbl = document.querySelector("table[data-section='items']")!.getBoundingClientRect();
+      return { fromContentLeft: Math.round(band.left - tbl.left),
+               width: Math.round(band.width), contentW: Math.round(tbl.width) };
+    });
+    expect(m.fromContentLeft).toBeLessThan(4);        // ملتصقٌ بحافّة المحتوى اليسرى
+    expect(m.width).toBeLessThan(m.contentW * 0.6);   // وبقدر محتواه لا بعرض الورقة
+  });
+
+  /** وخلايا الجدول متساويةُ المقاس فعلاً بعد التخطيط. */
+  test("وخلايا الجدول والترويسة بمقاسٍ واحد بعد التخطيط", async ({ page }) => {
+    await mount(page);
+    const m = await page.evaluate(() => {
+      const t = document.querySelector("table[data-section='items']")!;
+      const px = (s: string) => parseFloat(getComputedStyle(t.querySelector(s)!).fontSize);
+      return { td: px("tbody td"), th: px("thead th"), qty: px(".col-qty"), price: px(".col-price") };
+    });
+    expect(m.th).toBe(m.td);
+    expect(m.qty).toBe(m.td);
+    expect(m.price).toBe(m.td);
   });
 });

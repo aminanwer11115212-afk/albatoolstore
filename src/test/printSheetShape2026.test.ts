@@ -380,3 +380,133 @@ describe("لكلّ صفٍّ في مربّع الحساب علامتُه", () => 
     expect((b.match(/<tr /g) || []).length).toBe((b.match(/<svg /g) || []).length);
   });
 });
+
+/* ═══════════ ٩) الطلبُ الثالث: التساوي، والشمال، والطباعة ═══════════ */
+
+/**
+ * ## الألوانُ تُطبع كما تُعرض
+ *
+ * «الجملة في الطباعة لا تظهر». وصوّر الورقة مطبوعةً فإذا ترويسةُ الجدول
+ * البنفسجية بيضاء ومربّعُ الحساب بلا تظليل والشريطُ بلا أرضيته.
+ *
+ * والسببُ خارجَ الورقة: المتصفّحات تُسقط أرضياتِ الألوان عند الطباعة توفيراً
+ * للحبر. والشريطُ خطُّه **أبيض** على أرضيةٍ داكنة — فتسقط الأرضيةُ ويبقى
+ * أبيضُ على أبيض، أي لا شيء. وهو أسوأُ ما يقع: رقمٌ يختفي بلا أثر.
+ */
+describe("الألوانُ تُطبع كما تُعرض", () => {
+  const html = sheet();
+
+  it("القالبُ يُلزم المتصفّحَ برسم الأرضيات عند الطباعة", () => {
+    const printBlock = /@media print \{([\s\S]*?)\n  \}/g;
+    const blocks = Array.from(html.matchAll(printBlock)).map((m) => m[1]);
+    const all = blocks.join("\n");
+    expect(all).toMatch(/print-color-adjust:\s*exact/);
+    // والبادئةُ معها — كروم وسفاري القديمان يطبع بهما أكثرُ المستخدمين
+    expect(all).toMatch(/-webkit-print-color-adjust:\s*exact/);
+  });
+
+  /** وعلى كل عنصر لا على الشريط وحده: العلّةُ عامّةٌ في الورقة كلّها. */
+  it("وعلى كل عنصرٍ لا على الشريط وحده", () => {
+    expect(html).toMatch(/@media print \{[\s\S]*?\*\s*\{[\s\S]*?print-color-adjust:\s*exact/);
+  });
+
+  /** ولا يُترك الشريطُ بخطٍّ أبيضَ بلا ضمانِ أرضيته. */
+  it("والشريطُ خطُّه أبيضُ على أرضيةٍ داكنة — فضمانُها شرطُ ظهوره", () => {
+    const rule = /(?<![\w-.] )\.grand-band \{[^}]*\}/.exec(html)![0];
+    expect(rule).toMatch(/background:\s*#1f2d5a/);
+    expect(rule).toMatch(/color:\s*#fff/);
+  });
+});
+
+/**
+ * ## والجملةُ شمالَ الورقة في مربّعين
+ *
+ * «الجملة جيبها شمال وخليها في مربعات زي ما رسلتها ليك».
+ */
+describe("شريطُ الجملة شمالاً وفي مربّعين", () => {
+  const html = sheet();
+  const rule = /(?<![\w-.] )\.grand-band \{[^}]*\}/.exec(html)![0];
+
+  it("الهامشُ التلقائي على اليمين — فيُدفع الشريطُ شمالاً", () => {
+    // margin: أعلى يمين أسفل يسار ⇒ auto في موضع اليمين
+    expect(rule).toMatch(/margin:\s*-?[\d.]+px\s+auto\s+[\d.]+px\s+0/);
+  });
+
+  it("ومربّعان: للرقم أرضيةٌ أغمق وفاصلٌ بينهما", () => {
+    const val = /(?<![\w-.] )\.grand-band-value \{[^}]*\}/.exec(html)![0];
+    expect(val).toMatch(/background:\s*#16224a/);
+    expect(val).toMatch(/border-inline-start/);
+  });
+
+  it("والحوافُّ لا تقصّ الأرضية الداخلية", () => {
+    expect(rule).toContain("overflow: hidden");
+  });
+});
+
+/**
+ * ## وخلايا الجدول متساوية، وتصغر جميعاً للأرقام الطويلة
+ *
+ * «اجعل حجم الخط — اسم الصنف والأصناف والإجمالي وحقول الترويسة كلها — بنفس
+ * خط الكميات والسعر لتكون متساوية، وتصغر في حالة وجود أرقام كثيرة للسعر».
+ */
+describe("خلايا الجدول متساوية", () => {
+  it("الخليّةُ والترويسةُ وعمودا الكمية والسعر بمقاسٍ واحد", () => {
+    const html = sheet();
+    const cell = Number(/tbody td \{[^}]*font-size:\s*([\d.]+)px/.exec(html)![1]);
+    const head = Number(/thead th \{[^}]*font-size:\s*([\d.]+)px/.exec(html)![1]);
+    expect(head).toBe(cell);
+    // ولا مقاسَ خاصٌّ بالكمية والسعر — الفرقُ ثِقلٌ لا حجم
+    expect(/\.col-qty, \.col-price \{[^}]*\}/.exec(html)![0]).not.toContain("font-size");
+  });
+
+  /** والصنفُ يُوضع من أطول رقمٍ في الفاتورة، لا من خليّةٍ بعينها. */
+  it("وفاتورةُ الأرقام العادية بلا صنفِ تصغير", () => {
+    expect(sheet()).toMatch(/<table class="items-table"/);
+  });
+
+  it("وأرقامُ تسع خاناتٍ تنزل درجةً", () => {
+    const html = sheet({ items: [{ product_name: "صنف", quantity: 1,
+      unit_price: 968125000, tax_amount: 0, discount: 0, total: 968125000 }] });
+    expect(html).toMatch(/<table class="items-table num-(lg|xl)"/);
+  });
+
+  it("والتصغيرُ للجدول كلِّه — لا لعمودٍ فيُختلّ التساوي", () => {
+    const html = sheet();
+    for (const cls of ["num-lg", "num-xl"]) {
+      const r = new RegExp(`table\\.${cls} tbody td, table\\.${cls} thead th \\{[^}]*\\}`);
+      expect(r.exec(html), cls).toBeTruthy();
+    }
+  });
+});
+
+/**
+ * ## ومجموعُ القطع = مجموعُ الأرقام في أوّل الأسطر
+ *
+ * «عدد القطع على الرقم في الأول قبل كلمة كرتونة كبيرة»، و«فمثلاً كتبت 5
+ * كرتونة كبيرة تظهر إجمالي القطع 5».
+ *
+ * والصورةُ المطبوعة التي أرسلها فيها ستّةُ أسطرٍ تبدأ كلٌّ منها بـ1 —
+ * فمجموعُها **6**. وكانت تُحسب بالضرب في ‎*‎N فتخرج 99.
+ */
+describe("مجموعُ القطع كما في الورقة المطبوعة", () => {
+  const shown = (rows: any[]) => {
+    const html = formatPackaging([], rows)!;
+    return Number(/إجمالي عدد القطع :[\s\S]*?<span>([\d,]+)<\/span>/.exec(html)![1].replace(/,/g, ""));
+  };
+
+  it("خمسُ كراتين بلا عدد قطعٍ ⇒ 5", () => {
+    expect(shown([{ product_name: "", packaging_types: { name: "كرتونة كبيرة" },
+      packs_count: 5, pieces_per_pack: 0, quantity: 0 }])).toBe(5);
+  });
+
+  it("وأسطرُ الورقة المطبوعة كما هي ⇒ 6", () => {
+    expect(shown([
+      { product_name: "باكم فرامل", packaging_types: { name: "كرتونة صغيرة" }, packs_count: 1, pieces_per_pack: 50, quantity: 50 },
+      { product_name: "جي ان", packaging_types: { name: "بطارية" }, packs_count: 1, pieces_per_pack: 8, quantity: 8 },
+      { product_name: "بطارية 125", packaging_types: { name: "كرتونة صغيرة" }, packs_count: 1, pieces_per_pack: 10, quantity: 10 },
+      { product_name: "باكم فرامل", packaging_types: { name: "كرتونة كبيرة" }, packs_count: 1, pieces_per_pack: 20, quantity: 20 },
+      { product_name: "", packaging_types: { name: "كرتونة كبيرة" }, packs_count: 1, pieces_per_pack: 0, quantity: 0 },
+      { product_name: "لستك", packaging_types: { name: "ربطة" }, packs_count: 1, pieces_per_pack: 10, quantity: 10 },
+    ])).toBe(6);
+  });
+});

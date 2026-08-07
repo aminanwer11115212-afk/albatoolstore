@@ -298,6 +298,28 @@ export function generatePrintHTML(data: PrintData): string {
   const density = printDensity(items?.length, pkgRows);
   const pageDensityClass = densityClass(density);
 
+  /**
+   * صنفُ الجدول من أطول رقمٍ فيه.
+   *
+   * «تصغر في حالة وجود أرقام كثيرة للسعر بحيث كلهم تكون متساويات». وأعمدةُ
+   * السعر والإجمالي ثابتةُ العرض (100px و110px)، فرقمٌ من تسعة أرقام بفواصله
+   * يبلغ 11 محرفاً — يلامس حافّة عموده عند 15px، وما زاد يلتفّ سطرين فيرتفع
+   * الصفُّ ويختلّ الجدول.
+   *
+   * فالمقاسُ ينزل درجةً **للجدول كلّه** لا لخليّةٍ بعينها: تصغيرُ خليّةٍ وحدها
+   * يعيد الاختلافَ الذي طُلب رفعُه. والحدودُ مقيسةٌ بالتصيير لا مقدَّرة —
+   * راجع `e2e/print-rows-per-page.spec.ts`.
+   */
+  const longestMoney = Math.max(
+    0,
+    ...(items || []).flatMap((it) => [
+      (Number(it.unit_price) || 0).toLocaleString().length,
+      (Number(it.total) || 0).toLocaleString().length,
+    ]),
+    (Number(grandTotal) || 0).toLocaleString().length,
+  );
+  const numClass = longestMoney >= 13 ? " num-xl" : longestMoney >= 11 ? " num-lg" : "";
+
   // Helper: escape value for safe insertion inside an HTML attribute (double-quoted)
   const attr = (v: string) => String(v ?? "")
     .replace(/&/g, "&amp;")
@@ -495,28 +517,45 @@ ${PAGINATION_CSS}
    */
   thead th {
     background: #5b4cad; color: white;
-    padding: 5px 8px; font-size: 12.5px; font-weight: 700;
+    padding: 5px 8px; font-size: 15px; font-weight: 700;
     text-align: center; border: 1px solid #1a1a1a;
   }
   tbody td {
-    padding: 3.5px 8px; text-align: center; font-size: 12.5px;
+    padding: 3.5px 8px; text-align: center; font-size: 15px;
     border: 1px solid #999;
   }
-  /*
-   * عمودا الكمية والسعر أكبرُ من بقيّة الخلايا وأثقلُ خطّاً.
+  /**
+   * === خلايا الجدول كلُّها بمقاسٍ واحد ===
    *
-   * شكا صاحبُ المستودع صِغَرَهما، وسببُه أنهما كانا الخليّتين الوحيدتين بلا
-   * ثقلٍ ولا زيادة: عمودُ الجملة سميك وعمودُ الاسم عريض، وهما رقمان رفيعان
-   * بمقاس الخلية العام — وهما أوّلُ ما يراجعه العميل.
+   * طلبه صاحبُ المستودع: «اجعل حجم الخط — اسم الصنف والأصناف والإجمالي
+   * ومجموعهم، وحقول الترويسة كلها — بنفس خط الكميات والسعر، لتكون متساوية
+   * ومنسّقة».
    *
-   * والمقاسُ يتبع الكثافة كبقيّة الورقة — قواعدُه في وحدة الكثافة وحدها.
+   * وكان عمودا الكمية والسعر وحدهما 15px وبقيّةُ الخلايا 12.5 — رُفعا قبلُ
+   * لأنهما كانا الأنحفَ، فصارا الأعرضَ وحدهما، فاختلّ الصفُّ في الاتجاه
+   * المقابل. فالمقاسُ اليوم واحدٌ في الخلايا والترويسة معاً (15px)، والفرقُ
+   * بينها في **الثقل** لا في الحجم: الكميةُ والسعر أثقلُ لأنهما ما يُراجَع،
+   * والباقي عاديّ. فتُقرأ الأعمدةُ صفّاً مستقيماً.
    *
    * ولا تُكتب هنا نصوصُ الأقسام كما تظهر للعميل: تعليقاتُ هذا المقطع تخرج
    * في الورقة، وفحوصُ الإخفاء تبحث عن تلك النصوص فتجدها في تعليقٍ فتسقط.
    */
   .col-qty, .col-price {
-    font-size: 15px; font-weight: 800; color: #111;
+    font-weight: 800; color: #111;
   }
+  /**
+   * === وتصغر جميعاً حين تطول الأرقام ===
+   *
+   * «وتصغر في حالة وجود أرقام كثيرة للسعر بحيث كلهم تكون متساويات».
+   *
+   * والصنفُ يُوضع على الجدول من عدد أطول رقمٍ فيه — لا على خليّةٍ بعينها:
+   * تصغيرُ خليّةٍ واحدة يعيد الاختلافَ الذي طُلب رفعُه. فالجدولُ كلُّه ينزل
+   * درجةً، فتبقى الأعمدةُ متساوية وإن ضاقت.
+   *
+   * والحدُّ الأدنى فوق أرضية القراءة — الصفحةُ الزائدة أهون من رقمٍ لا يُقرأ.
+   */
+  table.num-lg tbody td, table.num-lg thead th { font-size: 13.5px; }
+  table.num-xl tbody td, table.num-xl thead th { font-size: 12px; }
   tbody tr:nth-child(even) { background: #f8f8f8; }
   /* صفُّ الجملة القديم باقٍ لقالب كشف الحساب — هو الذي يستعمله الآن،
      وورقةُ الفاتورة صارت إلى الشريط المضغوط أدناه. */
@@ -534,24 +573,38 @@ ${PAGINATION_CSS}
    * **فارغةٌ عمداً** كي يقع الرقمُ تحت عمود الإجمالي — فيمتدّ الإطارُ الأسود
    * بعرض الورقة حاملاً كلمتين ورقماً وثلاثة فراغات.
    *
-   * فخرج من الجدول إلى شريطٍ بقدر ما فيه: أرضيةٌ داكنة، الوصفُ يميناً والرقمُ
-   * يساراً، وعرضُه من محتواه لا من الورقة. ويُدفع إلى يسار الورقة بهامشٍ
-   * تلقائيّ ليقع تحت عمود الإجمالي كما كان — الموضعُ محفوظ والفراغُ ذهب.
+   * فخرج من الجدول إلى شريطٍ بقدر ما فيه: أرضيةٌ داكنة، وعرضُه من محتواه لا
+   * من الورقة.
+   *
+   * ## ومكانُه شمالَ الورقة
+   * «الجملة جيبها شمال». وكان الهامشُ التلقائي على اليسار فيدفعه إلى اليمين
+   * تحت عمود الاسم؛ فصار على اليمين ليدفعه إلى اليسار — تحت عمود الإجمالي
+   * الذي يحمل الرقم، فتنزل العينُ من آخر مبلغٍ إلى جملته في خطٍّ مستقيم.
+   *
+   * ## ومربّعان لا مربّع
+   * «خليها في مربعات زي ما رسلتها ليك». فبينهما فاصلٌ رأسيّ وللرقم أرضيةٌ
+   * أغمق قليلاً: يُقرأ الوصفُ خانةً والرقمُ خانةً كما في الصورة، لا سطراً
+   * واحداً بينه فراغ.
    *
    * ولا يُشطر بين صفحتين، وهو ذرّةٌ في حساب الترقيم كصفوف الجدول.
    */
   .grand-band {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 18px; width: fit-content; min-width: 250px; max-width: 62%;
-    margin: -12px 0 14px auto;
-    padding: 6px 14px; border-radius: 5px;
+    display: flex; align-items: stretch;
+    width: fit-content; min-width: 250px; max-width: 62%;
+    margin: -12px auto 14px 0;
+    border-radius: 5px; overflow: hidden;
     background: #1f2d5a; color: #fff;
     page-break-inside: avoid; break-inside: avoid;
   }
-  .grand-band-label { font-size: 14px; font-weight: 800; white-space: nowrap; }
+  .grand-band-label {
+    padding: 6px 14px; font-size: 15px; font-weight: 800; white-space: nowrap;
+    display: flex; align-items: center;
+  }
   .grand-band-value {
-    font-size: 17px; font-weight: 900; white-space: nowrap;
-    letter-spacing: 0.3px;
+    padding: 6px 16px; font-size: 17px; font-weight: 900; white-space: nowrap;
+    letter-spacing: 0.3px; background: #16224a;
+    border-inline-start: 1px solid rgba(255, 255, 255, 0.28);
+    display: flex; align-items: center; margin-inline-start: auto;
   }
 
   /* === SUMMARY BOXES === */
@@ -733,8 +786,33 @@ ${PAGINATION_CSS}
     border-top: 2px solid #2f6b4f; opacity: 0.55;
   }
 
+  /**
+   * === الألوانُ تُطبع كما تُعرض ===
+   *
+   * بلّغ صاحبُ المستودع: «الجملة في الطباعة لا تظهر». وصوّر الورقة مطبوعة،
+   * فإذا ترويسةُ الجدول البنفسجية بيضاء، ومربّعُ الحساب بلا تظليل، وشريطُ
+   * الجملة بلا أرضيته الداكنة.
+   *
+   * والسببُ ليس في الورقة: المتصفّحات **تُسقط أرضياتِ الألوان عند الطباعة**
+   * افتراضاً توفيراً للحبر، ما لم يؤشّر القارئُ «طباعة الخلفيات» في مربّع
+   * الحوار. فالشريطُ أرضيتُه داكنة وخطُّه أبيض — تسقط الأرضيةُ فيبقى خطٌّ
+   * أبيضُ على ورقٍ أبيض، أي **لا شيء**. وهو أسوأُ ما يقع: رقمٌ يختفي بلا
+   * أثرٍ يدلّ على غيابه.
+   *
+   * وخاصّيةُ print-color-adjust بقيمة exact تُلزم المتصفّحَ برسم ما رُسم على
+   * الشاشة.
+   * فتُكتب هنا مرّةً على كل عنصر — لا على الشريط وحده: العلّةُ عامّةٌ في
+   * الورقة كلّها، وكلُّ ما له أرضيةٌ يصيبه ما أصابه.
+   *
+   * والبادئةُ webkit- معها: كروم وسفاري القديمان لا يعرفان الاسمَ القياسي،
+   * وهما ما يطبع به أكثرُ المستخدمين على الهاتف.
+   */
   @media print {
     body { padding: 0; }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
   }
 </style>
 </head>
@@ -798,7 +876,7 @@ ${showHeader ? `
 
 ${showItems ? (variant === "stocktake" ? `
 <!-- Items Table (STOCKTAKE — quantity first + tick circle) -->
-<table data-section="items" data-section-label="كشف الجرد">
+<table class="items-table${numClass}" data-section="items" data-section-label="كشف الجرد">
   <thead>
     <tr>
       <th style="width:60px;">العدد</th>
@@ -829,7 +907,7 @@ ${showItems ? (variant === "stocktake" ? `
 </table>
 ` : variant === "no-account" ? `
 <!-- Items Table (NO PRICES — products only) -->
-<table data-section="items" data-section-label="المنتجات">
+<table class="items-table${numClass}" data-section="items" data-section-label="المنتجات">
   <thead>
     <tr>
       <th style="width:50px;">#</th>
@@ -849,7 +927,7 @@ ${showItems ? (variant === "stocktake" ? `
 </table>
 ` : `
 <!-- Items Table -->
-<table data-section="items" data-section-label="المنتجات">
+<table class="items-table${numClass}" data-section="items" data-section-label="المنتجات">
   <thead>
     <tr>
       <th style="width:35px;">#</th>

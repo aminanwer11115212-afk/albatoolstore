@@ -157,12 +157,14 @@ export const DENSITY_CSS = `
   .d-compact .doc-title { margin: 0; }
   .d-compact .doc-title h1 { font-size: 17px; }
   .d-compact .info-line { font-size: 13.5px; line-height: 1.35; }
-  .d-compact thead th { padding: 3px 6px; font-size: 12px; }
-  .d-compact tbody td { padding: 2px 6px; font-size: 12px; }
-  .d-compact .col-qty, .d-compact .col-price { font-size: 13.5px; }
-  .d-compact .grand-band { padding: 4px 12px; }
-  .d-compact .grand-band-label { font-size: 13px; }
-  .d-compact .grand-band-value { font-size: 15.5px; }
+  /* الخلايا والترويسة بمقاسٍ واحد في كل درجة — طلبُ التساوي يسري على
+     الدرجات كما يسري على الأصل، وإلا عاد الاختلافُ عند أوّل فاتورةٍ كبيرة. */
+  .d-compact thead th { padding: 3px 6px; font-size: 13.5px; }
+  .d-compact tbody td { padding: 2px 6px; font-size: 13.5px; }
+  .d-compact table.num-lg tbody td, .d-compact table.num-lg thead th { font-size: 12.5px; }
+  .d-compact table.num-xl tbody td, .d-compact table.num-xl thead th { font-size: 11.5px; }
+  .d-compact .grand-band-label { padding: 4px 12px; font-size: 14px; }
+  .d-compact .grand-band-value { padding: 4px 14px; font-size: 15.5px; }
   .d-compact .extra-content table td, .d-compact .extra-content table th { font-size: 11px; padding: 3px 5px; }
 
   .d-dense .header { padding-bottom: 4px; margin-bottom: 4px; }
@@ -173,12 +175,12 @@ export const DENSITY_CSS = `
   .d-dense .doc-title { margin: 0; }
   .d-dense .doc-title h1 { font-size: 17px; }
   .d-dense .info-line { font-size: 12.5px; line-height: 1.3; }
-  .d-dense thead th { padding: 2.5px 5px; font-size: 11.5px; }
-  .d-dense tbody td { padding: 1.5px 5px; font-size: 11.5px; }
-  .d-dense .col-qty, .d-dense .col-price { font-size: 12.5px; }
-  .d-dense .grand-band { padding: 3px 10px; }
-  .d-dense .grand-band-label { font-size: 12.5px; }
-  .d-dense .grand-band-value { font-size: 14.5px; }
+  .d-dense thead th { padding: 2.5px 5px; font-size: 12px; }
+  .d-dense tbody td { padding: 1.5px 5px; font-size: 12px; }
+  .d-dense table.num-lg tbody td, .d-dense table.num-lg thead th { font-size: 11.5px; }
+  .d-dense table.num-xl tbody td, .d-dense table.num-xl thead th { font-size: 10.5px; }
+  .d-dense .grand-band-label { padding: 3px 10px; font-size: 13px; }
+  .d-dense .grand-band-value { padding: 3px 12px; font-size: 14.5px; }
   .d-dense .extra-content table td, .d-dense .extra-content table th { font-size: 10.5px; padding: 2px 4px; }
   .d-dense .signatures { padding: 10px 50px 6px; margin-top: 10px; }
   .d-dense .sig-line { margin-top: 28px; }
