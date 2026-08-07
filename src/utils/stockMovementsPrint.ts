@@ -83,7 +83,7 @@ export async function renderStockMovementsHTML(opts: StockPrintOptions, includeT
 <style>
   @page { size: A4 landscape; margin: 10mm; }
   * { box-sizing: border-box; }
-  body { font-family: "Cairo", "Tajawal", Arial, sans-serif; font-weight: 600; color: #0f172a; margin: 0; padding: 12px; font-size: 12px; background:#f8fafc; }
+  body { font-family: Arial, "Liberation Sans", Helvetica, sans-serif; font-weight: 600; color: #0f172a; margin: 0; padding: 12px; font-size: 12px; background:#f8fafc; }
   .sheet { background:#fff; max-width: 297mm; margin: 0 auto; padding: 10mm; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
   .toolbar { position: sticky; top: 0; z-index: 50; background:#0f172a; color:#fff; padding:8px 12px; display:flex; align-items:center; gap:10px; margin: -12px -12px 12px; }
   .tb-btn { background:#fff; color:#0f172a; border:1px solid #cbd5e1; border-radius:6px; padding:6px 12px; font-family:inherit; font-weight:700; cursor:pointer; font-size:12px; }
