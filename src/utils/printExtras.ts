@@ -331,13 +331,29 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
    * محسوبةٌ في الأسطر فوقها على أي حال: كلُّ سطرٍ يبدأ بعددها («2 كرتونة
    * بطارية ‎*‎10»)، فمن أراد عدّها عدّها من مواضعها.
    */
+  /**
+   * ## والرقمُ ملاصقٌ لاسمه لا في الطرف الآخر
+   *
+   * قال صاحبُ المستودع: «إجمالي عدد القطع وطوالي جنبو العدد، ما تحطو بعيد
+   * هناك، عشان الزبون من أول نظرة يشوف العدد».
+   *
+   * وكان الشريطُ موزَّعاً بـspace-between بعرض الصندوق: الوصفُ عند حافّةٍ
+   * والرقمُ عند الحافّة المقابلة، بينهما فراغٌ يبلغ عرضَ الورقة. فالعينُ تقرأ
+   * الوصفَ ثمّ تقطع الصندوق كلَّه لتجد الرقم — وهو أهمُّ رقمٍ في التغليف:
+   * عليه يُستلم الشحن.
+   *
+   * فصار الشريطُ بقدر ما فيه (flex-start وعرضٌ من المحتوى)، والرقمُ بعد
+   * نقطتين مباشرةً. والوحدةُ باقيةٌ بعده: الوصفُ يقول «عدد القطع» والرقم
+   * يقول «90 قطعة» — من قرأ الرقم وحده عرف ما يعدّ.
+   */
   const totalPieces = rows.reduce((s, r) => s + r.total, 0);
   const foot = rows.length
     ? `<div data-pkg-line style="margin-top:8px;padding:5px 10px;`
       + `background:#f1eefb;border:1px solid ${PKG_ACCENT};border-radius:5px;`
-      + `display:flex;justify-content:space-between;align-items:center;`
+      + `display:flex;justify-content:flex-start;align-items:baseline;gap:6px;`
+      + `width:fit-content;max-width:100%;`
       + `page-break-inside:avoid;break-inside:avoid;">`
-      + `<span style="font-size:12px;font-weight:800;color:${PKG_ACCENT};">إجمالي عدد القطع</span>`
+      + `<span style="font-size:12px;font-weight:800;color:${PKG_ACCENT};white-space:nowrap;">إجمالي عدد القطع :</span>`
       // الفصلُ بهامشٍ لا بفراغ: المصوِّر يُسقط الفراغَ بين الرقم ووحدته —
       // ولا يُنجيه `&nbsp;` — فيخرج «108قطعة» ملتصقةً في ملفّ العميل، وهو
       // أهمُّ رقمٍ في الصندوق. والهامشُ تخطيطٌ لا حرفٌ يُسقَط.
@@ -348,8 +364,9 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
        * كلاهما يخرج «42قطعة» ملتصقةً أو متراكبة، والحشوُ على أخوين يباعد
        * بينهما بعرض الصندوق. والفجوةُ وحدها تخرج «42 قطعة» كما تُكتب.
        *
-       * ووعاءٌ واحد لا أخوان: الشريطُ موزَّعٌ بـspace-between، وثلاثةُ أبناءٍ
-       * فيه تتباعد فيقع الرقمُ في وسط الصندوق بعيداً عن وحدته.
+       * ووعاءٌ واحد لا أخوان: فجوةُ الشريط 6px تفصل الوصفَ عن الرقم، ولو كان
+       * الرقمُ ووحدتُه أخوين فيه لفصلتهما بالمقدار نفسه — فيبتعد الرقمُ عن
+       * وحدته بقدر بعده عن وصفه. والوعاءُ يجمعهما شيئاً واحداً.
        */
       + `<span style="display:flex;gap:6px;align-items:baseline;`
       + `font-size:15px;font-weight:900;color:${PKG_ACCENT};letter-spacing:0.3px;">`

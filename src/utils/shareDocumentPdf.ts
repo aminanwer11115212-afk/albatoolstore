@@ -212,7 +212,7 @@ export async function waitForImages(root: HTMLElement, timeoutMs = IMAGE_WAIT_MS
  * لمسار الطباعة، وإسقاطُ حدود صفوفه من قائمة القطع هنا — في `safeBreaks`
  * أسفله — لمسار الـPDF.
  */
-const UNSPLITTABLE = "tr, .extra-box, .account-box, .signatures, [data-pkg-rows], [data-pkg-line], .notes-section";
+const UNSPLITTABLE = "tr, .grand-band, .extra-box, .account-box, .signatures, .doc-thanks, [data-pkg-rows], [data-pkg-line], .notes-section";
 
 /** عناصرُ لا يُقطع **داخلها** — فتُسقط حدودُ ما بداخلها من قائمة القطع. */
 const ATOMIC = ".account-box";

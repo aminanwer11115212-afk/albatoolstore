@@ -88,11 +88,16 @@ async function measure(page: import("@playwright/test").Page, html: string) {
     const top = el.getBoundingClientRect().top;
     const rows = Array.from(
       document.querySelectorAll("table[data-section='items'] tbody tr"),
-    ).filter((r) => !r.classList.contains("total-row"));
-    const totalRow = document.querySelector("tr.total-row");
+    );
+    // «الجملة» صارت شريطاً مضغوطاً تحت الجدول لا صفّاً فيه بخلايا فارغة
+    const band = document.querySelector(".grand-band");
     return {
       rowCount: rows.length,
-      totalBottom: totalRow ? Math.round(totalRow.getBoundingClientRect().bottom - top) : -1,
+      totalBottom: band ? Math.round(band.getBoundingClientRect().bottom - top) : -1,
+      rowHeight: rows.length > 1
+        ? Math.round(((rows[rows.length - 1].getBoundingClientRect().bottom
+            - rows[0].getBoundingClientRect().top) / rows.length) * 10) / 10
+        : -1,
       density: el.className.trim(),
     };
   }, PRINT_W);
@@ -131,6 +136,40 @@ test.describe("الصفحة الأولى تحمل هدفها من البنود �
     const m = await measure(page, sheet({ n: COMPACT_AT + 1 }));
     expect(m.density).toContain("d-compact");
     expect(m.totalBottom).toBeLessThanOrEqual(PRINT_PAGE_H);
+  });
+
+  /**
+   * ## والحدُّ مشدودٌ إلى القياس لا مكتوبٌ فوقه
+   *
+   * ما دون الحدّ يجب أن **يفيض** لو زِيد بندٌ واحد وبقي عادياً — وإلا فالحدُّ
+   * أقلُّ مما تحتمله الورقة، وتُضغط فواتيرُ لا تحتاج ضغطاً. وهذا ما وقع حين
+   * قصُرت الصفوف وبقي الحدُّ على 19: صارت الورقةُ تحمل 27 ويُضغط ما فوق 19.
+   */
+  test("وبندٌ واحدٌ فوق الحدّ يفيض عن الصفحة لو بقي عادياً", async ({ page }) => {
+    await page.setContent(sheet({ n: COMPACT_AT + 1 }), { waitUntil: "networkidle" });
+    const bottom = await page.evaluate((w) => {
+      const el = document.querySelector<HTMLElement>(".page")!;
+      el.style.width = `${w}px`; el.style.maxWidth = `${w}px`; el.style.margin = "0";
+      el.classList.remove("d-compact", "d-dense");   // نُلغي الضغط عمداً
+      const top = el.getBoundingClientRect().top;
+      const band = document.querySelector(".grand-band")!;
+      return Math.round(band.getBoundingClientRect().bottom - top);
+    }, PRINT_W);
+    expect(bottom).toBeGreaterThan(PRINT_PAGE_H);
+  });
+
+  /**
+   * ## والصفُّ أقصرُ مما كان — «صغّر الأسطر عشان تشيل أصناف أكتر»
+   *
+   * كان نحو 37.5px بحشوٍ 7px، فصار نحو 30.5 بحشوٍ 3.5. والرقمُ هنا سقفٌ لا
+   * مطابقة: من أعاد الحشوَ إلى ما كان سقط الفحص، ومن قصّره أكثر مرّ — ما دام
+   * الخطُّ فوق أرضية القراءة، وذلك محروسٌ في وحدة الكثافة.
+   */
+  test("وصفُّ الجدول العاديّ لا يعود إلى ارتفاعه القديم", async ({ page }) => {
+    const m = await measure(page, sheet({ n: 10 }));
+    expect(m.density).not.toContain("d-compact");
+    expect(m.rowHeight).toBeGreaterThan(0);
+    expect(m.rowHeight).toBeLessThanOrEqual(32);
   });
 });
 

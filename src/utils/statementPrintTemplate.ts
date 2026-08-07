@@ -298,7 +298,7 @@ export function generateStatementHTML(data: StatementData): string {
   .total-row, .summary-row, .summary-box { page-break-inside: avoid; break-inside: avoid; }
   @media print { body { padding: 0; } .page { max-width: none; } }
   body {
-    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
     color: #1a1a1a; background: #fff; padding: 20px; line-height: 1.5;
     font-size: 14px;
   }

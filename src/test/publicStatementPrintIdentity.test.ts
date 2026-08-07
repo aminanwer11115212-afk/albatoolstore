@@ -196,8 +196,8 @@ describe("التواقيع — نفس كتلة قالب الطباعة", () => {
 
 describe("الخط ومقاس الصفحة", () => {
   it("نفس عائلة الخط وحجمه الأساسي", () => {
-    expect(cssProp(printBase, "body", "font-family")).toContain("Segoe UI");
-    expect(cssProp(pageBase, ".public-statement", "font-family")).toContain("Segoe UI");
+    expect(cssProp(printBase, "body", "font-family")).toContain("Arial");
+    expect(cssProp(pageBase, ".public-statement", "font-family")).toContain("Arial");
     expect(cssProp(pageBase, ".public-statement", "font-size")).toBe("14px");
   });
 

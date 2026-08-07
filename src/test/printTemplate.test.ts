@@ -9,11 +9,11 @@ const S = {
   header: 'class="header"',                   // company header block
   itemsTable: ">اسم الصنف<",                  // items <thead>
   prices: ">السعر<",                          // price column header (full only)
-  grandTotalRow: 'class="total-row"',         // grand total row in items table
+  grandTotalRow: 'class="grand-band"',         // grand total row in items table
   accountBoxes: 'data-section="account-summary"',
   finalRequired: 'data-section="final-status"',
   packaging: ">تفاصيل التغليف<",
-  transport: ">معلومات الترحيل<",
+  transport: ">تفاصيل الترحيل<",
   docTitle: 'class="doc-title"',              // always present
 };
 

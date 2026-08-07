@@ -38,7 +38,8 @@ export const CONTENT_MM = SCREEN_PAGE_MM.height - 2 * SCREEN_PAGE_MM.padding;
  * — فالمعاينةُ تقطع حيث يقطع الملفّ، لا حيث يقع الحدُّ حسابياً.
  */
 export const ATOM_SELECTOR =
-  "tr, .extra-box, .account-box, .signatures, [data-pkg-line], .notes-section";
+  "tr, .grand-band, .extra-box, .account-box, .signatures, .doc-thanks,"
+  + " [data-pkg-line], .notes-section";
 
 /**
  * ارتفاعُ شريط الترقيم المحجوز أسفل كل صفحة — بالبكسل.

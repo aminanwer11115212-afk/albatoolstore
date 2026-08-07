@@ -38,17 +38,22 @@ export type PrintDensity = "normal" | "compact" | "dense";
  * فوق هذا العدد من الأسطر تبدأ الورقة تضغط نفسها.
  *
  * وليس رقماً مختاراً بالذوق: هو ما تحمله الصفحةُ فعلاً في الدرجة العادية
- * **مع صفّ «جملة الفاتورة»**، مقيساً في **أضيق** المسارين — الطباعة، إذ
+ * **مع شريط «جملة الفاتورة»**، مقيساً في **أضيق** المسارين — الطباعة، إذ
  * عرضُ محتواها 190mm (‎@page A4 بهامش 10mm) لا 194mm كالـPDF، فتلتفّ أسماءُ
- * الأصناف أكثر وترتفع الصفوف:
+ * الأصناف أكثر وترتفع الصفوف.
  *
- *     ارتفاعُ الصفحة 277mm ≈ 1047px، ترويسةٌ 267px، صفٌّ عاديّ 37.5px
- *     ⇒ (1047 − 267 − 37) ÷ 37.5 ≈ 19
+ * وقد قِيس بالتصيير بعد تقصير الصفوف («صغّر الأسطر عشان تشيل أصناف أكتر»):
  *
- * وكان 25 ثمّ 20، فخرجت فاتورةُ العشرين بجملتها في الصفحة الثانية بينما
- * تسع فاتورةُ الثلاثين جملتَها في الأولى — الأصغرُ أسوأ من الأكبر.
+ *     صفٌّ عاديّ 30.5px بعد أن كان 37.5 — الحشوُ نزل من 7px إلى 3.5
+ *     ارتفاعُ الصفحة 1047px، وأسفلُ الشريط عند 26 بنداً = 1003 ✓
+ *                                        وعند 28 بنداً = 1064 ✗
+ *     ⇒ الحدُّ 27
+ *
+ * وكان 25 ثمّ 20 ثمّ 19، فخرجت فاتورةُ العشرين بجملتها في الصفحة الثانية
+ * بينما تسع فاتورةُ الثلاثين جملتَها في الأولى — الأصغرُ أسوأ من الأكبر.
+ * والحدُّ اليوم يقول ما يقوله القياس: ما دون 28 بنداً لا يحتاج ضغطاً أصلاً.
  */
-export const COMPACT_AT = 19;
+export const COMPACT_AT = 27;
 /** وفوق هذا تضغط ترويستها أيضاً. */
 export const DENSE_AT = 60;
 
@@ -147,30 +152,35 @@ export const DENSITY_CSS = `
   .d-compact .header { padding-bottom: 2px; margin-bottom: 2px; }
   .d-compact .header-logo img { height: 48px; }
   .d-compact .header-title { font-size: 19px; margin-bottom: 2px; }
-  .d-compact .header-address { font-size: 12px; line-height: 1.3; }
-  .d-compact .header-phones { font-size: 13px; margin-top: 0; }
+  .d-compact .header-meta { font-size: 12.5px; margin-top: 1px; gap: 3px 8px; }
   .d-compact .doc-head { margin: 3px 0 3px; }
   .d-compact .doc-title { margin: 0; }
   .d-compact .doc-title h1 { font-size: 17px; }
   .d-compact .info-line { font-size: 13.5px; line-height: 1.35; }
-  .d-compact thead th { padding: 4px 6px; font-size: 12px; }
-  .d-compact tbody td { padding: 2.5px 6px; font-size: 12.5px; }
-  .d-compact .col-qty, .d-compact .col-price { font-size: 14px; }
-  .d-compact .total-row td { font-size: 12.5px; }
+  .d-compact thead th { padding: 3px 6px; font-size: 12px; }
+  .d-compact tbody td { padding: 2px 6px; font-size: 12px; }
+  .d-compact .col-qty, .d-compact .col-price { font-size: 13.5px; }
+  .d-compact .grand-band { padding: 4px 12px; }
+  .d-compact .grand-band-label { font-size: 13px; }
+  .d-compact .grand-band-value { font-size: 15.5px; }
   .d-compact .extra-content table td, .d-compact .extra-content table th { font-size: 11px; padding: 3px 5px; }
 
   .d-dense .header { padding-bottom: 4px; margin-bottom: 4px; }
   .d-dense .header-logo img { height: 46px; }
   .d-dense .header-title { font-size: 18px; }
+  .d-dense .header-meta { font-size: 12px; margin-top: 1px; gap: 2px 8px; }
   .d-dense .doc-head { margin: 3px 0 4px; }
   .d-dense .doc-title { margin: 0; }
   .d-dense .doc-title h1 { font-size: 17px; }
   .d-dense .info-line { font-size: 12.5px; line-height: 1.3; }
-  .d-dense thead th { padding: 3px 5px; font-size: 11.5px; }
-  .d-dense tbody td { padding: 2.5px 5px; font-size: 11.5px; }
-  .d-dense .col-qty, .d-dense .col-price { font-size: 13px; }
-  .d-dense .total-row td { font-size: 12px; }
+  .d-dense thead th { padding: 2.5px 5px; font-size: 11.5px; }
+  .d-dense tbody td { padding: 1.5px 5px; font-size: 11.5px; }
+  .d-dense .col-qty, .d-dense .col-price { font-size: 12.5px; }
+  .d-dense .grand-band { padding: 3px 10px; }
+  .d-dense .grand-band-label { font-size: 12.5px; }
+  .d-dense .grand-band-value { font-size: 14.5px; }
   .d-dense .extra-content table td, .d-dense .extra-content table th { font-size: 10.5px; padding: 2px 4px; }
   .d-dense .signatures { padding: 10px 50px 6px; margin-top: 10px; }
   .d-dense .sig-line { margin-top: 28px; }
+  .d-dense .doc-thanks { margin-top: 2px; padding: 3px 0; font-size: 12.5px; }
 `;
