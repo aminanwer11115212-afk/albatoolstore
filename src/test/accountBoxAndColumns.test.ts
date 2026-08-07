@@ -74,26 +74,56 @@ describe("عمودا الكمية والسعر", () => {
     expect(html).toContain('<td class="col-price">');
   });
 
-  it("وقاعدتُهما في الورقة، أكبرُ من الخلية العامّة وأثقل", () => {
+  /**
+   * ## والفرقُ ثِقلٌ لا حجم — بعد أن طلب صاحبُ المستودع التساوي
+   *
+   * كانا 15px وبقيّةُ الخلايا 12.5، رُفعا حين شكا صِغَرَهما. فصارا الأعرضَ
+   * وحدَهما، فاختلّ الصفُّ في الاتجاه المقابل: «اجعل حجم الخط — اسم الصنف
+   * والأصناف والإجمالي وحقول الترويسة كلها — بنفس خط الكميات والسعر لتكون
+   * متساوية».
+   *
+   * فالمقاسُ اليوم واحدٌ في الجدول كلّه، والتمييزُ بالثقل وحده.
+   */
+  it("وقاعدتُهما ثِقلٌ لا مقاسٌ — الجدولُ كلُّه متساوٍ", () => {
     const rule = /\.col-qty,\s*\.col-price\s*\{([^}]*)\}/.exec(html);
     expect(rule).toBeTruthy();
-    const size = Number(/font-size:\s*([\d.]+)px/.exec(rule![1])?.[1]);
-    const base = Number(/tbody td \{[^}]*font-size:\s*([\d.]+)px/.exec(html)?.[1]);
-    expect(base).toBeGreaterThan(0);
-    expect(size).toBeGreaterThan(base);
     expect(rule![1]).toMatch(/font-weight:\s*800/);
+    // ولا مقاسَ خاصٌّ بهما يخالف بقيّةَ الخلايا
+    expect(rule![1]).not.toMatch(/font-size/);
   });
 
-  it("والمقاسُ يتبع الكثافة — لا يبقى كبيراً في ورقةٍ مضغوطة", () => {
-    expect(DENSITY_CSS).toMatch(/\.d-compact \.col-qty,\s*\.d-compact \.col-price/);
-    expect(DENSITY_CSS).toMatch(/\.d-dense \.col-qty,\s*\.d-dense \.col-price/);
+  it("والخليّةُ والترويسةُ بمقاسٍ واحد", () => {
+    const cell = Number(/tbody td \{[^}]*font-size:\s*([\d.]+)px/.exec(html)?.[1]);
+    const head = Number(/thead th \{[^}]*font-size:\s*([\d.]+)px/.exec(html)?.[1]);
+    expect(cell).toBeGreaterThan(0);
+    expect(head).toBe(cell);
   });
 
-  it("ولا ينزل أيٌّ منهما تحت أرضية القراءة", () => {
-    const sizes = Array.from(DENSITY_CSS.matchAll(/\.d-\w+ \.col-(?:qty|price)[^{]*\{[^}]*font-size:\s*([\d.]+)px/g))
-      .map((m) => Number(m[1]));
-    expect(sizes.length).toBe(2);
-    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(MIN_FONT_PX);
+  /** والتساوي يسري على الدرجات كما يسري على الأصل. */
+  it("وفي الدرجات كذلك — لا يعود الاختلافُ عند فاتورةٍ كبيرة", () => {
+    for (const d of ["d-compact", "d-dense"]) {
+      const cell = Number(new RegExp(`\\.${d} tbody td \\{[^}]*font-size:\\s*([\\d.]+)px`).exec(DENSITY_CSS)?.[1]);
+      const head = Number(new RegExp(`\\.${d} thead th \\{[^}]*font-size:\\s*([\\d.]+)px`).exec(DENSITY_CSS)?.[1]);
+      expect(cell, d).toBeGreaterThan(0);
+      expect(head, d).toBe(cell);
+      expect(cell, d).toBeGreaterThanOrEqual(MIN_FONT_PX);
+    }
+  });
+
+  /**
+   * ويصغر الجدولُ كلُّه حين تطول الأرقام — لا خليّةٌ بعينها، وإلا عاد
+   * الاختلافُ الذي طُلب رفعُه.
+   */
+  it("ويصغر الجدولُ كلُّه للأرقام الطويلة، لا خليّةٌ وحدها", () => {
+    for (const cls of ["num-lg", "num-xl"]) {
+      const rule = new RegExp(`table\\.${cls} tbody td, table\\.${cls} thead th \\{[^}]*font-size:\\s*([\\d.]+)px`);
+      const size = Number(rule.exec(html)?.[1]);
+      expect(size, cls).toBeGreaterThanOrEqual(MIN_FONT_PX);
+    }
+    // والصنفُ يُوضع على الجدول حين يطول الرقم
+    const big = sheet({ items: [{ product_name: "صنف", quantity: 1,
+      unit_price: 968125000, tax_amount: 0, discount: 0, total: 968125000 }] });
+    expect(big).toMatch(/<table class="items-table num-(lg|xl)"/);
   });
 
   it("والكشفُ وكشفُ الجرد يأخذان الصنفين نفسيهما — قاعدةٌ واحدة للنظام", () => {
