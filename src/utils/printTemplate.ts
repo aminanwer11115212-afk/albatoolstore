@@ -1435,6 +1435,23 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     var bar = clone.querySelector('#__lov_print_toolbar');
     if (bar) bar.remove();
     clone.querySelectorAll('.__lov_hidden').forEach(function(n){ n.remove(); });
+    /*
+     * ترقيمُ المعاينة لا يدخل الـPDF.
+     *
+     * أشرطةُ «1 من 2» وفواصلُها تنسيقُ **شاشة**: مخفيّةٌ في وسط الطباعة
+     * (‎@media print) — وهذا يكفي زرَّ الطباعة ولا يكفي هذا الزرّ. فالمصوِّرُ
+     * يرسم بوسيط screen لا print، فتخرج الأشرطةُ مرسومةً في الملفّ ويخرج
+     * معها فراغُ الفاصل.
+     *
+     * وأثرُها مضاعف: html2pdf يقسّم الملفّ على A4 بحدوده هو، فترقيمُ الشاشة
+     * يقع في مواضعَ لا تطابق تلك الحدود — «1 من 2» في وسط صفحة، وفراغٌ
+     * ثلاثون بكسلاً حيث لا فاصل. قِيس: ورقةُ أربعين بنداً كانت تخرج بشريطين
+     * وفاصلٍ مرسومين في ملفّ العميل.
+     *
+     * فتُنزع من النسخة كما يُنزع الشريطُ والأقسامُ المخفيّة — وصفحاتُ الملفّ
+     * حقيقيةٌ يقسّمها html2pdf، فلا يحتاج ترقيمَ الشاشة أصلاً.
+     */
+    clone.querySelectorAll('.lov-pgbreak, .lov-pgfoot').forEach(function(n){ n.remove(); });
     var wrap = document.createElement('div');
     wrap.appendChild(clone);
     return wrap;
@@ -1640,6 +1657,9 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     var bar = clone.querySelector('#__lov_print_toolbar');
     if (bar) bar.remove();
     clone.querySelectorAll('.__lov_hidden').forEach(function(n){ n.remove(); });
+    // وترقيمُ المعاينة كذلك: السكربتُ منزوعٌ أدناه فلا يُعاد حسابُه، فتبقى
+    // الأشرطةُ مجمَّدةً على مقاسِ شاشةٍ واحدة. راجع contentEl.
+    clone.querySelectorAll('.lov-pgbreak, .lov-pgfoot').forEach(function(n){ n.remove(); });
     // أزل السكربتات لأنها غير لازمة للعرض الثابت
     clone.querySelectorAll('script').forEach(function(n){ n.remove(); });
     var html = '<!doctype html>\\n' + clone.outerHTML;

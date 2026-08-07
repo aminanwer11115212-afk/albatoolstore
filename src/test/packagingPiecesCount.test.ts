@@ -137,8 +137,18 @@ describe("ورقةُ صاحب المستودع كما صوّرها", () => {
  * وتقريرِ الإرسال — فيقرآن من مصدرٍ واحد.
  */
 describe("مصدرٌ واحدٌ لكل شاشةٍ تعرض العدد", () => {
-  /** الشاشتان اللتان تعرضان العدد للمستخدم. */
-  const FILES = ["src/utils/printExtras.ts", "src/utils/dispatchReportPrint.ts"];
+  /**
+   * الشاشاتُ التي تعرض العدد للمستخدم.
+   *
+   * وثلاثتُها وُجدت بالمسح لا بالذاكرة: ورقةُ الفاتورة أوّلاً، ثمّ تقريرُ
+   * الإرسال، ثمّ ورقةُ الترحيل والتغليف — وهذه الأخيرةُ كانت تجمع
+   * `packs_count ?? 1` فتقرأ **صفراً** حيث تقرأ الورقةُ الكمية.
+   */
+  const FILES = [
+    "src/utils/printExtras.ts",
+    "src/utils/dispatchReportPrint.ts",
+    "src/utils/transportPackagingPrint.ts",
+  ];
   /** ووحدةُ الحساب نفسُها تذكر العبارة في شرحها — وهي المصدر لا شاشة. */
   const SOURCE = "src/utils/packagingCount.ts";
 
@@ -149,13 +159,20 @@ describe("مصدرٌ واحدٌ لكل شاشةٍ تعرض العدد", () => {
         const full = path.join(dir, e.name);
         if (e.isDirectory()) { if (e.name !== "test") walk(full); continue; }
         if (!/\.tsx?$/.test(e.name)) continue;
-        if (/إجمالي عدد القطع/.test(fs.readFileSync(full, "utf8"))) {
+        if (/عدد القطع/.test(fs.readFileSync(full, "utf8"))) {
           found.push(path.relative(process.cwd(), full).replace(/\\/g, "/"));
         }
       }
     };
+    /* شاشاتُ إدخال التغليف تذكر «× عدد القطع» عنواناً لحقلِ إدخال — لا
+       مجموعاً يُعرض. ومجموعُها أُخفي بطلب صاحب المستودع ويُقرأ من الورقة. */
+    const INPUT_LABELS = new Set([
+      "src/pages/InvoicePackagingPage.tsx",
+      "src/pages/QuotePackagingPage.tsx",
+    ]);
     walk(path.resolve(process.cwd(), "src"));
-    expect(found.sort()).toEqual([...FILES, SOURCE].sort());
+    expect(found.filter((f) => !INPUT_LABELS.has(f)).sort())
+      .toEqual([...FILES, SOURCE].sort());
   });
 
   it("وكلٌّ منها يستورد المصدرَ الواحد ولا يضرب في ‎*‎N", () => {
