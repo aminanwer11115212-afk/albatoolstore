@@ -1,5 +1,5 @@
 /**
- * رؤية التواقيع ومعلومات الترحيل وتفاصيل التغليف.
+ * رؤية التواقيع وتفاصيل الترحيل وتفاصيل التغليف.
  *
  * ## أين يُتحكَّم بها
  * في **«تخصيص الرؤية» بشريط المعاينة وحده** — لا أزرار لها في شاشة إدخال
@@ -35,7 +35,7 @@ const base = {
 const OPTIONAL_SECTIONS: Array<[string, string]> = [
   ["signatures", "التواقيع"],
   ["packaging", "تفاصيل التغليف"],
-  ["transport", "معلومات الترحيل"],
+  ["transport", "تفاصيل الترحيل"],
 ];
 
 describe("الأقسام الثلاثة تظهر افتراضاً وتُخصَّص رؤيتها من المعاينة", () => {
@@ -48,7 +48,7 @@ describe("الأقسام الثلاثة تظهر افتراضاً وتُخصَّ
 
   it("صندوقا التغليف والترحيل مرسومان", () => {
     expect(html).toContain("تفاصيل التغليف");
-    expect(html).toContain("معلومات الترحيل");
+    expect(html).toContain("تفاصيل الترحيل");
   });
 
   it.each(OPTIONAL_SECTIONS)("القسم %s يحمل `data-section` — فيبنى له زرّ في «تخصيص الرؤية»", (key) => {
@@ -90,9 +90,9 @@ describe("`hiddenSections` يحذف القسم من الورقة — لا يخف
     expect(html).toContain("تفاصيل التغليف");
   });
 
-  it("معلومات الترحيل وحدها — والتغليف يبقى", () => {
+  it("تفاصيل الترحيل وحدها — والتغليف يبقى", () => {
     const html = generatePrintHTML({ ...base, hiddenSections: ["transport"] });
-    expect(html).not.toContain("معلومات الترحيل");
+    expect(html).not.toContain("تفاصيل الترحيل");
     expect(html).toContain("تفاصيل التغليف");
   });
 
@@ -104,7 +104,7 @@ describe("`hiddenSections` يحذف القسم من الورقة — لا يخف
 
   it("الثلاثة معاً — والورقة نفسها سليمة", () => {
     const html = generatePrintHTML({ ...base, hiddenSections: ["signatures", "transport", "packaging"] });
-    for (const s of ["توقيع المستلم", "معلومات الترحيل", "تفاصيل التغليف"]) {
+    for (const s of ["توقيع المستلم", "تفاصيل الترحيل", "تفاصيل التغليف"]) {
       expect(html).not.toContain(s);
     }
     expect(html).toContain("بطارية");

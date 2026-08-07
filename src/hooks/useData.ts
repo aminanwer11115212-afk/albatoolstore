@@ -332,7 +332,7 @@ export function useInvoicesWithCustomers(
     queryFn: async () => {
       let query = supabase
         .from("invoices")
-        .select("*, customers(name, phone, whatsapp, balance)")
+        .select("*, customers(name, phone, whatsapp, balance, credit_balance, net_balance)")
         .order("created_at", { ascending: false });
       if (channel === "pos") {
         query = query.eq("source", "pos");

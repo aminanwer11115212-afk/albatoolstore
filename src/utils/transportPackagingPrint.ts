@@ -73,7 +73,7 @@ const baseStyles = (accent: string) => `
   tr, td, th { page-break-inside: avoid; break-inside: avoid; }
   .total-row, .summary-box, .signatures, .sig-box { page-break-inside: avoid; break-inside: avoid; }
   @media print { body { padding: 0; } .page { max-width: none; } }
-  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color:#1a1a1a; background:#fff; padding:20px; line-height:1.5; font-size:14px; }
+  body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; color:#1a1a1a; background:#fff; padding:20px; line-height:1.5; font-size:14px; }
   .page { max-width: 800px; margin: 0 auto; }
   .header { text-align:center; padding-bottom:10px; border-bottom: 3px solid ${accent}; margin-bottom:10px; }
   .header-logos { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }

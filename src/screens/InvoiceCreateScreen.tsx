@@ -81,6 +81,7 @@ import {
   btnStyle,
   invoiceItemsHash,
   resolveDefaultRate,
+  defaultRateDecision,
   deriveRateFromRows,
   priceFromProduct,
   effectiveRowRate,
@@ -185,6 +186,10 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
   // الاثنان في refs لأن تأثيري التحميل (الفاتورة/السعر) يتسابقان بأي ترتيب.
   const globalRateRef = useRef<number>(0);
   const derivedRateRef = useRef<number>(0);
+  /** هل وصلت بنودُ الفاتورة المحفوظة — قبلها لا يُقرَّر معدّلٌ. */
+  const rowsLoadedRef = useRef(false);
+  /** ووصولُ المعدّل العام حالةٌ لا مرجع: به يُعاد تشغيل قرارِ المعدّل. */
+  const [globalRateReady, setGlobalRateReady] = useState(false);
   // يُرفع عند تعديل المستخدم لسعر الصرف يدوياً فلا يُستبدَل باللاحق آلياً.
   const rateTouchedRef = useRef(false);
 
@@ -272,7 +277,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       setProductsLoading(true);
       try {
         const [cs, ps, cfg] = await Promise.all([
-          supabase.from("customers").select("id,name,phone,balance,company").order("name"),
+          supabase.from("customers").select("id,name,phone,balance,credit_balance,net_balance,company").order("name"),
           fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
           supabase.from("company_settings").select("*").maybeSingle(),
         ]);
@@ -322,7 +327,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
     };
     // Refetch customers when they change elsewhere or when user returns to this tab.
     const refetchCustomers = async () => {
-      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      const { data } = await supabase.from("customers").select("id,name,phone,balance,credit_balance,net_balance,company").order("name");
       if (data) {
         setCustomers(data as Customer[]);
         const currentId = selectedCustomerIdRef.current;
@@ -429,9 +434,23 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       const rate = Number(er?.rate_to_base || 0);
       if (!(rate > 0)) return;
       globalRateRef.current = rate;
-      // في وضع التعديل: لا نتجاوز المعدّل المشتقّ من بنود الفاتورة نفسها إن وُجد.
-      const effective = resolveDefaultRate(editId ? derivedRateRef.current : 0, rate);
-      if (effective === 1) return;
+      setGlobalRateReady(true);
+      /*
+       * ## ولا يُكتب هذا المعدّل فوق معدّل فاتورةٍ تُعدَّل
+       *
+       * هذا الأثرُ وأثرُ تحميل البنود كلاهما غير متزامن، فيسبق أحدُهما الآخر
+       * بحسب الشبكة. وكان يُحسب هنا `resolveDefaultRate(derivedRateRef, rate)`
+       * — و`derivedRateRef` ما زال صفراً إن لم تصل البنودُ بعد، فيسقط إلى
+       * المعدّل العام ويكتبه فوق معدّل الفاتورة. فيُضاف الصنفُ الجديد بمعدّل
+       * اليوم لا بمعدّلها. صوّره صاحبُ المستودع.
+       *
+       * فالقرارُ صار في `defaultRateDecision`، وهي تُعيد `null` في التعديل
+       * قبل وصول البنود — والأثرُ أدناه يتولّاه بعد وصولها.
+       */
+      const effective = defaultRateDecision({
+        editing: !!editId, rowsReady: false, derived: 0, global: rate,
+      });
+      if (effective === null || effective === 1 || rateTouchedRef.current) return;
       setDefaultRate(effective);
       setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: computeUnitPrice(r.foreign_price, effective) }));
       setRows((prev) => prev.map((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: computeUnitPrice(r.foreign_price, effective) })));
@@ -441,6 +460,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
   // ---------- Load invoice for edit ----------
   useEffect(() => {
     if (!editId) return;
+    rowsLoadedRef.current = false;
     (async () => {
       const { data: inv } = await supabase
         .from("invoices").select("*").eq("id", editId).maybeSingle();
@@ -463,7 +483,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       if (inv.exchange_rate_to_base) setExchangeRateToBase(Number(inv.exchange_rate_to_base));
       if (inv.customer_id) {
         const { data: c } = await supabase.from("customers")
-          .select("id,name,phone,balance,company").eq("id", inv.customer_id).maybeSingle();
+          .select("id,name,phone,balance,credit_balance,net_balance,company").eq("id", inv.customer_id).maybeSingle();
         if (c) { setCustomer(c as Customer); setCustomerSearch((c as Customer).name); }
       }
       const { data: items } = await supabase.from("invoice_items").select("*").eq("invoice_id", editId);
@@ -499,6 +519,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         // (مشتقّاً من بنودها)، فإن لم يحمل أي بند سعراً أجنبياً فعلى السعر العام
         // — لا على 1، وإلا أُدرج الصنف الجديد بالسعر الأجنبي الخام.
         derivedRateRef.current = deriveRateFromRows(mapped);
+        rowsLoadedRef.current = true;
         const effectiveRate = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
         if (effectiveRate > 0 && !rateTouchedRef.current) {
           setDefaultRate(effectiveRate);
@@ -509,6 +530,8 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       } else {
         setGeneralDiscount(Number(inv.discount) || 0);
         originalItemsHashRef.current = "";
+        // فاتورةٌ بلا بنود: وصلت ولم تُشتقّ — فالقرارُ للمعدّل العام
+        rowsLoadedRef.current = true;
       }
     })();
   }, [editId, navigate]);
@@ -541,15 +564,25 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
     });
   }, [editId, products, productsLoading]);
 
-  // بعد الملء أعلاه قد يصبح للفاتورة معدّل مشتق — اعتمده للبنود الجديدة.
+  /*
+   * صاحبُ القرار الوحيد في وضع التعديل.
+   *
+   * يعمل بعد وصول البنود (`rows.length`) وبعد وصول المعدّل العام
+   * (`globalRateReady`) — فلا يبقى للسباق أثر: أيُّهما سبق، القرارُ واحد.
+   */
   useEffect(() => {
     if (!editId || rateTouchedRef.current) return;
-    const effective = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
-    if (effective > 0 && effective !== defaultRate) {
+    const effective = defaultRateDecision({
+      editing: true,
+      rowsReady: rowsLoadedRef.current,
+      derived: derivedRateRef.current,
+      global: globalRateRef.current,
+    });
+    if (effective !== null && effective > 0 && effective !== defaultRate) {
       setDefaultRate(effective);
       setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effective, unit_price: computeUnitPrice(r.foreign_price, effective) }));
     }
-  }, [editId, rows.length, defaultRate]);
+  }, [editId, rows.length, defaultRate, globalRateReady]);
 
   // تُقرأ عند فتح الفاتورة وبعد كل إغلاق لنافذة التغليف أو الترحيل، فيعكس ما
   // يُطبع ما أُدخل للتوّ. (`clearPrintExtrasCache` لأن للقراءة ذاكرةً بعمر دقيقة.)

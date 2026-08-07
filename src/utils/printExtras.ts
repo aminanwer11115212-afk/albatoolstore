@@ -140,6 +140,41 @@ const PKG_ACCENT = "#5b2c8e";
 /** وخطُّ الفصل بين الأعمدة من اللون نفسه مخفَّفاً — ظاهرٌ على الورق لا باهت. */
 const PKG_RULE = "#a08cc9";
 
+/**
+ * عددُ القطع في صفّ تغليفٍ واحد.
+ *
+ * ## العطل: رقمان لصفٍّ واحد
+ * الورقةُ كانت تحسب `packs × pieces` دائماً، والعددُ يسقط أوّلاً إلى `quantity`
+ * حين يغيب `packs_count`:
+ *
+ *     const packs = packs_count || quantity;
+ *     total = packs * pieces;
+ *
+ * فصفٌّ فيه `packs_count = 0` و`pieces_per_pack = 3` و`quantity = 9` يخرج
+ * **27** في الورقة و**9** في نافذة التغليف — والفرقُ ثلاثةُ أضعاف: `quantity`
+ * حاصلُ ضربٍ أصلاً، فضُرب مرّةً ثانية.
+ *
+ * ## والقاعدة: العاملان إن حضرا، وإلا فالمخزَّن
+ * `packs_count × pieces_per_pack` قيمةٌ **تُتحقَّق من عامليها**، فهي المصدرُ
+ * حين يحضران. وإن غاب أحدُهما فلا ضربَ أصلاً: `quantity` هو ما خزّنته الشاشة
+ * (`quantity: packs * pieces` في نافذة التغليف وصفحة تغليف العرض وتحويل
+ * العرض إلى فاتورة)، أو عددُ الطرود في بياناتٍ سبقت العمودين.
+ *
+ * يحرسه `packagingPiecesCount.test.ts` بمقارنة الورقة بمجموع النافذة.
+ */
+export function piecesTotalOf(r: {
+  packs_count?: any; pieces_per_pack?: any; quantity?: any;
+}): number {
+  const packs = Number(r.packs_count || 0);
+  const pieces = Number(r.pieces_per_pack || 0);
+  // ١) العاملان حاضران: القيمةُ محسوبةٌ منهما لا مأخوذةٌ من مخزَّنٍ قد يشيخ
+  if (packs > 0 && pieces > 0) return packs * pieces;
+  // ٢) طرودٌ بلا قطعٍ مسجَّلة: قطعةٌ في كل طرد — لا صفرٌ يبتلع البند
+  if (packs > 0) return packs;
+  // ٣) ولا عاملَ أصلاً: المخزَّنُ هو الخبر — ولا يُضرب في شيء
+  return Number(r.quantity || 0);
+}
+
 export function packagingColumns(rowCount: number): number {
   if (rowCount <= 3) return 1;
   if (rowCount <= 10) return 2;
@@ -173,7 +208,8 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
     // العدد = عدد الطرود، فإن لم يُسجَّل فالكمية (بيانات أُدخلت قبل العمود).
     const packs = Number(r.packs_count || 0) || Number(r.quantity || 0) || 0;
     const pieces = Number(r.pieces_per_pack || 0);
-    return { label, packs, pieces, note: r.description || "" };
+    const total = piecesTotalOf(r);
+    return { label, packs, pieces, total, note: r.description || "" };
   }).filter((r) => r.label || r.packs);
 
   /**
@@ -196,7 +232,12 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
       const type = typeName(r);
       const packs = Number(r.packs_count || 0) || Number(r.quantity || 0) || 0;
       if (type || packs) {
-        rows.push({ label: type, packs, pieces: Number(r.pieces_per_pack || 0), note: "" });
+        rows.push({
+          label: type, packs,
+          pieces: Number(r.pieces_per_pack || 0),
+          total: piecesTotalOf(r),
+          note: "",
+        });
       }
     }
   }
@@ -290,25 +331,44 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
    * محسوبةٌ في الأسطر فوقها على أي حال: كلُّ سطرٍ يبدأ بعددها («2 كرتونة
    * بطارية ‎*‎10»)، فمن أراد عدّها عدّها من مواضعها.
    */
-  const totalPieces = rows.reduce((s, r) => s + r.packs * (r.pieces > 0 ? r.pieces : 1), 0);
+  /**
+   * ## والرقمُ ملاصقٌ لاسمه لا في الطرف الآخر
+   *
+   * قال صاحبُ المستودع: «إجمالي عدد القطع وطوالي جنبو العدد، ما تحطو بعيد
+   * هناك، عشان الزبون من أول نظرة يشوف العدد».
+   *
+   * وكان الشريطُ موزَّعاً بـspace-between بعرض الصندوق: الوصفُ عند حافّةٍ
+   * والرقمُ عند الحافّة المقابلة، بينهما فراغٌ يبلغ عرضَ الورقة. فالعينُ تقرأ
+   * الوصفَ ثمّ تقطع الصندوق كلَّه لتجد الرقم — وهو أهمُّ رقمٍ في التغليف:
+   * عليه يُستلم الشحن.
+   *
+   * فصار الشريطُ بقدر ما فيه (flex-start وعرضٌ من المحتوى)، والرقمُ بعد
+   * نقطتين مباشرةً. والوحدةُ باقيةٌ بعده: الوصفُ يقول «عدد القطع» والرقم
+   * يقول «90 قطعة» — من قرأ الرقم وحده عرف ما يعدّ.
+   */
+  const totalPieces = rows.reduce((s, r) => s + r.total, 0);
   const foot = rows.length
     ? `<div data-pkg-line style="margin-top:8px;padding:5px 10px;`
       + `background:#f1eefb;border:1px solid ${PKG_ACCENT};border-radius:5px;`
-      + `display:flex;justify-content:space-between;align-items:center;`
+      + `display:flex;justify-content:flex-start;align-items:baseline;gap:6px;`
+      + `width:fit-content;max-width:100%;`
       + `page-break-inside:avoid;break-inside:avoid;">`
-      + `<span style="font-size:12px;font-weight:800;color:${PKG_ACCENT};">إجمالي عدد القطع</span>`
-      // الفصلُ بهامشٍ لا بفراغ: المصوِّر يُسقط الفراغَ بين الرقم ووحدته —
-      // ولا يُنجيه `&nbsp;` — فيخرج «108قطعة» ملتصقةً في ملفّ العميل، وهو
-      // أهمُّ رقمٍ في الصندوق. والهامشُ تخطيطٌ لا حرفٌ يُسقَط.
+      + `<span style="font-size:12px;font-weight:800;color:${PKG_ACCENT};white-space:nowrap;">إجمالي عدد القطع :</span>`
       /*
-       * الرقمُ ووحدتُه في وعاءٍ مرنٍ بفجوةٍ صريحة — لا فراغٍ ولا هامش.
+       * ## الرقمُ ووحدتُه في وعاءٍ مرنٍ بفجوةٍ صريحة — لا فراغٍ ولا هامش
        *
-       * جُرّبت أربعُ صيغٍ بالتصوير الحقيقي: الفراغُ العادي والهامشُ المنطقي
-       * كلاهما يخرج «42قطعة» ملتصقةً أو متراكبة، والحشوُ على أخوين يباعد
-       * بينهما بعرض الصندوق. والفجوةُ وحدها تخرج «42 قطعة» كما تُكتب.
+       * المصوِّر يُسقط الفراغَ العاديَّ بين الرقم ووحدته — ولا يُنجيه nbsp —
+       * فيخرج «78قطعة» ملتصقةً في ملفّ العميل، وهو أهمُّ رقمٍ في الصندوق.
+       * فالفصلُ تخطيطٌ لا حرفٌ يُسقَط.
        *
-       * ووعاءٌ واحد لا أخوان: الشريطُ موزَّعٌ بـspace-between، وثلاثةُ أبناءٍ
-       * فيه تتباعد فيقع الرقمُ في وسط الصندوق بعيداً عن وحدته.
+       * وقِيس في ناتج المصوِّر نفسِه بعد أن صار الشريطُ مرناً بفجوة: الوعاءُ
+       * الداخليُّ يخرج بفجوة **7.5px** — كما كان حين كان الشريطُ موزَّعاً
+       * بـspace-between. فالوعاءُ يعمل داخل المرن كما عمل خارجه.
+       *
+       * ولا يُستبدل بحشوٍ ولا هامشٍ على الوحدة: كلاهما يخرج بفجوة 14.5px —
+       * ضعفَ المطلوب، فيبتعد الرقمُ عن وحدته بقدر بعده عن وصفه.
+       *
+       * يحرسه `e2e/print-pdf-shape.spec.ts` بقياس البكسلات في ناتج المصوِّر.
        */
       + `<span style="display:flex;gap:6px;align-items:baseline;`
       + `font-size:15px;font-weight:900;color:${PKG_ACCENT};letter-spacing:0.3px;">`

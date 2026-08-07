@@ -84,7 +84,7 @@ function useStockReturnsWithCustomers(limit?: number) {
     queryFn: async () => {
       let q = supabase
         .from("stock_returns")
-        .select("*, customers(name, phone, balance)")
+        .select("*, customers(name, phone, balance, credit_balance, net_balance)")
         .order("created_at", { ascending: false });
       if (limit) q = q.limit(limit);
       const { data, error } = await q;

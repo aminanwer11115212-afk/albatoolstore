@@ -126,6 +126,48 @@ export function resolveDefaultRate(derivedRate?: number | null, globalRate?: num
   return 1;
 }
 
+/**
+ * هل يُقرَّر المعدّل الافتراضي الآن — وبأيّ قيمة؟
+ *
+ * ## العطل كما بلّغ عنه صاحب المستودع
+ * «لمّا تستدعي فاتورة من شاشة آخر الفواتير في تعديل وإنشاء فاتورة، بيغيّر
+ * معدّل التحويل بتاع الفاتورة براهو — يعني لو أضفت صنف بتتضاف بسعر التضريب
+ * المغيَّر».
+ *
+ * ## والسبب سباقٌ بين أثرين
+ * أثرٌ يقرأ **المعدّل العام** من `exchange_rates`، وأثرٌ يحمّل **بنود
+ * الفاتورة** فيشتقّ منها معدّلها. وكلاهما غير متزامن، فيسبق أحدُهما الآخر
+ * بحسب الشبكة. وحين يصل قارئُ العام أخيراً كان يحسب:
+ *
+ *     resolveDefaultRate(derivedRateRef.current, globalRate)
+ *
+ * و`derivedRateRef` وقتَها **ما زال صفراً** — البنودُ لم تصل بعد. فيسقط
+ * الحسابُ إلى المعدّل العام ويكتبه فوق معدّل الفاتورة. فيُضاف الصنفُ الجديد
+ * بمعدّل اليوم لا بمعدّل الفاتورة، فتختلف أسعارُ بنودها.
+ *
+ * ## والعلاج: لا يُقرَّر قبل أن تُعرف البنود
+ * السباقُ لا يُعالَج بترتيبٍ يُرجى بل بحالةٍ تُمنع: في وضع التعديل لا قرار
+ * حتى **تصل البنود**. فتُعيد الدالّة `null` معناها «لا تكتب شيئاً بعد» —
+ * وهي الحالةُ التي كان الرمزُ يملؤها بالمعدّل العام.
+ *
+ * @param editing   وضعُ تعديل فاتورةٍ محفوظة
+ * @param rowsReady هل انتهى تحميلُ بنودها
+ * @param derived   المعدّل المشتقّ من بنودها (0 إن لم يحمل بندٌ سعراً أجنبياً)
+ * @param global    المعدّل العام من `exchange_rates`
+ */
+export function defaultRateDecision(opts: {
+  editing: boolean;
+  rowsReady: boolean;
+  derived?: number | null;
+  global?: number | null;
+}): number | null {
+  // الإنشاء: لا بنودَ يُشتقّ منها، فالعامُّ هو المصدر
+  if (!opts.editing) return resolveDefaultRate(0, opts.global);
+  // التعديل: معدّل الفاتورة من بنودها — ولا يُقرَّر قبل وصولها
+  if (!opts.rowsReady) return null;
+  return resolveDefaultRate(opts.derived, opts.global);
+}
+
 /** سعر الصرف المشتقّ من بنود فاتورة محفوظة (أول بند يحمل سعراً أجنبياً). */
 export function deriveRateFromRows(rows: Array<{ foreign_price?: any; exchange_rate?: any }>): number {
   const hit = rows.find((r) => (Number(r.foreign_price) || 0) > 0 && (Number(r.exchange_rate) || 0) > 0);

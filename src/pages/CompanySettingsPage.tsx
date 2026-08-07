@@ -41,6 +41,7 @@ export default function CompanySettingsPage() {
 
   const [form, setForm] = useState({
     company_name: "", phone: "", email: "", address: "", tax_number: "",
+    manager_name: "",
     currency: "ج.س", logo_url: "", city: "", region: "", country: "السودان", postbox: "", website: "",
   });
   const [billingForm, setBillingForm] = useState({
@@ -62,6 +63,7 @@ export default function CompanySettingsPage() {
       setForm({
         company_name: s.company_name || "", phone: s.phone || "", email: s.email || "",
         address: s.address || "", tax_number: s.tax_number || "",
+        manager_name: s.manager_name || "",
         currency: s.currency || "ج.س",
         logo_url: s.logo_url || "", city: s.city || "", region: s.region || "",
         country: s.country || "السودان", postbox: s.postbox || "", website: s.website || "",
@@ -103,6 +105,7 @@ export default function CompanySettingsPage() {
           payload: {
             company_name: form.company_name, phone: form.phone, email: form.email,
             address: form.address, tax_number: form.tax_number,
+            manager_name: form.manager_name,
             currency: form.currency,
             logo_url: form.logo_url,
             city: form.city, region: form.region, country: form.country,
@@ -268,6 +271,9 @@ export default function CompanySettingsPage() {
                   <Input value={form.company_name} onChange={e => setForm({ ...form, company_name: e.target.value })} /></div>
                 <div><Label className="flex items-center gap-1 mb-1.5"><Phone size={12} /> الهاتف</Label>
                   <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" /></div>
+                {/* يظهر في شريط بيانات الشركة أعلى الفاتورة: الهاتف | المسؤول | العنوان */}
+                <div><Label className="flex items-center gap-1 mb-1.5"><Building size={12} /> اسم المسؤول</Label>
+                  <Input value={form.manager_name} onChange={e => setForm({ ...form, manager_name: e.target.value })} placeholder="يظهر في ترويسة الفاتورة" /></div>
                 <div><Label className="flex items-center gap-1 mb-1.5"><Mail size={12} /> البريد الإلكتروني</Label>
                   <Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} type="email" dir="ltr" /></div>
                 <div><Label className="flex items-center gap-1 mb-1.5"><Globe size={12} /> الموقع الإلكتروني</Label>

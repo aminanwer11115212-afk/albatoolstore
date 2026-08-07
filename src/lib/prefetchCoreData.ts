@@ -92,7 +92,7 @@ export async function prefetchCoreData(qc: QueryClient): Promise<void> {
     safePrefetch(qc, ["invoices-with-customers", "all", 100], async () => {
       const { data, error } = await supabase
         .from("invoices")
-        .select("*, customers(name, phone, whatsapp, balance)")
+        .select("*, customers(name, phone, whatsapp, balance, credit_balance, net_balance)")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;

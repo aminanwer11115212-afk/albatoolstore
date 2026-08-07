@@ -102,7 +102,7 @@ export default function InvoiceViewPage() {
     try {
       const { data: inv, error: invErr } = await supabase
         .from("invoices")
-        .select("*, customers(name, phone, whatsapp, email, address, balance)")
+        .select("*, customers(name, phone, whatsapp, email, address, balance, credit_balance, net_balance)")
         .eq("id", id)
         .single();
       if (invErr) {

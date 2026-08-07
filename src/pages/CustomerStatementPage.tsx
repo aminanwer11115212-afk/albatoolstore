@@ -471,8 +471,6 @@ export default function CustomerStatementPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedCustomerId]);
-  const totalInvoices = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.total || 0), 0);
-  const totalPaid = filteredInvoices.reduce((s: number, inv: any) => s + Number(inv.paid_amount || 0), 0);
 
   // ===== Deleted-invoices: search / user filter / sort =====
   const deletedUsers = useMemo(() => {
@@ -585,6 +583,27 @@ export default function CustomerStatementPage() {
       r.invoiceId ? allowed.has(r.invoiceId) : !searching,
     );
   }, [accountView, visibleBlocks, invSearch]);
+
+  /*
+   * مجاميعُ الملخّص من `accountView` — لا من `paid_amount` الفواتير.
+   *
+   * ## العطل: رقمان تحت اسمٍ واحد في كشفٍ واحد
+   * «المدفوع» كان يُعرض مرّتين: في صندوق الملخّص مجموعَ `paid_amount`، وفي
+   * ذيل جدول الحساب `accountView.rowsPaid`. فيختلفان.
+   *
+   * والصندوقُ هو الخاطئ: `paid_amount` لا يعرف إلا ما كُتب على الفاتورة
+   * نفسها، فيسقط منه **شحناتُ الرصيد** (مالٌ دخل بلا فاتورة) و**ما دُفع على
+   * الحساب القديم** — دفعةُ 600,000 على فاتورة 500,000 وحسابٍ قديم 200,000
+   * تُقسَّم، فيُقرأ «المدفوع 500,000» وقد دفع العميل 600,000.
+   *
+   * وهي علّةُ ورقة الفاتورة نفسها («المدفوع يُشتقّ من الرصيد الفعلي لا من
+   * `paid_amount`») — بقيت هنا حتى صوّرها صاحب المستودع.
+   *
+   * فصار الصندوقُ يقرأ ما يقرؤه الجدول: يقفل الكشفُ على نفسه، وتتطابق
+   * الشاشةُ والورقة. ويحرسه `statementSummaryPaid.test.ts`.
+   */
+  const totalInvoices = accountView.rowsValue;
+  const totalPaid = accountView.rowsPaid;
 
   const resetFilters = () => {
     setFromDate(""); setToDate(""); setMinAmount(""); setMaxAmount(""); setPaymentStatus("all");

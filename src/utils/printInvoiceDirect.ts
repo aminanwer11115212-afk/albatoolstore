@@ -18,7 +18,7 @@ export async function buildInvoicePrintHtml(invoiceId: string): Promise<string> 
 
   const { data: invoice, error: iErr } = await supabase
     .from("invoices")
-    .select("*, customers(name, phone, address, email, balance, credit_balance)")
+    .select("*, customers(name, phone, address, email, balance, credit_balance, net_balance)")
     .eq("id", invoiceId).maybeSingle();
   if (iErr) throw iErr;
   if (!invoice) throw new Error("الفاتورة غير موجودة");

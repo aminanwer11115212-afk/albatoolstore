@@ -52,7 +52,7 @@ describe("الورقة تُبنى بقالب الطباعة نفسه", () => {
   it("التواقيع وصندوقا التغليف والترحيل — كما في المعاينة", () => {
     expect(html).toContain("توقيع المستلم");
     expect(html).toContain("تفاصيل التغليف");
-    expect(html).toContain("معلومات الترحيل");
+    expect(html).toContain("تفاصيل الترحيل");
   });
 
   it("**نفس الناتج حرفياً** كما تبنيه شاشة المعاينة للمدخلات نفسها", () => {
@@ -109,7 +109,7 @@ describe("الأقسام المخفيّة في المعاينة تُحذف من 
   it("لا تُخفى بالتنسيق بل تُحذف من المصدر", () => {
     const html = buildSharedDocumentHTML(payload({ hidden_sections: ["signatures", "transport"] }));
     expect(html).not.toContain("توقيع المستلم");
-    expect(html).not.toContain("معلومات الترحيل");
+    expect(html).not.toContain("تفاصيل الترحيل");
     expect(html).toContain("تفاصيل التغليف");
   });
 });

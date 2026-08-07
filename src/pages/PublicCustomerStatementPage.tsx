@@ -214,7 +214,7 @@ export default function PublicCustomerStatementPage() {
   return (
     <div dir="rtl" lang="ar" className="public-statement min-h-screen bg-gray-100 py-6 print:bg-white print:py-0">
       <style>{`
-        .public-statement { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #1a1a1a; line-height: 1.5; font-size: 14px; }
+        .public-statement { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; color: #1a1a1a; line-height: 1.5; font-size: 14px; }
         .ps-page { max-width: 800px; margin: 0 auto; background: #fff; padding: 20px; }
 
         /* === HEADER (matches printTemplate.ts) === */
@@ -253,8 +253,8 @@ export default function PublicCustomerStatementPage() {
         /* === SECTIONS & TABLES === */
         .ps-section-title { font-size: 14px; font-weight: 800; color: #5b2c8e; border-bottom: 2px dashed #5b2c8e; padding-bottom: 4px; margin: 18px 0 8px; }
         .ps-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; border: 2px solid #1a1a1a; }
-        .ps-table thead th { background: #5b4cad; color: white; padding: 8px 10px; font-size: 13px; font-weight: 700; text-align: center; border: 1px solid #1a1a1a; }
-        .ps-table tbody td { padding: 7px 10px; text-align: center; font-size: 13px; border: 1px solid #999; }
+        .ps-table thead th { background: #5b4cad; color: white; padding: 5px 8px; font-size: 12.5px; font-weight: 700; text-align: center; border: 1px solid #1a1a1a; }
+        .ps-table tbody td { padding: 3.5px 8px; text-align: center; font-size: 12.5px; border: 1px solid #999; }
         .ps-table tbody tr:nth-child(even) { background: #f8f8f8; }
         .ps-empty { text-align: center; padding: 12px; color: #888; font-size: 13px; background: #fafafa; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 12px; }
 

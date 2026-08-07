@@ -35,7 +35,7 @@ function useQuotesFullList() {
     queryFn: () => fetchAllRows((from, to) =>
       supabase
         .from("quotes")
-        .select("*, customers(name, phone, whatsapp, balance)")
+        .select("*, customers(name, phone, whatsapp, balance, credit_balance, net_balance)")
         .or("is_side.is.null,is_side.eq.false")
         .order("created_at", { ascending: false })
         .range(from, to)

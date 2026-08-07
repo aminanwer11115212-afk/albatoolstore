@@ -81,6 +81,64 @@ import { PAGINATION_CSS, PAGINATION_INLINE_JS } from "@/utils/sheetPagination";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
+/**
+ * ## رسومُ الورقة — سطريّةٌ لا إيموجي
+ *
+ * طلب صاحبُ المستودع علامةَ عربةٍ مع «تفاصيل الترحيل»، ومثلَها على بقيّة
+ * العناوين. ولم تُستعمل رموزُ الإيموجي (🚚 📦 🤝) وإن كانت أقصر: الإيموجي
+ * يُرسم بخطٍّ ملوّنٍ منفصل عن خطّ النصّ، وهو غيرُ مضمونٍ في المصوِّر ولا في
+ * سائقات الطباعة — فيخرج مربّعاً فارغاً في ملفّ العميل على بعض الأجهزة، وهو
+ * ما لا يُكتشف إلا عنده.
+ *
+ * والرسمُ السطريّ بـcurrentColor يرث لونَ عنوانه، فلا لونَ يُكتب مرّتين،
+ * ويطبع بأيّ حبر.
+ *
+ * ولا علامةَ backtick في هذه التعليقات ولا في وسوم SVG: الملفُّ كلُّه سلسلةٌ
+ * نصّية، والعلامةُ تنهيها فيسقط التصريف على سطرٍ لا علاقة له بالعلّة.
+ */
+const SVG_TRUCK =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M1 3h11v13H1z"/><path d="M12 8h4.5L21 12v4h-9z"/>'
+  + '<circle cx="6" cy="19" r="2"/><circle cx="17.5" cy="19" r="2"/></svg>';
+
+const SVG_BOX =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5"/>'
+  + '<path d="M12 12v9"/></svg>';
+
+const SVG_PHONE =
+  '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+  + '<path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0'
+  + ' 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0'
+  + ' 0 1 1 1c0 1.25.2 2.46.57 3.6a1 1 0 0 1-.25 1z"/></svg>';
+
+const SVG_USER =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+
+const SVG_PIN =
+  '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+  + '<path d="M12 2a7 7 0 0 0-7 7c0 5.1 7 13 7 13s7-7.9 7-13a7 7 0 0 0-7-7zm0 9.5A2.5'
+  + ' 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>';
+
+/*
+ * والمصافحةُ رُسمت مرّتين: أوّلُ مسارٍ خرج خربشةً لا تُعرف عند 18px — جُرّب
+ * بالتصيير ورُئي. فحلّ محلَّه هذا: أصابعُ اليد اليمنى ومعصمُها وكمّا الذراعين
+ * مسارات مفصولة، فيبقى الشكلُ مقروءاً في المقاس الصغير الذي يُطبع به.
+ */
+const SVG_HANDSHAKE =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="m11 17 2 2a1 1 0 1 0 3-3"/>'
+  + '<path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.9-3.9a3 3 0 0 0-4.2 0l-.9.9a1 1 0 1 1-3-3'
+  + 'l2.8-2.8a5.8 5.8 0 0 1 7.1-.9l.5.3a2 2 0 0 0 1.4.2L21 4"/>'
+  + '<path d="m21 3 1 11h-2"/>'
+  + '<path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/>'
+  + '<path d="M3 4h8"/></svg>';
+
 /** ألوان الإشارة في الطباعة — مطابقة لألوان الكشف: أخضر للعميل، أحمر عليه. */
 const TONE_COLOR: Record<"debit" | "credit" | "settled", string> = {
   credit: "#16a34a",
@@ -152,6 +210,17 @@ export function generatePrintHTML(data: PrintData): string {
   // الصندوقان متجاوران؛ إن أُخفيا معاً سقط الصفّ كلّه فلا يبقى إطارٌ فارغ.
   const showExtras = showPackaging || showTransport;
   const showSignatures = variant !== "stocktake" && !isSectionHidden("signatures");
+  /**
+   * عبارةُ الشكر قسمٌ قائمٌ بذاته لا ذيلٌ للتواقيع.
+   *
+   * كانت تذهب معها لأنها كانت جزءاً من صندوقها، وصاحبُ المستودع يُخفي
+   * التواقيع دائماً — فلا يرى العميلُ شكراً أبداً. فصار لها مفتاحُها: تُخفى
+   * وحدها، وتبقى وحدها.
+   */
+  const thanksText = String(
+    (company as any)?.invoice_notes ?? "",
+  ).trim() || "شكراً لتعاملكم معنا";
+  const showThanks = variant !== "stocktake" && !isSectionHidden("thanks");
   const logoURL = resolveLogoUrl(company?.logo_url);
   // "المطلوب النهائي" = جملة الفاتورة − المبلغ المدفوع (لا يُجمع مع الحساب القديم).
   const finalTotal = Math.max(0, grandTotal - paidAmount);
@@ -222,10 +291,27 @@ export function generatePrintHTML(data: PrintData): string {
      عشرات الأسطر، ومنعُ القسمة يدفع الصندوق كلّه لصفحةٍ تالية — أو يقصّه. */
   .extra-row, .extra-box { page-break-inside: auto; break-inside: auto; }
   @media print { body { padding: 0; } .page { max-width: none; } }
+  /**
+   * === الخطّ: Arial في الورقة كلّها ===
+   *
+   * طلبه صاحبُ المستودع صراحةً: «نوع الخط في جميع شاشات المعاينة والطباعة
+   * يكون Arial، دا كويس بوضح أكتر». وله سببٌ عمليّ فوق الذوق: الخطُّ السابق
+   * خطُّ ويندوز، لا يوجد على الهاتف ولا في المصوِّر — فتسقط الورقة إلى بديلٍ
+   * يختلف باختلاف الجهاز، وتختلف عروضُ الحروف فيفيض النصّ عن صناديقه. وArial
+   * (أو بديلُه المتري Liberation Sans / Helvetica) موجودٌ في كل مكان، فالورقة
+   * واحدةٌ على الشاشة والورق وملفّ العميل.
+   *
+   * والأرقامُ بـtabular-nums: أعمدةُ المبالغ تصطفّ رأسياً على منازلها، وهو ما
+   * كان يُشترى قبلُ بخطٍّ أحاديّ المسافة غريبٍ عن بقيّة الورقة.
+   *
+   * (ولا يُذكر اسمُ خطٍّ مهجورٍ هنا: هذا التعليقُ يخرج في الورقة، وفحصُ
+   * «لا أثرَ للخطّ القديم» يبحث عن اسمه في الناتج فيجده في تعليقٍ فيسقط.)
+   */
   body {
-    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
     color: #1a1a1a; background: #fff; padding: 20px; line-height: 1.5;
     font-size: 14px;
+    font-variant-numeric: tabular-nums;
   }
 
   .page { max-width: 800px; margin: 0 auto; }
@@ -281,16 +367,26 @@ ${PAGINATION_CSS}
     font-size: 22px; font-weight: 900; color: #c0392b;
     margin-bottom: 4px;
   }
-  .header-address {
-    font-size: 13px; color: #333; line-height: 1.6;
+  /**
+   * === شريطُ بيانات الشركة: سطرٌ واحد بعلاماتٍ فاصلة ===
+   *
+   * أرسل صاحبُ المستودع الشكل مصوَّراً: الهاتفُ والمسؤولُ والعنوان في **سطرٍ
+   * واحد**، كلٌّ بعلامته، بينها فواصل رأسية. وكان سطرين — العنوان تحت الاسم
+   * ثمّ الهاتف تحته — أي سطرٌ زائدٌ من رأس الورقة لمعلوماتٍ تسع سطراً.
+   *
+   * والعلاماتُ رسومٌ لا رموزُ إيموجي: الإيموجي يُرسم بخطٍّ ملوّنٍ قد لا يوجد
+   * في المصوِّر ولا في المطبعة، فيخرج مربّعاً فارغاً في ملفّ العميل. والرسمُ
+   * السطريّ يرث لونَ النصّ ويطبع بأيّ حبر.
+   */
+  .header-meta {
+    display: flex; justify-content: center; align-items: center;
+    flex-wrap: wrap; gap: 4px 10px;
+    font-size: 13.5px; font-weight: 700; color: #1a1a1a;
+    margin-top: 3px; line-height: 1.5;
   }
-  .header-phones {
-    font-size: 14px; font-weight: 700; color: #1a1a1a;
-    margin-top: 2px;
-  }
-  .header-manager {
-    font-size: 13px; color: #555; margin-top: 2px;
-  }
+  .header-meta-item { display: inline-flex; align-items: center; gap: 4px; }
+  .header-meta-item svg { width: 13px; height: 13px; flex: 0 0 auto; }
+  .header-meta-sep { color: #9aa3ad; font-weight: 400; }
 
   /* === DOC HEAD: العميل يميناً، العنوان وسطاً، التاريخ والرقم يساراً ===
      أرسل صاحبُ المستودع الشكل مصوَّراً: الثلاثةُ في شريطٍ واحد لا في ثلاثة
@@ -334,13 +430,26 @@ ${PAGINATION_CSS}
     width: 100%; border-collapse: collapse; margin-bottom: 12px;
     border: 2px solid #1a1a1a;
   }
+  /**
+   * === صفوفٌ أقصر تسع أصنافاً أكثر ===
+   *
+   * قارن صاحبُ المستودع ورقتَنا بورقةِ Access القديمة: تسعةُ أصنافٍ عندها في
+   * ثلث ما تأخذه عندنا. وقاس: «صغّر الأسطر عشان تشيل أصناف أكتر».
+   *
+   * والحشوُ هو المأخذ لا الخطّ: 7px فوق و7px تحت في خليّةٍ سطرُها 13px يعني
+   * أنّ **نصفَ ارتفاع الصفّ فراغ**. فنزل الحشوُ إلى 3.5px والخطُّ إلى 12.5px،
+   * فقصُر الصفُّ من نحو 34px إلى نحو 26px — أي بندٌ إضافيٌّ لكلّ أربعةٍ كانت.
+   * وهو فوق أرضية القراءة (MIN_FONT_PX) بمسافةٍ مريحة.
+   *
+   * وحدودُ الكثافة أُعيد قياسُها على هذا الارتفاع الجديد — لا تُخمَّن.
+   */
   thead th {
     background: #5b4cad; color: white;
-    padding: 8px 10px; font-size: 13px; font-weight: 700;
+    padding: 5px 8px; font-size: 12.5px; font-weight: 700;
     text-align: center; border: 1px solid #1a1a1a;
   }
   tbody td {
-    padding: 7px 10px; text-align: center; font-size: 13px;
+    padding: 3.5px 8px; text-align: center; font-size: 12.5px;
     border: 1px solid #999;
   }
   /*
@@ -359,11 +468,41 @@ ${PAGINATION_CSS}
     font-size: 15px; font-weight: 800; color: #111;
   }
   tbody tr:nth-child(even) { background: #f8f8f8; }
+  /* صفُّ الجملة القديم باقٍ لقالب كشف الحساب — هو الذي يستعمله الآن،
+     وورقةُ الفاتورة صارت إلى الشريط المضغوط أدناه. */
   .total-row td {
     font-weight: 800; font-size: 14px;
     border: 2px solid #1a1a1a; background: #f0f0f0;
   }
   .product-name { text-align: right; font-weight: 600; }
+
+  /**
+   * === شريطُ جملة الفاتورة ===
+   *
+   * قال صاحبُ المستودع: «عامل مستطيل طويل بحجم الورقة كلها ومقسّم فاضي ساي،
+   * شكلو ما حلو». وهو وصفٌ دقيق: كان صفّاً في الجدول بخمس خلايا، ثلاثٌ منها
+   * **فارغةٌ عمداً** كي يقع الرقمُ تحت عمود الإجمالي — فيمتدّ الإطارُ الأسود
+   * بعرض الورقة حاملاً كلمتين ورقماً وثلاثة فراغات.
+   *
+   * فخرج من الجدول إلى شريطٍ بقدر ما فيه: أرضيةٌ داكنة، الوصفُ يميناً والرقمُ
+   * يساراً، وعرضُه من محتواه لا من الورقة. ويُدفع إلى يسار الورقة بهامشٍ
+   * تلقائيّ ليقع تحت عمود الإجمالي كما كان — الموضعُ محفوظ والفراغُ ذهب.
+   *
+   * ولا يُشطر بين صفحتين، وهو ذرّةٌ في حساب الترقيم كصفوف الجدول.
+   */
+  .grand-band {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 18px; width: fit-content; min-width: 250px; max-width: 62%;
+    margin: -12px 0 14px auto;
+    padding: 6px 14px; border-radius: 5px;
+    background: #1f2d5a; color: #fff;
+    page-break-inside: avoid; break-inside: avoid;
+  }
+  .grand-band-label { font-size: 14px; font-weight: 800; white-space: nowrap; }
+  .grand-band-value {
+    font-size: 17px; font-weight: 900; white-space: nowrap;
+    letter-spacing: 0.3px;
+  }
 
   /* === SUMMARY BOXES === */
   .summary-row {
@@ -400,7 +539,7 @@ ${PAGINATION_CSS}
    * في RTL) والحسابُ يساراً، مشدودين إلى حافّتَي الورقة بـspace-between فلا
    * يطفو أحدهما في الوسط.
    *
-   * والترحيل صغير — «اجعل تفاصيل الترحيل بسيطة ومربّعها صغير»: يمتدّ حتى
+   * وصندوقُ النقل صغير — طُلب أن يكون بسيطاً ومربّعه صغيراً: يمتدّ حتى
    * نصف السطر ولا يتجاوزه، فيبقى إلى جانبه الحسابُ بقدره لا مضغوطاً.
    *
    * وalign-items: flex-start كي لا يُمطَّ الأقصرُ إلى طول الأطول: صندوقُ
@@ -479,11 +618,15 @@ ${PAGINATION_CSS}
   }
   .tr-main { font-size: 12px; font-weight: 700; color: #1a1a1a; }
   .tr-sub  { font-size: 10.5px; color: #666; }
+  /* عنوانُ الصندوق ورسمُه في سطرٍ واحد — والرسمُ يرث لونَ العنوان بـ
+     currentColor فلا لونَ يُكرَّر في موضعين. */
   .extra-box-title {
+    display: flex; align-items: center; gap: 6px;
     font-size: 14px; font-weight: 800; color: #5b2c8e;
     border-bottom: 2px dashed #5b2c8e;
     padding-bottom: 4px; margin-bottom: 8px;
   }
+  .extra-box-title svg { width: 16px; height: 16px; flex: 0 0 auto; }
   .extra-box p, .extra-content {
     font-size: 12px; color: #666;
   }
@@ -513,6 +656,33 @@ ${PAGINATION_CSS}
     font-size: 12px; color: #555; font-weight: 600;
   }
 
+  /**
+   * === سطرُ الشكر — لا يذهب مع التواقيع ===
+   *
+   * قال صاحبُ المستودع إنّه يُخفي خانتَي التوقيع دائماً — لا يريدهما أن تظهرا
+   * للزبون — وطلب أن تبقى عبارةُ الشكر ظاهرةً ولا تختفي معهما.
+   *
+   * (ولا تُذكر هنا أسماءُ الأقسام كما تظهر للعميل: هذا التعليقُ يخرج في
+   * الورقة، وفحوصُ الإخفاء تبحث عن تلك الأسماء فتجدها في تعليقٍ فتسقط.)
+   *
+   * فالسطرُ عنصرٌ مستقلٌّ خارج صندوق التواقيع بقسمٍ خاصٍّ به اسمُه thanks: من
+   * أخفى التواقيع أخفاها وحدها، وبقي الشكرُ آخرَ ما يقرأ العميل. ومن أراد
+   * إخفاءه أخفاه من زرّ تخصيص الرؤية كسائر الأقسام — الاختيارُ له لا للتلازم.
+   *
+   * ونصُّه من إعدادات الشركة (invoice_notes) لا مكتوباً هنا: كلُّ محلٍّ
+   * يشكر عملاءه بعبارته.
+   */
+  .doc-thanks {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 6px; padding: 6px 0;
+    font-size: 13.5px; font-weight: 800; color: #2f6b4f;
+  }
+  .doc-thanks svg { width: 18px; height: 18px; flex: 0 0 auto; }
+  .doc-thanks-rule {
+    display: inline-block; width: 26px; height: 0;
+    border-top: 2px solid #2f6b4f; opacity: 0.55;
+  }
+
   @media print {
     body { padding: 0; }
   }
@@ -528,8 +698,21 @@ ${showHeader ? `
     <div class="header-logo"><img src="${logoURL}" alt="Logo" /></div>
     <div>
       <div class="header-title">${esc(company?.company_name || "اولاد جابر لاسبيرات المواتر والتكاتك")}</div>
-      <div class="header-address">${esc(company?.address || "")}</div>
-      <div class="header-phones">${esc(company?.phone || "")}</div>
+      ${(() => {
+        /**
+         * الهاتفُ والمسؤولُ والعنوان في سطرٍ واحد، وما لم يُملأ لا يترك أثراً:
+         * لا علامةً معلّقة ولا فاصلاً زائداً في الطرف. فالفواصلُ تُنسج بين
+         * الموجود لا حول كلّ حقل.
+         */
+        const bits = [
+          company?.phone ? `<span class="header-meta-item">${SVG_PHONE}<span>${esc(company.phone)}</span></span>` : "",
+          (company as any)?.manager_name
+            ? `<span class="header-meta-item">${SVG_USER}<span>${esc((company as any).manager_name)}</span></span>` : "",
+          company?.address ? `<span class="header-meta-item">${SVG_PIN}<span>${esc(company.address)}</span></span>` : "",
+        ].filter(Boolean);
+        if (!bits.length) return "";
+        return `<div class="header-meta">${bits.join('<span class="header-meta-sep">|</span>')}</div>`;
+      })()}
     </div>
     <div class="header-logo"><img src="${logoURL}" alt="Logo" /></div>
   </div>
@@ -636,14 +819,12 @@ ${showItems ? (variant === "stocktake" ? `
         <td style="font-weight:700;">${it.total.toLocaleString()}</td>
       </tr>
     `).join("")}
-    <tr class="total-row" data-section="grand-total" data-section-label="الجملة">
-      <td colspan="2" style="text-align:right; padding-right:15px;">جملة ${type === "invoice" ? "الفاتورة" : type === "quote" ? "عرض السعر" : "المشتريات"}</td>
-      <td></td>
-      <td></td>
-      <td>${(Number(subtotal) || (grandTotal + (Number(discountTotal) || 0))).toLocaleString()}</td>
-    </tr>
   </tbody>
 </table>
+<div class="grand-band" data-section="grand-total" data-section-label="الجملة">
+  <span class="grand-band-label">جملة ${type === "invoice" ? "الفاتورة" : type === "quote" ? "عرض السعر" : "المشتريات"}</span>
+  <span class="grand-band-value">${(Number(subtotal) || (grandTotal + (Number(discountTotal) || 0))).toLocaleString()}</span>
+</div>
 `) : ""}
 
 ${(() => {
@@ -710,7 +891,9 @@ const accountBox = !showAccount ? "" : (() => {
    */
   const A = ACCOUNT_FONT_PX;
   const cellR = `padding:4px 7px;text-align:right;font-weight:700;color:#111;background:#f4f6f8;border:1px solid #b8bcc4;line-height:1.5;font-size:${A.label}px;`;
-  const cellL = `padding:4px 7px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.5;font-family:'Consolas','Courier New',monospace;font-size:${A.value}px;letter-spacing:0.2px;`;
+  // أرقامُ المربّع بخطّ الورقة نفسه، واصطفافُ المنازل من tabular-nums لا من
+  // خطٍّ أحادي المسافة يخالف ما حوله.
+  const cellL = `padding:4px 7px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.5;font-variant-numeric:tabular-nums;font-size:${A.value}px;letter-spacing:0.2px;`;
   const row = (opts: {
     section: string; label: string; value: string;
     valColor?: string; strong?: boolean; sideBadge?: string; badgeColor?: string;
@@ -764,12 +947,18 @@ const accountBox = !showAccount ? "" : (() => {
   // المتصفّح فينكسر الترتيب. راجع formatPackaging في printExtras.
   const packagingBox = showPackaging ? `
   <div class="extra-box" data-section="packaging" data-section-label="تفاصيل التغليف">
-    <div class="extra-box-title">تفاصيل التغليف</div>
+    <div class="extra-box-title">${SVG_BOX}<span>تفاصيل التغليف</span></div>
     <div class="extra-content">${cleanPackaging || `لا توجد بيانات تغليف ${docNoun}`}</div>
   </div>` : "";
+  /*
+   * والعنوانُ «تفاصيل الترحيل» لا «معلومات الترحيل»: هي تسميةُ صاحب المستودع
+   * في طلبه، وتُطابق جارَها «تفاصيل التغليف» فيقرأ العينُ صندوقين متناظرين.
+   * والمعرّفُ الداخلي (transport) لم يتغيّر — فاختياراتُ الإخفاء المحفوظة
+   * تبقى على حالها.
+   */
   const transportBox = showTransport ? `
-  <div class="extra-box extra-box--transport" data-section="transport" data-section-label="معلومات الترحيل">
-    <div class="extra-box-title">معلومات الترحيل</div>
+  <div class="extra-box extra-box--transport" data-section="transport" data-section-label="تفاصيل الترحيل">
+    <div class="extra-box-title">${SVG_TRUCK}<span>تفاصيل الترحيل</span></div>
     <p>${cleanTransport || `لا توجد بيانات ترحيل ${docNoun}`}</p>
   </div>` : "";
 
@@ -813,6 +1002,15 @@ ${showSignatures ? `
 <div class="signatures" data-section="signatures" data-section-label="التواقيع">
   <div class="sig-box"><div class="sig-line">توقيع المستلم</div></div>
   <div class="sig-box"><div class="sig-line">توقيع المسؤول</div></div>
+</div>
+` : ""}
+
+${showThanks ? `
+<div class="doc-thanks" data-section="thanks" data-section-label="عبارة الشكر">
+  <span class="doc-thanks-rule"></span>
+  ${SVG_HANDSHAKE}
+  <span>${esc(thanksText)}</span>
+  <span class="doc-thanks-rule"></span>
 </div>
 ` : ""}
 
