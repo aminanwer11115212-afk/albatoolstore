@@ -91,7 +91,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
         if (docType === "quote") {
           const { data: quote, error: qErr } = await supabase
             .from("quotes")
-            .select("*, customers(name, phone, address, email, balance, credit_balance)")
+            .select("*, customers(name, phone, address, email, balance, credit_balance, net_balance)")
             .eq("id", id).maybeSingle();
           if (qErr) throw qErr;
           if (!quote) throw new Error("عرض السعر غير موجود");
@@ -135,7 +135,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
         } else if (docType === "invoice") {
           const { data: invoice, error: iErr } = await supabase
             .from("invoices")
-            .select("*, customers(name, phone, address, email, balance, credit_balance)")
+            .select("*, customers(name, phone, address, email, balance, credit_balance, net_balance)")
             .eq("id", id).maybeSingle();
           if (iErr) throw iErr;
           if (!invoice) throw new Error("الفاتورة غير موجودة");
@@ -273,7 +273,7 @@ export default function DocumentPreviewPage({ docType }: Props) {
           // ===== مرتجع مبيعات =====
           const { data: ret, error: rErr } = await (supabase as any)
             .from("stock_returns")
-            .select("*, customers(name, phone, address, email, balance)")
+            .select("*, customers(name, phone, address, email, balance, credit_balance, net_balance)")
             .eq("id", id).maybeSingle();
           if (rErr) throw rErr;
           if (!ret) throw new Error("المرتجع غير موجود");

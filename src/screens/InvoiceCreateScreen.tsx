@@ -277,7 +277,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       setProductsLoading(true);
       try {
         const [cs, ps, cfg] = await Promise.all([
-          supabase.from("customers").select("id,name,phone,balance,company").order("name"),
+          supabase.from("customers").select("id,name,phone,balance,credit_balance,net_balance,company").order("name"),
           fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
           supabase.from("company_settings").select("*").maybeSingle(),
         ]);
@@ -327,7 +327,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
     };
     // Refetch customers when they change elsewhere or when user returns to this tab.
     const refetchCustomers = async () => {
-      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      const { data } = await supabase.from("customers").select("id,name,phone,balance,credit_balance,net_balance,company").order("name");
       if (data) {
         setCustomers(data as Customer[]);
         const currentId = selectedCustomerIdRef.current;
@@ -483,7 +483,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       if (inv.exchange_rate_to_base) setExchangeRateToBase(Number(inv.exchange_rate_to_base));
       if (inv.customer_id) {
         const { data: c } = await supabase.from("customers")
-          .select("id,name,phone,balance,company").eq("id", inv.customer_id).maybeSingle();
+          .select("id,name,phone,balance,credit_balance,net_balance,company").eq("id", inv.customer_id).maybeSingle();
         if (c) { setCustomer(c as Customer); setCustomerSearch((c as Customer).name); }
       }
       const { data: items } = await supabase.from("invoice_items").select("*").eq("invoice_id", editId);

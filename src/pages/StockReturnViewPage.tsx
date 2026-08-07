@@ -35,7 +35,7 @@ export default function StockReturnViewPage() {
   const load = async () => {
     if (!id) return;
     setLoading(true);
-    const { data: r } = await supabase.from("stock_returns").select("*, customers(name, phone, email, address, balance)").eq("id", id).single();
+    const { data: r } = await supabase.from("stock_returns").select("*, customers(name, phone, email, address, balance, credit_balance, net_balance)").eq("id", id).single();
     const { data: itms } = await supabase.from("stock_return_items").select("*").eq("stock_return_id", id);
     setRet(r);
     setItems(itms || []);

@@ -324,7 +324,7 @@ export default function StockReturnCreatePage() {
   useEffect(() => {
     (async () => {
       const [cs, ps, cfg, wh] = await Promise.all([
-        supabase.from("customers").select("id,name,phone,balance,company").order("name"),
+        supabase.from("customers").select("id,name,phone,balance,credit_balance,net_balance,company").order("name"),
         fetchAllProducts<Product>("id,name,sale_price,foreign_price,unit,stock_quantity,is_frozen,warehouse_id"),
         supabase.from("company_settings").select("currency,return_prefix").maybeSingle(),
         supabase.from("warehouses").select("id,name").order("name"),
@@ -353,7 +353,7 @@ export default function StockReturnCreatePage() {
     };
     // Refetch customers when they change elsewhere or when user returns to this tab.
     const refetchCustomers = async () => {
-      const { data } = await supabase.from("customers").select("id,name,phone,balance,company").order("name");
+      const { data } = await supabase.from("customers").select("id,name,phone,balance,credit_balance,net_balance,company").order("name");
       if (data) {
         setCustomers(data as Customer[]);
         const currentId = selectedCustomerIdRef.current;
@@ -396,7 +396,7 @@ export default function StockReturnCreatePage() {
       setReturnStatus(r.status || "pending");
       if (r.invoice_id) setLinkedInvoiceId(r.invoice_id);
       if (r.customer_id) {
-        const { data: c } = await supabase.from("customers").select("id,name,phone,balance,company").eq("id", r.customer_id).maybeSingle();
+        const { data: c } = await supabase.from("customers").select("id,name,phone,balance,credit_balance,net_balance,company").eq("id", r.customer_id).maybeSingle();
         if (c) { setCustomer(c as Customer); setCustomerSearch((c as Customer).name); }
       }
       const { data: items } = await supabase.from("stock_return_items").select("*").eq("stock_return_id", editId);
