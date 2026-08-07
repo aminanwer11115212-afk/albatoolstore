@@ -14,6 +14,7 @@ import { netBalanceOf } from "@/utils/balanceDisplay";
 import { accountArgsForQuote } from "@/utils/documentAccountArgs";
 import { netBeforeInvoice } from "@/utils/customerNetBefore";
 import { useDocumentFrameFit } from "@/utils/documentFrameFit";
+import { paymentWriteErrorMessage } from "@/utils/invoicePaymentWrite";
 import DocumentFrameZoom from "@/components/common/DocumentFrameZoom";
 
 /**
@@ -476,7 +477,11 @@ export default function DocumentPreviewPage({ docType }: Props) {
                       setInvMeta((m) => m ? { ...m, total: nextTotal, discount: nextDisc, paidAmount: nextPaid } : m);
                       setReloadTick((t) => t + 1);
                     } catch (e: any) {
-                      toast.error(e?.message || "تعذّر حفظ الخصم");
+                      /* الخصمُ الحيّ يغيّر `paid_amount` في فاتورة الكاش، فيوقظ
+                         حارسَ تناسق الدفعات في القاعدة. ونصُّ الحارس إنجليزيٌّ
+                         فيه معرّف الفاتورة — يُترجم ليعرف المستخدمُ أنّ شيئاً
+                         لم يتغيّر وأين يُصلحه. */
+                      toast.error(paymentWriteErrorMessage(e) || "تعذّر حفظ الخصم");
                     } finally {
                       setSavingDisc(false);
                     }

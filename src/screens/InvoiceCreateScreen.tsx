@@ -62,6 +62,7 @@ import MessageImportDialog, { MessageImportButton } from "@/components/MessageIm
 import type { ParsedLine } from "@/hooks/useMessageImport";
 import { ALLOWED_INVOICE_STATUSES, computeInvoiceStatusAfterPayment, isAllowedInvoiceStatus } from "@/utils/invoiceStatus";
 import { splitPayment } from "@/utils/overpayment";
+import { writeInvoicePayment, paymentWriteErrorMessage } from "@/utils/invoicePaymentWrite";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import { CustomerInfoStrip, netBalanceOf } from "@/utils/balanceDisplay";
 import {
@@ -859,35 +860,38 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         updatePayload.total = nextTotal;
       }
 
-      const { error: upErr } = await supabase.from("invoices").update(updatePayload).eq("id", editId);
-      if (upErr) throw upErr;
-
-      // 1) قيد الدفعة المطبَّقة على الفاتورة
-      if (payAccount && cashApplied > 0) {
-        await supabase.from("transactions").insert({
-          type: "income",
-          category: "customer_payment",
-          amount: cashApplied,
-          date: payDate,
-          description: finalNote,
-          account_id: payAccount,
-          customer_id: savedCustomerId,
-          reference_id: editId,
-        } as any);
-      }
-      // 2) قيد الفائض كسلفة/دائن للعميل
-      if (payAccount && cashOver > 0 && savedCustomerId) {
-        await supabase.from("transactions").insert({
-          type: "income",
-          amount: cashOver,
-          date: payDate,
-          description: `فائض دفعة فاتورة - سلفة عميل${refSuffix}`,
-          account_id: payAccount,
-          customer_id: savedCustomerId,
-          reference_id: editId,
-          category: "customer_credit",
-        } as any);
-      }
+      /*
+       * القيودُ أوّلاً ثمّ الفاتورة — حارسُ القاعدة مؤجَّلٌ إلى الإيداع،
+       * وPostgREST يُودع كلَّ طلبٍ وحده. شرحُه في `invoicePaymentWrite`.
+       */
+      await writeInvoicePayment(supabase as any, {
+        invoiceId: editId,
+        rows: [
+          // ١) قيد الدفعة المطبَّقة على الفاتورة
+          ...(cashApplied > 0 ? [{
+            type: "income" as const,
+            category: "customer_payment" as const,
+            amount: cashApplied,
+            date: payDate,
+            description: finalNote,
+            account_id: payAccount || null,
+            customer_id: savedCustomerId,
+            reference_id: editId,
+          }] : []),
+          // ٢) قيد الفائض كسلفة/دائن للعميل
+          ...(cashOver > 0 && savedCustomerId ? [{
+            type: "income" as const,
+            category: "customer_credit" as const,
+            amount: cashOver,
+            date: payDate,
+            description: `فائض دفعة فاتورة - سلفة عميل${refSuffix}`,
+            account_id: payAccount || null,
+            customer_id: savedCustomerId,
+            reference_id: editId,
+          }] : []),
+        ],
+        patch: updatePayload,
+      });
 
       await recordInvoiceRevision({
         invoiceId: editId,
