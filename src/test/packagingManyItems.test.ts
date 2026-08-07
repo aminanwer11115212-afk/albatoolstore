@@ -81,11 +81,15 @@ describe("البنود الكثيرة تصل الورقة كاملة", () => {
    * القطعُ لا الطرود: السطر يقول «6 كرتونة صنف ‎*‎6» — ستُّ كراتين في كلٍّ
    * ستُّ قطع. فمن جمع الكراتين وسمّاها قطعاً أخطأ في ورقةِ استلام.
    */
-  it("والمجموع في الذيل = مجموع القطع لا الطرود", () => {
-    const packs = manyItems.reduce((s, r) => s + r.packs_count, 0);
-    const pieces = manyItems.reduce((s, r) => s + r.packs_count * r.pieces_per_pack, 0);
-    expect(pieces).not.toBe(packs);
-    expect(packagingInfo).toContain(`>${pieces.toLocaleString()}</span>`);
+  /**
+   * المجموعُ = مجموعُ الأرقام المكتوبة في أوّل الأسطر — قرارُ صاحب المستودع:
+   * «عدد القطع على الرقم في الأول». و‎*‎N وصفُ الطرد لا عاملُ ضرب.
+   */
+  it("والمجموع في الذيل = مجموع أرقام الأسطر", () => {
+    const lead = manyItems.reduce((s, r) => s + r.packs_count, 0);
+    const multiplied = manyItems.reduce((s, r) => s + r.packs_count * r.pieces_per_pack, 0);
+    expect(multiplied).not.toBe(lead);   // فالفرقُ بين القاعدتين قائم
+    expect(packagingInfo).toContain(`>${lead.toLocaleString()}</span>`);
     expect(packagingInfo).not.toContain("طرداً");
   });
 

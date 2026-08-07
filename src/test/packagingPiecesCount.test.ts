@@ -1,126 +1,146 @@
 /**
- * «عدد القطع» — رقمٌ واحد في كل شاشة يذكره.
+ * «إجمالي عدد القطع» — مجموعُ الأرقام في أوّل الأسطر.
  *
- * ## العطل كما بلّغ عنه صاحب المستودع
- * «بالنسبة للفاتورة، في التغليف: العدد بتاع التغليف غلط».
+ * ## القاعدة كما قرّرها صاحبُ المستودع
+ * «عدد القطع على الرقم في الأول قبل كلمة كرتونة كبيرة»، و«فمثلاً كتبت 5
+ * كرتونة كبيرة تظهر إجمالي القطع 5».
  *
- * وله وجهان، كلاهما نوعٌ واحد: **حسابٌ مكتوبٌ في أكثرَ من موضع**.
+ * فالسطرُ يُعدّ بما بدأ به مهما كان فيه، وعلامةُ ‎*‎N وصفٌ لما في الطرد لا
+ * عاملُ ضربٍ في المجموع:
  *
- * ### الوجه الأوّل — الضربُ مرّتين في الورقة
- * كان العددُ يسقط إلى `quantity` حين يغيب `packs_count` ثمّ يُضرب في
- * `pieces_per_pack`:
+ *     1 كرتونة صغيرة باكم فرامل *50   ⇒ 1
+ *     1 كرتونة كبيرة                   ⇒ 1
+ *     5 كرتونة كبيرة                   ⇒ 5
  *
- *     const packs = packs_count || quantity;   // 0 || 9  ⇒ 9
- *     total = packs * pieces;                  // 9 × 3   ⇒ 27
+ * ## وقد حُسب بالضرب مرّةً فأخطأ
+ * ظُنَّ أنّ «القطع» قطعُ البضاعة داخل الطرود، فحُسب `packs × pieces_per_pack`.
+ * فخرجت ورقةُ صاحب المستودع بـ**99** حيث يريد **6** — ثمّ نُقل الخطأُ إلى
+ * تقرير الإرسال بحجّة توحيد الرقمين، وكان التقريرُ صحيحاً قبلها.
  *
- * و`quantity` حاصلُ ضربٍ أصلاً (الشاشةُ تخزّن `packs * pieces`) — فضُرب
- * مرّةً ثانية. فقرأت الورقةُ **27** وقرأت نافذةُ التغليف **9**.
- *
- * ### الوجه الثاني — الطرودُ تُسمّى قطعاً في تقرير الإرسال
- * تقريرُ الإرسال كان يجمع `packs_count` وحدَه ويسمّيه «إجمالي عدد القطع».
- * فمستندٌ فيه كرتونتان في كلٍّ منهما عشرُ قطع يقول هناك «2» وتقول ورقةُ
- * فاتورته «20» — نفسُ البيانات ونفسُ العبارة ورقمان يختلفان عشرةَ أضعاف.
- *
- * وهي علّةُ «المدفوع» نفسُها في كشف الحساب: اسمٌ واحدٌ فوق حسابين.
- *
- * ## والعلاج: مصدرٌ واحد
- * `piecesTotalOf` في وحدةٍ بلا تبعيّات، يستوردها كلُّ من يعرض العدد.
+ * ## والعلاج: الرقمُ المطبوع هو الرقمُ المجموع
+ * `packagingCountOf` تُشتقّ منها **بدايةُ السطر** والمجموعُ معاً. فلا يمكن أن
+ * يختلفا: من غيّر أحدَهما غيّر الآخر.
  */
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { piecesTotalOf, piecesTotalSum } from "@/utils/piecesTotal";
+import { packagingCountOf, packagingCountSum } from "@/utils/packagingCount";
 import { formatPackaging } from "@/utils/printExtras";
 
 const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 
+/** الرقمُ المعروض في شريط المجموع. */
+const shown = (rows: any[]) => {
+  const html = formatPackaging([], rows)!;
+  return Number(
+    /إجمالي عدد القطع :[\s\S]*?<span>([\d,]+)<\/span>/.exec(html)![1].replace(/,/g, ""),
+  );
+};
+
+/** والأرقامُ المكتوبة في أوّل الأسطر، بترتيبها. */
+const leadingNumbers = (rows: any[]) => {
+  const html = formatPackaging([], rows)!;
+  const body = html.slice(0, html.indexOf("إجمالي عدد القطع"));
+  return Array.from(body.matchAll(/<div data-pkg-line[^>]*>(\d+)\s/g)).map((m) => Number(m[1]));
+};
+
 /* ═══════════ ١) القاعدة بأرقامها ═══════════ */
 
-describe("عددُ القطع في صفٍّ واحد", () => {
-  it("العاملان حاضران ⇒ حاصلُ ضربهما", () => {
-    expect(piecesTotalOf({ packs_count: 2, pieces_per_pack: 10 })).toBe(20);
+describe("عددُ السطر الواحد", () => {
+  it("خمسُ كراتين ⇒ 5", () => {
+    expect(packagingCountOf({ packs_count: 5 })).toBe(5);
   });
 
-  /**
-   * هذا هو العطلُ بعينه: `quantity` حاصلُ ضربٍ مخزَّن، فضربُه ثانيةً يثلّثه.
-   */
-  it("ولا عاملَ للطرود ⇒ المخزَّنُ كما هو، لا مضروباً", () => {
-    expect(piecesTotalOf({ packs_count: 0, pieces_per_pack: 3, quantity: 9 })).toBe(9);
-    // وبالحساب القديم كان 27
-    expect(piecesTotalOf({ packs_count: 0, pieces_per_pack: 3, quantity: 9 })).not.toBe(27);
+  /** هذا هو موضعُ الخطأ: ‎*‎N لا تدخل الحساب. */
+  it("وكرتونةٌ فيها خمسون قطعة ⇒ 1 لا 50", () => {
+    expect(packagingCountOf({ packs_count: 1, pieces_per_pack: 50 } as any)).toBe(1);
   });
 
-  it("وطرودٌ بلا قطعٍ مسجَّلة ⇒ قطعةٌ في كل طرد لا صفر", () => {
-    expect(piecesTotalOf({ packs_count: 4, pieces_per_pack: 0, quantity: 0 })).toBe(4);
+  it("وبلا عددِ طرودٍ مسجَّل تُقرأ الكمية — بياناتٌ سبقت العمود", () => {
+    expect(packagingCountOf({ packs_count: 0, quantity: 9 })).toBe(9);
   });
 
   it("وصفٌّ فارغٌ تماماً ⇒ صفر، لا NaN يفسد المجموع", () => {
-    expect(piecesTotalOf({})).toBe(0);
-    expect(piecesTotalOf({ packs_count: null, pieces_per_pack: undefined, quantity: null })).toBe(0);
+    expect(packagingCountOf({})).toBe(0);
+    expect(packagingCountOf({ packs_count: null, quantity: null })).toBe(0);
   });
 
   it("والمجموعُ بالقاعدة نفسها — لا جمعٌ بيدٍ أخرى", () => {
-    const rows = [
-      { packs_count: 1, pieces_per_pack: 50 },   // 50
-      { packs_count: 1, pieces_per_pack: 8 },    // 8
-      { packs_count: 2, pieces_per_pack: 10 },   // 20
-      { packs_count: 0, pieces_per_pack: 3, quantity: 9 }, // 9
-    ];
-    expect(piecesTotalSum(rows)).toBe(87);
-    expect(piecesTotalSum(rows)).toBe(rows.reduce((s, r) => s + piecesTotalOf(r), 0));
+    const rows = [{ packs_count: 1 }, { packs_count: 5 }, { packs_count: 0, quantity: 2 }];
+    expect(packagingCountSum(rows)).toBe(8);
+    expect(packagingCountSum(rows)).toBe(rows.reduce((s, r) => s + packagingCountOf(r), 0));
   });
 });
 
-/* ═══════════ ٢) الورقةُ تعرض ما تحسبه القاعدة ═══════════ */
+/* ═══════════ ٢) الورقةُ: المجموعُ هو ما كُتب في الأسطر ═══════════ */
 
 /**
- * المسارُ كاملاً: صفوفُ القاعدة ← `formatPackaging` ← الشريطُ في الورقة.
- * فلو عاد الضربُ المزدوج يوماً ظهر في الرقم المعروض لا في دالّةٍ منعزلة.
+ * أسطرُ الورقة التي أرسلها صاحبُ المستودع مصوَّرةً — ستّةُ أسطرٍ تبدأ كلٌّ
+ * منها بـ1، ومنها سطرٌ بلا ‎*‎N. ومجموعُها **6**.
  */
-describe("شريطُ الورقة يعرض المجموع نفسه", () => {
-  const ROWS = [
-    { product_name: "باكم فرامل امامي", packs_count: 1, pieces_per_pack: 50 },
-    { product_name: "بطارية جي ان", packs_count: 1, pieces_per_pack: 8 },
-    { product_name: "بطارية 125", packs_count: 2, pieces_per_pack: 10 },
-  ];
+const PHOTO_ROWS = [
+  { product_name: "باكم فرامل امامي 3 عجل هجام اصلي", packaging_types: { name: "كرتونة صغيرة" }, packs_count: 1, pieces_per_pack: 50, quantity: 50 },
+  { product_name: "جي ان YAYE", packaging_types: { name: "بطارية" }, packs_count: 1, pieces_per_pack: 8, quantity: 8 },
+  { product_name: "بطارية 125 سي جي / دايون صغير YAYE", packaging_types: { name: "كرتونة صغيرة" }, packs_count: 1, pieces_per_pack: 10, quantity: 10 },
+  { product_name: "باكم فرامل امامي 3 عجل هجام اصلي", packaging_types: { name: "كرتونة كبيرة" }, packs_count: 1, pieces_per_pack: 20, quantity: 20 },
+  { product_name: "", packaging_types: { name: "كرتونة كبيرة" }, packs_count: 1, pieces_per_pack: 0, quantity: 0 },
+  { product_name: "لستك", packaging_types: { name: "ربطة" }, packs_count: 1, pieces_per_pack: 10, quantity: 10 },
+];
 
-  it("الرقمُ المعروض = مجموعُ القاعدة", () => {
-    const html = formatPackaging([], ROWS)!;
-    const shown = /إجمالي عدد القطع :[\s\S]*?<span>([\d,]+)<\/span>/.exec(html)?.[1];
-    expect(shown).toBe(piecesTotalSum(ROWS).toLocaleString());
-    expect(shown).toBe("78");
+describe("ورقةُ صاحب المستودع كما صوّرها", () => {
+  it("ستّةُ أسطرٍ تبدأ بـ1 ⇒ المجموع 6", () => {
+    expect(leadingNumbers(PHOTO_ROWS)).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(shown(PHOTO_ROWS)).toBe(6);
   });
 
-  /** والصفُّ الذي كان يُضرب مرّتين يُعرض بقيمته المخزَّنة. */
-  it("وصفُّ الضرب المزدوج يُعرض 9 لا 27", () => {
-    const rows = [{ product_name: "صنف", packs_count: 0, pieces_per_pack: 3, quantity: 9 }];
-    const html = formatPackaging([], rows)!;
-    const shown = /إجمالي عدد القطع :[\s\S]*?<span>([\d,]+)<\/span>/.exec(html)?.[1];
-    expect(shown).toBe("9");
+  /** وبالحساب القديم كان 99 — وهو ما رآه في ورقته. */
+  it("وبالضرب في ‎*‎N كان 99", () => {
+    const old = PHOTO_ROWS.reduce((s, r) => {
+      const p = Number(r.packs_count || 0), n = Number(r.pieces_per_pack || 0);
+      return s + (p > 0 && n > 0 ? p * n : p || Number(r.quantity || 0));
+    }, 0);
+    expect(old).toBe(99);
+  });
+
+  it("و«5 كرتونة كبيرة» وحدها ⇒ 5", () => {
+    const rows = [{ product_name: "", packaging_types: { name: "كرتونة كبيرة" }, packs_count: 5 }];
+    expect(leadingNumbers(rows)).toEqual([5]);
+    expect(shown(rows)).toBe(5);
   });
 
   /**
-   * والمجاميعُ الأخرى لا تتحرّك بتصحيح هذا الرقم: عددُ الأسطر كما هو، وكلُّ
-   * سطرٍ يبدأ بعدد طرودِه — فمن كان يعدّ الطرود يجدها في مواضعها.
+   * والعقدُ البنيويّ: المجموعُ = مجموعُ ما كُتب في الأسطر، أيّاً كانت
+   * البيانات. فلا يحتاج المستخدمُ أن يثق برقمٍ لا يستطيع عدَّه بعينه.
    */
-  it("ولا يتحرّك ما عداه — الأسطرُ وأعدادُ طرودها كما هي", () => {
-    const html = formatPackaging([], ROWS)!;
-    expect((html.match(/data-pkg-line/g) || []).length).toBe(ROWS.length + 1); // + شريطُ المجموع
+  it("والمجموعُ دائماً = مجموعُ الأرقام المكتوبة", () => {
+    for (const rows of [PHOTO_ROWS,
+      [{ packs_count: 3, pieces_per_pack: 7, product_name: "أ" }, { packs_count: 12, product_name: "ب" }],
+      [{ packs_count: 0, quantity: 4, product_name: "ج" }],
+    ]) {
+      const lead = leadingNumbers(rows as any);
+      expect(shown(rows as any)).toBe(lead.reduce((s, n) => s + n, 0));
+    }
+  });
+
+  /** و‎*‎N باقيةٌ في الأسطر — وصفُ الطرد لم يُحذف، إنما لا يُضرب. */
+  it("و‎*‎N باقيةٌ في الأسطر وصفاً لا حساباً", () => {
+    const html = formatPackaging([], PHOTO_ROWS)!;
     expect(html).toContain("*50");
-    expect(html).toContain("*8");
-    expect(html).toContain("2 ");
+    expect(html).toContain("*20");
   });
 });
 
-/* ═══════════ ٣) وكلُّ شاشةٍ تذكر العبارة تقرأ من المصدر ═══════════ */
+/* ═══════════ ٣) ولا شاشةَ تحسب العدد بنفسها ═══════════ */
 
 /**
- * النمطُ يُبحث عنه في المشروع كلّه لا في موضع البلاغ وحده. وقد وُجد بعد
- * الإصلاح الأوّل في **تقرير الإرسال**: يجمع `packs_count` ويسمّيه قطعاً.
+ * النمطُ يُبحث عنه في المشروع كلّه: العدُّ مكتوبٌ في موضعين — ورقةِ الفاتورة
+ * وتقريرِ الإرسال — فيقرآن من مصدرٍ واحد.
  */
-describe("لا شاشةَ تحسب العدد بنفسها", () => {
-  /** كلُّ ملفٍّ في المصدر يذكر العبارة كما تظهر للمستخدم. */
+describe("مصدرٌ واحدٌ لكل شاشةٍ تعرض العدد", () => {
+  /** الشاشتان اللتان تعرضان العدد للمستخدم. */
   const FILES = ["src/utils/printExtras.ts", "src/utils/dispatchReportPrint.ts"];
+  /** ووحدةُ الحساب نفسُها تذكر العبارة في شرحها — وهي المصدر لا شاشة. */
+  const SOURCE = "src/utils/packagingCount.ts";
 
   it("الشاشاتُ المعروفة هي هذه — فإن ظهرت ثالثةٌ سقط الفحص", () => {
     const found: string[] = [];
@@ -135,35 +155,21 @@ describe("لا شاشةَ تحسب العدد بنفسها", () => {
       }
     };
     walk(path.resolve(process.cwd(), "src"));
-    expect(found.sort()).toEqual(FILES.slice().sort());
+    expect(found.sort()).toEqual([...FILES, SOURCE].sort());
   });
 
-  it("وكلٌّ منها يستورد المصدرَ الواحد ولا يجمع بيده", () => {
+  it("وكلٌّ منها يستورد المصدرَ الواحد ولا يضرب في ‎*‎N", () => {
     for (const f of FILES) {
       const src = read(f);
-      expect(src, `${f} لا يستورد piecesTotal`).toMatch(/from "@\/utils\/piecesTotal"/);
-      // ولا جمعٌ يدويٌّ لـ`packs_count` تحت اسم القطع
-      expect(src, `${f} فيه جمعٌ يدويّ للطرود`)
-        .not.toMatch(/reduce\([^)]*packs_count\s*\?\?\s*1/);
+      expect(src, `${f} لا يستورد packagingCount`).toMatch(/from "@\/utils\/packagingCount"/);
+      // ولا ضربٌ يدويّ في عدد القطع داخل الطرد
+      expect(src, `${f} فيه ضربٌ في pieces_per_pack`)
+        .not.toMatch(/packs\s*\*\s*pieces|pieces_per_pack\s*\)?\s*\*/);
     }
   });
 
-  /**
-   * وتقريرُ الإرسال يعطي الرقمَ نفسَه الذي تعطيه الورقة — وهو ما كان يختلف.
-   * يُقاس بالحساب المشترك على نفس البيانات، فالفرقُ لا يعود إلا بحسابٍ ثانٍ.
-   */
-  it("وتقريرُ الإرسال يقول ما تقوله الورقة", () => {
-    const flat = [
-      { packs_count: 2, pieces_per_pack: 10, quantity: 20 },
-      { packs_count: 1, pieces_per_pack: 8, quantity: 8 },
-    ];
-    // الورقة
-    const html = formatPackaging([], flat.map((r, i) => ({ ...r, product_name: `صنف ${i}` })))!;
-    const sheet = /إجمالي عدد القطع :[\s\S]*?<span>([\d,]+)<\/span>/.exec(html)![1];
-    // والتقرير — نفسُ الدالّة التي صار يستوردها
-    expect(piecesTotalSum(flat).toLocaleString()).toBe(sheet);
-    expect(sheet).toBe("28");
-    // وبالحساب القديم كان التقريرُ يقول 3 (مجموعَ الطرود)
-    expect(flat.reduce((s, r) => s + r.packs_count, 0)).toBe(3);
+  it("والتقريرُ يقول ما تقوله الورقة", () => {
+    expect(packagingCountSum(PHOTO_ROWS)).toBe(shown(PHOTO_ROWS));
+    expect(packagingCountSum(PHOTO_ROWS)).toBe(6);
   });
 });

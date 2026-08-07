@@ -13,7 +13,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
-import { piecesTotalSum } from "@/utils/piecesTotal";
+import { packagingCountSum } from "@/utils/packagingCount";
 import { attachLookups, PACKAGING_TYPE_LOOKUP, TRANSPORTER_LOOKUP, DESTINATION_LOOKUP } from "@/utils/lookupJoin";
 
 const ACCENT = "#16a34a";
@@ -175,24 +175,20 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
 }
 
 /**
- * إجمالي عدد القطع — بالحساب نفسِه الذي في ورقة الفاتورة.
+ * إجمالي عدد القطع — مجموعُ الأرقام المكتوبة في أوّل الأسطر.
  *
- * ## العطل: شاشتان، نفسُ العبارة، رقمان
- * كان هذا التقرير يجمع `packs_count` وحدَه ويسمّيه «إجمالي عدد القطع» — أي
- * **الطرود** لا القطع. فمستندٌ فيه كرتونتان في كلٍّ منهما عشرُ قطع يقول هنا
- * «عدد القطع: 2» وتقول ورقةُ فاتورته «إجمالي عدد القطع : 20 قطعة» — نفسُ
- * البيانات ونفسُ العبارة ورقمان يختلفان عشرةَ أضعاف.
+ * وهي القاعدةُ التي قرّرها صاحبُ المستودع: «عدد القطع على الرقم في الأول قبل
+ * كلمة كرتونة كبيرة». فستّةُ أسطرٍ تبدأ كلٌّ منها بـ1 مجموعُها 6، وعلامةُ
+ * ‎*‎N بعد الاسم وصفٌ لما في الطرد لا عاملُ ضرب.
  *
- * وهي علّةُ «المدفوع» نفسُها في كشف الحساب: اسمٌ واحدٌ فوق حسابين. والأسطرُ
- * فوق المجموع تُظهر الطرودَ على أي حال («2 كرتونة بطارية ‎*‎10»)، فمن أراد
- * عدّها عدّها من مواضعها.
- *
- * فصار الحسابُ من `piecesTotal` — المصدرِ الواحد الذي تقرأ منه الورقة.
+ * وقد ضُرب هذا المجموعُ في ‎*‎N مرّةً — ظنّاً أنّ «القطع» قطعُ البضاعة داخل
+ * الطرود — فخرج التقريرُ برقمٍ أكبر بأضعاف. والحسابُ اليوم من
+ * `packagingCount` وحده، وهو المصدرُ الذي تقرأ منه ورقةُ الفاتورة أيضاً.
  */
-function totalPiecesFor(doc: DispatchDoc): number {
+function totalCountFor(doc: DispatchDoc): number {
   const flat = doc.packagingItemsFlat || [];
-  if (flat.length) return piecesTotalSum(flat as any);
-  return piecesTotalSum((doc.packaging || []) as any);
+  if (flat.length) return packagingCountSum(flat as any);
+  return packagingCountSum((doc.packaging || []) as any);
 }
 
 function renderTransports(rows: any[]): string {
@@ -275,7 +271,7 @@ function renderPackagingLines(doc: DispatchDoc): string {
 function renderCard(doc: DispatchDoc, idx: number): string {
   const inv = doc.invoice;
   const cust = inv.customers;
-  const totalPieces = totalPiecesFor(doc);
+  const totalPieces = totalCountFor(doc);
   return `
     <section class="d-card">
       <header class="d-card-head">
@@ -389,7 +385,7 @@ export function buildDispatchSheetHTML(
   });
 
   const cardsHtml = mergedDocs.map((d, i) => renderCard(d, i)).join("");
-  const totalPiecesAll = mergedDocs.reduce((s, d) => s + totalPiecesFor(d), 0);
+  const totalPiecesAll = mergedDocs.reduce((s, d) => s + totalCountFor(d), 0);
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">

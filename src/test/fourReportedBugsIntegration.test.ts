@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { buildCustomerAccountView } from "@/utils/buildCustomerAccountView";
-import { piecesTotalSum } from "@/utils/piecesTotal";
+import { packagingCountSum } from "@/utils/packagingCount";
 import { formatPackaging } from "@/utils/printExtras";
 import {
   defaultRateDecision, deriveRateFromRows, effectiveRowRate, computeUnitPrice,
@@ -95,11 +95,14 @@ describe("١) «المدفوع» في الكشف — الصندوقُ يساوي
 /* ═════════════ ٢) عددُ قطع التغليف ═════════════ */
 
 /**
+ * ## القاعدة كما قرّرها صاحبُ المستودع
+ * «عدد القطع على الرقم في الأول قبل كلمة كرتونة كبيرة». فالمجموعُ = مجموعُ
+ * الأرقام المكتوبة في أوّل الأسطر، و‎*‎N وصفُ الطرد لا عاملُ ضرب.
+ *
  * ## السيناريو بالأرقام
- * ثلاثةُ بنود: كرتونةٌ ×50، وبطاريةٌ ×8، وكرتونتان ×10. والمجموعُ 78.
- * وصفٌّ رابع بلا طرودٍ مسجَّلة كان يُضرب مرّتين.
+ * ثلاثةُ أسطر تبدأ بـ1 و1 و2 ⇒ **4**. وقد حُسبت مرّةً بالضرب فخرجت 78.
  */
-describe("٢) عددُ القطع — رقمٌ واحد في كل شاشة", () => {
+describe("٢) عددُ القطع — الرقمُ المكتوب هو المجموع", () => {
   const ROWS = [
     { product_name: "باكم فرامل امامي", packs_count: 1, pieces_per_pack: 50, quantity: 50 },
     { product_name: "بطارية جي ان", packs_count: 1, pieces_per_pack: 8, quantity: 8 },
@@ -113,26 +116,30 @@ describe("٢) عددُ القطع — رقمٌ واحد في كل شاشة", () 
     );
   };
 
-  it("الورقةُ تعرض 78", () => {
-    expect(shownOnSheet(ROWS)).toBe(78);
+  it("الورقةُ تعرض 4 — مجموعَ ما كُتب في أوّل الأسطر", () => {
+    expect(shownOnSheet(ROWS)).toBe(4);
   });
 
-  it("وتقريرُ الإرسال يعرض 78 — كان يعرض 4 (مجموعَ الطرود)", () => {
-    expect(piecesTotalSum(ROWS)).toBe(78);
-    const oldWay = ROWS.reduce((s, r) => s + Number(r.packs_count ?? 1), 0);
-    expect(oldWay).toBe(4);
+  it("وبالضرب في ‎*‎N كان 78", () => {
+    const multiplied = ROWS.reduce((s, r) => s + r.packs_count * r.pieces_per_pack, 0);
+    expect(multiplied).toBe(78);
   });
 
-  it("والضربُ المزدوج ذهب: 0 طرود × 3 قطع مع كمية 9 ⇒ 9 لا 27", () => {
-    const row = [{ product_name: "صنف", packs_count: 0, pieces_per_pack: 3, quantity: 9 }];
-    expect(shownOnSheet(row)).toBe(9);
+  it("وتقريرُ الإرسال يقول ما تقوله الورقة", () => {
+    expect(packagingCountSum(ROWS)).toBe(shownOnSheet(ROWS));
+    expect(packagingCountSum(ROWS)).toBe(4);
+  });
+
+  /** وخمسُ كراتين بلا ‎*‎N ⇒ 5 — مثالُ صاحب المستودع بعينه. */
+  it("و«5 كرتونة كبيرة» ⇒ 5", () => {
+    expect(shownOnSheet([{ product_name: "", packs_count: 5 }])).toBe(5);
   });
 
   /**
-   * ولم تتحرّك أعدادُ الطرود المعروضة في الأسطر: التصحيحُ في المجموع وحده،
-   * فمن كان يعدّ الكراتين يجدها كما هي.
+   * ولم تتحرّك الأسطرُ نفسُها: التصحيحُ في المجموع وحده، و‎*‎N باقيةٌ وصفاً
+   * لما في الطرد.
    */
-  it("ولم تتحرّك أعدادُ الطرود في الأسطر", () => {
+  it("ولم تتحرّك الأسطرُ ولا أوصافُها", () => {
     const html = formatPackaging([], ROWS)!;
     expect(html).toContain("*50");
     expect(html).toContain("*8");
