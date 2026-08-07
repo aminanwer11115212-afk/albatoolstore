@@ -11,6 +11,7 @@ import { AlertTriangle, Trash2, Download, ShieldOff, Loader2, Eye } from "lucide
 import { toast } from "sonner";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
+import { wipeTable } from "@/utils/wipeTable";
 
 /**
  * أداة مطوّر مخفية — تُفتح فقط عبر Ctrl+Shift+9.
@@ -186,13 +187,21 @@ export default function HiddenDevResetDialog() {
     },
   ];
 
-  const exportBackup = async () => {
+  /**
+   * تصديرُ نسخةٍ احتياطية — ويُعيد أسماءَ ما فشل.
+   *
+   * ولمَ يُعيدها: من علّم «نسخة احتياطية قبل التنفيذ» طلب أماناً قبل حذفٍ لا
+   * رجعةَ فيه. فلو فشل التصديرُ ومضى الحذفُ ذهبت البياناتُ بلا نسخة، والرسالةُ
+   * تقول «تم». فيمتنع الحذفُ ما لم تتمّ النسخة.
+   */
+  const exportBackup = async (): Promise<{ ok: number; failed: string[] }> => {
     if (affectedTables.length === 0) {
       toast.info("لا يوجد جداول محدّدة للنسخ");
-      return;
+      return { ok: 0, failed: [] };
     }
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    let ok = 0, fail = 0;
+    let ok = 0;
+    const failed: string[] = [];
     for (const t of affectedTables) {
       try {
         const { data, error } = await supabase.from(t as any).select("*").limit(50000);
@@ -201,11 +210,13 @@ export default function HiddenDevResetDialog() {
         downloadCSV(`albatool-backup_${t}_${stamp}.csv`, csv || "empty\n");
         ok++;
       } catch (e: any) {
-        fail++;
+        failed.push(t);
         console.warn(`[HiddenDevReset] backup ${t} failed:`, e?.message);
       }
     }
-    toast.success(`تم تصدير ${ok} ملف CSV${fail ? ` — فشل ${fail}` : ""}`);
+    if (failed.length) toast.error(`فشل نسخُ ${failed.length} جدول: ${failed.join("، ")}`);
+    else toast.success(`تم تصدير ${ok} ملف CSV`);
+    return { ok, failed };
   };
 
   const logAudit = async (payload: any, dryRun: boolean) => {
@@ -232,7 +243,12 @@ export default function HiddenDevResetDialog() {
     const collected: any = { scope: selectedKeys, started_at: new Date().toISOString() };
     try {
       if (backupBefore) {
-        await exportBackup();
+        const b = await exportBackup();
+        if (b.failed.length) {
+          throw new Error(
+            `تعذّر نسخُ هذه الجداول احتياطياً: ${b.failed.join("، ")} — أُلغي الحذف حفاظاً عليها`,
+          );
+        }
         collected.backup = "csv_exported";
       }
 
@@ -259,39 +275,34 @@ export default function HiddenDevResetDialog() {
         collected.danger = data;
       }
 
-      const wipeTable = async (t: string) => {
-        const { error } = await supabase.from(t as any).delete().not("id", "is", null as any);
-        if (error && !/id.*does not exist/i.test(error.message)) {
-          const { error: e2 } = await supabase.from(t as any).delete().gte("created_at" as any, "1900-01-01");
-          if (e2) throw e2;
-        }
-      };
+      /* المسحُ من `@/utils/wipeTable` — وكان مكتوباً هنا بشرطٍ معكوس يبتلع
+         الخطأ ويُعلن النجاح. الشرحُ والفحصُ في الوحدة نفسِها. */
+      const wipe = (t: string) => wipeTable(supabase as any, t);
 
       if (scope.transporters) {
         for (const t of [
           "invoices_transports_items", "invoice_transports", "quote_transports",
           "customer_preferred_transporter", "customer_transporters",
           "destination_transporters", "locality_transporters",
-        ]) await wipeTable(t);
-        const { error: eTr } = await supabase.from("transporters").delete().not("id", "is", null as any);
-        if (eTr) throw eTr;
+        ]) await wipe(t);
+        await wipe("transporters");
         collected.transporters = { ok: true };
       }
 
       if (scope.stock_movements) {
-        for (const t of ["stock_return_items", "stock_returns", "stock_transfers", "stock_adjustments_log"]) await wipeTable(t);
+        for (const t of ["stock_return_items", "stock_returns", "stock_transfers", "stock_adjustments_log"]) await wipe(t);
         collected.stock_movements = { ok: true };
       }
       if (scope.payment_logs) {
-        for (const t of ["invoice_revisions", "discount_audit_log"]) await wipeTable(t);
+        for (const t of ["invoice_revisions", "discount_audit_log"]) await wipe(t);
         collected.payment_logs = { ok: true };
       }
       if (scope.statements_log) {
-        await wipeTable("activity_log");
+        await wipe("activity_log");
         collected.statements_log = { ok: true };
       }
       if (scope.bot_logs) {
-        for (const t of ["bot_audit_log", "bot_scan_snapshots"]) await wipeTable(t);
+        for (const t of ["bot_audit_log", "bot_scan_snapshots"]) await wipe(t);
         collected.bot_logs = { ok: true };
       }
 
