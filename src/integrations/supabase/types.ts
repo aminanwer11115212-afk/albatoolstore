@@ -252,6 +252,7 @@ export type Database = {
           invoice_notes: string | null
           invoice_prefix: string | null
           logo_url: string | null
+          manager_name: string | null
           payment_terms_days: number | null
           phone: string | null
           postbox: string | null
@@ -290,6 +291,7 @@ export type Database = {
           invoice_notes?: string | null
           invoice_prefix?: string | null
           logo_url?: string | null
+          manager_name?: string | null
           payment_terms_days?: number | null
           phone?: string | null
           postbox?: string | null
@@ -328,6 +330,7 @@ export type Database = {
           invoice_notes?: string | null
           invoice_prefix?: string | null
           logo_url?: string | null
+          manager_name?: string | null
           payment_terms_days?: number | null
           phone?: string | null
           postbox?: string | null
