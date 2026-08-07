@@ -140,6 +140,41 @@ const PKG_ACCENT = "#5b2c8e";
 /** وخطُّ الفصل بين الأعمدة من اللون نفسه مخفَّفاً — ظاهرٌ على الورق لا باهت. */
 const PKG_RULE = "#a08cc9";
 
+/**
+ * عددُ القطع في صفّ تغليفٍ واحد.
+ *
+ * ## العطل: رقمان لصفٍّ واحد
+ * الورقةُ كانت تحسب `packs × pieces` دائماً، والعددُ يسقط أوّلاً إلى `quantity`
+ * حين يغيب `packs_count`:
+ *
+ *     const packs = packs_count || quantity;
+ *     total = packs * pieces;
+ *
+ * فصفٌّ فيه `packs_count = 0` و`pieces_per_pack = 3` و`quantity = 9` يخرج
+ * **27** في الورقة و**9** في نافذة التغليف — والفرقُ ثلاثةُ أضعاف: `quantity`
+ * حاصلُ ضربٍ أصلاً، فضُرب مرّةً ثانية.
+ *
+ * ## والقاعدة: العاملان إن حضرا، وإلا فالمخزَّن
+ * `packs_count × pieces_per_pack` قيمةٌ **تُتحقَّق من عامليها**، فهي المصدرُ
+ * حين يحضران. وإن غاب أحدُهما فلا ضربَ أصلاً: `quantity` هو ما خزّنته الشاشة
+ * (`quantity: packs * pieces` في نافذة التغليف وصفحة تغليف العرض وتحويل
+ * العرض إلى فاتورة)، أو عددُ الطرود في بياناتٍ سبقت العمودين.
+ *
+ * يحرسه `packagingPiecesCount.test.ts` بمقارنة الورقة بمجموع النافذة.
+ */
+export function piecesTotalOf(r: {
+  packs_count?: any; pieces_per_pack?: any; quantity?: any;
+}): number {
+  const packs = Number(r.packs_count || 0);
+  const pieces = Number(r.pieces_per_pack || 0);
+  // ١) العاملان حاضران: القيمةُ محسوبةٌ منهما لا مأخوذةٌ من مخزَّنٍ قد يشيخ
+  if (packs > 0 && pieces > 0) return packs * pieces;
+  // ٢) طرودٌ بلا قطعٍ مسجَّلة: قطعةٌ في كل طرد — لا صفرٌ يبتلع البند
+  if (packs > 0) return packs;
+  // ٣) ولا عاملَ أصلاً: المخزَّنُ هو الخبر — ولا يُضرب في شيء
+  return Number(r.quantity || 0);
+}
+
 export function packagingColumns(rowCount: number): number {
   if (rowCount <= 3) return 1;
   if (rowCount <= 10) return 2;
@@ -173,7 +208,8 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
     // العدد = عدد الطرود، فإن لم يُسجَّل فالكمية (بيانات أُدخلت قبل العمود).
     const packs = Number(r.packs_count || 0) || Number(r.quantity || 0) || 0;
     const pieces = Number(r.pieces_per_pack || 0);
-    return { label, packs, pieces, note: r.description || "" };
+    const total = piecesTotalOf(r);
+    return { label, packs, pieces, total, note: r.description || "" };
   }).filter((r) => r.label || r.packs);
 
   /**
@@ -196,7 +232,12 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
       const type = typeName(r);
       const packs = Number(r.packs_count || 0) || Number(r.quantity || 0) || 0;
       if (type || packs) {
-        rows.push({ label: type, packs, pieces: Number(r.pieces_per_pack || 0), note: "" });
+        rows.push({
+          label: type, packs,
+          pieces: Number(r.pieces_per_pack || 0),
+          total: piecesTotalOf(r),
+          note: "",
+        });
       }
     }
   }
@@ -290,7 +331,7 @@ export function formatPackaging(headers: any[], items: any[] = []): string | und
    * محسوبةٌ في الأسطر فوقها على أي حال: كلُّ سطرٍ يبدأ بعددها («2 كرتونة
    * بطارية ‎*‎10»)، فمن أراد عدّها عدّها من مواضعها.
    */
-  const totalPieces = rows.reduce((s, r) => s + r.packs * (r.pieces > 0 ? r.pieces : 1), 0);
+  const totalPieces = rows.reduce((s, r) => s + r.total, 0);
   const foot = rows.length
     ? `<div data-pkg-line style="margin-top:8px;padding:5px 10px;`
       + `background:#f1eefb;border:1px solid ${PKG_ACCENT};border-radius:5px;`
