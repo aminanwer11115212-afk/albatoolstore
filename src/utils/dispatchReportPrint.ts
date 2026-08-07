@@ -13,6 +13,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
+import { piecesTotalSum } from "@/utils/piecesTotal";
 import { attachLookups, PACKAGING_TYPE_LOOKUP, TRANSPORTER_LOOKUP, DESTINATION_LOOKUP } from "@/utils/lookupJoin";
 
 const ACCENT = "#16a34a";
@@ -174,18 +175,24 @@ export async function loadDispatchDoc(id: string): Promise<DispatchDoc | null> {
 }
 
 /**
- * إجمالي "عدد القطع" = Σ packs_count من سجلات التغليف
- * (وليس عدد القطع داخل الربطة الواحدة).
+ * إجمالي عدد القطع — بالحساب نفسِه الذي في ورقة الفاتورة.
+ *
+ * ## العطل: شاشتان، نفسُ العبارة، رقمان
+ * كان هذا التقرير يجمع `packs_count` وحدَه ويسمّيه «إجمالي عدد القطع» — أي
+ * **الطرود** لا القطع. فمستندٌ فيه كرتونتان في كلٍّ منهما عشرُ قطع يقول هنا
+ * «عدد القطع: 2» وتقول ورقةُ فاتورته «إجمالي عدد القطع : 20 قطعة» — نفسُ
+ * البيانات ونفسُ العبارة ورقمان يختلفان عشرةَ أضعاف.
+ *
+ * وهي علّةُ «المدفوع» نفسُها في كشف الحساب: اسمٌ واحدٌ فوق حسابين. والأسطرُ
+ * فوق المجموع تُظهر الطرودَ على أي حال («2 كرتونة بطارية ‎*‎10»)، فمن أراد
+ * عدّها عدّها من مواضعها.
+ *
+ * فصار الحسابُ من `piecesTotal` — المصدرِ الواحد الذي تقرأ منه الورقة.
  */
-function totalPacksFor(doc: DispatchDoc): number {
+function totalPiecesFor(doc: DispatchDoc): number {
   const flat = doc.packagingItemsFlat || [];
-  if (flat.length) {
-    return flat.reduce((s, r) => s + Number(r.packs_count ?? 1), 0);
-  }
-  return (doc.packaging || []).reduce(
-    (s: number, r: any) => s + Number(r.packs_count ?? 1),
-    0
-  );
+  if (flat.length) return piecesTotalSum(flat as any);
+  return piecesTotalSum((doc.packaging || []) as any);
 }
 
 function renderTransports(rows: any[]): string {
@@ -268,7 +275,7 @@ function renderPackagingLines(doc: DispatchDoc): string {
 function renderCard(doc: DispatchDoc, idx: number): string {
   const inv = doc.invoice;
   const cust = inv.customers;
-  const totalPacks = totalPacksFor(doc);
+  const totalPieces = totalPiecesFor(doc);
   return `
     <section class="d-card">
       <header class="d-card-head">
@@ -300,7 +307,7 @@ function renderCard(doc: DispatchDoc, idx: number): string {
           ${renderPackagingLines(doc)}
           <div class="d-pk-total">
             <span>إجمالي عدد القطع:</span>
-            <b>${totalPacks}</b>
+            <b>${totalPieces}</b>
           </div>
         </div>
 
@@ -382,7 +389,7 @@ export function buildDispatchSheetHTML(
   });
 
   const cardsHtml = mergedDocs.map((d, i) => renderCard(d, i)).join("");
-  const totalPacksAll = mergedDocs.reduce((s, d) => s + totalPacksFor(d), 0);
+  const totalPiecesAll = mergedDocs.reduce((s, d) => s + totalPiecesFor(d), 0);
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -529,7 +536,7 @@ export function buildDispatchSheetHTML(
   <div class="d-summary">
     <div>📅 التاريخ: <b>${today}</b></div>
     <div>عدد الفواتير: <b>${mergedDocs.length}</b></div>
-    <div>إجمالي عدد القطع: <b>${totalPacksAll}</b></div>
+    <div>إجمالي عدد القطع: <b>${totalPiecesAll}</b></div>
   </div>
 
   ${cardsHtml}

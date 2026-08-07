@@ -139,6 +139,56 @@ const SVG_HANDSHAKE =
   + '<path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/>'
   + '<path d="M3 4h8"/></svg>';
 
+/**
+ * ## علاماتُ صفوف مربّع الحساب
+ *
+ * أرسل صاحبُ المستودع صورةَ المربّع وقد أحاط بعمود العلامات: لكلّ صفٍّ علامتُه
+ * إلى يمينه — ورقةٌ للقيمة، وساعةٌ للقديم، وآلةُ حسابٍ للجملة، ومالٌ للمدفوع،
+ * ومحفظةٌ للرصيد. فالعينُ تجد الصفَّ بشكله قبل أن تقرأ اسمه، وهو مربّعٌ
+ * يُقرأ في عجلة.
+ *
+ * ورسومٌ سطرية لا إيموجي، للسبب نفسِه الذي في رسوم الترويسة: الإيموجي يُرسم
+ * بخطٍّ ملوّنٍ غيرِ مضمونٍ في المصوِّر ولا في المطبعة فيخرج مربّعاً فارغاً.
+ */
+const ACCT_ICON_COLOR = "#1f5c43";
+
+const SVG_FILE =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/>'
+  + '<path d="M14 2v5h5"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>';
+
+const SVG_CLOCK =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.5 2"/></svg>';
+
+const SVG_CALC =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8"/>'
+  + '<path d="M8 11h.01"/><path d="M12 11h.01"/><path d="M16 11h.01"/>'
+  + '<path d="M8 15h.01"/><path d="M12 15h.01"/><path d="M16 15h.01"/>'
+  + '<path d="M8 19h.01"/><path d="M12 19h.01"/><path d="M16 19h.01"/></svg>';
+
+const SVG_CASH =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<rect x="2" y="6" width="20" height="12" rx="2"/>'
+  + '<circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01"/><path d="M18 12h.01"/></svg>';
+
+const SVG_WALLET =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1"/>'
+  + '<path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/>'
+  + '<path d="M21 10h-4a2 2 0 0 0 0 4h4z"/></svg>';
+
+const SVG_TAG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M20.6 13.4 12 22 2 12V2h10z"/><path d="M7.5 7.5h.01"/></svg>';
+
 /** ألوان الإشارة في الطباعة — مطابقة لألوان الكشف: أخضر للعميل، أحمر عليه. */
 const TONE_COLOR: Record<"debit" | "credit" | "settled", string> = {
   credit: "#16a34a",
@@ -894,19 +944,31 @@ const accountBox = !showAccount ? "" : (() => {
   // أرقامُ المربّع بخطّ الورقة نفسه، واصطفافُ المنازل من tabular-nums لا من
   // خطٍّ أحادي المسافة يخالف ما حوله.
   const cellL = `padding:4px 7px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.5;font-variant-numeric:tabular-nums;font-size:${A.value}px;letter-spacing:0.2px;`;
+  /*
+   * خليّةُ العلامة: عرضٌ ثابت، وحدودُها كحدود جارتها فتبدو عموداً واحداً من
+   * الجدول لا لصاقةً عليه. والرسمُ يرث لونَ الخليّة بـcurrentColor.
+   *
+   * ولا تُخلّ بالارتفاع المحجوز: عددُ الصفوف واحد، والرسمُ 15px أقصرُ من سطر
+   * الخليّة (نحو 19px) فلا يمدّ الصفّ.
+   */
+  const cellI = `width:26px;padding:3px 0;text-align:center;vertical-align:middle;`
+    + `background:#f4f6f8;border:1px solid #b8bcc4;color:${ACCT_ICON_COLOR};line-height:0;`;
+  const icon = (svg: string) =>
+    `<span style="display:inline-block;width:15px;height:15px;">${svg}</span>`;
   const row = (opts: {
-    section: string; label: string; value: string;
+    section: string; label: string; value: string; icon: string;
     valColor?: string; strong?: boolean; sideBadge?: string; badgeColor?: string;
     valueClass?: string;
   }) => `
     <tr data-section="${opts.section}" data-section-label="${opts.label}">
+      <td style="${cellI}${opts.strong ? "background:#e8eef7;" : ""}">${icon(opts.icon)}</td>
       <td style="${cellR}${opts.strong ? "background:#e8eef7;" : ""}">${opts.label}</td>
       <td class="${opts.valueClass || "summary-box-value"}" style="${cellL}${opts.valColor ? `color:${opts.valColor};` : ""}${opts.strong ? `background:#eef4fb;font-size:${A.strong}px;` : ""}">${opts.value}</td>
       <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:${A.badge}px;color:${opts.badgeColor || "#111"};white-space:nowrap;">${opts.sideBadge || ""}</td>
     </tr>`;
   const rows = [
-    row({ section: "invoice-value", label: isQuote ? "قيمة عرض السعر" : "قيمة الفاتورة", value: fmt(invoiceValue) }),
-    generalDiscount > 0.01 ? row({ section: "discount-row", label: isQuote ? "الخصم على العرض" : "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : "",
+    row({ section: "invoice-value", label: isQuote ? "قيمة عرض السعر" : "قيمة الفاتورة", value: fmt(invoiceValue), icon: SVG_FILE }),
+    generalDiscount > 0.01 ? row({ section: "discount-row", label: isQuote ? "الخصم على العرض" : "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b", icon: SVG_TAG }) : "",
     !isQuote && hasPrev ? (() => {
       const prevSigned = signedAmountText(-prevNet);
       return row({
@@ -916,12 +978,14 @@ const accountBox = !showAccount ? "" : (() => {
         valColor: TONE_COLOR[prevSigned.tone],
         sideBadge: prevNet > 0 ? "عليه" : "له",
         badgeColor: TONE_COLOR[prevSigned.tone],
+        icon: SVG_CLOCK,
       });
     })() : "",
-    row({ section: "majmoo-row", label: isQuote ? "إجمالي عرض السعر" : "جملة الحساب", value: fmt(jomlaHesab), strong: true }),
-    isQuote ? "" : row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" }),
+    row({ section: "majmoo-row", label: isQuote ? "إجمالي عرض السعر" : "جملة الحساب", value: fmt(jomlaHesab), strong: true, icon: SVG_CALC }),
+    isQuote ? "" : row({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111", icon: SVG_CASH }),
     isQuote && !hasPrev ? "" : `
     <tr data-section="final-status" data-section-label="رصيد العميل الحالي">
+      <td style="${cellI}background:#e8eef7;">${icon(SVG_WALLET)}</td>
       <td style="${cellR}background:#e8eef7;">رصيد العميل الحالي</td>
       <td data-section="final-total" data-section-label="رصيد العميل الحالي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:${A.strong}px;color:${finalColor};">${finalDisplay}</td>
       <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:${A.badge}px;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
