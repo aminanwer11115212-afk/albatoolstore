@@ -1263,7 +1263,7 @@ export default function ProductsPage() {
 <style>
   @page { size: A4; margin: 8mm 6mm 10mm 6mm; }
   * { box-sizing: border-box; }
-  html, body { font-family: "Cairo", "Segoe UI", Tahoma, Arial, sans-serif; color: #1f2937; }
+  html, body { font-family: Arial, "Liberation Sans", Helvetica, sans-serif; color: #1f2937; }
   body { margin: 0; padding: 0; background: #fff; }
 
   .toolbar {

@@ -394,7 +394,7 @@ export function buildDispatchSheetHTML(
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { background: #fff; }
     body {
-      font-family: 'Cairo', 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
+      font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
       color: #111; font-size: 10px; line-height: 1.35; padding: 4px;
       font-weight: 600;
     }
