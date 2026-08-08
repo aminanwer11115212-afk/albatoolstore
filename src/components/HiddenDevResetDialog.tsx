@@ -28,25 +28,77 @@ type ScopeKey =
   | "transporters"
   | "stock_movements" | "payment_logs" | "statements_log" | "bot_logs";
 
-// جداول التأثير لكل خيار — تُستخدم في المعاينة والنسخ الاحتياطي CSV.
-const SCOPE_TABLES: Record<ScopeKey, string[]> = {
-  stock: ["products"],
-  ledger: ["transactions", "customers"],
-  invoices: ["invoices", "invoice_items", "invoice_attachments", "invoice_revisions"],
-  quotes: ["quotes", "quote_items", "quote_attachments"],
-  purchases: ["purchase_orders", "purchase_order_items"],
-  bank: ["transactions", "accounts"],
-  customers: ["customers", "suppliers"],
-  transporters: [
+/**
+ * أثرُ الخيار على الجدول — والفرقُ ليس تجميلياً.
+ *
+ * «حذف» يُفرغ الجدول، و«تصفير» يُبقي الصفوف ويمحو أرقامها. وكانت المعاينةُ
+ * تعرضهما سواءً بعددٍ أحمر تحت عنوان «ما سيُمسّ»: فيقرأ الأدمن «customers
+ * 302» قبل فعلٍ لا رجعةَ فيه ويفهم أن ٣٠٢ عميلاً سيُحذفون — وإنّما تُصفَّر
+ * أرصدتُهم. و«تعديل» أخطرُها كتماً: خيارُ «تصفير كشف الحساب» يكتب
+ * `paid_amount = total` على **كل** الفواتير غير النقدية ويعلّمها مدفوعة.
+ */
+type Effect = "delete" | "zero" | "modify";
+
+interface AffectedTable { table: string; effect: Effect }
+
+const del = (...t: string[]): AffectedTable[] => t.map((table) => ({ table, effect: "delete" as const }));
+const zero = (...t: string[]): AffectedTable[] => t.map((table) => ({ table, effect: "zero" as const }));
+
+/**
+ * جداولُ التأثير لكل خيار — تُستخدم في المعاينة والنسخ الاحتياطي.
+ *
+ * ## العطل الذي كان هنا
+ * القائمةُ كانت **أقصرَ ممّا تفعله الدوالّ فعلاً**. خيارُ «الفواتير» يُعلن
+ * أربعةَ جداول، و`admin_reset_transactional_data` تحذف من **عشرة**:
+ * التغليفُ والترحيلُ وبنودُهما والمحذوفاتُ والحركاتُ المرتبطة لم تكن مذكورةً
+ * ولا منسوخةً احتياطياً. فتذهب بلا معاينةٍ ولا نسخة — في أداةٍ كلُّ غرضها أن
+ * يرى صاحبُها ما يمحوه وأن يحتفظ بنسخةٍ منه قبل محوه.
+ *
+ * وأشدُّها خفاءً «تصفير كشف الحساب»: يكتب على جدول `invoices` كلِّه ولم يكن
+ * الجدولُ مذكوراً أصلاً.
+ *
+ * فالقوائمُ الآن مقروءةٌ من نصّ الدوالّ حرفاً بحرف، ويحرسها
+ * `hiddenDevResetDialog.test.tsx`.
+ */
+const SCOPE_TABLES: Record<ScopeKey, AffectedTable[]> = {
+  stock: zero("products"),
+  ledger: [
+    ...del("transactions"),
+    // يُكتب على كل فاتورة غير نقدية: paid_amount = total والحالة «مدفوعة»
+    { table: "invoices", effect: "modify" },
+    ...zero("customers"),
+  ],
+  invoices: del(
+    "invoice_items", "invoices_packaging_items", "invoices_transports_items",
+    "invoice_packaging", "invoice_transports", "invoice_revisions",
+    "invoice_attachments", "deleted_invoice_items", "transactions", "invoices",
+  ),
+  quotes: del(
+    "quote_items", "quote_transports", "quotes_packaging_items", "quotes_packaging",
+    "quote_attachments", "deleted_quote_items", "quotes",
+  ),
+  purchases: del("purchase_order_items", "purchase_attachments", "transactions", "purchase_orders"),
+  bank: [...del("transactions"), ...zero("accounts")],
+  customers: zero("customers", "suppliers"),
+  transporters: del(
     "transporters", "customer_transporters", "customer_preferred_transporter",
     "destination_transporters", "locality_transporters",
     "invoice_transports", "invoices_transports_items", "quote_transports",
-  ],
-  stock_movements: ["stock_adjustments_log", "stock_transfers", "stock_returns", "stock_return_items"],
-  payment_logs: ["invoice_revisions", "discount_audit_log"],
-  statements_log: ["activity_log"],
-  bot_logs: ["bot_audit_log", "bot_scan_snapshots"],
+  ),
+  stock_movements: del("stock_adjustments_log", "stock_transfers", "stock_returns", "stock_return_items"),
+  payment_logs: del("invoice_revisions", "discount_audit_log"),
+  statements_log: del("activity_log"),
+  bot_logs: del("bot_audit_log", "bot_scan_snapshots"),
 };
+
+export const EFFECT_LABEL: Record<Effect, string> = {
+  delete: "حذف",
+  zero: "تصفير",
+  modify: "تعديل",
+};
+
+/** حدُّ النسخة الاحتياطية — يُقرأ في الشرح والفحص معاً. */
+export const BACKUP_ROW_LIMIT = 50_000;
 
 const INITIAL_SCOPE: Record<ScopeKey, boolean> = {
   stock: false, ledger: false,
@@ -116,11 +168,28 @@ export default function HiddenDevResetDialog() {
     () => (Object.keys(scope) as ScopeKey[]).filter((k) => scope[k]),
     [scope],
   );
-  const affectedTables = useMemo(() => {
-    const s = new Set<string>();
-    selectedKeys.forEach((k) => SCOPE_TABLES[k].forEach((t) => s.add(t)));
-    return [...s];
+  /**
+   * الجداولُ المتأثّرة وأثرُ كلٍّ منها.
+   *
+   * وحين يجتمع خياران على جدولٍ واحد يغلب الأشدّ: `transactions` تُحذف مع
+   * «الفواتير» وتُحذف مع «البنك»، و`customers` تُصفَّر مع خيارٍ وتُحذف منها
+   * حركاتٌ مع آخر. فالأشدُّ هو ما يُعرض ويُنسخ له احتياطياً.
+   */
+  const affected = useMemo(() => {
+    const rank: Record<Effect, number> = { zero: 0, modify: 1, delete: 2 };
+    const m = new Map<string, Effect>();
+    for (const k of selectedKeys) {
+      for (const { table, effect } of SCOPE_TABLES[k]) {
+        const cur = m.get(table);
+        if (cur === undefined || rank[effect] > rank[cur]) m.set(table, effect);
+      }
+    }
+    return [...m.entries()]
+      .map(([table, effect]) => ({ table, effect }))
+      .sort((a, b) => rank[b.effect] - rank[a.effect] || a.table.localeCompare(b.table));
   }, [selectedKeys]);
+
+  const affectedTables = useMemo(() => affected.map((a) => a.table), [affected]);
 
   /**
    * معاينة عدّ الصفوف للجداول المتأثرة.
@@ -225,14 +294,30 @@ export default function HiddenDevResetDialog() {
     const failed: string[] = [];
     const blocks: string[] = [];
     for (const t of affectedTables) {
-      const { data, error } = await supabase.from(t as any).select("*").limit(50000);
+      // نطلب صفّاً زائداً عن الحدّ: وجودُه دليلُ بترٍ لا احتمالُه.
+      const { data, error } = await supabase.from(t as any).select("*").limit(BACKUP_ROW_LIMIT + 1);
       if (error) {
         failed.push(t);
         console.warn(`[HiddenDevReset] backup ${t} failed:`, error.message);
         continue;
       }
       const rows = (data || []) as any[];
-      blocks.push(`### ${t} — ${rows.length} صف\n${rowsToCSV(rows) || "(فارغ)"}`);
+      /*
+       * البترُ عند الحدّ لا يُبتلع.
+       *
+       * كان الطلبُ بـ`limit(50000)` ثمّ يُكتب ما عاد ويُعلن النجاح. فجدولٌ فيه
+       * ستّون ألفاً تُنسَخ منه خمسون، ويمضي الحذفُ على ثقةِ نسخةٍ ناقصة —
+       * وعشرةُ آلاف صفٍّ تذهب بلا أثر ولا رسالة.
+       *
+       * فالبترُ يُعدّ فشلاً كفشل القراءة: يُوقف الحذفَ ويُسمّى جدولُه.
+       */
+      if (rows.length > BACKUP_ROW_LIMIT) {
+        failed.push(`${t} (أكبر من ${BACKUP_ROW_LIMIT.toLocaleString()} صف)`);
+        console.warn(`[HiddenDevReset] backup ${t} exceeds ${BACKUP_ROW_LIMIT} rows`);
+        continue;
+      }
+      const effect = affected.find((a) => a.table === t)?.effect ?? "delete";
+      blocks.push(`### ${t} — ${rows.length} صف — ${EFFECT_LABEL[effect]}\n${rowsToCSV(rows) || "(فارغ)"}`);
       ok++;
     }
 
@@ -512,14 +597,30 @@ export default function HiddenDevResetDialog() {
                 <Eye size={14} /> معاينة ما سيُمسّ ({affectedTables.length} جدول)
                 {countsLoading && <Loader2 size={12} className="animate-spin" />}
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 text-[11px]">
-                {affectedTables.map((t) => (
-                  <div key={t} className="flex justify-between gap-2 bg-background/60 rounded px-2 py-1 border border-border/60">
+              {/* الأثرُ مكتوبٌ على كل جدول: «حذف» يُفرغه، و«تصفير» يمحو أرقامه
+                  ويُبقي صفوفه، و«تعديل» يكتب عليها. وكانت الثلاثةُ تُعرض عدداً
+                  أحمر واحداً فيُقرأ الكلُّ حذفاً. */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 text-[11px]">
+                {affected.map(({ table: t, effect }) => (
+                  <div key={t} className="flex items-center justify-between gap-2 bg-background/60 rounded px-2 py-1 border border-border/60">
                     <span className="font-mono truncate" dir="ltr">{t}</span>
-                    {/* «؟» تعني «تعذّرت القراءة» لا «صفر» — والفرقُ بينهما هو
-                        الفرقُ بين حذفٍ يعرف صاحبُه ما يحذف وحذفٍ على العمياء. */}
-                    <span className={counts[t] === null ? "font-bold text-amber-600" : "font-bold text-destructive"}>
-                      {counts[t] === null ? "؟" : (counts[t] ?? "…").toLocaleString?.() ?? counts[t]}
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          effect === "delete"
+                            ? "bg-destructive/15 text-destructive"
+                            : effect === "modify"
+                              ? "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                              : "bg-sky-500/15 text-sky-700 dark:text-sky-400"
+                        }`}
+                      >
+                        {EFFECT_LABEL[effect]}
+                      </span>
+                      {/* «؟» تعني «تعذّرت القراءة» لا «صفر» — والفرقُ بينهما هو
+                          الفرقُ بين حذفٍ يعرف صاحبُه ما يحذف وحذفٍ على العمياء. */}
+                      <span className={counts[t] === null ? "font-bold text-amber-600" : "font-bold text-foreground"}>
+                        {counts[t] === null ? "؟" : (counts[t] ?? "…").toLocaleString?.() ?? counts[t]}
+                      </span>
                     </span>
                   </div>
                 ))}
@@ -542,8 +643,11 @@ export default function HiddenDevResetDialog() {
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Download size={14} /> نسخة احتياطية CSV قبل التنفيذ
               </div>
+              {/* الوصفُ يطابق ما يفعله الكود: ملفٌّ واحد لا ملفٌّ لكل جدول.
+                  كان يَعِد بملفاتٍ منفصلة، فمن يجد واحداً يظنّ النسخةَ فشلت. */}
               <div className="text-xs text-muted-foreground mt-0.5">
-                يُنزَّل ملف CSV منفصل لكل جدول متأثر (بحد 50 ألف صف) قبل الحذف.
+                ملف CSV واحد يضمّ كل جدول متأثر ككتلة بعنوانها. وإن تعذّر نسخُ
+                جدول أو تجاوز {BACKUP_ROW_LIMIT.toLocaleString()} صف، يُلغى الحذف.
               </div>
             </div>
             <Button
