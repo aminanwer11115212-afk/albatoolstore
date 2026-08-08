@@ -187,6 +187,14 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
   // الاثنان في refs لأن تأثيري التحميل (الفاتورة/السعر) يتسابقان بأي ترتيب.
   const globalRateRef = useRef<number>(0);
   const derivedRateRef = useRef<number>(0);
+  /**
+   * معدّلُ الفاتورة كما حُفظ معها في `invoices.exchange_rate`.
+   *
+   * وهو أوثقُ من الاشتقاق: `invoice_items` لا عمودَ للمعدّل فيه، فالاشتقاقُ
+   * قسمةُ السعر المحلي على الأجنبي — وأيُّ تعديلٍ يدويٍّ على السعر يجعلها
+   * تُخرج رقماً آخر (‏50000 ÷ 54 = 925.925926 كما صوّره صاحبُ المستودع).
+   */
+  const savedRateRef = useRef<number>(0);
   /** هل وصلت بنودُ الفاتورة المحفوظة — قبلها لا يُقرَّر معدّلٌ. */
   const rowsLoadedRef = useRef(false);
   /** ووصولُ المعدّل العام حالةٌ لا مرجع: به يُعاد تشغيل قرارِ المعدّل. */
@@ -449,7 +457,8 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
        * قبل وصول البنود — والأثرُ أدناه يتولّاه بعد وصولها.
        */
       const effective = defaultRateDecision({
-        editing: !!editId, rowsReady: false, derived: 0, global: rate,
+        editing: !!editId, rowsReady: false,
+        saved: savedRateRef.current, derived: 0, global: rate,
       });
       if (effective === null || effective === 1 || rateTouchedRef.current) return;
       setDefaultRate(effective);
@@ -462,6 +471,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
   useEffect(() => {
     if (!editId) return;
     rowsLoadedRef.current = false;
+    savedRateRef.current = 0;
     (async () => {
       const { data: inv } = await supabase
         .from("invoices").select("*").eq("id", editId).maybeSingle();
@@ -482,6 +492,12 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       setSavedDue(invoiceDue(inv as any));
       if (inv.currency_code) setCurrencyCode(inv.currency_code);
       if (inv.exchange_rate_to_base) setExchangeRateToBase(Number(inv.exchange_rate_to_base));
+      /* معدّلُ الفاتورة المحفوظ — يسبق أيَّ اشتقاقٍ من البنود. والفواتيرُ
+         التي حُفظت قبل هذا العمود تبقى على الاشتقاق. */
+      savedRateRef.current = Number((inv as any).exchange_rate) || 0;
+      if (savedRateRef.current > 0 && !rateTouchedRef.current) {
+        setDefaultRate(savedRateRef.current);
+      }
       if (inv.customer_id) {
         const { data: c } = await supabase.from("customers")
           .select("id,name,phone,balance,credit_balance,net_balance,company").eq("id", inv.customer_id).maybeSingle();
@@ -521,7 +537,10 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         // — لا على 1، وإلا أُدرج الصنف الجديد بالسعر الأجنبي الخام.
         derivedRateRef.current = deriveRateFromRows(mapped);
         rowsLoadedRef.current = true;
-        const effectiveRate = resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
+        // المحفوظُ أوّلاً، ثمّ المشتقُّ من البنود للفواتير القديمة
+        const effectiveRate = savedRateRef.current > 0
+          ? savedRateRef.current
+          : resolveDefaultRate(derivedRateRef.current, globalRateRef.current);
         if (effectiveRate > 0 && !rateTouchedRef.current) {
           setDefaultRate(effectiveRate);
           setQuickRow((r) => (r.product_id ? r : { ...r, exchange_rate: effectiveRate, unit_price: computeUnitPrice(r.foreign_price, effectiveRate) }));
@@ -576,6 +595,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
     const effective = defaultRateDecision({
       editing: true,
       rowsReady: rowsLoadedRef.current,
+      saved: savedRateRef.current,
       derived: derivedRateRef.current,
       global: globalRateRef.current,
     });
@@ -1222,6 +1242,9 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         payment_method: pos ? "cash" : paymentMethod,
         currency_code: currencyCode,
         exchange_rate_to_base: exchangeRateToBase,
+        /* معدّلُ الفاتورة يُحفظ معها — وإلا أُعيد اشتقاقُه بالقسمة عند
+           التحميل فخرج رقماً آخر. العمودُ موجودٌ في القاعدة ولم يكن يُكتب. */
+        exchange_rate: defaultRate > 0 ? defaultRate : null,
         notes,
         internal_note: internalNote,
         ...(pos ? { source: "pos", walk_in_customer_name: walkInName.trim() || "عميل نقدي" } : {}),
@@ -1646,6 +1669,19 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       number: invoiceNumber,
       isCash,
       date: invoiceDate,
+      /*
+       * حقولٌ تمرّرها صفحةُ المعاينة وكانت تسقط هنا، فتختلف ورقةُ زرّ الإرسال
+       * عن الورقة التي رآها المستخدم: تاريخُ الاستحقاق، والمتبقّي، والحالة،
+       * وطريقةُ الدفع. طلبَ صاحبُ المستودع أن يتطابقا «بنفس كل شيء».
+       *
+       * وهذا ثالثُ افتراقٍ يقع بين البانيَين — سبقه افتراقُ حساب العميل الذي
+       * عولج بـ`documentAccountArgs`. فيحرسه الآن فحصٌ يقارن الحقول نفسَها
+       * في الموضعين: `src/test/sendPdfMatchesPreview.test.ts`.
+       */
+      dueDate: dueDate || undefined,
+      status: invoiceStatus,
+      paymentMethod,
+      hidePaidBox: false,
       customer,
       items: rows.filter(r => r.product_id).map(r => ({
         product_name: r.product_name,
@@ -1663,6 +1699,8 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
       discountTotal: totals.itemDiscounts + generalDiscount,
       shipping,
       grandTotal: totals.total,
+      // المتبقّي من الرصيد الفعلي لا من حالةٍ قديمة في الشاشة
+      dueAmount: Math.max(0, totals.total - (accountArgs.paidAmount || 0)),
       notes,
       company,
       variant,
