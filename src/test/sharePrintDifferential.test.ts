@@ -21,6 +21,10 @@
  * و`netBeforeInvoiceEdge` في الحافّة.
  */
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+
+const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 import { generatePrintHTML } from "@/utils/printTemplate";
 import { buildDocHTML, netBeforeInvoiceEdge } from "../../supabase/functions/document-share/template";
 import { netBeforeInvoice } from "@/utils/customerNetBefore";
@@ -147,6 +151,101 @@ describe("ملخّص الحساب: ورقة المستخدم وورقة العم
     expect(cell(print, "final-total")).toBe("+100");
     expect(cell(share, "final-total")).toBe("+100");
     expect(share).toMatch(/data-section="final-total"[^>]*color:#16a34a/);
+  });
+});
+
+/**
+ * الرسومُ السطرية — أرسل صاحبُ المستودع معاينته وملفَّه متجاورين: «اللوقوهات
+ * الصغيرة لا تظهر هنا». وكانت الرسومُ في قالب الطباعة وحده، وقالبُ الرابط
+ * العام بلا رسمٍ واحد: لا عمودَ علاماتٍ في مربّع الحساب، ولا هاتفَ ولا مسؤولَ
+ * ولا موقعَ في الترويسة، ولا صندوقَ تغليفٍ ولا شاحنةَ ترحيل.
+ *
+ * والتعريفُ الآن واحدٌ في `_shared/documentIcons.ts` يستورده الطرفان، فلا
+ * يبقى إلا أن يُقيَّد **استعمالُه** في الاثنين.
+ */
+describe("رسوم الورقة: الطباعة والرابط العام", () => {
+  const scenario: Scenario = {
+    subtotal: 1000, discountTotal: 100, shipping: 0, grandTotal: 900,
+    paidAmount: 0, previousDebt: 200_000, previousCredit: 0,
+    currentNet: 150_000, isQuote: false,
+  };
+
+  /** رسمٌ لكل صفٍّ من مربّع الحساب — تُميَّز بأوّل مسارٍ فيها. */
+  const ACCOUNT_ICON_ROWS = [
+    "invoice-value", "discount-row", "prev-account-row", "majmoo-row", "paid-amount",
+  ];
+
+  function withIcons() {
+    return bothSheets(scenario);
+  }
+
+  it("كل صفٍّ في مربّع الحساب يحمل رسماً — في الورقتين", () => {
+    const { print, share } = withIcons();
+    for (const [label, html] of [["print", print], ["share", share]] as const) {
+      for (const section of ACCOUNT_ICON_ROWS) {
+        const row = html.match(new RegExp(`data-section="${section}"[\\s\\S]{0,2500}?</tr>`));
+        expect({ label, section, hasIcon: !!row && row[0].includes("<svg") })
+          .toEqual({ label, section, hasIcon: true });
+      }
+      // ورصيدُ العميل الحالي في صفٍّ مستقل
+      const finalRow = html.match(/data-section="final-status"[\s\S]{0,2500}?<\/tr>/);
+      expect({ label, hasIcon: !!finalRow && finalRow[0].includes("<svg") })
+        .toEqual({ label, hasIcon: true });
+    }
+  });
+
+  it("الترويسة والتغليف والترحيل والشكر ترسم في الورقتين", () => {
+    const company = { company_name: "شركة", phone: "0900", address: "عطبرة", manager_name: "مينا" };
+    const print = generatePrintHTML({
+      type: "invoice", number: "D", date: "2026-08-08", customer: { name: "ع" },
+      items: [], taxTotal: 0, subtotal: 1000, discountTotal: 0, grandTotal: 1000,
+      company, packagingInfo: "كرتونة", transportInfo: "الخرطوم",
+    } as any);
+    const share = buildDocHTML({
+      docTitle: "فاتورة مبيعات", docNumber: "D", date: "2026-08-08", customer: { name: "ع" },
+      items: [], subtotal: 1000, grandTotal: 1000,
+      company, packagingInfo: "كرتونة", transportInfo: "الخرطوم",
+    } as any);
+
+    for (const [label, html] of [["print", print], ["share", share]] as const) {
+      // الترويسة: هاتف ومسؤول وموقع
+      expect({ label, meta: (html.match(/class="header-meta-item"/g) || []).length })
+        .toEqual({ label, meta: 3 });
+      for (const section of ["packaging", "transport", "thanks"]) {
+        const block = html.match(new RegExp(`data-section="${section}"[\\s\\S]{0,900}`));
+        expect({ label, section, hasIcon: !!block && block[0].includes("<svg") })
+          .toEqual({ label, section, hasIcon: true });
+      }
+    }
+  });
+
+  it("رسومٌ سطرية لا إيموجي — الإيموجي يخرج مربّعاً فارغاً في المصوِّر", () => {
+    // الرسمُ يُرسم بالمسارات، والإيموجي بخطٍّ ملوّنٍ غيرِ مضمونٍ في
+    // html2canvas ولا في سائقات الطباعة. فلا إيموجي في عناوين الأقسام.
+    const { print, share } = withIcons();
+    const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+    for (const [label, html] of [["print", print], ["share", share]] as const) {
+      const titles = [...html.matchAll(/data-section-label="([^"]*)"/g)].map((m) => m[1]);
+      expect({ label, withEmoji: titles.filter((t) => EMOJI.test(t)) })
+        .toEqual({ label, withEmoji: [] });
+    }
+  });
+
+  it("التعريف واحد — لا نسخةَ رسمٍ ثانية في أيّ من القالبين", () => {
+    const shared = read("supabase/functions/_shared/documentIcons.ts");
+    expect(shared).not.toMatch(/^\s*import\s/m); // وإلا سقطت دالّة الحافّة
+    expect((shared.match(/export const SVG_/g) || []).length).toBeGreaterThanOrEqual(12);
+    for (const f of [
+      "src/utils/printTemplate.ts",
+      "supabase/functions/document-share/template.ts",
+    ]) {
+      const src = read(f);
+      expect({ f, importsShared: src.includes("documentIcons") })
+        .toEqual({ f, importsShared: true });
+      // لا تعريفَ محلّياً يُخالف المشترك
+      expect({ f, localDefs: (src.match(/^const SVG_\w+ =/gm) || []).length })
+        .toEqual({ f, localDefs: 0 });
+    }
   });
 });
 

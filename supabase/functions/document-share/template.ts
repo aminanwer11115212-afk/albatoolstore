@@ -21,6 +21,12 @@
 //   * `<meta name="lov-doc-label|lov-doc-number|lov-customer-name">`
 //   * اسم ملف PDF: "<label> - <customer> - <number> - <amount>.pdf"
 
+import {
+  SVG_BOX, SVG_TRUCK, SVG_PHONE, SVG_USER, SVG_PIN, SVG_HANDSHAKE,
+  SVG_FILE, SVG_CLOCK, SVG_CALC, SVG_CASH, SVG_WALLET, SVG_TAG,
+  ACCT_ICON_COLOR,
+} from "../_shared/documentIcons.ts";
+
 export function attr(v: unknown): string {
   return String(v ?? "")
     .replace(/&/g, "&amp;")
@@ -221,10 +227,19 @@ export function buildDocHTML(args: ShareDocArgs): string {
   const finalBadge = Math.abs(finalNet) <= 0.01 ? "" : finalNet > 0 ? "عليه" : "له";
   const finalColor = TONE_COLOR[finalSigned.tone];
 
+  /*
+   * خليّةُ العلامة: عرضٌ ثابت وحدودٌ كحدود جارتها، فتبدو عموداً من الجدول لا
+   * لصاقةً عليه. والرسمُ يرث لونَ الخليّة بـcurrentColor.
+   */
+  const cellI = `width:26px;padding:3px 0;text-align:center;vertical-align:middle;`
+    + `background:#f4f6f8;border:1px solid #b8bcc4;color:${ACCT_ICON_COLOR};line-height:0;`;
+  const icon = (svg: string) =>
+    `<span style="display:inline-block;width:15px;height:15px;">${svg}</span>`;
   const cellR = "padding:3px 6px;text-align:right;font-weight:700;color:#111;background:#f4f6f8;border:1px solid #b8bcc4;line-height:1.1;font-size:10px;";
   const cellL = "padding:3px 6px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.1;font-family:'Consolas','Courier New',monospace;font-size:10.5px;letter-spacing:0.2px;";
-  const sumRow = (o: { section: string; label: string; value: string; valColor?: string; strong?: boolean; sideBadge?: string; badgeColor?: string }) => `
+  const sumRow = (o: { section: string; label: string; value: string; icon: string; valColor?: string; strong?: boolean; sideBadge?: string; badgeColor?: string }) => `
     <tr data-section="${o.section}" data-section-label="${attr(o.label)}">
+      <td style="${cellI}${o.strong ? "background:#e8eef7;" : ""}">${icon(o.icon)}</td>
       <td style="${cellR}${o.strong ? "background:#e8eef7;" : ""}">${attr(o.label)}</td>
       <td class="summary-box-value" style="${cellL}${o.valColor ? `color:${o.valColor};` : ""}${o.strong ? "background:#eef4fb;font-size:11.5px;" : ""}">${o.value}</td>
       <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:9.5px;color:${o.badgeColor || "#111"};white-space:nowrap;">${o.sideBadge || ""}</td>
@@ -312,7 +327,15 @@ export function buildDocHTML(args: ShareDocArgs): string {
 
   .extra-row { display: flex; gap: 16px; margin: 16px 0; }
   .extra-box { flex: 1; border: 2px solid #999; border-radius: 6px; padding: 12px 16px; min-height: 80px; }
-  .extra-box-title { font-size: 14px; font-weight: 800; color: #5b2c8e; border-bottom: 2px dashed #5b2c8e; padding-bottom: 4px; margin-bottom: 8px; }
+  .extra-box-title { font-size: 14px; font-weight: 800; color: #5b2c8e; border-bottom: 2px dashed #5b2c8e; padding-bottom: 4px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .extra-box-title svg { width: 16px; height: 16px; flex: 0 0 auto; }
+  .header-meta { margin-top: 2px; display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; font-weight: 700; color: #1a1a1a; }
+  .header-meta-item { display: inline-flex; align-items: center; gap: 4px; }
+  .header-meta-item svg { width: 13px; height: 13px; flex: 0 0 auto; }
+  .header-meta-sep { opacity: 0.45; }
+  .doc-thanks { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; color: #4a7c59; font-weight: 700; font-size: 13px; }
+  .doc-thanks svg { width: 18px; height: 18px; flex: 0 0 auto; }
+  .doc-thanks-rule { flex: 0 0 40px; height: 1px; background: #4a7c59; opacity: 0.5; }
   .extra-box p { font-size: 12px; color: #666; }
 
   .notes-section { margin: 10px 0; padding: 8px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; }
@@ -350,8 +373,16 @@ export function buildDocHTML(args: ShareDocArgs): string {
     ${logoHTML}
     <div>
       <div class="header-title">${attr(company?.company_name || "")}</div>
-      <div class="header-address">${attr(company?.address || "")}</div>
-      <div class="header-phones">${attr(company?.phone || "")}</div>
+      ${(() => {
+        // نفس نسيج ترويسة الطباعة: الهاتفُ والمسؤولُ والعنوان في سطرٍ واحد
+        // برسومها، وما لم يُملأ لا يترك فاصلاً معلّقاً.
+        const bits = [
+          company?.phone ? `<span class="header-meta-item">${SVG_PHONE}<span>${attr(company.phone)}</span></span>` : "",
+          company?.manager_name ? `<span class="header-meta-item">${SVG_USER}<span>${attr(company.manager_name)}</span></span>` : "",
+          company?.address ? `<span class="header-meta-item">${SVG_PIN}<span>${attr(company.address)}</span></span>` : "",
+        ].filter(Boolean);
+        return bits.length ? `<div class="header-meta">${bits.join('<span class="header-meta-sep">|</span>')}</div>` : "";
+      })()}
     </div>
     ${logoHTML}
   </div>
@@ -403,19 +434,20 @@ export function buildDocHTML(args: ShareDocArgs): string {
 
 <table class="summary-table" data-section="account-summary" data-section-label="ملخص الحساب">
   <tbody>
-    ${sumRow({ section: "invoice-value", label: isQuote ? "قيمة عرض السعر" : "قيمة الفاتورة", value: fmt(invoiceValue) })}
-    ${generalDiscount > 0.01 ? sumRow({ section: "discount-row", label: isQuote ? "الخصم على العرض" : "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b" }) : ""}
+    ${sumRow({ section: "invoice-value", label: isQuote ? "قيمة عرض السعر" : "قيمة الفاتورة", value: fmt(invoiceValue), icon: SVG_FILE })}
+    ${generalDiscount > 0.01 ? sumRow({ section: "discount-row", label: isQuote ? "الخصم على العرض" : "الخصم على الفاتورة", value: `− ${fmt(generalDiscount)}`, valColor: "#c0392b", icon: SVG_TAG }) : ""}
     ${!isQuote && hasPrev ? (() => {
       const s = signedAmountText(-prevNet);
       return sumRow({
         section: "prev-account-row", label: "الحساب القديم", value: s.text,
-        valColor: TONE_COLOR[s.tone], sideBadge: prevNet > 0 ? "عليه" : "له", badgeColor: TONE_COLOR[s.tone],
+        valColor: TONE_COLOR[s.tone], sideBadge: prevNet > 0 ? "عليه" : "له", badgeColor: TONE_COLOR[s.tone], icon: SVG_CLOCK,
       });
     })() : ""}
-    ${sumRow({ section: "majmoo-row", label: isQuote ? "إجمالي عرض السعر" : "جملة الحساب", value: fmt(jomlaHesab), strong: true })}
-    ${isQuote ? "" : sumRow({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111" })}
+    ${sumRow({ section: "majmoo-row", label: isQuote ? "إجمالي عرض السعر" : "جملة الحساب", value: fmt(jomlaHesab), strong: true, icon: SVG_CALC })}
+    ${isQuote ? "" : sumRow({ section: "paid-amount", label: "المدفوع", value: fmt(paidValue), valColor: paidValue > 0 ? "#16a34a" : "#111", icon: SVG_CASH })}
     ${isQuote && !hasPrev ? "" : `
     <tr data-section="final-status" data-section-label="رصيد العميل الحالي">
+      <td style="${cellI}background:#e8eef7;">${icon(SVG_WALLET)}</td>
       <td style="${cellR}background:#e8eef7;">رصيد العميل الحالي</td>
       <td data-section="final-total" data-section-label="رصيد العميل الحالي" class="summary-box-value" style="${cellL}background:#eef4fb;font-size:11.5px;color:${finalColor};">${finalSigned.text}</td>
       <td style="border:none;padding:0 4px;text-align:right;font-weight:800;font-size:9.5px;color:${finalColor};white-space:nowrap;">${finalBadge}</td>
@@ -427,12 +459,12 @@ ${showExtras ? `
 <div class="extra-row">
   ${showPackaging ? `
   <div class="extra-box" data-section="packaging" data-section-label="تفاصيل التغليف">
-    <div class="extra-box-title">تفاصيل التغليف</div>
+    <div class="extra-box-title">${SVG_BOX}<span>تفاصيل التغليف</span></div>
     <p>${cleanPackaging || `لا توجد بيانات تغليف ${docNoun}`}</p>
   </div>` : ""}
   ${showTransport ? `
   <div class="extra-box" data-section="transport" data-section-label="معلومات الترحيل">
-    <div class="extra-box-title">معلومات الترحيل</div>
+    <div class="extra-box-title">${SVG_TRUCK}<span>معلومات الترحيل</span></div>
     <p>${cleanTransport || `لا توجد بيانات ترحيل ${docNoun}`}</p>
   </div>` : ""}
 </div>
@@ -446,6 +478,15 @@ ${showSignatures ? `
   <div class="sig-box"><div class="sig-line">توقيع المسؤول</div></div>
 </div>
 ` : ""}
+
+${isHidden("thanks") ? "" : `
+<div class="doc-thanks" data-section="thanks" data-section-label="عبارة الشكر">
+  <span class="doc-thanks-rule"></span>
+  ${SVG_HANDSHAKE}
+  <span>${attr(String(company?.invoice_notes ?? "").trim() || "شكراً لتعاملكم معنا")}</span>
+  <span class="doc-thanks-rule"></span>
+</div>
+`}
 
 </div>
 </div>
