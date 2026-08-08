@@ -236,7 +236,9 @@ export function buildDocHTML(args: ShareDocArgs): string {
   const icon = (svg: string) =>
     `<span style="display:inline-block;width:15px;height:15px;">${svg}</span>`;
   const cellR = "padding:3px 6px;text-align:right;font-weight:700;color:#111;background:#f4f6f8;border:1px solid #b8bcc4;line-height:1.1;font-size:10px;";
-  const cellL = "padding:3px 6px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.1;font-family:'Consolas','Courier New',monospace;font-size:10.5px;letter-spacing:0.2px;";
+  // أرقامُ المربّع بخطّ الورقة نفسه واصطفافُ المنازل من tabular-nums — لا خطٌّ
+  // أحادي المسافة يخالف ما حوله، كما في قالب الطباعة.
+  const cellL = "padding:3px 6px;text-align:left;font-weight:800;color:#111;background:#ffffff;border:1px solid #b8bcc4;line-height:1.1;font-variant-numeric:tabular-nums;font-size:10.5px;letter-spacing:0.2px;";
   const sumRow = (o: { section: string; label: string; value: string; icon: string; valColor?: string; strong?: boolean; sideBadge?: string; badgeColor?: string }) => `
     <tr data-section="${o.section}" data-section-label="${attr(o.label)}">
       <td style="${cellI}${o.strong ? "background:#e8eef7;" : ""}">${icon(o.icon)}</td>
@@ -272,7 +274,14 @@ export function buildDocHTML(args: ShareDocArgs): string {
      (بلا علامة backtick هنا: هذا التعليق داخل نصٍّ قالبي، والعلامة تُنهيه.) */
   .extra-row, .extra-box { page-break-inside: auto; break-inside: auto; }
   body {
-    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    /*
+     * نفسُ مكدّس ورقة الطباعة حرفياً.
+     *
+     * كان «Segoe UI» أوّلَ الخطّ هنا — وهو خطُّ ويندوز لا يوجد على أندرويد
+     * ولا لينكس. فورقةُ صاحب المحلّ تُرسم بـArial وورقةُ عميله بـSegoe UI أو
+     * Tahoma حسب جهازه: نفسُ الفاتورة بحرفين مختلفين وعرضين مختلفين.
+     */
+    font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
     color: #1a1a1a; background: #f3f4f6; padding: 80px 12px 24px; line-height: 1.5;
     font-size: 14px;
   }
@@ -319,6 +328,27 @@ export function buildDocHTML(args: ShareDocArgs): string {
   tbody td { padding: 7px 10px; text-align: center; font-size: 13px; border: 1px solid #999; }
   tbody tr:nth-child(even) { background: #f8f8f8; }
   .total-row td { font-weight: 800; font-size: 14px; border: 2px solid #1a1a1a; background: #f0f0f0; }
+  /* شريطُ الجملة — نفس قيم قالب الطباعة. أرضيةٌ فاتحة وخطٌّ غامق كي لا يخرج
+     من الطابعة كتلةَ حبرٍ سوداء تبتلع الرقم. */
+  .grand-band {
+    display: flex; align-items: stretch;
+    width: fit-content; min-width: 250px; max-width: 62%;
+    margin: -12px auto 14px 0;
+    border-radius: 5px; overflow: hidden;
+    background: #eef2fb; color: #16224a;
+    border: 1.5px solid #1f2d5a;
+    page-break-inside: avoid; break-inside: avoid;
+  }
+  .grand-band-label {
+    padding: 6px 14px; font-size: 15px; font-weight: 800; white-space: nowrap;
+    display: flex; align-items: center;
+  }
+  .grand-band-value {
+    padding: 6px 16px; font-size: 17px; font-weight: 900; white-space: nowrap;
+    letter-spacing: 0.3px; background: #dce4f5;
+    border-inline-start: 1.5px solid #1f2d5a;
+    display: flex; align-items: center; margin-inline-start: auto;
+  }
   .product-name { text-align: right; font-weight: 600; }
 
   .summary-box-value { font-size: 20px; font-weight: 900; }
@@ -423,14 +453,13 @@ export function buildDocHTML(args: ShareDocArgs): string {
   </thead>
   <tbody>
     ${items.map((it, i) => `<tr><td>${i + 1}</td><td class="product-name">${attr(it.product_name)}</td><td>${fmt(it.quantity)}</td><td>${fmt(it.unit_price)}</td><td style="font-weight:700;">${fmt(it.total)}</td></tr>`).join("")}
-    <tr class="total-row" data-section="grand-total" data-section-label="الجملة">
-      <td colspan="2" style="text-align:right; padding-right:15px;">جملة ${isQuote ? "عرض السعر" : "الفاتورة"}</td>
-      <td></td>
-      <td></td>
-      <td>${fmt(Number(subtotal) || (Number(grandTotal) || 0) + generalDiscount)}</td>
-    </tr>
   </tbody>
 </table>
+
+<div class="grand-band" data-section="grand-total" data-section-label="الجملة">
+  <span class="grand-band-label">جملة ${isQuote ? "عرض السعر" : "الفاتورة"}</span>
+  <span class="grand-band-value">${fmt(Number(subtotal) || (Number(grandTotal) || 0) + generalDiscount)}</span>
+</div>
 
 <table class="summary-table" data-section="account-summary" data-section-label="ملخص الحساب">
   <tbody>

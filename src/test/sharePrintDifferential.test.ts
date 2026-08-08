@@ -249,6 +249,64 @@ describe("رسوم الورقة: الطباعة والرابط العام", () =
   });
 });
 
+describe("خطُّ الورقة وشريطُ الجملة", () => {
+  const ARIAL = "Arial, 'Liberation Sans', Helvetica, sans-serif";
+
+  it("الورقتان بخطٍّ واحد — Arial أوّلاً", () => {
+    // كان `'Segoe UI'` أوّلَ خطّ رابط العميل: موجودٌ على ويندوز، غائبٌ عن
+    // أندرويد ولينكس. فنفسُ الفاتورة تُرسم بحرفين مختلفين حسب جهاز قارئها.
+    const { print, share } = bothSheets({
+      subtotal: 1000, discountTotal: 0, shipping: 0, grandTotal: 1000,
+      paidAmount: 0, previousDebt: 0, previousCredit: 0, currentNet: null, isQuote: false,
+    });
+    for (const [label, html] of [["print", print], ["share", share]] as const) {
+      expect({ label, hasArial: html.includes(`font-family: ${ARIAL}`) })
+        .toEqual({ label, hasArial: true });
+      // ولا يسبقه خطٌّ خاصٌّ بنظامٍ بعينه في وسم الورقة
+      expect({ label, segoe: html.includes("font-family: 'Segoe UI'") })
+        .toEqual({ label, segoe: false });
+    }
+  });
+
+  it("أرقام مربّع الحساب تصطفّ بـtabular-nums لا بخطٍّ أحادي المسافة", () => {
+    // الخطُّ الأحادي يخالف ما حوله في الورقة؛ والاصطفافُ يأتي من الرقم نفسه.
+    const { print, share } = bothSheets({
+      subtotal: 1000, discountTotal: 0, shipping: 0, grandTotal: 1000,
+      paidAmount: 0, previousDebt: 5000, previousCredit: 0, currentNet: 6000, isQuote: false,
+    });
+    for (const [label, html] of [["print", print], ["share", share]] as const) {
+      expect({ label, tabular: html.includes("font-variant-numeric:tabular-nums") })
+        .toEqual({ label, tabular: true });
+      expect({ label, mono: /font-family:'Consolas'/.test(html) })
+        .toEqual({ label, mono: false });
+    }
+  });
+
+  /**
+   * «اجعل اللون خفيف كي لا يظهر في الطباعة أسود». الأرضيةُ الكحلية الغامقة
+   * تخرج من الطابعة أحاديةِ اللون كتلةَ حبرٍ سوداء تبتلع الرقمَ الأبيض الذي
+   * فيها — فيصير أبرزُ رقمٍ في الورقة أقلَّها قراءة.
+   */
+  it("شريط الجملة أرضيتُه فاتحة وخطُّه غامق — في الورقتين", () => {
+    const { print, share } = bothSheets({
+      subtotal: 1000, discountTotal: 0, shipping: 0, grandTotal: 1000,
+      paidAmount: 0, previousDebt: 0, previousCredit: 0, currentNet: null, isQuote: false,
+    });
+    for (const [label, html] of [["print", print], ["share", share]] as const) {
+      const band = html.match(/\.grand-band \{[\s\S]*?\}/);
+      expect({ label, defined: !!band }).toEqual({ label, defined: true });
+      expect({ label, light: /background: #eef2fb/.test(band![0]) })
+        .toEqual({ label, light: true });
+      // لا أرضيةَ داكنة ولا خطَّ أبيض عليها
+      expect({ label, dark: /background: #1f2d5a|color: #fff/.test(band![0]) })
+        .toEqual({ label, dark: false });
+      // وشريطٌ مضغوط لا صفَّ جدولٍ بعرض الورقة
+      expect({ label, isBand: html.includes('class="grand-band" data-section="grand-total"') })
+        .toEqual({ label, isBand: true });
+    }
+  });
+});
+
 describe("إعادة تشغيل سجلّ الحساب: التطبيق والحافّة", () => {
   /**
    * `netBeforeInvoice` و`netBeforeInvoiceEdge` نسختان من نفس الخوارزمية.

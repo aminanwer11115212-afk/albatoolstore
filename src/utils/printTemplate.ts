@@ -517,12 +517,26 @@ ${PAGINATION_CSS}
    *
    * ولا يُشطر بين صفحتين، وهو ذرّةٌ في حساب الترقيم كصفوف الجدول.
    */
+  /*
+   * ## وأرضيتُه فاتحةٌ لا داكنة
+   *
+   * «اجعل اللون خفيف كي لا يظهر في الطباعة أسود، يظهر مربع بلون خفيف».
+   * كانت الأرضيةُ كحليةً غامقة (#1f2d5a) بخطٍّ أبيض — تُقرأ على الشاشة،
+   * وتخرج من الطابعة كتلةَ حبرٍ سوداء تبتلع الرقمَ الأبيضَ الذي فيها.
+   * والطابعةُ أحاديةُ اللون تحوّل الغامقَ إلى أسودَ صلب، فيصير أبرزُ رقمٍ
+   * في الورقة أقلَّها قراءةً — وهو عكسُ الغرض من إبرازه.
+   *
+   * فالأرضيةُ فاتحةٌ والخطُّ غامق، ويبقى الشريطُ متميّزاً بإطاره وبفاصله
+   * الرأسي لا بثقل حبره. والتباينُ أعلى لا أدنى: غامقٌ على فاتحٍ يُقرأ
+   * مطبوعاً وعلى الشاشة سواء.
+   */
   .grand-band {
     display: flex; align-items: stretch;
     width: fit-content; min-width: 250px; max-width: 62%;
     margin: -12px auto 14px 0;
     border-radius: 5px; overflow: hidden;
-    background: #1f2d5a; color: #fff;
+    background: #eef2fb; color: #16224a;
+    border: 1.5px solid #1f2d5a;
     page-break-inside: avoid; break-inside: avoid;
   }
   .grand-band-label {
@@ -531,8 +545,8 @@ ${PAGINATION_CSS}
   }
   .grand-band-value {
     padding: 6px 16px; font-size: 17px; font-weight: 900; white-space: nowrap;
-    letter-spacing: 0.3px; background: #16224a;
-    border-inline-start: 1px solid rgba(255, 255, 255, 0.28);
+    letter-spacing: 0.3px; background: #dce4f5;
+    border-inline-start: 1.5px solid #1f2d5a;
     display: flex; align-items: center; margin-inline-start: auto;
   }
 
