@@ -131,6 +131,19 @@ Deno.test("رابط العميل: كل أقسام ورقة الطباعة حاض
   assertStringIncludes(html, "معلومات الترحيل");
 });
 
+Deno.test("رابط العميل: الشحن يدخل «قيمة الفاتورة»", () => {
+  // كانت `invoiceValue` هنا تقرأ `subtotal` وحده وقالبُ الطباعة يقرأ
+  // `subtotal + shipping`. ولا يظهر الفرق على صفٍّ متّسق — لأن
+  // `grandTotal + discount` يساويهما — بل على صفٍّ لا تحمل `total` فيه الشحن.
+  const html = buildDocHTML({
+    ...baseArgs, subtotal: 1000, shipping: 250, grandTotal: 1000, paidAmount: 0,
+  });
+  const m = html.match(
+    /data-section="invoice-value"[\s\S]*?class="summary-box-value"[^>]*>([^<]*)</,
+  );
+  assertEquals(m![1].trim(), "1,250");
+});
+
 Deno.test("رابط العميل: فيه تكبير وتصغير وطباعة", () => {
   const html = buildDocHTML({ ...baseArgs, paidAmount: 0 });
   assertStringIncludes(html, 'id="__zoom_in"');
