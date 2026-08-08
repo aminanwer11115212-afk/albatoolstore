@@ -710,6 +710,7 @@ Deno.serve(async (req) => {
     // ورقةَ الطباعة والمعاينة. كانت الورقة هنا مبسّطة فتختلف عمّا يراه المستخدم.
     let subtotal: number | null = null;
     let discountTotal = 0;
+    let shipping = 0;
     let previousDebt = 0;
     let previousCredit = 0;
     let currentNet: number | null = null;
@@ -736,6 +737,7 @@ Deno.serve(async (req) => {
       grandTotal = Number((inv as any).total || 0);
       subtotal = Number((inv as any).subtotal || 0) || null;
       discountTotal = Number((inv as any).discount || 0);
+      shipping = Number((inv as any).shipping || 0);
       // رصيد العميل الآن: منه يُشتقّ «المدفوع» في الملخّص كما في الطباعة،
       // والمتبقّي على هذه الفاتورة يُطرح ليُعرف الحساب القديم.
       {
@@ -1082,7 +1084,7 @@ Deno.serve(async (req) => {
       : [];
     const html = statementHtml || buildDocHTML({
       docTitle, docNumber, date, customer, items, grandTotal, paidAmount, notes, company, hiddenSections,
-      subtotal, discountTotal, previousDebt, previousCredit, currentNet, isQuote, packagingInfo, transportInfo,
+      subtotal, discountTotal, shipping, previousDebt, previousCredit, currentNet, isQuote, packagingInfo, transportInfo,
     });
     logInfo(requestId, "share.rendered", {
       doc_type: tk.doc_type,

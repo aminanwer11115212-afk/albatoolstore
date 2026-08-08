@@ -153,6 +153,16 @@ export interface ShareDocArgs {
   hiddenSections?: string[];
   /** قيمة البنود قبل الخصم — تُعرض في سطر «الجملة» */
   subtotal?: number | null;
+  /**
+   * الشحن على المستند.
+   *
+   * كان ساقطاً من هذه الواجهة أصلاً، و`invoiceValue` هنا تقرأ `subtotal` وحده
+   * بينما قالب الطباعة يقرأ `subtotal + shipping`. فما دامت `total` محسوبةً
+   * صحيحةً (`subtotal − discount + shipping`) تساوى الطرفان بالصدفة عبر الحدّ
+   * `grandTotal + discount`. وحين ينحرف الصفّ — وهو ما يقع فعلاً — تفترق
+   * «قيمة الفاتورة» بين الورقتين بمقدار الشحن.
+   */
+  shipping?: number | null;
   /** الخصم العام على المستند */
   discountTotal?: number | null;
   /** رصيد العميل المدين قبل هذا المستند */
@@ -171,7 +181,7 @@ export function buildDocHTML(args: ShareDocArgs): string {
   const {
     docTitle, docNumber, date, customer, items, grandTotal, paidAmount = 0,
     notes, company, hiddenSections = [],
-    subtotal = null, discountTotal = 0,
+    subtotal = null, discountTotal = 0, shipping = 0,
     previousDebt = 0, previousCredit = 0, currentNet = null,
     isQuote = false, packagingInfo, transportInfo,
   } = args;
@@ -196,7 +206,7 @@ export function buildDocHTML(args: ShareDocArgs): string {
   const generalDiscount = Math.max(0, r2(Number(discountTotal) || 0));
   const invoiceValue = Math.max(
     (Number(grandTotal) || 0) + generalDiscount,
-    Number(subtotal) || 0,
+    (Number(subtotal) || 0) + (Number(shipping) || 0),
     Number(grandTotal) || 0,
   );
   const netValue = Number(grandTotal) || 0;
