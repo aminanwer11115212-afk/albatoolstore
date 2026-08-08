@@ -288,7 +288,12 @@ export function buildDocHTML(args: ShareDocArgs): string {
 
   /* شريط الأدوات — لا يُطبع ولا يدخل الـPDF */
   .toolbar { position: fixed; top: 0; right: 0; left: 0; z-index: 999; background: linear-gradient(135deg, #5b21b6, #7c3aed); color: #fff; padding: 10px 12px; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-  .toolbar button { background: rgba(255,255,255,0.95); color: #5b21b6; border: 0; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; }
+  /* الأزرارُ تلتفّ ولا تنضغط.
+     كانت تُعصر على شاشة الهاتف حتى يلتفّ نصُّها داخلها — «تحمي/PDF» و«طبا/عة»
+     — لأن عنصر flex ينكمش تحت مقاس محتواه افتراضياً. فمُنع الانكماشُ ومُنع
+     التفافُ النصّ، فتنزل الأزرارُ سطراً جديداً كاملةً بدل أن تُشوَّه. */
+  .toolbar button { background: rgba(255,255,255,0.95); color: #5b21b6; border: 0; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; white-space: nowrap; flex: 0 0 auto; }
+  .toolbar > * { flex: 0 0 auto; }
   .toolbar button:hover:not(:disabled) { background: #fff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
   .toolbar button:disabled { opacity: 0.85; cursor: wait; background: #fff; }
   .toolbar button.success { background: #10b981; color: #fff; }

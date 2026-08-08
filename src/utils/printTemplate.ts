@@ -1163,7 +1163,7 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     color: #fff; padding: 8px 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     display: flex; flex-direction: column; gap: 6px;
-    font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+    font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
     font-size: 13px;
   }
   #__lov_print_toolbar .row {
