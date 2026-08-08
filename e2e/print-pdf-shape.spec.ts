@@ -309,7 +309,7 @@ test.describe("الطباعة", () => {
     await page.emulateMedia({ media: "print" });
     const m = await page.evaluate(() => {
       const band = document.querySelector(".grand-band") as HTMLElement;
-      const th = document.querySelector("thead th") as HTMLElement;
+      const th = document.querySelector("table.items-table thead th") as HTMLElement;
       const cs = getComputedStyle(band);
       const adjust = (el: Element) => {
         const s = getComputedStyle(el) as any;
@@ -319,6 +319,8 @@ test.describe("الطباعة", () => {
         bandBg: cs.backgroundColor, bandColor: cs.color,
         bandAdjust: adjust(band), thAdjust: adjust(th),
         thBg: getComputedStyle(th).backgroundColor,
+        thColor: getComputedStyle(th).color,
+        thBorderBottom: getComputedStyle(th).borderBottomWidth,
       };
     });
     // الأرضيةُ الداكنة والخطُّ الأبيض باقيان في وسط الطباعة
@@ -327,7 +329,19 @@ test.describe("الطباعة", () => {
     // والمتصفّحُ مُلزَمٌ برسمهما
     expect(m.bandAdjust).toBe("exact");
     expect(m.thAdjust).toBe("exact");
-    expect(m.thBg).toBe("rgb(91, 76, 173)");
+
+    /*
+     * وترويسةُ جدول البنود بيضاءُ الأرضية أسودُ الخطّ بطلب صاحب المستودع.
+     *
+     * وكانت هذه الترويسةُ **مِجَسَّ** هذا الفحص: يقرأ أرضيتَها البنفسجية
+     * ليُثبت أنّ الأرضيات لا تسقط. ولمّا صارت بيضاء لم تعد تصلح مِجَسّاً —
+     * الأبيضُ يُقرأ أبيض سواءٌ رُسم أو سقط. فالمِجَسُّ الآن شريطُ الجملة
+     * وحده (أعلاه)، وتُقاس الترويسةُ لذاتها: أبيضُ وأسودُ وحدٌّ سفليٌّ غليظ
+     * — وهو ما يفصلها عن البنود، خطٌّ لا لون.
+     */
+    expect(m.thBg).toBe("rgb(255, 255, 255)");
+    expect(m.thColor).toBe("rgb(0, 0, 0)");
+    expect(m.thBorderBottom).toBe("2px");
   });
 
   /** والشريطُ شمالَ الورقة كما طُلب — يُقاس بالموضع لا بالقاعدة. */
