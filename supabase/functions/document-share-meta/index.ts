@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
 <html dir="rtl" lang="ar"><head><meta charset="utf-8">
 <title>تعذّر فتح المستند</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<style>body{font-family:'Segoe UI',Tahoma,sans-serif;background:#f3f4f6;color:#1a1a1a;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:12px;padding:32px;text-align:center;max-width:480px;box-shadow:0 4px 16px rgba(0,0,0,.08)}h1{font-size:18px;margin:0 0 12px;color:#b91c1c}p{color:#555;margin:0 0 8px;font-size:14px}code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:12px;color:#5b21b6}</style>
+<style>body{font-family:Arial, 'Liberation Sans', Helvetica, sans-serif;background:#f3f4f6;color:#1a1a1a;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:12px;padding:32px;text-align:center;max-width:480px;box-shadow:0 4px 16px rgba(0,0,0,.08)}h1{font-size:18px;margin:0 0 12px;color:#b91c1c}p{color:#555;margin:0 0 8px;font-size:14px}code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:12px;color:#5b21b6}</style>
 </head><body><div class="card">
 <h1>تعذّر فتح رابط المستند</h1>
 <p>تم اكتشاف حلقة تحويل ولم نتمكن من توجيهك إلى الصفحة الصحيحة.</p>
@@ -416,7 +416,7 @@ Deno.serve(async (req) => {
 <link rel="icon" href="${escapeHtml(LOGO_URL)}">
 <meta http-equiv="refresh" content="0; url=${escapeHtml(targetUrl)}">
 <style>
-  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #f3f4f6; color: #1a1a1a; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; background: #f3f4f6; color: #1a1a1a; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
   .card { background: #fff; border-radius: 12px; padding: 32px; text-align: center; max-width: 420px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
   img { width: 120px; height: 120px; object-fit: contain; margin-bottom: 16px; }
   h1 { font-size: 18px; margin: 0 0 8px; color: #5b21b6; }

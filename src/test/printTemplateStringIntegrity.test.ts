@@ -18,23 +18,36 @@
  * تعليقات `/*` تسكن نصّ الورقة في موضعين: كتلة `<style>` وكتلة `<script>`.
  * وما عداهما داخل `${...}` كودُ TypeScript حقيقي — تعليقاته حرّة، وفيها
  * backtick مشروع يشير إلى أسماء الحقول.
+ *
+ * ## وقالبان لا قالب
+ * الحراسةُ كانت على ملفّ الطباعة وحده، وقالبُ رابط العميل
+ * (`document-share/template.ts`) سلسلةٌ نصّية طويلة مثله تماماً — ووقع فيه
+ * العطلُ نفسه: تعليقٌ عربي يشرح مكدّس الخطوط، وفيه backtick حول اسم خط،
+ * فسقط الملفّ كلُّه. فصار الفحص يمرّ على الاثنين.
  */
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-const TPL = fs.readFileSync(path.resolve(process.cwd(), "src/utils/printTemplate.ts"), "utf8");
+/** القالبان اللذان يبنيان ورقةً كسلسلةٍ نصّية طويلة. */
+const SHEETS = [
+  "src/utils/printTemplate.ts",
+  "supabase/functions/document-share/template.ts",
+] as const;
+
+const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 
 /** نصّ الورقة وحده: من بداية القالب حتى إغلاق سلسلته. */
-const sheetSrc = (() => {
-  const a = TPL.indexOf("return `<!DOCTYPE html>");
-  const b = TPL.indexOf("</html>`;", a);
-  return a < 0 || b < 0 ? "" : TPL.slice(a, b);
-})();
+const sheetOf = (file: string): string => {
+  const src = read(file);
+  const a = src.indexOf("return `<!DOCTYPE html>");
+  const b = src.indexOf("</html>`;", a);
+  return a < 0 || b < 0 ? "" : src.slice(a, b);
+};
 
-const region = (from: string, to: string): string => {
-  const a = sheetSrc.indexOf(from);
-  return a < 0 ? "" : sheetSrc.slice(a, sheetSrc.indexOf(to, a));
+const regionOf = (sheet: string, from: string, to: string): string => {
+  const a = sheet.indexOf(from);
+  return a < 0 ? "" : sheet.slice(a, sheet.indexOf(to, a));
 };
 
 const commentLines = (src: string, open: string, close: string): string[] => {
@@ -48,10 +61,10 @@ const commentLines = (src: string, open: string, close: string): string[] => {
   return out;
 };
 
-const STYLE = region("<style>", "</style>");
-const SCRIPT = region("<script>", "</script>");
+describe.each(SHEETS)("نصّ القالب موجودٌ فعلاً — فحصٌ لا يُفرَّغ صامتاً (%s)", (file) => {
+  const sheetSrc = sheetOf(file);
+  const STYLE = regionOf(sheetSrc, "<style>", "</style>");
 
-describe("نصّ القالب موجودٌ فعلاً — فحصٌ لا يُفرَّغ صامتاً", () => {
   it("السلسلة تُعثر عليها بطرفيها", () => {
     expect(sheetSrc.length).toBeGreaterThan(5000);
   });
@@ -66,22 +79,26 @@ describe("نصّ القالب موجودٌ فعلاً — فحصٌ لا يُفر
    * فهي أشدّ المواضع عرضةً لعلامة الـbacktick في تعليقٍ عربي.
    */
   it("وكتلة السكربت — إن وُجدت — مفحوصةٌ هي الأخرى", () => {
-    expect(typeof SCRIPT).toBe("string");
+    expect(typeof regionOf(sheetSrc, "<script>", "</script>")).toBe("string");
   });
 });
 
-describe("لا backtick داخل تعليقات نصّ القالب", () => {
+describe.each(SHEETS)("لا backtick داخل تعليقات نصّ القالب (%s)", (file) => {
+  const sheetSrc = sheetOf(file);
+  const STYLE = regionOf(sheetSrc, "<style>", "</style>");
+  const SCRIPT = regionOf(sheetSrc, "<script>", "</script>");
+
   it("لا في تعليقات CSS ولا في تعليقات السكربت", () => {
     const bad = [...commentLines(STYLE, "/*", "*/"), ...commentLines(SCRIPT, "/*", "*/")]
       .filter((l) => l.includes("`"))
       .map((l) => l.trim());
-    expect(bad).toEqual([]);
+    expect({ file, bad }).toEqual({ file, bad: [] });
   });
 
   it("ولا في تعليقات HTML", () => {
     const bad = commentLines(sheetSrc, "<!--", "-->")
       .filter((l) => l.includes("`"))
       .map((l) => l.trim());
-    expect(bad).toEqual([]);
+    expect({ file, bad }).toEqual({ file, bad: [] });
   });
 });

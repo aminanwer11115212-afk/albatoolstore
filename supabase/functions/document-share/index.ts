@@ -404,7 +404,7 @@ function buildStatementHTML(args: {
 <style>
   @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #1a1a1a; background: #f3f4f6; padding: 80px 12px 24px; line-height: 1.5; font-size: 14px; }
+  body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; color: #1a1a1a; background: #f3f4f6; padding: 80px 12px 24px; line-height: 1.5; font-size: 14px; }
   .toolbar { position: fixed; top: 0; right: 0; left: 0; z-index: 999; background: linear-gradient(135deg, #5b21b6, #7c3aed); color: #fff; padding: 12px; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
   .toolbar button { background: rgba(255,255,255,0.95); color: #5b21b6; border: 0; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 14px; min-width: 180px; }
   .toolbar button:disabled { opacity: 0.85; cursor: wait; }
@@ -552,7 +552,7 @@ function buildPackagingHTML(args: {
 <style>
   @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color:#1a1a1a; background:#fff; padding:20px; line-height:1.5; font-size:14px; }
+  body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; color:#1a1a1a; background:#fff; padding:20px; line-height:1.5; font-size:14px; }
   .toolbar { position: fixed; top: 0; right: 0; left: 0; z-index: 999; background: linear-gradient(135deg, #5b21b6, #7c3aed); color: #fff; padding: 10px; display: flex; justify-content: center; gap: 12px; }
   .toolbar button { background: #fff; color: #5b21b6; border: 0; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; }
   .page { max-width: 800px; margin: 70px auto 0; }
@@ -644,7 +644,7 @@ function buildPackagingHTML(args: {
 function buildErrorHTML(message: string, status: number, requestId?: string): Response {
   const rid = requestId ? `<p style="margin-top:12px;color:#999;font-size:12px;font-family:monospace">Request ID: ${attr(requestId)}</p>` : "";
   const html = `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>خطأ</title>
-<style>body{font-family:Tahoma,Arial,sans-serif;background:#f3f4f6;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+<style>body{font-family:Arial, 'Liberation Sans', Helvetica, sans-serif;background:#f3f4f6;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
 .box{background:#fff;padding:32px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.1);text-align:center;max-width:420px}
 h2{color:#c0392b;margin-bottom:12px}p{color:#555}</style></head>
 <body><div class="box"><h2>تعذّر فتح المستند</h2><p>${attr(message)}</p><p style="margin-top:8px;color:#777;font-size:12px">إذا استمرت المشكلة، أرسل رقم الطلب للمسؤول.</p>${rid}</div></body></html>`;
@@ -945,7 +945,7 @@ Deno.serve(async (req) => {
 <style>
   @page { size: A4; margin: 10mm; }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:20px;line-height:1.5;font-size:14px}
+  body{font-family:Arial, 'Liberation Sans', Helvetica, sans-serif;color:#1a1a1a;background:#fff;padding:20px;line-height:1.5;font-size:14px}
   .toolbar{position:fixed;top:0;right:0;left:0;z-index:999;background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;padding:10px;display:flex;justify-content:center;gap:12px}
   .toolbar button{background:#fff;color:#5b21b6;border:0;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px}
   .page{max-width:800px;margin:70px auto 0}
@@ -1021,7 +1021,7 @@ Deno.serve(async (req) => {
 <style>
   @page { size: A4; margin: 10mm; }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:20px;line-height:1.55;font-size:14px}
+  body{font-family:Arial, 'Liberation Sans', Helvetica, sans-serif;color:#1a1a1a;background:#fff;padding:20px;line-height:1.55;font-size:14px}
   .toolbar{position:fixed;top:0;right:0;left:0;z-index:999;background:linear-gradient(135deg,#15803d,#16a34a);color:#fff;padding:10px;display:flex;justify-content:center;gap:12px}
   .toolbar button{background:#fff;color:#15803d;border:0;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px}
   .page{max-width:800px;margin:70px auto 0}
