@@ -151,6 +151,10 @@ export default function HiddenDevResetDialog() {
   const [passphrase, setPassphrase] = useState(randomPassphrase());
   /** يُزاد بعد كل تنفيذ فيُعاد العدّ — وإلا بقيت المعاينة تعرض ما حُذف. */
   const [countsTick, setCountsTick] = useState(0);
+  /** تقدّمُ التنفيذ — يُعرض شريطاً باسم الخطوة الجارية. */
+  const [progress, setProgress] = useState<
+    { done: number; total: number; label: string; failed: number } | null
+  >(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -370,6 +374,70 @@ export default function HiddenDevResetDialog() {
     }
   };
 
+  /**
+   * خطواتُ التنفيذ مرتّبةً — كلُّ خطوةٍ باسمها الذي يُعرض في الشريط.
+   *
+   * الترتيبُ يتبع التبعية: الأبناءُ قبل الآباء، وبنودُ الترحيل قبل الناقلين.
+   */
+  const buildSteps = (): { label: string; run: () => Promise<void> }[] => {
+    const steps: { label: string; run: () => Promise<void> }[] = [];
+    const wipeStep = (t: string) => ({
+      label: `مسح ${t}`,
+      run: async () => { await wipeTable(supabase as any, t); },
+    });
+
+    if (scope.stock || scope.ledger) {
+      steps.push({
+        label: scope.stock && scope.ledger ? "تصفير المخزون وكشوف الحسابات"
+          : scope.stock ? "تصفير كميات المنتجات" : "تصفير كشوف حسابات العملاء",
+        run: async () => {
+          const { error } = await supabase.rpc("admin_reset_stock_and_ledgers" as any,
+            { _scope: { stock: scope.stock, ledger: scope.ledger } });
+          if (error) throw error;
+        },
+      });
+    }
+
+    if (scope.invoices || scope.quotes || scope.purchases || scope.bank || scope.customers) {
+      const parts = [
+        scope.invoices && "الفواتير", scope.quotes && "عروض الأسعار",
+        scope.purchases && "المشتريات", scope.bank && "حركات البنك",
+        scope.customers && "أرصدة العملاء",
+      ].filter(Boolean);
+      steps.push({
+        label: `حذف ${parts.join(" و")}`,
+        run: async () => {
+          const { error } = await supabase.rpc("admin_reset_transactional_data" as any, {
+            _scope: {
+              invoices: scope.invoices, quotes: scope.quotes, purchases: scope.purchases,
+              bank: scope.bank, customers: scope.customers,
+            },
+          });
+          if (error) throw error;
+        },
+      });
+    }
+
+    if (scope.transporters) {
+      for (const t of [
+        "invoices_transports_items", "invoice_transports", "quote_transports",
+        "customer_preferred_transporter", "customer_transporters",
+        "destination_transporters", "locality_transporters", "transporters",
+      ]) steps.push(wipeStep(t));
+    }
+    if (scope.stock_movements) {
+      for (const t of ["stock_return_items", "stock_returns", "stock_transfers", "stock_adjustments_log"]) steps.push(wipeStep(t));
+    }
+    if (scope.payment_logs) {
+      for (const t of ["invoice_revisions", "discount_audit_log"]) steps.push(wipeStep(t));
+    }
+    if (scope.statements_log) steps.push(wipeStep("activity_log"));
+    if (scope.bot_logs) {
+      for (const t of ["bot_audit_log", "bot_scan_snapshots"]) steps.push(wipeStep(t));
+    }
+    return steps;
+  };
+
   const run = async () => {
     if (!canRun) return;
     if (!confirm("تنفيذ العملية المخفية؟ لا يمكن التراجع.")) return;
@@ -377,8 +445,21 @@ export default function HiddenDevResetDialog() {
     const collected: any = { scope: selectedKeys, started_at: new Date().toISOString() };
     /** ما مُسح فعلاً حتى الآن — يُقرأ في مسار الخطأ أيضاً. */
     const wiped: string[] = [];
+    const stepFailures: { label: string; error: string }[] = [];
     collected.wiped = wiped;
+    collected.failures = stepFailures;
     try {
+      /*
+       * النسخةُ الاحتياطية وحدَها بوّابةٌ تُوقف كلَّ شيء.
+       *
+       * وما بعدها لا يُوقف: كانت الحلقةُ ترمي عند أوّل خطوةٍ تفشل، فيبقى ما
+       * بعدها كلُّه بلا تنفيذ — «لا يكملها». وجدولٌ واحدٌ تمنعه الصلاحيات
+       * يُبطل تسع خطواتٍ لا شأن لها به.
+       *
+       * فالفشلُ الآن يُسجَّل وتمضي البقيّة، ويُعرض في النهاية ما تمّ وما لم
+       * يتمّ بأسمائه. فالعمليةُ ليست ذرّية أصلاً — والإيقافُ المبكر لا يجعلها
+       * كذلك، إنّما يترك العملَ ناقصاً بلا سبب.
+       */
       if (backupBefore) {
         const b = await exportBackup();
         if (b.failed.length) {
@@ -389,70 +470,38 @@ export default function HiddenDevResetDialog() {
         collected.backup = "csv_exported";
       }
 
-      if (scope.stock || scope.ledger) {
-        const { data, error } = await supabase.rpc(
-          "admin_reset_stock_and_ledgers" as any,
-          { _scope: { stock: scope.stock, ledger: scope.ledger } },
-        );
-        if (error) throw error;
-        collected.quick = data;
+      const steps = buildSteps();
+      setProgress({ done: 0, total: steps.length, label: steps[0]?.label ?? "", failed: 0 });
+      for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        setProgress({ done: i, total: steps.length, label: s.label, failed: stepFailures.length });
+        try {
+          await s.run();
+          wiped.push(s.label);
+        } catch (e: any) {
+          stepFailures.push({ label: s.label, error: e?.message || String(e) });
+        }
+        // إفساحُ إطارٍ للرسم: الشريطُ يُرى متحرّكاً لا يقفز من صفرٍ إلى تمام
+        await new Promise((r) => setTimeout(r, 0));
       }
-
-      if (scope.invoices || scope.quotes || scope.purchases || scope.bank || scope.customers) {
-        const { data, error } = await supabase.rpc(
-          "admin_reset_transactional_data" as any,
-          {
-            _scope: {
-              invoices: scope.invoices, quotes: scope.quotes, purchases: scope.purchases,
-              bank: scope.bank, customers: scope.customers,
-            },
-          },
-        );
-        if (error) throw error;
-        collected.danger = data;
-      }
-
-      /* المسحُ من `@/utils/wipeTable` — وكان مكتوباً هنا بشرطٍ معكوس يبتلع
-         الخطأ ويُعلن النجاح. الشرحُ والفحصُ في الوحدة نفسِها.
-         وكلُّ جدولٍ يُسجَّل بعد مسحه: العمليةُ ليست ذرّية، فإن انقطعت في
-         منتصفها وجب أن يُعرف ما مضى منها. */
-      const wipe = async (t: string) => {
-        await wipeTable(supabase as any, t);
-        wiped.push(t);
-      };
-
-      if (scope.transporters) {
-        for (const t of [
-          "invoices_transports_items", "invoice_transports", "quote_transports",
-          "customer_preferred_transporter", "customer_transporters",
-          "destination_transporters", "locality_transporters",
-        ]) await wipe(t);
-        await wipe("transporters");
-        collected.transporters = { ok: true };
-      }
-
-      if (scope.stock_movements) {
-        for (const t of ["stock_return_items", "stock_returns", "stock_transfers", "stock_adjustments_log"]) await wipe(t);
-        collected.stock_movements = { ok: true };
-      }
-      if (scope.payment_logs) {
-        for (const t of ["invoice_revisions", "discount_audit_log"]) await wipe(t);
-        collected.payment_logs = { ok: true };
-      }
-      if (scope.statements_log) {
-        await wipe("activity_log");
-        collected.statements_log = { ok: true };
-      }
-      if (scope.bot_logs) {
-        for (const t of ["bot_audit_log", "bot_scan_snapshots"]) await wipe(t);
-        collected.bot_logs = { ok: true };
-      }
+      setProgress({ done: steps.length, total: steps.length, label: "اكتمل", failed: stepFailures.length });
 
       collected.finished_at = new Date().toISOString();
       setResult(collected);
 
       // سجّل بعد التنفيذ (bot_audit_log قد يكون تم مسحه بنفس الجلسة — نُدرج صف جديد يشرح ذلك)
-      await logAudit({ after: { done: true }, summary: collected }, false);
+      await logAudit({ after: { done: true, failures: stepFailures }, summary: collected }, false);
+
+      if (stepFailures.length) {
+        toast.error(`تمّت ${wiped.length} خطوة وفشلت ${stepFailures.length}`, {
+          description: stepFailures.map((f) => `${f.label}: ${f.error}`).join(" · "),
+          duration: 20000,
+        });
+        setConfirmText("");
+        setPassphrase(randomPassphrase());
+        setCountsTick((t) => t + 1);
+        return;
+      }
 
       [
         "products", "products-full", "product",
@@ -550,7 +599,7 @@ export default function HiddenDevResetDialog() {
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
-        if (!v) { setConfirmText(""); setResult(null); setScope(INITIAL_SCOPE); }
+        if (!v) { setConfirmText(""); setResult(null); setScope(INITIAL_SCOPE); setProgress(null); }
       }}
     >
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0" dir="rtl">
@@ -682,6 +731,36 @@ export default function HiddenDevResetDialog() {
               </Button>
             </div>
           </div>
+
+          {/* شريطُ التقدّم — يُظهر الخطوةَ الجارية باسمها وعددَها من الكلّ.
+              العمليةُ تمرّ على عشرات الجداول، وزرٌّ يدور بلا خبرٍ يترك صاحبَه
+              لا يدري أوصلت أم تعلّقت. */}
+          {progress && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 text-xs font-bold">
+                <span className="truncate text-foreground">{progress.label}</span>
+                <span className="font-mono shrink-0 text-muted-foreground" dir="ltr">
+                  {progress.done}/{progress.total}
+                </span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  role="progressbar"
+                  aria-valuenow={progress.done}
+                  aria-valuemax={progress.total}
+                  className={`h-full transition-[width] duration-200 ease-out ${
+                    progress.failed ? "bg-amber-500" : "bg-destructive"
+                  }`}
+                  style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
+                />
+              </div>
+              {progress.failed > 0 && (
+                <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                  فشلت {progress.failed} خطوة — والبقيّة تمضي، والتفصيل في النهاية.
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2">
             <Button variant="destructive" onClick={run} disabled={!canRun}>

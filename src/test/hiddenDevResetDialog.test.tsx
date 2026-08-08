@@ -250,13 +250,18 @@ describe("النسخة الاحتياطية", () => {
 
 /* ═══════════ ٣-ب) الفشلُ في المنتصف يُقال بأسمائه ═══════════ */
 
-describe("انقطاعُ الحذف في منتصفه", () => {
+describe("خطوةٌ تفشل لا توقف ما بعدها", () => {
   /**
-   * العمليةُ ليست ذرّية: تُمسح الجداولُ واحداً بعد واحد. فإن رفض أحدُها
-   * بقي ما قبله محذوفاً. وقولُ «تعذّر التنفيذ» وحدَه يُقرأ «لم يحدث شيء» —
-   * وهو أخطرُ ما يُقال عن حذفٍ وقع بعضُه.
+   * ## العطل الذي بلّغ عنه صاحب المستودع
+   * «ما زال هناك أعطال في الحذف في منطقة الدانجر زون **لا يكملها**».
+   *
+   * وكانت الحلقةُ ترمي عند أوّل خطوةٍ تفشل، فيبقى ما بعدها كلُّه بلا تنفيذ:
+   * جدولٌ واحدٌ تمنعه الصلاحيات يُبطل ثماني خطواتٍ لا شأن لها به. والعمليةُ
+   * ليست ذرّية أصلاً — فالإيقافُ المبكر لا يحميها، إنّما يترك العملَ ناقصاً.
+   *
+   * فالفشلُ يُسجَّل وتمضي البقيّة، ويُعرض في النهاية ما تمّ وما لم يتمّ.
    */
-  it("يُذكر ما مُسح قبل التوقّف بأسمائه", async () => {
+  it("تمضي البقيّة، ويُقال ما تمّ وما فشل", async () => {
     DENY_DELETE.add("customer_transporters");
     mount();
     pressShortcut();
@@ -270,12 +275,28 @@ describe("انقطاعُ الحذف في منتصفه", () => {
 
     await waitFor(() => expect(toasts.some((t) => t.kind === "error")).toBe(true), { timeout: 4000 });
     const err = toasts.find((t) => t.kind === "error")!;
-    /* ترتيبُ المسح: invoices_transports_items، invoice_transports،
-       quote_transports، customer_preferred_transporter، ثمّ الرافض. فأربعةٌ
-       مُسحت قبله — والعددُ يُقرأ من الترتيب لا يُخمَّن. */
-    expect(err.desc, "لم يُذكر ما مُسح قبل التوقّف").toMatch(/مُسحت 4 جدول/);
-    expect(err.desc).toContain("invoices_transports_items");
-    expect(err.desc).not.toContain("locality_transporters");   // لم يُبلَغ أصلاً
+    // ثماني خطوات: سبعُ نجحت وواحدةٌ فشلت — لا توقّفَ عند الرابعة
+    expect(err.msg, "لم يُذكر ما تمّ وما فشل").toMatch(/تمّت 7 خطوة وفشلت 1/);
+    expect(err.desc).toContain("customer_transporters");
+  });
+
+  it("والجداولُ التي بعد الرافض تُمسح فعلاً", async () => {
+    DENY_DELETE.add("customer_transporters");
+    mount();
+    pressShortcut();
+    await screen.findByText(/أداة مطوّر مخفية/);
+    fireEvent.click(screen.getByText(/حذف كل الناقلين وسجلات الترحيل/));
+    await waitFor(() => expect(screen.getByText("transporters")).toBeTruthy());
+    const label = screen.getByText(/اكتب عبارة المرور/).textContent || "";
+    const phrase = /([^\s]+-\d{4})/.exec(label)![1];
+    fireEvent.change(screen.getByPlaceholderText(phrase), { target: { value: phrase } });
+    fireEvent.click(screen.getByText("تنفيذ الآن"));
+
+    await waitFor(() => expect(toasts.some((t) => t.kind === "error")).toBe(true), { timeout: 4000 });
+    // `transporters` آخرُ الترتيب وبعد الرافض — وكان لا يُبلَغ أصلاً
+    expect(calls.some((c) => c.startsWith("delete:transporters")), "لم يُبلَغ ما بعد الرافض")
+      .toBe(true);
+    expect(calls.some((c) => c.startsWith("delete:locality_transporters"))).toBe(true);
   });
 });
 

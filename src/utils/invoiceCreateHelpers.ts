@@ -90,6 +90,43 @@ export function deriveRowRate(unitPrice: unknown, foreignPrice: unknown): number
   return Math.round((up / fp) * f) / f;
 }
 
+/**
+ * معدّلُ الصفّ عند **استدعاء مستندٍ محفوظ**.
+ *
+ * ## العطل
+ * `invoice_items` لا تحمل عمودَ معدّل — المعدّلُ الوحيد المحفوظ هو
+ * `invoices.exchange_rate`. فكان الاستدعاء يشتقّ معدّلَ كل صفٍّ بالقسمة:
+ *
+ *     السعر المحلي ÷ السعر الأجنبي
+ *
+ *  وهي قسمةٌ لا تُرجع ما دخل. لأن المحلّي يُحفظ مدوَّراً إلى قرشين:
+ *
+ *     763.63 × 1400 = 1,069,082.00        ← يُحفظ
+ *     1,069,082 ÷ 763.63 = 1400.000524…   ← يُستخرَج
+ *
+ * فيرى المستخدم في خانة المعدّل «1400.000524» لفاتورةٍ أدخلها بـ1400 —
+ * رقمٌ لم يكتبه أحد، ولّده التقريبُ ذهاباً وإياباً.
+ *
+ * ## والحلّ ليس هامشَ تسامحٍ مخمَّناً
+ * بل سؤالٌ دقيق: **هل يُعيد المعدّلُ المحفوظ إنتاجَ السعر المخزَّن حرفياً؟**
+ * فإن كان `roundMoney(fp × savedRate)` يساوي السعرَ المحفوظ تماماً، فذاك هو
+ * المعدّل الذي أُدخل به الصفُّ — لا تقريبَ له.
+ *
+ * وإلّا فالصفُّ أُدخل بمعدّلٍ يخالف معدّل المستند (سعرٌ كُتب باليد مثلاً)،
+ * ولا سبيل لمعرفته إلا بالاشتقاق — فيبقى الاشتقاق لهذه الحالة وحدها.
+ */
+export function rowRateOnLoad(
+  unitPrice: unknown,
+  foreignPrice: unknown,
+  savedRate: unknown,
+): number {
+  const up = roundMoney(unitPrice);
+  const fp = Number(foreignPrice) || 0;
+  const saved = Number(savedRate) || 0;
+  if (saved > 0 && fp > 0 && computeUnitPrice(fp, saved) === up) return saved;
+  return deriveRowRate(up, fp);
+}
+
 export function newRow(rate: number = 1): InvRow {
   return {
     uid: crypto.randomUUID(),
@@ -193,8 +230,37 @@ export function defaultRateDecision(opts: {
 
 /** سعر الصرف المشتقّ من بنود فاتورة محفوظة (أول بند يحمل سعراً أجنبياً). */
 export function deriveRateFromRows(rows: Array<{ foreign_price?: any; exchange_rate?: any }>): number {
-  const hit = rows.find((r) => (Number(r.foreign_price) || 0) > 0 && (Number(r.exchange_rate) || 0) > 0);
-  return hit ? Number(hit.exchange_rate) : 0;
+  /*
+   * الأشيعُ لا الأوّل.
+   *
+   * كان يُؤخذ **أوّلُ** صفٍّ له سعرٌ أجنبي، ويصير معدّلُه معدّلَ المستند كلِّه.
+   * وصفٌّ واحدٌ كُتب سعرُه المحلي باليد — خصمٌ خاصّ، أو سعرٌ اتُّفق عليه —
+   * ينتج نسبةً لا تشبه معدّل الفاتورة. فإن صادف أن كان أوّلَ الصفوف، ظهر في
+   * خانة المعدّل رقمٌ بكسورٍ لم يُدخله أحد بدل 1400.
+   *
+   * والأغلبيةُ أصدقُ شاهد: بنودُ الفاتورة تُدخل بمعدّلٍ واحد، والشاذُّ منها
+   * واحدٌ أو اثنان. فيُختار ما تكرّر أكثر، ويُرجَّح عند التساوي أسبقُ ظهوراً
+   * — فالنتيجةُ ثابتةٌ لا تتغيّر بترتيب القراءة.
+   */
+  const tally = new Map<number, { count: number; first: number }>();
+  rows.forEach((r, i) => {
+    const fp = Number(r.foreign_price) || 0;
+    const rate = Number(r.exchange_rate) || 0;
+    if (fp <= 0 || rate <= 0) return;
+    const seen = tally.get(rate);
+    if (seen) seen.count++;
+    else tally.set(rate, { count: 1, first: i });
+  });
+  if (tally.size === 0) return 0;
+  let best = 0;
+  let bestCount = -1;
+  let bestFirst = Infinity;
+  for (const [rate, { count, first }] of tally) {
+    if (count > bestCount || (count === bestCount && first < bestFirst)) {
+      best = rate; bestCount = count; bestFirst = first;
+    }
+  }
+  return best;
 }
 
 /**

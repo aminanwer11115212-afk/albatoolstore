@@ -81,15 +81,26 @@ describe("المعاينة تغطّي كل ما تمسّه الدوالّ", () =
   });
 
   it("وجداولُ المسح من الواجهة مذكورةٌ هي الأخرى", () => {
-    // ما يُمسح بـ`wipeTable` مكتوبٌ في `run()` — كلُّه يمرّ بالمعاينة والنسخة.
-    const run = DIALOG.slice(DIALOG.indexOf("const run = async"));
+    // ما يُمسح بـ`wipeTable` مكتوبٌ خطواتٍ في `buildSteps()` — كلُّه يمرّ
+    // بالمعاينة والنسخة الاحتياطية.
+    const a = DIALOG.indexOf("const buildSteps");
+    const b = DIALOG.indexOf("const run = async", a);
+    expect(a).toBeGreaterThan(-1);
+    const steps = DIALOG.slice(a, b);
     const wiped = new Set(
-      [...run.matchAll(/await wipe\("(\w+)"\)|for \(const t of \[([^\]]+)\]\)/g)]
+      [...steps.matchAll(/wipeStep\("(\w+)"\)|for \(const t of \[([^\]]+)\]\)/g)]
         .flatMap((m) => (m[1] ? [m[1]] : [...m[2].matchAll(/"(\w+)"/g)].map((x) => x[1]))),
     );
     expect(wiped.size).toBeGreaterThan(8);
     const missing = [...wiped].filter((t) => !declared.has(t));
     expect({ missing }).toEqual({ missing: [] });
+  });
+
+  it("والتنفيذُ يُكمل بعد الخطوة الفاشلة لا يقف عندها", () => {
+    const run = DIALOG.slice(DIALOG.indexOf("const run = async"));
+    // الفشلُ يُجمَع في قائمةٍ داخل الحلقة، ولا يُرمى منها
+    expect(run).toMatch(/stepFailures\.push\(/);
+    expect(run).toMatch(/for \(let i = 0; i < steps\.length; i\+\+\)/);
   });
 });
 

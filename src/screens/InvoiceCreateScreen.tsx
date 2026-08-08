@@ -90,6 +90,7 @@ import {
   applyRateToRow,
   computeUnitPrice,
   deriveRowRate,
+  rowRateOnLoad,
 } from "@/utils/invoiceCreateHelpers";
 
 
@@ -510,7 +511,9 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         const mapped = items.map((it: any) => {
           const fp = Number(it.foreign_price) || 0;
           const up = Number(it.unit_price) || 0;
-          const er = deriveRowRate(up, fp);
+          // معدّلُ الفاتورة المحفوظ يسبق الاشتقاق متى فسّر سعرَ الصفّ حرفياً —
+          // فالقسمةُ العكسية تُولّد كسوراً لم يُدخلها أحد. راجع `rowRateOnLoad`.
+          const er = rowRateOnLoad(up, fp, savedRateRef.current);
           return {
             uid: crypto.randomUUID(),
             dbId: it.id,
