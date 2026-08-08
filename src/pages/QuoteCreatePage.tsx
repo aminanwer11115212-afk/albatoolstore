@@ -619,6 +619,12 @@ export default function QuoteCreatePage() {
         const mapped = items.map((it: any) => {
           const fp = Number(it.foreign_price) || 0;
           const up = Number(it.unit_price) || 0;
+          /* الاشتقاق هنا وحدَه — بخلاف الفاتورة.
+             جدولُ `quotes` لا يحمل عمودَ `exchange_rate` (وما فيه هو
+             `exchange_rate_to_base` لتحويل العملة الأساسية، شيءٌ آخر). فلا
+             معدّلَ محفوظاً يُرجَع إليه، ولا مرساةَ إلا سعرا الصفّ. ومتى
+             أُضيف العمود يصير النداء `rowRateOnLoad(up, fp, savedRate)`
+             كما في `InvoiceCreateScreen`. */
           const er = deriveRowRate(up, fp);
           return {
             uid: crypto.randomUUID(),
