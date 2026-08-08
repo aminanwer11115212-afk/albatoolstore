@@ -97,6 +97,8 @@ export default function HiddenDevResetDialog() {
   const [counts, setCounts] = useState<Record<string, number | null>>({});
   const [countsLoading, setCountsLoading] = useState(false);
   const [passphrase, setPassphrase] = useState(randomPassphrase());
+  /** يُزاد بعد كل تنفيذ فيُعاد العدّ — وإلا بقيت المعاينة تعرض ما حُذف. */
+  const [countsTick, setCountsTick] = useState(0);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -120,7 +122,20 @@ export default function HiddenDevResetDialog() {
     return [...s];
   }, [selectedKeys]);
 
-  // معاينة عدّ الصفوف للجداول المتأثرة
+  /**
+   * معاينة عدّ الصفوف للجداول المتأثرة.
+   *
+   * ## العطل الذي كان هنا
+   * كان العدُّ ملفوفاً بـ`try/catch` و`count ?? 0`. و**PostgREST لا يرمي**:
+   * يُرجع `{ count: null, error }`. فالـ`catch` لا يقع أبداً، و`?? 0` يحوّل
+   * «تعذّرت القراءة» إلى **صفر**.
+   *
+   * وأثرُه في أداةٍ كلُّ غرضها أن يرى المستخدم ما سيُمحى قبل محوه: جدولٌ فيه
+   * ألفُ صفٍّ لا تُقرأ سياستُه يُعرض «0»، فيقرأ المستخدم «لا شيء هنا» ويمضي.
+   * وفرعُ «؟» المكتوب في الواجهة كان شيفرةً ميتة لا تُبلَغ.
+   *
+   * فالخطأ يُقرأ الآن صراحةً، والفارق بين «فارغ» و«لا أعرف» محفوظ.
+   */
   useEffect(() => {
     if (!open || !isAdmin || affectedTables.length === 0) return;
     let cancelled = false;
@@ -130,10 +145,10 @@ export default function HiddenDevResetDialog() {
       await Promise.all(
         affectedTables.map(async (t) => {
           try {
-            const { count } = await supabase
+            const { count, error } = await supabase
               .from(t as any)
               .select("*", { count: "exact", head: true });
-            next[t] = count ?? 0;
+            next[t] = error ? null : (count ?? 0);
           } catch {
             next[t] = null;
           }
@@ -145,7 +160,13 @@ export default function HiddenDevResetDialog() {
       }
     })();
     return () => { cancelled = true; };
-  }, [open, isAdmin, affectedTables.join("|")]);
+  }, [open, isAdmin, affectedTables.join("|"), countsTick]);
+
+  /** الجداولُ التي تعذّرت قراءتُها — تُذكر بأسمائها لا تُخفى في «؟». */
+  const unreadable = useMemo(
+    () => affectedTables.filter((t) => counts[t] === null),
+    [affectedTables, counts],
+  );
 
   const anySelected = selectedKeys.length > 0;
   const canRun = anySelected && confirmText.trim() === passphrase && !busy && isAdmin;
@@ -202,26 +223,49 @@ export default function HiddenDevResetDialog() {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     let ok = 0;
     const failed: string[] = [];
+    const blocks: string[] = [];
     for (const t of affectedTables) {
-      try {
-        const { data, error } = await supabase.from(t as any).select("*").limit(50000);
-        if (error) throw error;
-        const csv = rowsToCSV(data || []);
-        downloadCSV(`albatool-backup_${t}_${stamp}.csv`, csv || "empty\n");
-        ok++;
-      } catch (e: any) {
+      const { data, error } = await supabase.from(t as any).select("*").limit(50000);
+      if (error) {
         failed.push(t);
-        console.warn(`[HiddenDevReset] backup ${t} failed:`, e?.message);
+        console.warn(`[HiddenDevReset] backup ${t} failed:`, error.message);
+        continue;
       }
+      const rows = (data || []) as any[];
+      blocks.push(`### ${t} — ${rows.length} صف\n${rowsToCSV(rows) || "(فارغ)"}`);
+      ok++;
+    }
+
+    /*
+     * ملفٌّ واحدٌ لا ملفٌّ لكل جدول.
+     *
+     * كان يُنزَّل ملفٌّ لكل جدول بـ`a.click()` متتالية — والمتصفّحات تحجب
+     * التنزيلَ التلقائي بعد الأوّل: يظهر شريطُ إذنٍ للمستخدم، ومن رفضه مرّةً
+     * تُسقط البقيةُ **صامتةً**. والحلقةُ تعدّها ناجحةً لأنّ الـblob أُنشئ،
+     * فتقول «تم تصدير ٨ ملفات» وعلى القرص واحد.
+     *
+     * وهذا في نسخةٍ احتياطية تحرس حذفاً لا رجعةَ فيه أخطرُ ما يكون: يمضي
+     * الحذفُ على ثقةِ نسخةٍ لا وجود لها. فصار تنزيلاً واحداً — لا شيء يُحجب
+     * بعده — وكلُّ جدولٍ كتلةٌ فيه بعنوانه وعدد صفوفه.
+     */
+    if (ok > 0) {
+      downloadCSV(`albatool-backup_${stamp}.csv`, blocks.join("\n\n"));
     }
     if (failed.length) toast.error(`فشل نسخُ ${failed.length} جدول: ${failed.join("، ")}`);
-    else toast.success(`تم تصدير ${ok} ملف CSV`);
+    else toast.success(`تم تصدير نسخة احتياطية واحدة تضم ${ok} جدول`);
     return { ok, failed };
   };
 
+  /**
+   * تسجيلُ التنفيذ في سجل التدقيق.
+   *
+   * والنافذةُ تَعِد في صدرها: «كل تنفيذ يُوثَّق في سجل التدقيق». وكان فشلُ
+   * الكتابة يُبتلع في `console.warn` وحده — فيُعلَن النجاحُ ولا سجلَّ له،
+   * ولا أحدَ يعلم. فالوعدُ إن أُخلف قيل.
+   */
   const logAudit = async (payload: any, dryRun: boolean) => {
     try {
-      await supabase.from("bot_audit_log").insert({
+      const { error } = await supabase.from("bot_audit_log").insert({
         action: "hidden_dev_reset",
         actor_uid: user?.id ?? null,
         actor_role: isAdmin ? "admin" : null,
@@ -231,8 +275,13 @@ export default function HiddenDevResetDialog() {
         after_state: payload?.after ?? null,
         details: { passphrase_used: !!passphrase, at: new Date().toISOString(), ...payload } as any,
       } as any);
-    } catch (e) {
+      if (error) throw error;
+    } catch (e: any) {
       console.warn("[HiddenDevReset] audit log failed", e);
+      toast.error("تعذّر تسجيل العملية في سجل التدقيق", {
+        description: `نُفِّذت العملية لكنها لم تُوثَّق: ${e?.message || e}`,
+        duration: 10000,
+      });
     }
   };
 
@@ -241,6 +290,9 @@ export default function HiddenDevResetDialog() {
     if (!confirm("تنفيذ العملية المخفية؟ لا يمكن التراجع.")) return;
     setBusy(true);
     const collected: any = { scope: selectedKeys, started_at: new Date().toISOString() };
+    /** ما مُسح فعلاً حتى الآن — يُقرأ في مسار الخطأ أيضاً. */
+    const wiped: string[] = [];
+    collected.wiped = wiped;
     try {
       if (backupBefore) {
         const b = await exportBackup();
@@ -276,8 +328,13 @@ export default function HiddenDevResetDialog() {
       }
 
       /* المسحُ من `@/utils/wipeTable` — وكان مكتوباً هنا بشرطٍ معكوس يبتلع
-         الخطأ ويُعلن النجاح. الشرحُ والفحصُ في الوحدة نفسِها. */
-      const wipe = (t: string) => wipeTable(supabase as any, t);
+         الخطأ ويُعلن النجاح. الشرحُ والفحصُ في الوحدة نفسِها.
+         وكلُّ جدولٍ يُسجَّل بعد مسحه: العمليةُ ليست ذرّية، فإن انقطعت في
+         منتصفها وجب أن يُعرف ما مضى منها. */
+      const wipe = async (t: string) => {
+        await wipeTable(supabase as any, t);
+        wiped.push(t);
+      };
 
       if (scope.transporters) {
         for (const t of [
@@ -336,16 +393,54 @@ export default function HiddenDevResetDialog() {
       setConfirmText("");
       setPassphrase(randomPassphrase());
       setScope(INITIAL_SCOPE);
+      // ويُعاد العدّ: معاينةٌ تعرض ما حُذف تجعل المستخدم يظنّ الحذفَ لم يقع
+      setCountsTick((t) => t + 1);
     } catch (e: any) {
-      await logAudit({ error: e?.message || String(e) }, false);
-      toast.error(e?.message || "تعذّر التنفيذ — يلزم صلاحية admin");
+      /*
+       * العمليةُ ليست ذرّية: قد تكون جداولُ مُسحت قبل موضع الفشل. وقولُ
+       * «تعذّر التنفيذ» وحدَه يُقرأ «لم يحدث شيء» — وهو أخطرُ ما يُقال عن
+       * حذفٍ وقع بعضُه. فيُذكر ما مضى بأسمائه، ويُحفظ في سجل التدقيق.
+       */
+      collected.failed_at = new Date().toISOString();
+      collected.error = e?.message || String(e);
+      setResult(collected);
+      await logAudit({ error: collected.error, partial: wiped, summary: collected }, false);
+      setCountsTick((t) => t + 1);
+      toast.error(e?.message || "تعذّر التنفيذ", {
+        description: wiped.length
+          ? `تنبيه: العملية ليست ذرّية — مُسحت ${wiped.length} جدول قبل التوقّف: ${wiped.join("، ")}`
+          : "لم يُمسح أيُّ جدول.",
+        duration: 15000,
+      });
     } finally {
       setBusy(false);
     }
   };
 
+  /*
+   * ريثما يُقرأ الدور: لا تُعرض أدواتُ الحذف.
+   *
+   * كان الشرطُ `!roleLoading && !isAdmin` وحده، فيسقط غيرُ الأدمن في الفرع
+   * الأخير ما دام الدورُ يُقرأ — فيرى مربّعاتِ الحذف كاملةً ثمّ تُسحب منه.
+   * والزرُّ كان مقفولاً فعلاً، لكنّ عرضَ أداةٍ لا رجعةَ فيها لمن لا يملكها
+   * ليس مما يُترك للحظة.
+   */
+  if (open && roleLoading) {
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 size={18} className="animate-spin" /> جارِ التحقّق من الصلاحية…
+            </DialogTitle>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   // شاشة رفض الوصول لغير الأدمن
-  if (open && !roleLoading && !isAdmin) {
+  if (open && !isAdmin) {
     return (
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md" dir="rtl">
@@ -421,12 +516,22 @@ export default function HiddenDevResetDialog() {
                 {affectedTables.map((t) => (
                   <div key={t} className="flex justify-between gap-2 bg-background/60 rounded px-2 py-1 border border-border/60">
                     <span className="font-mono truncate" dir="ltr">{t}</span>
-                    <span className="font-bold text-destructive">
-                      {counts[t] === null ? "?" : (counts[t] ?? "…").toLocaleString?.() ?? counts[t]}
+                    {/* «؟» تعني «تعذّرت القراءة» لا «صفر» — والفرقُ بينهما هو
+                        الفرقُ بين حذفٍ يعرف صاحبُه ما يحذف وحذفٍ على العمياء. */}
+                    <span className={counts[t] === null ? "font-bold text-amber-600" : "font-bold text-destructive"}>
+                      {counts[t] === null ? "؟" : (counts[t] ?? "…").toLocaleString?.() ?? counts[t]}
                     </span>
                   </div>
                 ))}
               </div>
+
+              {unreadable.length > 0 && (
+                <div className="rounded-md border border-amber-600/50 bg-amber-500/10 p-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                  <b>تعذّرت قراءة {unreadable.length} جدول</b> — لا يُعرف كم فيها من صفوف،
+                  وقد تكون ممتلئة. والحذف سيُحاول عليها ويتوقّف إن رفضته الصلاحيات:
+                  <span className="font-mono" dir="ltr"> {unreadable.join("، ")}</span>
+                </div>
+              )}
             </div>
           )}
 
