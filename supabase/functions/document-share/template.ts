@@ -621,7 +621,9 @@ ${isHidden("thanks") ? "" : `
       el.style.marginBottom = '0';
       var wrap = document.createElement('div'); wrap.appendChild(el);
       var blob = await window.html2pdf().set({
-        margin: 8, filename: fileName,
+        // 10 = A4_MM.margin في التطبيق، ونفس @page margin أعلاه. لا تصلها
+        // دالّةُ الحافّة استيراداً، فيقيّدها «sheetGeometrySingleSource».
+        margin: 10, filename: fileName,
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }

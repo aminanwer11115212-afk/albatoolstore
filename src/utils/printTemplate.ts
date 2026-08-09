@@ -83,6 +83,8 @@ import {
 } from "@/utils/printDensity";
 import { PDF_SCALE_INLINE_JS } from "@/utils/pdfCanvasScale";
 import { PAGINATION_CSS, PAGINATION_INLINE_JS } from "@/utils/sheetPagination";
+// هندسةُ الورقة من مصدرها الواحد — يُحقن هامشُها في سكربت الشريط أدناه.
+import { A4_MM } from "@/utils/sheetPagePlan";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -1403,7 +1405,11 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
   function genPdfBlob(){
     var el = contentEl();
     var opt = {
-      margin: 8,
+      // هامشُ الورقة من مصدره الواحد «A4_MM.margin» — لا رقماً يُكتب هنا.
+      // كان 8 بينما الشاشةُ والطباعة على 10، فيخرج المحتوى في 194mm بدل
+      // 190mm: تمدُّدٌ نحو 2% يغيّر عرضَ الأعمدة ومواضعَ التفاف الأسطر، فتُقرأ
+      // ورقةُ الملفّ غيرَ الورقة التي عاينها صاحبُها.
+      margin: ${A4_MM.margin},
       filename: buildDocFileName(),
       image: { type: 'jpeg', quality: 0.95 },
       // الدقّة من حجم الورقة لا رقماً ثابتاً: الثابتة تتجاوز سقف لوحة الرسم

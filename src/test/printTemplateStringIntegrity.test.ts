@@ -102,3 +102,50 @@ describe.each(SHEETS)("لا backtick داخل تعليقات نصّ القالب
     expect({ file, bad }).toEqual({ file, bad: [] });
   });
 });
+
+/**
+ * الفحصُ الشامل: لا backtick في نصّ الورقة أصلاً — لا في تعليقٍ ولا غيره.
+ *
+ * ## ثغرةُ الفحص السابق
+ * كان يمرّ على تعليقات `/* … *\/` وحدها، فيفوته تعليقُ السطر `//`. ووقع ذلك
+ * فعلاً: كُتب في سكربت الشريط تعليقُ سطرٍ فيه اسمُ ثابتٍ محاطٌ بعلامتين،
+ * فأنهى السلسلةَ وسقط التصريف — **والحارسُ أخضر**.
+ *
+ * ## الصياغةُ الأقوى
+ * نصُّ الورقة سلسلةٌ نصّية، ومحتواها لا يجوز أن يحمل backtick أبداً. وما
+ * داخل `${…}` كودُ TypeScript حقيقي تعليقاتُه حرّة. فتُنزع الاستيفاءاتُ
+ * أوّلاً — بعدّ الأقواس لا بتعبيرٍ نمطي، فالمتداخلُ منها كثير — ثمّ يُفحص
+ * الباقي: أيُّ backtick فيه عطلٌ قطعاً.
+ */
+function stripInterpolations(src: string): string {
+  let out = "";
+  for (let i = 0; i < src.length; i++) {
+    if (src[i] === "$" && src[i + 1] === "{") {
+      let depth = 1;
+      i += 2;
+      while (i < src.length && depth > 0) {
+        if (src[i] === "{") depth++;
+        else if (src[i] === "}") depth--;
+        i++;
+      }
+      i--; // حلقةُ for تزيد واحداً
+      continue;
+    }
+    out += src[i];
+  }
+  return out;
+}
+
+describe.each(SHEETS)("نصُّ الورقة بلا backtick البتّة (%s)", (file) => {
+  const sheetSrc = sheetOf(file);
+
+  it("بعد نزع الاستيفاءات لا يبقى backtick — ولو في تعليق سطر", () => {
+    // فاتحةُ السلسلة نفسها (return `<!DOCTYPE …) ليست محتواها — تُستثنى
+    const content = stripInterpolations(sheetSrc).replace("return `<!DOCTYPE html>", "");
+    const lines = content.split("\n")
+      .map((l, i) => ({ n: i + 1, l }))
+      .filter(({ l }) => l.includes("`"))
+      .map(({ n, l }) => `${n}: ${l.trim().slice(0, 90)}`);
+    expect({ file, lines }).toEqual({ file, lines: [] });
+  });
+});
