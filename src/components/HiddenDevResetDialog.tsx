@@ -12,6 +12,15 @@ import { toast } from "sonner";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
 import { wipeTable } from "@/utils/wipeTable";
+import {
+  assertLedgerResetApplied, ledgerResetCounts, ledgerResetLine,
+} from "@/utils/ledgerResetResult";
+
+/**
+ * خطوةٌ في التنفيذ. وما تُعيده — إن أعادت — يُضمّ إلى ملخّص العملية:
+ * حصيلةُ التصفير أرقامٌ تُقرأ، لا مجرّدُ «تمّت».
+ */
+type Step = { label: string; run: () => Promise<void | Record<string, unknown>> };
 
 /**
  * أداة مطوّر مخفية — تُفتح فقط عبر Ctrl+Shift+9.
@@ -379,8 +388,8 @@ export default function HiddenDevResetDialog() {
    *
    * الترتيبُ يتبع التبعية: الأبناءُ قبل الآباء، وبنودُ الترحيل قبل الناقلين.
    */
-  const buildSteps = (): { label: string; run: () => Promise<void> }[] => {
-    const steps: { label: string; run: () => Promise<void> }[] = [];
+  const buildSteps = (): Step[] => {
+    const steps: Step[] = [];
     const wipeStep = (t: string) => ({
       label: `مسح ${t}`,
       run: async () => { await wipeTable(supabase as any, t); },
@@ -390,10 +399,23 @@ export default function HiddenDevResetDialog() {
       steps.push({
         label: scope.stock && scope.ledger ? "تصفير المخزون وكشوف الحسابات"
           : scope.stock ? "تصفير كميات المنتجات" : "تصفير كشوف حسابات العملاء",
+        /*
+         * الحصيلةُ تُقرأ ولا تُرمى.
+         *
+         * الدالّةُ تُعيد كم حُذف وكم عُلِّم وكم قيدَ تسويةٍ أُدرج، وكان
+         * الناتجُ يُهمَل ويُقرأ `error` وحدَه. فمنه يُعرف شيئان: ما جرى
+         * فعلاً بالأرقام، وأيُّ نسخةٍ من الدالّة في القاعدة — فهجراتُ
+         * Supabase تُطبَّق يدوياً، ولا سبيلَ آخر لمعرفة أنها وصلت.
+         */
         run: async () => {
-          const { error } = await supabase.rpc("admin_reset_stock_and_ledgers" as any,
+          const { data, error } = await supabase.rpc("admin_reset_stock_and_ledgers" as any,
             { _scope: { stock: scope.stock, ledger: scope.ledger } });
           if (error) throw error;
+          assertLedgerResetApplied(data, !!scope.ledger);
+          return {
+            reset_counts: ledgerResetCounts(data),
+            reset_summary: ledgerResetLine(data, !!scope.ledger),
+          };
         },
       });
     }
@@ -476,7 +498,9 @@ export default function HiddenDevResetDialog() {
         const s = steps[i];
         setProgress({ done: i, total: steps.length, label: s.label, failed: stepFailures.length });
         try {
-          await s.run();
+          // ما تُعيده الخطوةُ يُضمّ إلى الملخّص — الأرقامُ أنفعُ من «تمّ»
+          const details = await s.run();
+          if (details) Object.assign(collected, details);
           wiped.push(s.label);
         } catch (e: any) {
           stepFailures.push({ label: s.label, error: e?.message || String(e) });
