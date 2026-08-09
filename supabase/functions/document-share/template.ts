@@ -288,7 +288,12 @@ export function buildDocHTML(args: ShareDocArgs): string {
 
   /* شريط الأدوات — لا يُطبع ولا يدخل الـPDF */
   .toolbar { position: fixed; top: 0; right: 0; left: 0; z-index: 999; background: linear-gradient(135deg, #5b21b6, #7c3aed); color: #fff; padding: 10px 12px; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-  .toolbar button { background: rgba(255,255,255,0.95); color: #5b21b6; border: 0; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; }
+  /* الأزرارُ تلتفّ ولا تنضغط.
+     كانت تُعصر على شاشة الهاتف حتى يلتفّ نصُّها داخلها — «تحمي/PDF» و«طبا/عة»
+     — لأن عنصر flex ينكمش تحت مقاس محتواه افتراضياً. فمُنع الانكماشُ ومُنع
+     التفافُ النصّ، فتنزل الأزرارُ سطراً جديداً كاملةً بدل أن تُشوَّه. */
+  .toolbar button { background: rgba(255,255,255,0.95); color: #5b21b6; border: 0; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; white-space: nowrap; flex: 0 0 auto; }
+  .toolbar > * { flex: 0 0 auto; }
   .toolbar button:hover:not(:disabled) { background: #fff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
   .toolbar button:disabled { opacity: 0.85; cursor: wait; background: #fff; }
   .toolbar button.success { background: #10b981; color: #fff; }
@@ -327,6 +332,9 @@ export function buildDocHTML(args: ShareDocArgs): string {
   thead th { background: #5b4cad; color: #fff; padding: 8px 10px; font-size: 13px; font-weight: 700; text-align: center; border: 1px solid #1a1a1a; }
   tbody td { padding: 7px 10px; text-align: center; font-size: 13px; border: 1px solid #999; }
   tbody tr:nth-child(even) { background: #f8f8f8; }
+  /* الكميةُ والسعر والإجمالي بثقلٍ واحد — نفس قالب الطباعة. كان الإجمالي
+     يُكتب سطرياً بـ700 فيخرج أخفَّ من جاريه في الصفّ الواحد. */
+  .col-qty, .col-price, .col-total { font-weight: 800; color: #111; }
   .total-row td { font-weight: 800; font-size: 14px; border: 2px solid #1a1a1a; background: #f0f0f0; }
   /* شريطُ الجملة — نفس قيم قالب الطباعة. أرضيةٌ فاتحة وخطٌّ غامق كي لا يخرج
      من الطابعة كتلةَ حبرٍ سوداء تبتلع الرقم. */
@@ -379,6 +387,19 @@ export function buildDocHTML(args: ShareDocArgs): string {
   @media print {
     body { padding: 0; background: #fff; }
     .toolbar, .progress-bar { display: none !important; }
+    /*
+     * === الورقةُ كانت تنكمش على محتواها في الطباعة ===
+     *
+     * الحاوية .sheet-wrap صفُّ مرونة (display:flex) والورقةُ عنصرٌ فيه.
+     * وعنصرُ المرونة بعرضٍ auto يأخذ **مقاس محتواه** لا مقاس أبيه، فتخرج
+     * الورقةُ أضيقَ من المساحة المتاحة. قِيس في Chromium: 173.7mm بدل 190mm
+     * — ستّةَ عشرَ مليمتراً تُغيّر عرضَ الأعمدة ومواضعَ التفاف الأسطر، فيرى
+     * صاحبُ الرابط القديم ورقةً غيرَ التي يعاينها صاحبُ المحلّ.
+     *
+     * فالطباعةُ تُخرجها من صفّ المرونة إلى التدفّق العادي، فتملأ 190mm كما
+     * تفعل ورقةُ القالب. يحرسه sheetGeometrySingleSource.
+     */
+    .sheet-wrap { display: block; }
     .page { box-shadow: none; border-radius: 0; padding: 0; width: auto; max-width: none; transform: none !important; }
   }
 </style>${hiddenCSS}
@@ -452,7 +473,7 @@ export function buildDocHTML(args: ShareDocArgs): string {
     </tr>
   </thead>
   <tbody>
-    ${items.map((it, i) => `<tr><td>${i + 1}</td><td class="product-name">${attr(it.product_name)}</td><td>${fmt(it.quantity)}</td><td>${fmt(it.unit_price)}</td><td style="font-weight:700;">${fmt(it.total)}</td></tr>`).join("")}
+    ${items.map((it, i) => `<tr><td>${i + 1}</td><td class="product-name">${attr(it.product_name)}</td><td class="col-qty">${fmt(it.quantity)}</td><td class="col-price">${fmt(it.unit_price)}</td><td class="col-total">${fmt(it.total)}</td></tr>`).join("")}
   </tbody>
 </table>
 
@@ -616,7 +637,9 @@ ${isHidden("thanks") ? "" : `
       el.style.marginBottom = '0';
       var wrap = document.createElement('div'); wrap.appendChild(el);
       var blob = await window.html2pdf().set({
-        margin: 8, filename: fileName,
+        // 10 = A4_MM.margin في التطبيق، ونفس @page margin أعلاه. لا تصلها
+        // دالّةُ الحافّة استيراداً، فيقيّدها «sheetGeometrySingleSource».
+        margin: 10, filename: fileName,
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }

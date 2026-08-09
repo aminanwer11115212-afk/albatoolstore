@@ -182,12 +182,31 @@ describe("كلُّ ما يُطبع يطبع أرضياته", () => {
     "src/pages/PublicCustomerStatementPage.tsx",
   ];
 
+  /**
+   * القاعدةُ قد تكون في الملفّ نفسِه أو في قشرة الورقة التي يستوردها
+   * (`sheetShellCss`) — والمقصودُ أن تصل الناتج، لا أن تُكتب مرّتين.
+   *
+   * فمن استورد القشرةَ يُقرأ نصُّها معه: هي مصدرُ قواعد الورقة الواحد بعد
+   * توحيد الهندسة، وفيها إلزامُ الأرضيات. ومن لم يستوردها يلزمه أن يكتبها.
+   */
+  const SHELL = "src/utils/sheetShellCss.ts";
+  const withShell = (f: string) => {
+    const src = read(f);
+    return /from "@\/utils\/sheetShellCss"/.test(src) ? src + "\n" + read(SHELL) : src;
+  };
+
   for (const f of PRINTABLE) {
     it(f, () => {
-      const src = read(f);
+      const src = withShell(f);
       expect(src, "لا يُلزم المتصفّحَ برسم الأرضيات").toMatch(/print-color-adjust:\s*exact/);
       expect(src, "بلا بادئة webkit — وبها يطبع أكثرُ مستخدمي الهاتف")
         .toMatch(/-webkit-print-color-adjust:\s*exact/);
     });
   }
+
+  it("والقشرةُ نفسُها تحمل الإلزام — فلا يسقط عن كل من استوردها معاً", () => {
+    const shell = read(SHELL);
+    expect(shell).toMatch(/-webkit-print-color-adjust:\s*exact/);
+    expect(shell).toMatch(/print-color-adjust:\s*exact/);
+  });
 });

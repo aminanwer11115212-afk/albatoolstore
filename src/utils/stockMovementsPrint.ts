@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { pdfScaleForElement } from "@/utils/pdfCanvasScale";
+import { sheetShellCss } from "@/utils/sheetShellCss";
+import { A4_MM } from "@/utils/sheetPagePlan";
 
 export interface PrintMove {
   date: string;
@@ -81,11 +83,9 @@ export async function renderStockMovementsHTML(opts: StockPrintOptions, includeT
 <meta charset="utf-8" />
 <title>تقرير حركات المخزون — ${esc(opts.from)} إلى ${esc(opts.to)}</title>
 <style>
-  @page { size: A4 landscape; margin: 10mm; }
   * { box-sizing: border-box; }
-  body { font-family: Arial, "Liberation Sans", Helvetica, sans-serif; font-weight: 600; color: #0f172a; margin: 0; padding: 12px; font-size: 12px; background:#f8fafc; }
-  .sheet { background:#fff; max-width: 297mm; margin: 0 auto; padding: 10mm; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-  .toolbar { position: sticky; top: 0; z-index: 50; background:#0f172a; color:#fff; padding:8px 12px; display:flex; align-items:center; gap:10px; margin: -12px -12px 12px; }
+  body { font-family: Arial, "Liberation Sans", Helvetica, sans-serif; font-weight: 600; color: #0f172a; font-size: 12px; }
+  .toolbar { position: sticky; top: 0; z-index: 50; background:#0f172a; color:#fff; padding:8px 12px; display:flex; align-items:center; gap:10px; margin-bottom: 10px; }
   .tb-btn { background:#fff; color:#0f172a; border:1px solid #cbd5e1; border-radius:6px; padding:6px 12px; font-family:inherit; font-weight:700; cursor:pointer; font-size:12px; }
   .tb-btn.primary { background:#059669; color:#fff; border-color:#047857; }
   .tb-btn:hover { opacity:.9; }
@@ -120,19 +120,15 @@ export async function renderStockMovementsHTML(opts: StockPrintOptions, includeT
   .footer { margin-top: 10px; padding-top: 6px; border-top: 1px dashed #cbd5e1; font-size: 10px; color: #64748b; display: flex; justify-content: space-between; }
   .empty { text-align: center; padding: 30px; color: #64748b; font-size: 13px; }
   @media print {
-    /* الأرضياتُ تُطبع كما تُعرض — راجع printTemplate. */
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body { background:#fff; padding:0; }
-    .sheet { box-shadow:none; padding:0; max-width:none; }
-    .noprint { display: none !important; }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
   }
+${sheetShellCss({ landscape: true })}
 </style>
 </head>
 <body>
 ${toolbar}
-<div class="sheet">
+<div class="page">
   <div class="header">
     <div class="co">
       ${company?.logo_url ? `<img src="${esc(company.logo_url)}" alt="logo" />` : ""}
@@ -229,11 +225,12 @@ export async function downloadStockMovementsPdf(opts: StockPrintOptions): Promis
   });
   try {
     const html2pdf = (await import("html2pdf.js")).default as any;
-    const target = idoc.body.querySelector(".sheet") as HTMLElement || idoc.body;
+    const target = idoc.body.querySelector(".page") as HTMLElement || idoc.body;
     await html2pdf()
       .from(target)
       .set({
-        margin: 5,
+        // هامشُ الورقة من مصدره الواحد — نفسُ @page ونفسُ ورقةِ الشاشة
+        margin: A4_MM.margin,
         filename: `stock-movements-${opts.from}_${opts.to}.pdf`,
         image: { type: "jpeg", quality: 0.95 },
         html2canvas: { scale: pdfScaleForElement(target), useCORS: true, backgroundColor: "#ffffff" },

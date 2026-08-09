@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
 import { packagingCountSum } from "@/utils/packagingCount";
 import { attachLookups, PACKAGING_TYPE_LOOKUP, TRANSPORTER_LOOKUP, DESTINATION_LOOKUP } from "@/utils/lookupJoin";
+import { sheetShellCss } from "@/utils/sheetShellCss";
 
 const ACCENT = "#16a34a";
 
@@ -393,12 +394,10 @@ export function buildDispatchSheetHTML(
   <meta charset="utf-8" />
   <title>كشف الترحيلات — ${today}</title>
   <style>
-    @page { size: A4; margin: 7mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { background: #fff; }
     body {
       font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
-      color: #111; font-size: 10px; line-height: 1.35; padding: 4px;
+      color: #111; font-size: 10px; line-height: 1.35;
       font-weight: 600;
     }
 
@@ -519,12 +518,11 @@ export function buildDispatchSheetHTML(
     }
 
 
-    @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0; }
-    }
+${sheetShellCss()}
   </style>
 </head>
 <body>
+<div class="page">
   ${headerHTML(company)}
 
   <div class="d-doc-title"><h1>كشف الترحيلات</h1></div>
@@ -540,6 +538,7 @@ export function buildDispatchSheetHTML(
   ${signaturesHTML()}
 
   <div class="d-footer">تم إنشاء هذا الكشف من نظام أولاد جابر — البتول ستور — ${today}</div>
+</div>
 </body>
 </html>`;
 }

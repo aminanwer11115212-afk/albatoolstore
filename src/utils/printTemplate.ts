@@ -83,6 +83,8 @@ import {
 } from "@/utils/printDensity";
 import { PDF_SCALE_INLINE_JS } from "@/utils/pdfCanvasScale";
 import { PAGINATION_CSS, PAGINATION_INLINE_JS } from "@/utils/sheetPagination";
+// هندسةُ الورقة من مصدرها الواحد — يُحقن هامشُها في سكربت الشريط أدناه.
+import { A4_MM } from "@/utils/sheetPagePlan";
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -469,7 +471,18 @@ ${PAGINATION_CSS}
    * ولا تُكتب هنا نصوصُ الأقسام كما تظهر للعميل: تعليقاتُ هذا المقطع تخرج
    * في الورقة، وفحوصُ الإخفاء تبحث عن تلك النصوص فتجدها في تعليقٍ فتسقط.
    */
-  .col-qty, .col-price {
+  /**
+   * وعمودُ الإجمالي معهما.
+   *
+   * كان يُكتب بثقلٍ سطريّ 700 بينما الكميةُ والسعر 800، فيخرج أخفَّ منهما في
+   * الصفّ الواحد — وهو أهمُّ رقمٍ في السطر. صوّره صاحبُ المستودع مكبَّراً:
+   * «١,٩٦٠» ثقيلةٌ و«٣,٩٢٠» إلى جانبها أخفّ.
+   *
+   * فالثقلُ اليوم من هذه القاعدة وحدها للأعمدة الثلاثة — لا ثقلَ سطريٌّ على
+   * خليّة. يحرسه «totalColumnWeight.test.ts» بحساب الثقل المُصرَّف لا بقراءة
+   * النصّ.
+   */
+  .col-qty, .col-price, .col-total {
     font-weight: 800; color: #111;
   }
   /**
@@ -836,7 +849,7 @@ ${showItems ? (variant === "stocktake" ? `
         <td class="col-qty">${it.quantity}</td>
         <td class="product-name">${esc(it.product_name)}</td>
         <td class="col-price">${(Number(it.unit_price) || 0).toLocaleString()}</td>
-        <td style="font-weight:700;">${(Number(it.total) || 0).toLocaleString()}</td>
+        <td class="col-total">${(Number(it.total) || 0).toLocaleString()}</td>
         <td style="text-align:center;"><span style="display:inline-block;width:18px;height:18px;border:1.5px solid #333;border-radius:50%;"></span></td>
         <td>${i + 1}</td>
       </tr>
@@ -887,7 +900,7 @@ ${showItems ? (variant === "stocktake" ? `
         <td class="product-name">${esc(it.product_name)}</td>
         <td class="col-qty">${it.quantity}</td>
         <td class="col-price">${it.unit_price.toLocaleString()}</td>
-        <td style="font-weight:700;">${it.total.toLocaleString()}</td>
+        <td class="col-total">${it.total.toLocaleString()}</td>
       </tr>
     `).join("")}
   </tbody>
@@ -1163,7 +1176,7 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
     color: #fff; padding: 8px 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     display: flex; flex-direction: column; gap: 6px;
-    font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+    font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
     font-size: 13px;
   }
   #__lov_print_toolbar .row {
@@ -1403,7 +1416,11 @@ export function buildPrintWindowHtml(html: string, inline: boolean = false): str
   function genPdfBlob(){
     var el = contentEl();
     var opt = {
-      margin: 8,
+      // هامشُ الورقة من مصدره الواحد «A4_MM.margin» — لا رقماً يُكتب هنا.
+      // كان 8 بينما الشاشةُ والطباعة على 10، فيخرج المحتوى في 194mm بدل
+      // 190mm: تمدُّدٌ نحو 2% يغيّر عرضَ الأعمدة ومواضعَ التفاف الأسطر، فتُقرأ
+      // ورقةُ الملفّ غيرَ الورقة التي عاينها صاحبُها.
+      margin: ${A4_MM.margin},
       filename: buildDocFileName(),
       image: { type: 'jpeg', quality: 0.95 },
       // الدقّة من حجم الورقة لا رقماً ثابتاً: الثابتة تتجاوز سقف لوحة الرسم

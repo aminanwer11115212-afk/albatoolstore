@@ -261,7 +261,7 @@ describe("الخطُّ Arial والأرقامُ مصطفّة", () => {
   });
 
   it("وعمودا الكمية والسعر أثقلُ من بقيّة الخلايا", () => {
-    const rule = /\.col-qty, \.col-price \{[^}]*\}/.exec(html)![0];
+    const rule = /\.col-qty, \.col-price, \.col-total \{[^}]*\}/.exec(html)![0];
     expect(rule).toMatch(/font-weight:\s*[89]00/);
   });
 });
@@ -501,7 +501,7 @@ describe("خلايا الجدول متساوية", () => {
     const head = Number(/thead th \{[^}]*font-size:\s*([\d.]+)px/.exec(html)![1]);
     expect(head).toBe(cell);
     // ولا مقاسَ خاصٌّ بالكمية والسعر — الفرقُ ثِقلٌ لا حجم
-    expect(/\.col-qty, \.col-price \{[^}]*\}/.exec(html)![0]).not.toContain("font-size");
+    expect(/\.col-qty, \.col-price, \.col-total \{[^}]*\}/.exec(html)![0]).not.toContain("font-size");
   });
 
   /** والصنفُ يُوضع من أطول رقمٍ في الفاتورة، لا من خليّةٍ بعينها. */

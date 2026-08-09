@@ -66,6 +66,7 @@ export interface StatementData {
 }
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
+import { sheetShellCss } from "@/utils/sheetShellCss";
 
 function fmt(n: number | undefined | null): string {
   return Number(n || 0).toLocaleString();
@@ -289,25 +290,17 @@ export function generateStatementHTML(data: StatementData): string {
 <meta name="lov-wa-text" content='${waTextAttr}'>
 <meta name="lov-wa-phone" content='${waPhoneAttr}'>
 <style>
-  @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   table { page-break-inside: auto; }
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
   tr, td, th { page-break-inside: avoid; break-inside: avoid; }
   .total-row, .summary-row, .summary-box { page-break-inside: avoid; break-inside: avoid; }
-  @media print {
-    body { padding: 0; } .page { max-width: none; }
-    /* الأرضياتُ تُطبع كما تُعرض — المتصفّحاتُ تُسقطها افتراضاً توفيراً
-       للحبر، فيخرج خطٌّ أبيضُ على ورقٍ أبيض. راجع printTemplate. */
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  }
   body {
     font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
-    color: #1a1a1a; background: #fff; padding: 20px; line-height: 1.5;
+    color: #1a1a1a; line-height: 1.5;
     font-size: 14px;
   }
-  .page { max-width: 800px; margin: 0 auto; }
 
   .header {
     text-align: center; padding-bottom: 10px;
@@ -382,6 +375,7 @@ export function generateStatementHTML(data: StatementData): string {
   }
 
   [data-section].__lov_hidden { display: none !important; }
+${sheetShellCss()}
 </style>
 </head>
 <body>
