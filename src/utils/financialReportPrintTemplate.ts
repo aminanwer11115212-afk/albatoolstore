@@ -61,6 +61,7 @@ export interface FinancialReportData {
 }
 
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
+import { sheetShellCss } from "@/utils/sheetShellCss";
 
 const fmt = (v: any): string => {
   if (v === null || v === undefined || v === "") return "—";
@@ -168,19 +169,16 @@ ${summary.map((s) => `  <div class="summary-box">
 <title>${esc(title)}</title>
 <meta name="lov-wa-text" content='${waTextAttr}'>
 <style>
-  @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   table { page-break-inside: auto; }
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
   tr, td, th { page-break-inside: avoid; break-inside: avoid; }
   .section-block, .summary-row, .summary-box, .total-row, .notes-section { page-break-inside: avoid; break-inside: avoid; }
-  @media print { body { padding: 0; } .page { max-width: none; } }
   body {
     font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
-    color: #1a1a1a; background: #fff; padding: 20px; line-height: 1.5; font-size: 14px;
+    color: #1a1a1a; line-height: 1.5; font-size: 14px;
   }
-  .page { max-width: 820px; margin: 0 auto; }
 
   .header {
     background: linear-gradient(135deg, #5b2c8e, #7e3eb5);
@@ -238,10 +236,10 @@ ${summary.map((s) => `  <div class="summary-box">
   [data-section].__lov_hidden { display: none !important; }
 
   @media print {
-    body { background: #fff !important; }
     .header { background: #5b2c8e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
+${sheetShellCss()}
 </style>
 </head>
 <body>

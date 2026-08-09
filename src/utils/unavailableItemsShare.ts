@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { openWhatsApp } from "@/utils/whatsapp";
+import { sheetShellCss } from "@/utils/sheetShellCss";
 
 export interface UnavailableItemRow {
   product_name: string;
@@ -85,12 +86,10 @@ export function buildUnavailableItemsPrintHTML(opts: UnavailableShareOpts): stri
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${attr(docTitle)} ${attr(docNumber || "")}</title>
 <style>
-  @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; color:#1a1a1a; background:#fff; padding:20px; line-height:1.5; font-size:14px; }
+  body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; color:#1a1a1a; line-height:1.5; font-size:14px; }
   .toolbar { position: fixed; top: 0; right: 0; left: 0; z-index: 999; background: linear-gradient(135deg, #5b21b6, #7c3aed); color: #fff; padding: 10px; display: flex; justify-content: center; gap: 12px; }
   .toolbar button { background: #fff; color: #5b21b6; border: 0; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; }
-  .page { max-width: 800px; margin: 70px auto 0; }
   .header { text-align:center; padding-bottom:10px; border-bottom: 3px solid #c0392b; margin-bottom:10px; }
   .header-logos { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
   .header-logo img { height:75px; object-fit:contain; }
@@ -108,12 +107,7 @@ export function buildUnavailableItemsPrintHTML(opts: UnavailableShareOpts): stri
   tbody tr:nth-child(even) { background:#fdf6f6; }
   .product-name { text-align:right; font-weight:600; }
   .footer-note { margin: 20px 0 10px; padding: 12px; border:1px dashed #c0392b; background:#fdf6f6; border-radius:6px; text-align:center; font-weight:700; color:#7a1f1f; }
-  @media print {
-    .toolbar { display: none !important; } body { padding:0; } .page { margin-top: 0; }
-    /* الأرضياتُ تُطبع كما تُعرض — المتصفّحاتُ تُسقطها افتراضاً توفيراً
-       للحبر، فيخرج خطٌّ أبيضُ على ورقٍ أبيض. راجع printTemplate. */
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  }
+${sheetShellCss({ toolbarPx: 70 })}
 </style>
 </head>
 <body>

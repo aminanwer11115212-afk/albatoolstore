@@ -64,23 +64,16 @@ const esc = (s: any) => String(s ?? "")
 
 import { packagingCountSum } from "@/utils/packagingCount";
 import { resolveLogoUrl } from "@/utils/albatoolLogo";
+import { sheetShellCss } from "@/utils/sheetShellCss";
 
 const baseStyles = (accent: string) => `
-  @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   table { page-break-inside: auto; }
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
   tr, td, th { page-break-inside: avoid; break-inside: avoid; }
   .total-row, .summary-box, .signatures, .sig-box { page-break-inside: avoid; break-inside: avoid; }
-  @media print {
-    body { padding: 0; } .page { max-width: none; }
-    /* الأرضياتُ تُطبع كما تُعرض — المتصفّحاتُ تُسقطها افتراضاً توفيراً
-       للحبر، فيخرج خطٌّ أبيضُ على ورقٍ أبيض. راجع printTemplate. */
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  }
-  body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; color:#1a1a1a; background:#fff; padding:20px; line-height:1.5; font-size:14px; }
-  .page { max-width: 800px; margin: 0 auto; }
+  body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; color:#1a1a1a; line-height:1.5; font-size:14px; }
   .header { text-align:center; padding-bottom:10px; border-bottom: 3px solid ${accent}; margin-bottom:10px; }
   .header-logos { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
   .header-logo img { height:75px; object-fit:contain; }
@@ -107,7 +100,7 @@ const baseStyles = (accent: string) => `
   .signatures { display:flex; justify-content:space-between; padding:20px 50px 10px; margin-top:20px; }
   .sig-box { text-align:center; width:180px; }
   .sig-line { border-top:1px solid #999; margin-top:45px; padding-top:5px; font-size:12px; color:#555; font-weight:600; }
-  @media print { body { padding:0; } }
+${sheetShellCss()}
 `;
 
 const headerHTML = (company?: CompanyInfo | null) => {
