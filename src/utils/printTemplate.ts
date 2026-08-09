@@ -471,7 +471,18 @@ ${PAGINATION_CSS}
    * ولا تُكتب هنا نصوصُ الأقسام كما تظهر للعميل: تعليقاتُ هذا المقطع تخرج
    * في الورقة، وفحوصُ الإخفاء تبحث عن تلك النصوص فتجدها في تعليقٍ فتسقط.
    */
-  .col-qty, .col-price {
+  /**
+   * وعمودُ الإجمالي معهما.
+   *
+   * كان يُكتب بثقلٍ سطريّ 700 بينما الكميةُ والسعر 800، فيخرج أخفَّ منهما في
+   * الصفّ الواحد — وهو أهمُّ رقمٍ في السطر. صوّره صاحبُ المستودع مكبَّراً:
+   * «١,٩٦٠» ثقيلةٌ و«٣,٩٢٠» إلى جانبها أخفّ.
+   *
+   * فالثقلُ اليوم من هذه القاعدة وحدها للأعمدة الثلاثة — لا ثقلَ سطريٌّ على
+   * خليّة. يحرسه «totalColumnWeight.test.ts» بحساب الثقل المُصرَّف لا بقراءة
+   * النصّ.
+   */
+  .col-qty, .col-price, .col-total {
     font-weight: 800; color: #111;
   }
   /**
@@ -838,7 +849,7 @@ ${showItems ? (variant === "stocktake" ? `
         <td class="col-qty">${it.quantity}</td>
         <td class="product-name">${esc(it.product_name)}</td>
         <td class="col-price">${(Number(it.unit_price) || 0).toLocaleString()}</td>
-        <td style="font-weight:700;">${(Number(it.total) || 0).toLocaleString()}</td>
+        <td class="col-total">${(Number(it.total) || 0).toLocaleString()}</td>
         <td style="text-align:center;"><span style="display:inline-block;width:18px;height:18px;border:1.5px solid #333;border-radius:50%;"></span></td>
         <td>${i + 1}</td>
       </tr>
@@ -889,7 +900,7 @@ ${showItems ? (variant === "stocktake" ? `
         <td class="product-name">${esc(it.product_name)}</td>
         <td class="col-qty">${it.quantity}</td>
         <td class="col-price">${it.unit_price.toLocaleString()}</td>
-        <td style="font-weight:700;">${it.total.toLocaleString()}</td>
+        <td class="col-total">${it.total.toLocaleString()}</td>
       </tr>
     `).join("")}
   </tbody>
