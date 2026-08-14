@@ -81,6 +81,8 @@ import {
   calcTotal,
   btnStyle,
   invoiceItemsHash,
+  isSavableRow,
+  savedItemName,
   resolveDefaultRate,
   defaultRateDecision,
   deriveRateFromRows,
@@ -1032,7 +1034,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
 
   // ---------- Totals ----------
   const totals = useMemo(() => {
-    const validRows = rows.filter((r) => r.product_id);
+    const validRows = rows.filter(isSavableRow);
     const subtotal = validRows.reduce((s, r) => s + (r.quantity * r.unit_price), 0);
     const itemDiscounts = validRows.reduce((s, r) => s + (r.quantity * r.unit_price * (r.discount / 100)), 0);
     const afterGeneral = subtotal - itemDiscounts - generalDiscount;
@@ -1144,7 +1146,7 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
         );
       }
     }
-    const validRows = rows.filter((r) => r.product_id);
+    const validRows = rows.filter(isSavableRow);
     if (!validRows.length) { toast.error("أضف منتجاً واحداً على الأقل"); releaseGuard(); return false; }
 
     // ============================================================
@@ -1422,7 +1424,9 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
           return {
             invoice_id: invId!,
             product_id: r.product_id,
-            product_name: r.product_name,
+            /* الاسمُ المكتوبُ بيدٍ يسبق المحفوظ من بطاقة المنتج: حقلُ الاسم
+               مربوطٌ بـ`productSearch`، فمن عدّله بيده كان اسمُه يُهمَل. */
+            product_name: savedItemName(r),
             quantity: r.quantity,
             unit_price: r.unit_price,
             foreign_price: r.foreign_price,
@@ -1432,10 +1436,13 @@ export default function InvoiceCreateScreen({ pos = false }: { pos?: boolean } =
             warehouse_id: wid,
           };
         });
-        // دفاع ثانٍ: إزالة الأسطر المتطابقة تماماً (product_id + quantity + unit_price + discount)
+        /* دفاع ثانٍ: إزالة الأسطر المتطابقة تماماً.
+           والاسمُ في المفتاح لا المنتجُ وحده: البنودُ الحرّة `product_id`
+           فيها فارغ، فبندان مختلفان بنفس الكمية والسعر كانا يُعدّان واحداً
+           فيُحذف أحدُهما. */
         const seenKeys = new Set<string>();
         const itemsPayload = rawItemsPayload.filter((it) => {
-          const key = `${it.product_id}|${it.quantity}|${it.unit_price}|${it.discount}`;
+          const key = `${it.product_id || it.product_name}|${it.quantity}|${it.unit_price}|${it.discount}`;
           if (seenKeys.has(key)) return false;
           seenKeys.add(key);
           return true;

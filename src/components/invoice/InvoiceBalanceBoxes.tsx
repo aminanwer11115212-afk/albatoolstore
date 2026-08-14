@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { netBalanceOf } from "@/utils/balanceDisplay";
 import { netBeforeInvoice } from "@/utils/customerNetBefore";
 import { signedAmountText } from "@/utils/buildCustomerAccountView";
+import { invoiceOverpay } from "@/utils/invoiceOverpay";
 
 /**
  * صندوقا الحساب في معاينة الفاتورة: **الحساب القديم** و**الحساب الحالي**.
@@ -56,6 +57,8 @@ function Box({ title, hint, value }: { title: string; hint: string; value: numbe
 export default function InvoiceBalanceBoxes({ invoiceId, customerId }: Props) {
   const [before, setBefore] = useState<number | null>(null);
   const [current, setCurrent] = useState<number | null>(null);
+  /** ما دُفع فوق قيمة هذه الفاتورة — صفرٌ في الغالب. */
+  const [overpay, setOverpay] = useState(0);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -89,6 +92,8 @@ export default function InvoiceBalanceBoxes({ invoiceId, customerId }: Props) {
         }),
       );
       setCurrent(cust ? netBalanceOf(cust) : null);
+      // القيودُ محمَّلةٌ أصلاً لحساب «القديم» — فلا استعلامَ إضافي
+      setOverpay(invoiceOverpay(invoiceId, txs || []));
       setReady(true);
     })();
     return () => {
@@ -124,6 +129,21 @@ export default function InvoiceBalanceBoxes({ invoiceId, customerId }: Props) {
           hint="صافي الحساب الآن بعد كل الفواتير والحركات"
           value={current}
         />
+        {/*
+          فائضُ هذه الفاتورة — لا يظهر إلا إذا وقع.
+
+          الفاتورةُ تُعلن نفسَها «مدفوعة» لأنّ `paid_amount` مقصوصٌ عند
+          إجماليها، والزائدُ يذهب إلى رصيد العميل. فكان صاحبُ الفاتورة يقرأ
+          «خالصة» ولا يعلم أنّ للعميل عنده بقيّة. والقيدُ مربوطٌ بالفاتورة
+          أصلاً — فيُعرض هنا بإشارة العرض: موجبٌ أخضرُ لصالح العميل.
+        */}
+        {overpay > 0.01 && (
+          <Box
+            title="فائض هذه الفاتورة"
+            hint="دُفع فوق قيمتها — أُضيف إلى رصيد العميل"
+            value={-overpay}
+          />
+        )}
       </div>
       <p className="text-[10px] text-muted-foreground mt-2">
         «+» أخضر رصيد للعميل · «−» أحمر مستحق عليه
