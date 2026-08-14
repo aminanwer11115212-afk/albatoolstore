@@ -11,6 +11,18 @@ import SyncStatusIndicator from "@/components/layout/SyncStatusIndicator";
 import SimpleSyncStatusIndicator from "@/components/SyncStatusIndicator";
 import { useScreenZoom } from "@/hooks/useScreenZoom";
 import { useUserScopedLegacyKey } from "@/lib/userScopedKey";
+import { leadsWithAny } from "@/utils/searchMatch";
+
+/**
+ * ما يُعرض من النتائج، وما يُطلب من القاعدة قبل الترشيح.
+ *
+ * والصيدُ أوسعُ من العرض عمداً: القاعدةُ تُسأل «يحتوي» لأنها لا تعرف التطبيع
+ * العربي، ثمّ يُرشَّح المردودُ بـ«يبدأ بـ» في المتصفّح. فلو تساوى الرقمان
+ * لسقط من النتائج من يبدأ اسمُه بالمكتوب لكنّه جاء بعد الخامس عشر في ردٍّ
+ * مرتَّبٍ بغير ذلك.
+ */
+const RESULT_LIMIT = 15;
+const CANDIDATE_LIMIT = 80;
 
 interface AppNavbarProps {
   onToggleSidebar: () => void;
@@ -394,20 +406,47 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
       try {
         if (q) {
           const like = `%${q}%`;
+          /*
+           * ## بحثُ العميل: «يبدأ بـ» لا «يحتوي»
+           *
+           * شكا صاحبُ المستودع: «لما أكتب محمد بجيب لي ناس كتير»، وطلب أن يكون
+           * «نفس لما أجي أكتب فاتورة».
+           *
+           * وشاشةُ الفاتورة تُرشّح بـ`leadsWithAny` — الحقلُ **يبدأ** بالمكتوب.
+           * وهذا الشريطُ كان يسأل القاعدةَ `ilike %محمد%`، فيردّ كلَّ من فيه
+           * الاسمُ في أي موضع: «أحمد محمد»، «عبد المحمود»…
+           *
+           * ولا يكفي تحويلُ السؤال إلى `ilike محمد%`: التطبيعَ العربي (أ/ا،
+           * ى/ي، ة/ه) لا تعرفه القاعدة، فمن كتب «احمد» لا يجد «أحمد». فيُوسَّع
+           * الصيدُ من القاعدة ثمّ يُرشَّح **بالمطابِق نفسِه** الذي تستعمله
+           * الشاشة — فيتطابق السلوكان بنيوياً لا بالمصادفة.
+           */
           const c = await supabase
             .from("customers")
             .select("id,name,phone,company")
             .or(`name.ilike.${like},phone.ilike.${like},company.ilike.${like}`)
-            .limit(15);
+            .limit(CANDIDATE_LIMIT);
+          const inv = await supabase
+            .from("invoices")
+            .select("id,invoice_number,date,total,customers(name),walk_in_customer_name")
+            .ilike("invoice_number", like)
+            .order("date", { ascending: false })
+            .limit(RESULT_LIMIT);
           if (!cancelled) {
-            setResults({ customers: c.data || [], invoices: [], quotes: [], purchases: [], returns: [] });
+            setResults({
+              customers: (c.data || [])
+                .filter((x: any) => leadsWithAny([x.name, x.phone, x.company], q))
+                .slice(0, RESULT_LIMIT),
+              invoices: inv.data || [],
+              quotes: [], purchases: [], returns: [],
+            });
           }
         } else {
           const c = await supabase
             .from("customers")
             .select("id,name,phone,company")
             .order("created_at", { ascending: false })
-            .limit(15);
+            .limit(RESULT_LIMIT);
           if (!cancelled) {
             setResults({ customers: c.data || [], invoices: [], quotes: [], purchases: [], returns: [] });
           }
@@ -419,7 +458,7 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
     return () => { cancelled = true; };
   }, [showSearch, debouncedQuery]);
 
-  // Build flat list of items for navigation (customers only)
+  // Build flat list of items for navigation
   const sections = useMemo(() => {
     const customerItems: SearchItem[] = results.customers.map((c) => ({
       kind: "customer", id: c.id, label: c.name,
@@ -428,7 +467,30 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
       // (بدل الواجهة المنبثقة القديمة في صفحة العملاء).
       path: `/customers/${c.id}/statement`, icon: Users,
     }));
+    /*
+     * ## بحثُ الفاتورة برقمها
+     *
+     * طلبُ صاحب المستودع: «وعايز فوقها بحث عن فاتورة — تخليني أبحث برقم
+     * الفاتورة برضو».
+     *
+     * وحقلُ `invoices` في نتائج هذا الشريط كان موجوداً منذ البداية ويُملأ
+     * بمصفوفةٍ فارغة دائماً — بابٌ بُني ولم يُفتح.
+     *
+     * و«يحتوي» هنا مقصودٌ لا سهو: رقمُ الفاتورة `INV-26953`، وصاحبُها يكتب
+     * `26953` وحدها. فلو اشتُرط «يبدأ بـ» لما وجدها أبداً.
+     */
+    const invoiceItems: SearchItem[] = (results.invoices || []).map((i: any) => ({
+      kind: "invoice", id: i.id, label: i.invoice_number,
+      sub: [
+        i.customers?.name || i.walk_in_customer_name || "عميل نقدي",
+        i.date,
+        Number(i.total || 0).toLocaleString(),
+      ].filter(Boolean).join(" • "),
+      path: `/invoices/view/${i.id}`, icon: FileText,
+    }));
+    // الفواتيرُ فوق العملاء — «وعايز فوقها بحث عن فاتورة»
     return [
+      { title: "الفواتير", items: invoiceItems },
       { title: "العملاء", items: customerItems },
     ].filter((s) => s.items.length > 0);
   }, [results]);
@@ -575,7 +637,7 @@ export default function AppNavbar({ onToggleSidebar, sidebarCollapsed }: AppNavb
             <input
               ref={searchRef}
               type="text"
-              placeholder="بحث عن عميل بالاسم أو الهاتف..."
+              placeholder="بحث برقم الفاتورة أو باسم العميل..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onFocus={() => setShowSearch(true)}
