@@ -346,8 +346,48 @@ export const btnStyle = (bg: string): React.CSSProperties => ({
   boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
 });
 
+/**
+ * هل هذا الصفُّ بندٌ يُحفظ؟
+ *
+ * ## العطل الذي عالجَته
+ * بلّغ صاحبُ المستودع: «لمّا تعدّل اسم الصنف داخل الفاتورة — لو عدّلته بيدك —
+ * طلعت وجيت الفاتورة بتلقاه اتمسح».
+ *
+ * وحقلُ الاسم في الصفّ مربوطٌ بـ`productSearch`، وتعديلُه يكتب:
+ *
+ *     updateRow(uid, { productSearch: value, product_id: null })
+ *
+ * ثمّ كان الحفظُ يأخذ `rows.filter(r => r.product_id)` — فالصفُّ الذي كتبتَ
+ * اسمَه بيدك **يسقط من كل شيء**: من المجاميع، ومن البنود المحفوظة، ومن
+ * المخزون. فتعود إلى الفاتورة فلا تجده. ولا رسالةَ تقول إنّ شيئاً حُذف،
+ * والإجماليُّ يتغيّر بصمت.
+ *
+ * ## والقاعدة الصحيحة
+ * البندُ بندٌ إن كان له **منتجٌ مرتبط أو اسمٌ مكتوب**. فجدولُ `invoice_items`
+ * يقبل `product_id` فارغاً ويشترط `product_name` — والبندُ الحرّ مُمثَّلٌ فيه
+ * أصلاً. والصفُّ الفارغ تماماً يبقى ساقطاً كما كان، فلا يُحفظ سطرٌ لم يُكتب.
+ *
+ * ويحرسه `src/test/invoiceFreeTextItem.test.ts`.
+ */
+export function isSavableRow(row: {
+  product_id?: string | null;
+  product_name?: unknown;
+  productSearch?: unknown;
+}): boolean {
+  if (row.product_id) return true;
+  const typed = String(row.product_name ?? "").trim() || String(row.productSearch ?? "").trim();
+  return typed.length > 0;
+}
+
+/** اسمُ البند كما يُحفظ — المكتوبُ بيدٍ يسبق المحفوظ من البطاقة. */
+export function savedItemName(row: { product_name?: unknown; productSearch?: unknown }): string {
+  const typed = String(row.productSearch ?? "").trim();
+  if (typed) return typed;
+  return String(row.product_name ?? "").trim();
+}
+
 // بصمة مختصرة لبنود الفاتورة لاكتشاف ما إن تغيّرت قبل الحفظ
-export function invoiceItemsHash(items: Array<{ product_id?: string | null; quantity?: any; unit_price?: any; foreign_price?: any; discount?: any; unit?: any; product_name?: any }>): string {
+export function invoiceItemsHash(items: Array<{ product_id?: string | null; quantity?: any; unit_price?: any; foreign_price?: any; discount?: any; unit?: any; product_name?: any; productSearch?: any }>): string {
   return items
     .map((it) => [
       it.product_id || "",
@@ -356,7 +396,11 @@ export function invoiceItemsHash(items: Array<{ product_id?: string | null; quan
       Number(it.foreign_price) || 0,
       Number(it.discount) || 0,
       it.unit || "",
-      it.product_name || "",
+      /* بالاسم كما يُحفظ لا كما حُمّل: حقلُ الاسم مربوطٌ بـ`productSearch`،
+         فلو قِيست البصمةُ بـ`product_name` وحده لبقيت كما هي بعد تعديل
+         الاسم بيد، فيُتخطّى إعادةُ كتابة البنود ويضيع التعديل — وهو نفسُ
+         العطل من بابٍ ثانٍ. */
+      savedItemName(it),
     ].join("|"))
     .join("§");
 }
